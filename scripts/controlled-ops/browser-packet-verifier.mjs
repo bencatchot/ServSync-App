@@ -32,8 +32,26 @@ import {
   validateSummary,
 } from './browser-schema.mjs';
 import { parseStrictJson, scanCustomerContent, scanSensitiveContent } from './sanitize.mjs';
+import {
+  BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS,
+  BROWSER_ATTEMPT_OUTCOME_CLASS,
+  BROWSER_ATTEMPT_SELECTION_ARTIFACT,
+  BROWSER_ATTEMPT_SELECTION_CLASS,
+  BROWSER_ATTEMPT_SUMMARY_CLASS,
+  attemptImportSummaryPath,
+  attemptOutcomePath,
+  attemptSummaryPath,
+  browserAttemptTokenSetFromIndex,
+  buildAttemptInventory,
+  buildSelectionRecord,
+  expectedSelectionEntry,
+  registerBrowserAttemptEntries,
+  validateSelection,
+  writeOrVerifyJsonArtifact,
+} from './browser-attempts.mjs';
 
 export const BROWSER_PACKET_VERIFICATION_SCHEMA = 'servsync-controlled-ops/browser-freeze-verification-v1';
+export const BROWSER_PACKET_VERIFICATION_SCHEMA_V2 = 'servsync-controlled-ops/browser-freeze-verification-v2';
 export const BROWSER_FREEZE_VERIFICATION_ARTIFACT = 'browser-freeze-verification.json';
 export const BROWSER_FREEZE_VERIFICATION_ARTIFACT_CLASS = 'browser_freeze_verification';
 export const BROWSER_SUMMARY_ARTIFACT = 'browser-summary.json';
@@ -73,6 +91,21 @@ const VERIFICATION_FIELDS = [
   'verification_status',
   'cleanup_assurance',
   'privacy_scan',
+];
+const VERIFICATION_V2_FIELDS = [
+  ...VERIFICATION_FIELDS,
+  'selected_execution_token_id',
+  'selected_browser_run_id',
+  'selected_binding_digest',
+  'selected_attempt_sequence',
+  'attempt_count',
+  'attempt_inventory_digest',
+  'selection_record_path',
+  'selection_record_sha256',
+  'selection_record_bytes',
+  'selected_outcome_path',
+  'selected_outcome_sha256',
+  'selected_outcome_bytes',
 ];
 const RAW_BROWSER_NAME_PATTERNS = [
   /browser-journal/i,
@@ -142,6 +175,14 @@ function readArtifactIndex(rootPath, operationId, stageId, modes = [0o600, 0o400
     if ((expectedClass && entry.artifact_class !== expectedClass) || (expectedPath && entry.path !== expectedPath)) {
       throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser artifact path and class do not match.');
     }
+    const attemptEntry = browserAttemptTokenSetFromIndex({ artifacts: [entry] });
+    if (attemptEntry.hasV2 && entry.artifact_class === BROWSER_ATTEMPT_SELECTION_CLASS && entry.summary_path !== BROWSER_ATTEMPT_SELECTION_ARTIFACT) {
+      throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser selection summary path is invalid.');
+    }
+    if ([BROWSER_ATTEMPT_SUMMARY_CLASS, BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS, BROWSER_ATTEMPT_OUTCOME_CLASS].includes(entry.artifact_class)) {
+      const expectedSummary = entry.artifact_class === BROWSER_ATTEMPT_OUTCOME_CLASS ? entry.path : attemptOutcomePath(entry.path.split('/')[1]);
+      if (entry.summary_path !== expectedSummary) throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser attempt summary path is invalid.');
+    }
   }
   return index;
 }
@@ -158,7 +199,15 @@ function matchingEntry(left, right) {
 
 function inspectBrowserArtifactGroup(rootPath, operationId, stageId, modes = [0o600, 0o400]) {
   const index = readArtifactIndex(rootPath, operationId, stageId, modes);
+  const v2 = browserAttemptTokenSetFromIndex(index);
   const browserEntries = index.artifacts.filter((entry) => BROWSER_PATH_CLASS.has(entry.path) || BROWSER_CLASS_PATH.has(entry.artifact_class));
+  const fixedEntries = browserEntries.filter((entry) => entry.path !== BROWSER_FREEZE_VERIFICATION_ARTIFACT);
+  const hasFreezeVerification = browserEntries.some((entry) => entry.path === BROWSER_FREEZE_VERIFICATION_ARTIFACT);
+  if (v2.hasV2 && fixedEntries.length > 0) throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser stage mixes v1 and v2 evidence.');
+  if (v2.hasV2) {
+    if (!v2.hasSelection) return { kind: 'v2-pending', index, entries: new Map(), attemptTokens: v2.tokens };
+    return { kind: hasFreezeVerification ? 'v2-complete' : 'v2-pending', index, entries: new Map(), attemptTokens: v2.tokens };
+  }
   if (browserEntries.length === 0) return { kind: 'none', index, entries: new Map() };
   const byPath = new Map();
   for (const entry of browserEntries) {
@@ -182,10 +231,10 @@ function inspectBrowserArtifactGroup(rootPath, operationId, stageId, modes = [0o
 export function assertBrowserArtifactIndexConsistency(rootPath, operationId, stageId, { requireVerified = true, modes = [0o600, 0o400] } = {}) {
   const group = inspectBrowserArtifactGroup(rootPath, operationId, stageId, modes);
   if (group.kind === 'none') return group;
-  if (group.kind === 'pending' && requireVerified) {
+  if ((group.kind === 'pending' || group.kind === 'v2-pending') && requireVerified) {
     throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
   }
-  if (group.kind === 'complete') verifyBrowserVerificationRecordStructural(rootPath, operationId, stageId, group, modes);
+  if (group.kind === 'complete' || group.kind === 'v2-complete') verifyBrowserVerificationRecordStructural(rootPath, operationId, stageId, group, modes);
   return group;
 }
 
@@ -259,13 +308,17 @@ function validateBrowserImportSummary(summary) {
     'browser_workspace_cleanup_status',
     'imported_utc',
   ], [], 'browser import summary');
+  const fixedSummaryPath = `stages/${summary.stage_id}/artifacts/${BROWSER_SUMMARY_ARTIFACT}`;
+  const attemptSummaryRelativePath = typeof summary.execution_token_id === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(summary.execution_token_id)
+    ? `stages/${summary.stage_id}/artifacts/${attemptSummaryPath(summary.execution_token_id)}`
+    : null;
   if (summary.schema_version !== BROWSER_PACKET_IMPORT_SCHEMA
     || summary.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY
     || summary.source_binding_mode !== 'current_source_snapshot'
     || summary.browser_status !== 'passed'
     || summary.packet_sanitization_status !== 'passed'
     || summary.browser_workspace_cleanup_status !== 'cleaned'
-    || summary.browser_summary_relative_path !== `stages/${summary.stage_id}/artifacts/${BROWSER_SUMMARY_ARTIFACT}`
+    || ![fixedSummaryPath, attemptSummaryRelativePath].includes(summary.browser_summary_relative_path)
     || !/^[a-f0-9]{64}$/.test(summary.binding_digest)
     || !/^[a-f0-9]{64}$/.test(summary.source_manifest_digest)
     || !/^[a-f0-9]{64}$/.test(summary.browser_summary_sha256)
@@ -452,12 +505,19 @@ function buildVerificationRecord({
 
 function validateVerificationRecord(record) {
   assertExactObject(record, VERIFICATION_FIELDS, [], 'browser freeze verification');
-  assertExactObject(record.privacy_scan, ['secret_findings', 'customer_content_findings', 'prohibited_retained_artifact_findings', 'files_scanned'], [], 'browser verification privacy scan');
+  validateCommonVerificationRecord(record, 'browser freeze verification');
   if (record.schema_version !== BROWSER_PACKET_VERIFICATION_SCHEMA
-    || record.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY
-    || record.source_binding_mode !== 'current_source_snapshot'
     || record.browser_summary_path !== `stages/${record.stage_id}/artifacts/${BROWSER_SUMMARY_ARTIFACT}`
-    || record.browser_import_summary_path !== `stages/${record.stage_id}/artifacts/${BROWSER_IMPORT_SUMMARY_ARTIFACT}`
+    || record.browser_import_summary_path !== `stages/${record.stage_id}/artifacts/${BROWSER_IMPORT_SUMMARY_ARTIFACT}`) {
+    throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser freeze verification record is invalid.');
+  }
+  return record;
+}
+
+function validateCommonVerificationRecord(record, label) {
+  assertExactObject(record.privacy_scan, ['secret_findings', 'customer_content_findings', 'prohibited_retained_artifact_findings', 'files_scanned'], [], 'browser verification privacy scan');
+  if (record.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY
+    || record.source_binding_mode !== 'current_source_snapshot'
     || record.verification_status !== 'passed'
     || !['packet_recovery_without_global_workspace_absence_proof', 'authenticated_in_process_cleanup'].includes(record.cleanup_assurance)
     || ![record.binding_digest, record.source_manifest_digest, record.browser_summary_sha256, record.browser_import_summary_sha256, record.promotion_event_hash, record.event_chain_head_at_verification].every((value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value))
@@ -472,7 +532,7 @@ function validateVerificationRecord(record) {
     || record.privacy_scan.prohibited_retained_artifact_findings !== 0
     || !Number.isInteger(record.privacy_scan.files_scanned)
     || record.privacy_scan.files_scanned < 2) {
-    throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser freeze verification record is invalid.');
+    throw new EvidenceError('BROWSER_VERIFICATION_INVALID', `${label} record is invalid.`);
   }
   validateControlledSlug(record.operation_id, 'browser verification operation ID');
   validateControlledSlug(record.stage_id, 'browser verification stage ID');
@@ -522,10 +582,225 @@ function assertVerificationMatchesState(record, {
   return record;
 }
 
+function selectedAttemptArtifactPaths(stageId, token) {
+  return [
+    `stages/${stageId}/artifacts/${attemptSummaryPath(token)}`,
+    `stages/${stageId}/artifacts/${attemptImportSummaryPath(token)}`,
+    `stages/${stageId}/artifacts/${attemptOutcomePath(token)}`,
+  ];
+}
+
+function readAttemptSummary(rootPath, stageId, token) {
+  const path = browserArtifactPath(rootPath, stageId, attemptSummaryPath(token));
+  const { content, parsed, info } = readCanonicalPacketJson(rootPath, path, BROWSER_LIMITS.summary_bytes);
+  return { content, summary: validateSummary(parsed), info };
+}
+
+function readAttemptImportSummary(rootPath, stageId, token) {
+  const path = browserArtifactPath(rootPath, stageId, attemptImportSummaryPath(token));
+  const { content, parsed, info } = readCanonicalPacketJson(rootPath, path, BROWSER_LIMITS.summary_bytes);
+  return { content, importSummary: validateBrowserImportSummary(parsed), info };
+}
+
+function v2PrivacyScan(rootPath, stageId, contents) {
+  return scanBrowserPrivacy(rootPath, stageId, contents);
+}
+
+function buildVerificationRecordV2({
+  metadata,
+  stageId,
+  token,
+  summary,
+  summaryContent,
+  importSummary,
+  importContent,
+  outcome,
+  outcomeContent,
+  binding,
+  promotionEvent,
+  chain,
+  privacyScan,
+  verificationUtc,
+  selection,
+  selectionContent,
+}) {
+  return {
+    ...buildVerificationRecord({
+      metadata,
+      stageId,
+      token,
+      summary,
+      summaryContent,
+      importSummary,
+      importContent,
+      binding,
+      promotionEvent,
+      chain,
+      privacyScan,
+      verificationUtc,
+    }),
+    schema_version: BROWSER_PACKET_VERIFICATION_SCHEMA_V2,
+    browser_summary_path: `stages/${stageId}/artifacts/${attemptSummaryPath(token.token)}`,
+    browser_import_summary_path: `stages/${stageId}/artifacts/${attemptImportSummaryPath(token.token)}`,
+    selected_execution_token_id: token.token,
+    selected_browser_run_id: summary.run_id,
+    selected_binding_digest: binding.binding_digest,
+    selected_attempt_sequence: selection.selected_attempt_sequence,
+    attempt_count: selection.attempt_count,
+    attempt_inventory_digest: selection.attempt_inventory_digest,
+    selection_record_path: `stages/${stageId}/artifacts/${BROWSER_ATTEMPT_SELECTION_ARTIFACT}`,
+    selection_record_sha256: sha256(selectionContent),
+    selection_record_bytes: Buffer.byteLength(selectionContent),
+    selected_outcome_path: `stages/${stageId}/artifacts/${attemptOutcomePath(token.token)}`,
+    selected_outcome_sha256: sha256(outcomeContent),
+    selected_outcome_bytes: Buffer.byteLength(outcomeContent),
+    cleanup_assurance: outcome.cleanup_assurance,
+  };
+}
+
+function validateVerificationRecordV2(record) {
+  assertExactObject(record, VERIFICATION_V2_FIELDS, [], 'browser freeze verification v2');
+  if (record.schema_version !== BROWSER_PACKET_VERIFICATION_SCHEMA_V2
+    || record.selection_record_path !== `stages/${record.stage_id}/artifacts/${BROWSER_ATTEMPT_SELECTION_ARTIFACT}`
+    || record.browser_summary_path !== `stages/${record.stage_id}/artifacts/${attemptSummaryPath(record.selected_execution_token_id)}`
+    || record.browser_import_summary_path !== `stages/${record.stage_id}/artifacts/${attemptImportSummaryPath(record.selected_execution_token_id)}`
+    || record.selected_outcome_path !== `stages/${record.stage_id}/artifacts/${attemptOutcomePath(record.selected_execution_token_id)}`
+    || record.selected_execution_token_id !== record.execution_token_id
+    || record.selected_browser_run_id !== record.browser_run_id
+    || record.selected_binding_digest !== record.binding_digest
+    || !Number.isInteger(record.selected_attempt_sequence)
+    || !Number.isInteger(record.attempt_count)
+    || record.selected_attempt_sequence !== record.attempt_count
+    || ![record.attempt_inventory_digest, record.selection_record_sha256, record.selected_outcome_sha256].every((value) => /^[a-f0-9]{64}$/.test(value))
+    || !Number.isInteger(record.selection_record_bytes)
+    || !Number.isInteger(record.selected_outcome_bytes)) {
+    throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser freeze verification v2 record is invalid.');
+  }
+  validateCommonVerificationRecord(record, 'browser freeze verification v2');
+  return record;
+}
+
+function v2VerificationState(rootPath, metadata, stageId, events, chain, tokens, group) {
+  if (!['v2-pending', 'v2-complete'].includes(group.kind)) return null;
+  const inventory = buildAttemptInventory(rootPath, metadata, stageId, events, { requireOutcomes: true });
+  const selected = inventory.tail;
+  if (!selected || selected.attempt_status !== 'succeeded') throw new EvidenceError('BROWSER_FINAL_ATTEMPT_NOT_SUCCESSFUL', 'The latest authorized browser attempt is not successful.');
+  const token = tokens.find((candidate) => candidate.token === selected.execution_token_id);
+  if (!token) throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Selected browser attempt token is missing.');
+  const { content: summaryContent, summary } = readAttemptSummary(rootPath, stageId, token.token);
+  const { content: importContent, importSummary } = readAttemptImportSummary(rootPath, stageId, token.token);
+  const outcomeRead = readCanonicalPacketJson(rootPath, browserArtifactPath(rootPath, stageId, attemptOutcomePath(token.token)), BROWSER_LIMITS.summary_bytes);
+  const outcome = selected.outcome;
+  const binding = assertImportSummaryMatchesEvidence(importSummary, metadata, stageId, token, summaryContent, summary);
+  if (outcome.browser_run_id !== summary.run_id
+    || outcome.binding_digest !== binding.binding_digest
+    || outcome.browser_summary_sha256 !== sha256(summaryContent)
+    || outcome.browser_import_summary_sha256 !== sha256(importContent)) {
+    throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Selected browser attempt outcome does not match retained evidence.');
+  }
+  const promotionEvent = assertPromotionEvent(events, stageId, token.token, selectedAttemptArtifactPaths(stageId, token.token));
+  if (selected.promotion_event_id !== promotionEvent.event_id || selected.promotion_event_hash !== promotionEvent.current_event_hash) {
+    throw new EvidenceError('BROWSER_ATTEMPT_SELECTION_INVALID', 'Selected browser attempt inventory does not match the promotion event.');
+  }
+  const privacyScan = v2PrivacyScan(rootPath, stageId, [summaryContent, importContent, outcomeRead.content]);
+  return { inventory, selected, token, summary, summaryContent, importSummary, importContent, outcome, outcomeContent: outcomeRead.content, binding, promotionEvent, privacyScan };
+}
+
+function writeOrVerifySelectionRecord(rootPath, metadata, stageId, state) {
+  const retainedPath = browserArtifactPath(rootPath, stageId, BROWSER_ATTEMPT_SELECTION_ARTIFACT);
+  const candidatePath = resolveInside(rootPath, `quarantine/browser-attempt-selection-candidate.json`);
+  const selection = buildSelectionRecord({
+    metadata,
+    stageId,
+    inventory: state.inventory,
+    selectedAttempt: state.selected,
+    selectedOutcome: state.outcome,
+  });
+  const content = `${canonicalStringify(selection)}\n`;
+  if (existsSync(retainedPath)) {
+    const retained = readCanonicalPacketJson(rootPath, retainedPath, BROWSER_LIMITS.summary_bytes);
+    const retainedSelection = validateSelection(retained.parsed);
+    const expected = buildSelectionRecord({
+      metadata,
+      stageId,
+      inventory: state.inventory,
+      selectedAttempt: state.selected,
+      selectedOutcome: state.outcome,
+      selectionUtc: retainedSelection.selection_utc,
+    });
+    if (canonicalStringify(retainedSelection) !== canonicalStringify(expected)) throw new EvidenceError('BROWSER_ATTEMPT_SELECTION_INVALID', 'Browser attempt selection conflicts with retained evidence.');
+    return { selection: retainedSelection, content: retained.content };
+  }
+  if (existsSync(candidatePath)) {
+    const candidate = readCanonicalPacketJson(rootPath, candidatePath, BROWSER_LIMITS.summary_bytes, [0o600]);
+    if (canonicalStringify(validateSelection(candidate.parsed)) !== canonicalStringify(selection)) throw new EvidenceError('BROWSER_ATTEMPT_SELECTION_INVALID', 'Browser attempt selection candidate conflicts with retained evidence.');
+  } else {
+    writeJsonAtomic(candidatePath, selection, 0o600, rootPath);
+  }
+  writeJsonAtomic(retainedPath, selection, 0o600, rootPath);
+  if (existsSync(candidatePath)) {
+    unlinkSync(candidatePath);
+    fsyncDirectory(dirname(candidatePath));
+  }
+  registerBrowserAttemptEntries(rootPath, metadata, stageId, [expectedSelectionEntry()]);
+  return { selection, content };
+}
+
+function assertVerificationMatchesStateV2(record, { metadata, stageId, state, chain, selection, selectionContent }) {
+  validateVerificationRecordV2(record);
+  const historicalChain = { ...chain, head: record.event_chain_head_at_verification };
+  const expected = buildVerificationRecordV2({
+    metadata,
+    stageId,
+    token: state.token,
+    summary: state.summary,
+    summaryContent: state.summaryContent,
+    importSummary: state.importSummary,
+    importContent: state.importContent,
+    outcome: state.outcome,
+    outcomeContent: state.outcomeContent,
+    binding: state.binding,
+    promotionEvent: state.promotionEvent,
+    chain: historicalChain,
+    privacyScan: state.privacyScan,
+    verificationUtc: record.verification_utc,
+    selection,
+    selectionContent,
+  });
+  if (canonicalStringify(record) !== canonicalStringify(expected)) throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser freeze verification v2 does not match retained evidence.');
+  return record;
+}
+
+function writeOrVerifyVerificationRecordV2(rootPath, stageId, state, metadata, chain, selectionRecord) {
+  const retainedPath = retainedVerificationPath(rootPath, stageId);
+  const candidatePath = verificationCandidatePath(rootPath);
+  if (existsSync(retainedPath)) {
+    const retained = readCanonicalPacketJson(rootPath, retainedPath, BROWSER_LIMITS.summary_bytes);
+    const record = assertVerificationMatchesStateV2(retained.parsed, { metadata, stageId, state, chain, ...selectionRecord });
+    if (existsSync(candidatePath)) unlinkSync(candidatePath);
+    return record;
+  }
+  const verificationUtc = new Date(Math.max(
+    Date.parse(utcNow()),
+    Date.parse(chain.lastActionTimestamp),
+    Date.parse(state.importSummary.imported_utc),
+    Date.parse(state.promotionEvent.action_timestamp),
+    Date.parse(selectionRecord.selection.selection_utc),
+  )).toISOString();
+  const record = buildVerificationRecordV2({ metadata, stageId, token: state.token, summary: state.summary, summaryContent: state.summaryContent, importSummary: state.importSummary, importContent: state.importContent, outcome: state.outcome, outcomeContent: state.outcomeContent, binding: state.binding, promotionEvent: state.promotionEvent, chain, privacyScan: state.privacyScan, verificationUtc, selection: selectionRecord.selection, selectionContent: selectionRecord.content });
+  validateVerificationRecordV2(record);
+  writeJsonAtomic(candidatePath, record, 0o600, rootPath);
+  writeJsonAtomic(retainedPath, record, 0o600, rootPath);
+  unlinkSync(candidatePath);
+  fsyncDirectory(dirname(candidatePath));
+  return record;
+}
+
 function browserVerificationState(rootPath, metadata, stageId, events, chain, tokens) {
   validateControlledSlug(stageId, 'browser verification stage ID');
   const group = inspectBrowserArtifactGroup(rootPath, metadata.operation_id, stageId);
   if (group.kind === 'none') return { kind: 'none', group };
+  if (group.kind === 'v2-pending' || group.kind === 'v2-complete') return { kind: group.kind, group, v2: v2VerificationState(rootPath, metadata, stageId, events, chain, tokens, group) };
   if (group.kind !== 'pending' && group.kind !== 'complete') {
     throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser evidence is not in a verifiable state.');
   }
@@ -626,6 +901,15 @@ function registerVerificationArtifact(rootPath, operationId, stageId) {
 export function ensureBrowserVerificationForFreeze({ rootPath, metadata, stageId, events, chain, tokens }) {
   const state = browserVerificationState(rootPath, metadata, stageId, events, chain, tokens);
   if (state.kind === 'none') return null;
+  if (state.kind === 'v2-pending' || state.kind === 'v2-complete') {
+    const selectionRecord = writeOrVerifySelectionRecord(rootPath, metadata, stageId, state.v2);
+    const record = writeOrVerifyVerificationRecordV2(rootPath, stageId, state.v2, metadata, chain, selectionRecord);
+    registerVerificationArtifact(rootPath, metadata.operation_id, stageId);
+    const group = inspectBrowserArtifactGroup(rootPath, metadata.operation_id, stageId, [0o600]);
+    if (group.kind !== 'v2-complete') throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser verification v2 artifact was not registered.');
+    verifyBrowserStageEvidence({ rootPath, metadata, stageId, events, chain, tokens });
+    return record;
+  }
   const record = writeOrVerifyVerificationRecord(rootPath, stageId, state, metadata, chain);
   registerVerificationArtifact(rootPath, metadata.operation_id, stageId);
   const group = inspectBrowserArtifactGroup(rootPath, metadata.operation_id, stageId, [0o600]);
@@ -637,6 +921,14 @@ export function ensureBrowserVerificationForFreeze({ rootPath, metadata, stageId
 export function verifyBrowserStageEvidence({ rootPath, metadata, stageId, events, chain, tokens }) {
   const state = browserVerificationState(rootPath, metadata, stageId, events, chain, tokens);
   if (state.kind === 'none') return null;
+  if (state.kind === 'v2-pending') throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
+  if (state.kind === 'v2-complete') {
+    const selectionRead = readCanonicalPacketJson(rootPath, browserArtifactPath(rootPath, stageId, BROWSER_ATTEMPT_SELECTION_ARTIFACT), BROWSER_LIMITS.summary_bytes);
+    const selection = validateSelection(selectionRead.parsed);
+    if (selection.attempt_inventory_digest !== state.v2.inventory.digest || selection.selected_execution_token_id !== state.v2.selected.execution_token_id) throw new EvidenceError('BROWSER_ATTEMPT_SELECTION_INVALID', 'Browser attempt selection does not match inventory.');
+    const { parsed: record } = readCanonicalPacketJson(rootPath, retainedVerificationPath(rootPath, stageId), BROWSER_LIMITS.summary_bytes);
+    return assertVerificationMatchesStateV2(record, { metadata, stageId, state: state.v2, chain, selection, selectionContent: selectionRead.content });
+  }
   if (state.kind !== 'complete') throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
   const { parsed: record } = readCanonicalPacketJson(rootPath, retainedVerificationPath(rootPath, stageId), BROWSER_LIMITS.summary_bytes);
   return assertVerificationMatchesState(record, { metadata, stageId, ...state, chain });
@@ -645,6 +937,11 @@ export function verifyBrowserStageEvidence({ rootPath, metadata, stageId, events
 export function verifyBrowserVerificationRecordStructural(rootPath, operationId, stageId, group = null, modes = [0o600, 0o400]) {
   const currentGroup = group ?? inspectBrowserArtifactGroup(rootPath, operationId, stageId, modes);
   if (currentGroup.kind === 'none') return null;
+  if (currentGroup.kind === 'v2-pending') throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
+  if (currentGroup.kind === 'v2-complete') {
+    const recordRead = readCanonicalPacketJson(rootPath, retainedVerificationPath(rootPath, stageId), BROWSER_LIMITS.summary_bytes, modes);
+    return validateVerificationRecordV2(recordRead.parsed);
+  }
   if (currentGroup.kind !== 'complete') throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
   const { content: summaryContent, summary } = readBrowserSummary(rootPath, stageId);
   const { content: importContent, importSummary } = readImportSummary(rootPath, stageId);

@@ -31,6 +31,24 @@ import {
   writeJsonAtomic,
 } from './internal.mjs';
 import { readCanonicalJsonFile } from './manifest.mjs';
+import {
+  BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS,
+  BROWSER_ATTEMPT_OUTCOME_CLASS,
+  BROWSER_ATTEMPT_SUMMARY_CLASS,
+  CONTINUABLE_CLEANUP_ASSURANCES,
+  assertPredecessorOutcomeForRetryLaunch,
+  attemptImportSummaryPath,
+  attemptOutcomePath,
+  attemptSummaryPath,
+  buildAttemptOutcome,
+  expectedAttemptEntry,
+  readAttemptOutcome,
+  registerBrowserAttemptEntries,
+  terminalEventForToken,
+  validateAttemptOutcome,
+  writeOrVerifyJsonArtifact,
+  writeOrVerifyTextArtifact,
+} from './browser-attempts.mjs';
 import { appendEventUnderPacketMutation, verifyEventChain, readEvents } from './evidence.mjs';
 import {
   BROWSER_WORKFLOW_COMMAND_CATEGORY,
@@ -151,6 +169,7 @@ function assertLaunchEligibleToken(rootPath, metadata, stageId, tokenId) {
   if (!['claimed', 'started'].includes(token.state)) {
     throw new EvidenceError('BROWSER_PACKET_TOKEN_STATE_INVALID', 'Browser launch binding requires an active browser workflow token.');
   }
+  assertPredecessorOutcomeForRetryLaunch(rootPath, metadata, stageId, token);
   return token;
 }
 
@@ -898,6 +917,324 @@ function promotedResult(metadata, stageId, token, finalState, summaryContent, im
   };
 }
 
+function v2AttemptTransactionPath(rootPath, token) {
+  validateControlledSlug(token, 'browser attempt token');
+  return resolveInside(rootPath, `quarantine/browser-attempt-${token}-transaction.json`);
+}
+
+const V2_ATTEMPT_TRANSACTION_SCHEMA = 'servsync-controlled-ops/browser-attempt-transaction-v1';
+const V2_ATTEMPT_TRANSACTION_FIELDS = [
+  'schema_version',
+  'operation_id',
+  'stage_id',
+  'execution_token_id',
+  'command_category',
+  'binding_digest',
+  'browser_run_id',
+  'source_binding_mode',
+  'source_manifest_digest',
+  'browser_summary_sha256',
+  'browser_summary_bytes',
+  'transaction_state',
+  'prepared_utc',
+  'updated_utc',
+];
+
+function validateV2AttemptTransaction(transaction, metadata, stageId, token) {
+  assertExactObject(transaction, V2_ATTEMPT_TRANSACTION_FIELDS, [], 'browser attempt transaction');
+  if (transaction.schema_version !== V2_ATTEMPT_TRANSACTION_SCHEMA
+    || transaction.operation_id !== metadata.operation_id
+    || transaction.stage_id !== stageId
+    || transaction.execution_token_id !== token.token
+    || transaction.command_category !== token.command_category
+    || transaction.source_binding_mode !== 'current_source_snapshot'
+    || !['prepared', 'event_recorded'].includes(transaction.transaction_state)
+    || !/^[a-f0-9]{64}$/.test(transaction.binding_digest)
+    || !/^[a-f0-9]{64}$/.test(transaction.source_manifest_digest)
+    || !/^[a-f0-9]{64}$/.test(transaction.browser_summary_sha256)
+    || !Number.isInteger(transaction.browser_summary_bytes)
+    || transaction.browser_summary_bytes <= 0
+    || transaction.browser_summary_bytes > BROWSER_LIMITS.summary_bytes) {
+    throw new EvidenceError('BROWSER_PACKET_TRANSACTION_INVALID', 'Browser attempt transaction is invalid.');
+  }
+  validateGeneratedBrowserId(transaction.browser_run_id, 'browser attempt transaction run ID');
+  validateTimestamp(transaction.prepared_utc, 'browser attempt transaction prepared timestamp');
+  validateTimestamp(transaction.updated_utc, 'browser attempt transaction updated timestamp');
+  if (Date.parse(transaction.updated_utc) < Date.parse(transaction.prepared_utc)) throw new EvidenceError('BROWSER_PACKET_TRANSACTION_INVALID', 'Browser attempt transaction timestamp regressed.');
+  return transaction;
+}
+
+function readV2AttemptTransaction(rootPath, metadata, stageId, token) {
+  const path = v2AttemptTransactionPath(rootPath, token.token);
+  if (!existsSync(path)) return null;
+  return validateV2AttemptTransaction(readCanonicalJsonFile(path, BROWSER_LIMITS.summary_bytes), metadata, stageId, token);
+}
+
+function writeV2AttemptTransaction(rootPath, transaction) {
+  writeJsonAtomic(v2AttemptTransactionPath(rootPath, transaction.execution_token_id), transaction, 0o600, rootPath);
+}
+
+function hasLegacyBrowserState(rootPath, stageId) {
+  return existsSync(transactionPath(rootPath))
+    || existsSync(summaryCandidatePath(rootPath))
+    || existsSync(importSummaryCandidatePath(rootPath))
+    || existsSync(retainedSummaryPath(rootPath, stageId))
+    || existsSync(retainedImportSummaryPath(rootPath, stageId));
+}
+
+function buildImportSummaryV2(metadata, stageId, token, summary, summaryContent, importedUtc) {
+  return {
+    schema_version: BROWSER_PACKET_IMPORT_SCHEMA,
+    operation_id: metadata.operation_id,
+    stage_id: stageId,
+    execution_token_id: token.token,
+    command_category: token.command_category,
+    binding_digest: summary.binding_digest,
+    browser_run_id: summary.run_id,
+    source_binding_mode: summary.source_binding_mode,
+    source_manifest_digest: summary.source_manifest_digest,
+    browser_status: summary.status,
+    browser_summary_relative_path: `stages/${stageId}/artifacts/${attemptSummaryPath(token.token)}`,
+    browser_summary_sha256: sha256(summaryContent),
+    browser_summary_bytes: Buffer.byteLength(summaryContent),
+    packet_sanitization_status: 'passed',
+    browser_workspace_cleanup_status: 'cleaned',
+    imported_utc: importedUtc,
+  };
+}
+
+function verifyNoV2RunReuse(rootPath, stageId, tokenId, runId) {
+  const indexPath = resolveInside(rootPath, `stages/${stageId}/artifact-index.json`);
+  const index = readCanonicalJsonFile(indexPath);
+  for (const entry of index.artifacts ?? []) {
+    if (entry.artifact_class !== BROWSER_ATTEMPT_OUTCOME_CLASS) continue;
+    const outcome = readCanonicalJsonFile(resolveInside(rootPath, `stages/${stageId}/artifacts/${entry.path}`), BROWSER_LIMITS.summary_bytes);
+    if (outcome.execution_token_id === tokenId) throw new EvidenceError('BROWSER_PACKET_IMPORT_EXISTS', 'Browser attempt evidence already exists for this token.');
+    if (outcome.browser_run_id !== null && outcome.browser_run_id === runId) throw new EvidenceError('BROWSER_PACKET_STATE_CONFLICT', 'Browser run is already bound to another token.');
+  }
+}
+
+function verifyNoV2TokenImport(rootPath, stageId, tokenId) {
+  const indexPath = resolveInside(rootPath, `stages/${stageId}/artifact-index.json`);
+  const index = readCanonicalJsonFile(indexPath);
+  for (const entry of index.artifacts ?? []) {
+    if (entry.artifact_class !== BROWSER_ATTEMPT_OUTCOME_CLASS) continue;
+    const outcome = readCanonicalJsonFile(resolveInside(rootPath, `stages/${stageId}/artifacts/${entry.path}`), BROWSER_LIMITS.summary_bytes);
+    if (outcome.execution_token_id === tokenId) throw new EvidenceError('BROWSER_PACKET_IMPORT_EXISTS', 'Browser attempt evidence already exists for this token.');
+  }
+}
+
+function v2ArtifactPathsFor(stageId, token) {
+  return [
+    `stages/${stageId}/artifacts/${attemptSummaryPath(token)}`,
+    `stages/${stageId}/artifacts/${attemptImportSummaryPath(token)}`,
+    `stages/${stageId}/artifacts/${attemptOutcomePath(token)}`,
+  ];
+}
+
+function verifyFinalV2AttemptState(rootPath, metadata, stageId, token, transaction) {
+  const summaryPath = resolveInside(rootPath, `stages/${stageId}/artifacts/${attemptSummaryPath(token.token)}`);
+  const importSummaryPath = resolveInside(rootPath, `stages/${stageId}/artifacts/${attemptImportSummaryPath(token.token)}`);
+  const summary = verifyBrowserSummary(summaryPath);
+  const summaryContent = readFileSync(summaryPath, 'utf8');
+  const importSummary = validateBrowserImportSummary(readCanonicalJsonFile(importSummaryPath, BROWSER_LIMITS.summary_bytes));
+  const importContent = readFileSync(importSummaryPath, 'utf8');
+  const { outcome } = readAttemptOutcome(rootPath, stageId, token.token);
+  validateAttemptOutcome(outcome);
+  const expectedBinding = createBrowserPacketBinding({
+    operationId: metadata.operation_id,
+    stageId,
+    executionTokenId: token.token,
+    commandCategory: token.command_category,
+    browserRunId: summary.run_id,
+    sourceBindingMode: summary.source_binding_mode,
+    sourceManifestDigest: summary.source_manifest_digest,
+  });
+  assertSuccessfulBrowserSummary(summary, expectedBinding);
+  if (transaction.binding_digest !== expectedBinding.binding_digest
+    || transaction.browser_run_id !== summary.run_id
+    || transaction.source_manifest_digest !== summary.source_manifest_digest
+    || transaction.browser_summary_sha256 !== sha256(summaryContent)
+    || transaction.browser_summary_bytes !== Buffer.byteLength(summaryContent)
+    || importSummary.binding_digest !== expectedBinding.binding_digest
+    || importSummary.browser_run_id !== summary.run_id
+    || importSummary.browser_summary_sha256 !== sha256(summaryContent)
+    || importSummary.browser_summary_bytes !== Buffer.byteLength(summaryContent)
+    || outcome.attempt_status !== 'succeeded'
+    || outcome.binding_digest !== expectedBinding.binding_digest
+    || outcome.browser_run_id !== summary.run_id
+    || outcome.browser_summary_sha256 !== sha256(summaryContent)
+    || outcome.browser_import_summary_sha256 !== sha256(importContent)) {
+    throw new EvidenceError('BROWSER_PACKET_TRANSACTION_INVALID', 'Browser attempt transaction does not match retained evidence.');
+  }
+  const index = readCanonicalJsonFile(resolveInside(rootPath, `stages/${stageId}/artifact-index.json`));
+  for (const expected of [
+    expectedAttemptEntry(token.token, BROWSER_ATTEMPT_SUMMARY_CLASS),
+    expectedAttemptEntry(token.token, BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS),
+    expectedAttemptEntry(token.token, BROWSER_ATTEMPT_OUTCOME_CLASS),
+  ]) {
+    if (!index.artifacts.some((entry) => canonicalStringify(entry) === canonicalStringify(expected))) {
+      throw new EvidenceError('BROWSER_PACKET_TRANSACTION_INVALID', 'Browser attempt transaction index is incomplete.');
+    }
+  }
+  const event = verifyOrAppendBrowserEvent(rootPath, metadata, stageId, token.token, importSummary.imported_utc, v2ArtifactPathsFor(stageId, token.token));
+  return { summary, summaryContent, importSummary, importContent, event };
+}
+
+function promoteGeneratedBrowserEvidenceToPacketV2({ rootPath, metadata, stageId, executionTokenId, browserWorkspace, generatedAt }) {
+  const token = assertCompletedBrowserWorkflowToken(rootPath, metadata, stageId, executionTokenId);
+  const transaction = readV2AttemptTransaction(rootPath, metadata, stageId, token);
+  if (transaction !== null) {
+    const finalState = verifyFinalV2AttemptState(rootPath, metadata, stageId, token, transaction);
+    removePacketFileIfExists(rootPath, v2AttemptTransactionPath(rootPath, token.token));
+    if (readDirectorySorted(resolveInside(rootPath, 'quarantine')).length !== 0) throw new EvidenceError('BROWSER_PACKET_QUARANTINE_NOT_EMPTY', 'Browser packet import must leave quarantine empty after transaction recovery.');
+    return {
+      status: BROWSER_PACKET_IMPORT_STATUS,
+      operation_id: metadata.operation_id,
+      stage_id: stageId,
+      execution_token_id: token.token,
+      command_category: token.command_category,
+      browser_run_id: finalState.summary.run_id,
+      binding_digest: finalState.summary.binding_digest,
+      browser_summary_relative_path: `stages/${stageId}/artifacts/${attemptSummaryPath(token.token)}`,
+      browser_summary_sha256: sha256(finalState.summaryContent),
+      browser_import_summary_relative_path: `stages/${stageId}/artifacts/${attemptImportSummaryPath(token.token)}`,
+      browser_import_summary_sha256: sha256(finalState.importContent),
+      browser_attempt_outcome_relative_path: `stages/${stageId}/artifacts/${attemptOutcomePath(token.token)}`,
+      browser_workspace_cleanup_status: 'cleaned',
+      freeze_state: 'not_frozen',
+      manifest_state: 'not_created',
+      seal_state: 'not_created',
+    };
+  }
+  verifyNoV2TokenImport(rootPath, stageId, token.token);
+  const imported = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: browserWorkspace?.cleanupHandle, generatedAt });
+  const summary = verifyBrowserSummary(imported.summaryPath);
+  const expectedBinding = createBrowserPacketBinding({
+    operationId: metadata.operation_id,
+    stageId,
+    executionTokenId,
+    commandCategory: token.command_category,
+    browserRunId: summary.run_id,
+    sourceBindingMode: summary.source_binding_mode,
+    sourceManifestDigest: summary.source_manifest_digest,
+  });
+  assertSuccessfulBrowserSummary(summary, expectedBinding);
+  verifyNoV2RunReuse(rootPath, stageId, token.token, summary.run_id);
+  const summaryContent = canonicalJsonBytes(summary, 'browser summary');
+  packetSideScan(summaryContent);
+  const importedUtc = ensureMonotonicUtc(currentChainTimestamp(rootPath));
+  writeV2AttemptTransaction(rootPath, {
+    schema_version: V2_ATTEMPT_TRANSACTION_SCHEMA,
+    operation_id: metadata.operation_id,
+    stage_id: stageId,
+    execution_token_id: token.token,
+    command_category: token.command_category,
+    binding_digest: summary.binding_digest,
+    browser_run_id: summary.run_id,
+    source_binding_mode: summary.source_binding_mode,
+    source_manifest_digest: summary.source_manifest_digest,
+    browser_summary_sha256: sha256(summaryContent),
+    browser_summary_bytes: Buffer.byteLength(summaryContent),
+    transaction_state: 'prepared',
+    prepared_utc: importedUtc,
+    updated_utc: importedUtc,
+  });
+  const cleanup = cleanupWorkspaceForTransaction(browserWorkspace, {
+    browser_run_id: summary.run_id,
+    workspace_cleanup_status: 'pending',
+  });
+  if (!['cleaned', 'already_cleaned', 'cleaned_from_packet_evidence'].includes(cleanup.status)) throw new EvidenceError('BROWSER_PACKET_CLEANUP_FAILED', 'Browser packet import cleanup failed.');
+  const importSummary = buildImportSummaryV2(metadata, stageId, token, summary, summaryContent, importedUtc);
+  validateBrowserImportSummary(importSummary);
+  const importContent = canonicalJsonBytes(importSummary, 'browser import summary');
+  packetSideScan(importContent);
+  const terminalEvent = terminalEventForToken(readEvents(rootPath), token);
+  const outcome = buildAttemptOutcome({
+    metadata,
+    stageId,
+    token,
+    terminalEvent,
+    cleanupAssurance: cleanup.status === 'cleaned' ? 'authenticated_in_process_cleanup' : 'packet_recovery_without_global_workspace_absence_proof',
+    summary,
+    summaryContent,
+    importSummary,
+    importContent,
+    retainedAt: importedUtc,
+  });
+  writeOrVerifyTextArtifact(rootPath, stageId, attemptSummaryPath(token.token), summaryContent, BROWSER_LIMITS.summary_bytes);
+  writeOrVerifyJsonArtifact(rootPath, stageId, attemptImportSummaryPath(token.token), importSummary, BROWSER_LIMITS.summary_bytes);
+  writeOrVerifyJsonArtifact(rootPath, stageId, attemptOutcomePath(token.token), outcome, BROWSER_LIMITS.summary_bytes);
+  registerBrowserAttemptEntries(rootPath, metadata, stageId, [
+    expectedAttemptEntry(token.token, BROWSER_ATTEMPT_SUMMARY_CLASS),
+    expectedAttemptEntry(token.token, BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS),
+    expectedAttemptEntry(token.token, BROWSER_ATTEMPT_OUTCOME_CLASS),
+  ]);
+  const event = verifyOrAppendBrowserEvent(rootPath, metadata, stageId, token.token, importedUtc, v2ArtifactPathsFor(stageId, token.token));
+  if (event.current_event_hash !== readEvents(rootPath).at(-1)?.current_event_hash) throw new EvidenceError('BROWSER_PACKET_EVENT_CONFLICT', 'Browser promotion event was not retained in the event chain.');
+  writeV2AttemptTransaction(rootPath, {
+    schema_version: V2_ATTEMPT_TRANSACTION_SCHEMA,
+    operation_id: metadata.operation_id,
+    stage_id: stageId,
+    execution_token_id: token.token,
+    command_category: token.command_category,
+    binding_digest: summary.binding_digest,
+    browser_run_id: summary.run_id,
+    source_binding_mode: summary.source_binding_mode,
+    source_manifest_digest: summary.source_manifest_digest,
+    browser_summary_sha256: sha256(summaryContent),
+    browser_summary_bytes: Buffer.byteLength(summaryContent),
+    transaction_state: 'event_recorded',
+    prepared_utc: importedUtc,
+    updated_utc: ensureMonotonicUtc(Date.parse(importedUtc)),
+  });
+  removePacketFileIfExists(rootPath, v2AttemptTransactionPath(rootPath, token.token));
+  if (readDirectorySorted(resolveInside(rootPath, 'quarantine')).length !== 0) throw new EvidenceError('BROWSER_PACKET_QUARANTINE_NOT_EMPTY', 'Browser packet import must leave quarantine empty after success.');
+  return {
+    status: BROWSER_PACKET_IMPORT_STATUS,
+    operation_id: metadata.operation_id,
+    stage_id: stageId,
+    execution_token_id: token.token,
+    command_category: token.command_category,
+    browser_run_id: summary.run_id,
+    binding_digest: summary.binding_digest,
+    browser_summary_relative_path: `stages/${stageId}/artifacts/${attemptSummaryPath(token.token)}`,
+    browser_summary_sha256: sha256(summaryContent),
+    browser_import_summary_relative_path: `stages/${stageId}/artifacts/${attemptImportSummaryPath(token.token)}`,
+    browser_import_summary_sha256: sha256(importContent),
+    browser_attempt_outcome_relative_path: `stages/${stageId}/artifacts/${attemptOutcomePath(token.token)}`,
+    browser_workspace_cleanup_status: 'cleaned',
+    freeze_state: 'not_frozen',
+    manifest_state: 'not_created',
+    seal_state: 'not_created',
+  };
+}
+
+export function retainTerminalBrowserAttemptOutcome(options = {}) {
+  assertExactObject(options, ['operationRoot', 'stageId', 'executionTokenId'], ['browserWorkspace', 'cleanupAssurance'], 'browser attempt outcome options');
+  const { operationRoot, stageId, executionTokenId, browserWorkspace = null, cleanupAssurance = null } = options;
+  const { rootPath } = assertOperationRoot(operationRoot, { allowSealed: false });
+  let retained;
+  withPacketMutationLock(rootPath, 'browser-attempt-outcome', ({ rootPath: lockedRoot, metadata }) => {
+    const token = readCanonicalJsonFile(resolveInside(lockedRoot, `tokens/${executionTokenId}.json`));
+    if (token.operation_id !== metadata.operation_id || token.stage_id !== stageId || token.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY) throw new EvidenceError('BROWSER_PACKET_TOKEN_INVALID', 'Browser attempt outcome token identity is invalid.');
+    if (token.state === 'completed') throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Successful browser attempts must be retained through packet promotion.');
+    const terminalEvent = terminalEventForToken(readEvents(lockedRoot), token);
+    let assurance = cleanupAssurance;
+    if (assurance === null) {
+      if (browserWorkspace?.cleanupHandle) {
+        const cleanup = cleanupBrowserEvidence(browserWorkspace.cleanupHandle);
+        assurance = cleanup.status === 'cleaned' || cleanup.status === 'already_cleaned' ? 'authenticated_in_process_cleanup' : 'cleanup_not_completed';
+      } else assurance = 'no_workspace_created';
+    }
+    const outcome = buildAttemptOutcome({ metadata, stageId, token, terminalEvent, cleanupAssurance: assurance });
+    writeOrVerifyJsonArtifact(lockedRoot, stageId, attemptOutcomePath(token.token), outcome, BROWSER_LIMITS.summary_bytes);
+    registerBrowserAttemptEntries(lockedRoot, metadata, stageId, [expectedAttemptEntry(token.token, BROWSER_ATTEMPT_OUTCOME_CLASS)]);
+    retained = outcome;
+  });
+  return retained;
+}
+
 function currentChainTimestamp(rootPath) {
   return validateTimestamp(verifyEventChain(rootPath).lastActionTimestamp, 'event chain action timestamp');
 }
@@ -919,6 +1256,10 @@ export function promoteGeneratedBrowserEvidenceToPacket(options = {}) {
   const { rootPath } = assertOperationRoot(operationRoot, { allowSealed: false });
   let promoted;
   withPacketMutationLock(rootPath, 'browser-packet-import', ({ rootPath: lockedRoot, metadata }) => {
+    if (!hasLegacyBrowserState(lockedRoot, stageId)) {
+      promoted = promoteGeneratedBrowserEvidenceToPacketV2({ rootPath: lockedRoot, metadata, stageId, executionTokenId, browserWorkspace, generatedAt });
+      return;
+    }
     const token = assertCompletedBrowserWorkflowToken(lockedRoot, metadata, stageId, executionTokenId);
     let transaction = readTransaction(lockedRoot, metadata, stageId, executionTokenId);
 
@@ -1115,13 +1456,17 @@ export function validateBrowserImportSummary(summary) {
     'browser_workspace_cleanup_status',
     'imported_utc',
   ], [], 'browser import summary');
+  const fixedSummaryPath = `stages/${summary.stage_id}/artifacts/${BROWSER_SUMMARY_ARTIFACT}`;
+  const attemptSummaryRelativePath = typeof summary.execution_token_id === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(summary.execution_token_id)
+    ? `stages/${summary.stage_id}/artifacts/${attemptSummaryPath(summary.execution_token_id)}`
+    : null;
   if (summary.schema_version !== BROWSER_PACKET_IMPORT_SCHEMA
     || summary.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY
     || summary.source_binding_mode !== 'current_source_snapshot'
     || summary.browser_status !== 'passed'
     || summary.packet_sanitization_status !== 'passed'
     || summary.browser_workspace_cleanup_status !== 'cleaned'
-    || summary.browser_summary_relative_path !== `stages/${summary.stage_id}/artifacts/${BROWSER_SUMMARY_ARTIFACT}`
+    || ![fixedSummaryPath, attemptSummaryRelativePath].includes(summary.browser_summary_relative_path)
     || !/^[a-f0-9]{64}$/.test(summary.binding_digest)
     || !/^[a-f0-9]{64}$/.test(summary.source_manifest_digest)
     || !/^[a-f0-9]{64}$/.test(summary.browser_summary_sha256)

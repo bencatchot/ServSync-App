@@ -78,6 +78,36 @@ test('execution tokens are atomic and retries require a new explicitly authorize
   } finally { packet.cleanup(); }
 });
 
+test('completed execution tokens require successful harness evidence', () => {
+  let caseNumber = 0;
+  for (const [classification, shouldPass] of [
+    ['completed', true],
+    ['evidence_complete', true],
+    ['harness_failed', false],
+    ['interrupted', false],
+    [null, false],
+    ['completed-with-signal', false],
+  ]) {
+    const packet = makePacket('stage-1', `op-h${caseNumber += 1}`);
+    try {
+      claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-1', commandCategory: 'fake', expectedResult: 'completed' });
+      updateExecutionToken(packet.root, 'token-1', 'started');
+      const harnessResult = classification === null ? null : {
+        classification: classification === 'completed-with-signal' ? 'completed' : classification,
+        detail: classification === 'evidence_complete' ? 'evidence_complete' : 'evidence_retained',
+        wrapper_signal: classification === 'completed-with-signal' ? 'SIGTERM' : null,
+        forwarded_signal: classification === 'completed-with-signal' ? 'SIGTERM' : null,
+      };
+      const update = () => updateExecutionToken(packet.root, 'token-1', 'completed', {
+        commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null },
+        harnessResult,
+      });
+      if (shouldPass) assert.doesNotThrow(update);
+      else assert.throws(update, /harness|signal|token/i);
+    } finally { packet.cleanup(); }
+  }
+});
+
 test('retry lineage rejects reused authorization, cycles, and cross-operation token records', () => {
   const packet = makePacket(); const other = makePacket('stage-1', 'operation-test-2');
   const completed = { commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null }, harnessResult: { classification: 'completed', detail: 'evidence_retained', wrapper_signal: null, forwarded_signal: null } };

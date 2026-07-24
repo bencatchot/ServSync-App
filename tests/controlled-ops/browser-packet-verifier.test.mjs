@@ -22,6 +22,11 @@ import {
   testIdFor,
 } from '../../scripts/controlled-ops/browser-schema.mjs';
 import {
+  attemptImportSummaryPath,
+  attemptSummaryPath,
+  BROWSER_ATTEMPT_SUMMARY_CLASS,
+} from '../../scripts/controlled-ops/browser-attempts.mjs';
+import {
   BROWSER_FREEZE_VERIFICATION_ARTIFACT,
   BROWSER_FREEZE_VERIFICATION_ARTIFACT_CLASS,
 } from '../../scripts/controlled-ops/browser-packet-verifier.mjs';
@@ -174,11 +179,11 @@ test('browser-aware freeze creates a bound verification artifact and allows mani
     assert.equal(freeze.lifecycle, 'workflow-frozen');
     const verificationPath = join(run.artifactDir, BROWSER_FREEZE_VERIFICATION_ARTIFACT);
     const verification = readCanonicalJsonFile(verificationPath);
-    assert.equal(verification.schema_version, 'servsync-controlled-ops/browser-freeze-verification-v1');
+    assert.equal(verification.schema_version, 'servsync-controlled-ops/browser-freeze-verification-v2');
     assert.equal(verification.operation_id, readCanonicalJsonFile(join(run.packet.root, 'operation.json')).operation_id);
     assert.equal(verification.stage_id, run.stageId);
     assert.equal(verification.execution_token_id, run.token);
-    assert.equal(verification.cleanup_assurance, 'packet_recovery_without_global_workspace_absence_proof');
+    assert.equal(verification.cleanup_assurance, 'authenticated_in_process_cleanup');
     assert.equal(verification.privacy_scan.secret_findings, 0);
     assert.equal(verification.privacy_scan.customer_content_findings, 0);
     assert.equal(modeOf(verificationPath), 0o400);
@@ -201,9 +206,9 @@ test('browser verifier rejects fixed browser path relabeling and alternate brows
       const indexPath = join(run.packet.root, 'stages', run.stageId, 'artifact-index.json');
       const index = readCanonicalJsonFile(indexPath);
       if (mutation === 'relabel-summary') {
-        index.artifacts = index.artifacts.map((entry) => (entry.path === 'browser-summary.json' ? { ...entry, artifact_class: 'internal' } : entry));
+        index.artifacts = index.artifacts.map((entry) => (entry.path === attemptSummaryPath(run.token) ? { ...entry, artifact_class: 'internal' } : entry));
       } else {
-        index.artifacts.push({ path: 'nested/browser-summary.json', artifact_class: 'browser_summary', sanitization_status: 'internal', summary_path: 'nested/browser-summary.json' });
+        index.artifacts.push({ path: 'nested/browser-summary.json', artifact_class: BROWSER_ATTEMPT_SUMMARY_CLASS, sanitization_status: 'internal', summary_path: 'nested/browser-summary.json' });
       }
       writeCanonical(indexPath, index);
       assert.throws(() => freezeStage(run.packet.root, run.stageId), hasCode('BROWSER_VERIFICATION_INVALID'));
@@ -218,11 +223,11 @@ test('browser verifier rejects tampered retained browser evidence and raw browse
     const run = preparePromotedBrowserPacket();
     try {
       if (mutation === 'summary-status') {
-        const path = join(run.artifactDir, 'browser-summary.json');
+        const path = join(run.artifactDir, attemptSummaryPath(run.token));
         const summary = readCanonicalJsonFile(path);
         writeCanonical(path, { ...summary, status: 'failed' });
       } else if (mutation === 'import-digest') {
-        const path = join(run.artifactDir, 'browser-import-summary.json');
+        const path = join(run.artifactDir, attemptImportSummaryPath(run.token));
         const summary = readCanonicalJsonFile(path);
         writeCanonical(path, { ...summary, browser_summary_sha256: 'a'.repeat(64) });
       } else {
