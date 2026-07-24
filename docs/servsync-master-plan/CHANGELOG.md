@@ -4,6 +4,21 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-24
+
+- Branch: `docs/controlled-ops-operational-closeout-slice-3`
+- Files changed: added the Controlled Operations policy/runbook, updated the FB-020 operations runbook cross-reference, reconciled controlled-operations status in the master plan and feature backlog, updated the master-plan README link inventory, and recorded this changelog entry.
+- Summary of change: Documented Controlled Operations Slice 3 as the authoritative local/provider-neutral policy closeout for the evidence foundation through Slice 2D-A. The new runbook covers implemented packet, command, browser, browser-attempt, reconciliation, provider-neutral adapter, local fake-provider, freeze, manifest, seal, verification, expected external digest, and local external-anchor custody behavior. It also records that the tooling does not provide live provider authority, credential resolution, Production/Sandbox/Preview/Demo/Vercel/Supabase authority, SQL or deployment authority, automatic rollback, host-compromise nonrepudiation, global proof of external workspace deletion after process loss, or a real Vercel/Supabase/GitHub adapter.
+- Reason for change: The controlled-operations implementation sequence is complete through local/provider-neutral Slice 2D-A, so operators need a single policy/runbook that states the current evidence guarantees, stop conditions, retention/custody rules, recovery guidance, and future live-provider prerequisites without overstating operational authority.
+- Tests/checks run: Documentation-only validation covered changed-file scope, `git diff --check`, Markdown link validation, heading-hierarchy review, duplicate/conflicting policy review, controlled-ops terminology review, sensitive/private identifier scan, customer-content scan, and generated-artifact scan. No app or controlled-ops source tests were run because no source, SQL, package, or runtime files changed.
+- Known risks or follow-ups: Slice 2D-B live provider adapters remain deferred until a specific provider, credential, target, authorization, idempotency, rollback, and custody model is approved. Broader FB-020 backup/PITR, storage restore, public go-live, and paid-subscription readiness remain separate follow-up gates.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-020 now records the completed local/provider-neutral controlled-operations evidence foundation through Slice 2D-A, the Slice 3 documentation closeout, and the deferred Slice 2D-B live-provider gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now points to the controlled-operations policy/runbook and states the exact local/provider-neutral capability boundary.
+
 ## 2026-07-20
 
 - Branch: `codex/durable-draft-cohort-gating-v1`

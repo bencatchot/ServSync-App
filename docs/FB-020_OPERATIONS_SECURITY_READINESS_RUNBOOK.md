@@ -8,6 +8,8 @@ This document is not approval to change production, apply SQL, modify RLS/storag
 
 FB-020 has met the controlled private beta baseline for the current beta stage. The baseline is supported by production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, a first non-production database-only schema restore drill, schema restore verification matching 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no committed secrets/artifacts. FB-020 is not fully complete: full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production role credentials remain future/not configured, optional stable production smoke record IDs remain future/not configured, public go-live readiness remains a separate gate, and paid-subscription readiness remains a separate gate.
 
+Controlled-operations packet policy is documented in [Controlled Operations Policy And Runbook](CONTROLLED_OPERATIONS_RUNBOOK.md). That runbook covers the local/provider-neutral evidence foundation through Slice 2D-A and the Slice 3 documentation closeout. It does not approve live provider adapters, credentials, SQL, deployment, Supabase, Vercel, Production, Sandbox, Preview, Demo, or customer-data access.
+
 ## Operating Principles
 
 - Default to sandbox, preview, or local environments for authenticated and mutating validation.
