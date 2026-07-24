@@ -23,7 +23,9 @@ import {
   resolveInside,
   safeError,
   sha256,
+  terminalObservedResultForState,
   utcNow,
+  validateAuthorizationReference,
   validateControlledSlug,
   validateRelativePath,
   validateTimestamp,
@@ -34,14 +36,20 @@ import { readCanonicalJsonFile } from './manifest.mjs';
 import {
   BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS,
   BROWSER_ATTEMPT_OUTCOME_CLASS,
+  BROWSER_ATTEMPT_RECONCILIATION_CLASS,
   BROWSER_ATTEMPT_SUMMARY_CLASS,
+  CLEANUP_ASSURANCES,
   CONTINUABLE_CLEANUP_ASSURANCES,
   assertPredecessorOutcomeForRetryLaunch,
   attemptImportSummaryPath,
   attemptOutcomePath,
+  attemptReconciliationPath,
   attemptSummaryPath,
+  buildAttemptReconciliation,
   buildAttemptOutcome,
   expectedAttemptEntry,
+  isReconciledBrowserAttemptToken,
+  readAttemptReconciliation,
   readAttemptOutcome,
   registerBrowserAttemptEntries,
   terminalEventForToken,
@@ -49,7 +57,7 @@ import {
   writeOrVerifyJsonArtifact,
   writeOrVerifyTextArtifact,
 } from './browser-attempts.mjs';
-import { appendEventUnderPacketMutation, verifyEventChain, readEvents } from './evidence.mjs';
+import { appendEventUnderPacketMutation, updateExecutionTokenUnderPacketMutation, verifyEventChain, readEvents } from './evidence.mjs';
 import {
   BROWSER_WORKFLOW_COMMAND_CATEGORY,
   BROWSER_LIMITS,
@@ -1231,6 +1239,157 @@ export function retainTerminalBrowserAttemptOutcome(options = {}) {
     writeOrVerifyJsonArtifact(lockedRoot, stageId, attemptOutcomePath(token.token), outcome, BROWSER_LIMITS.summary_bytes);
     registerBrowserAttemptEntries(lockedRoot, metadata, stageId, [expectedAttemptEntry(token.token, BROWSER_ATTEMPT_OUTCOME_CLASS)]);
     retained = outcome;
+  });
+  return retained;
+}
+
+function reconciliationArtifactExists(rootPath, stageId, token) {
+  return existsSync(resolveInside(rootPath, `stages/${stageId}/artifacts/${attemptReconciliationPath(token)}`));
+}
+
+function classifyAttemptTransactionState(rootPath, token) {
+  const states = [];
+  if (existsSync(transactionPath(rootPath))) states.push('legacy_transaction');
+  if (existsSync(v2AttemptTransactionPath(rootPath, token))) states.push('attempt_transaction');
+  return states.length === 0 ? 'none' : states.sort(compareStrings).join('_and_');
+}
+
+function classifyAttemptCandidateState(rootPath, stageId, token) {
+  const states = [];
+  if (existsSync(summaryCandidatePath(rootPath)) || existsSync(importSummaryCandidatePath(rootPath))) states.push('legacy_candidate');
+  for (const relativePath of [attemptSummaryPath(token), attemptImportSummaryPath(token), attemptOutcomePath(token), attemptReconciliationPath(token)]) {
+    if (existsSync(resolveInside(rootPath, `stages/${stageId}/artifacts/${relativePath}`))) states.push('retained_browser_artifact');
+  }
+  return states.length === 0 ? 'none' : [...new Set(states)].sort(compareStrings).join('_and_');
+}
+
+function assertNoConflictingReconciliationState(rootPath, stageId, token) {
+  if (classifyAttemptTransactionState(rootPath, token) !== 'none' || classifyAttemptCandidateState(rootPath, stageId, token) !== 'none') {
+    throw new EvidenceError('BROWSER_RECONCILIATION_CONFLICT', 'Browser attempt reconciliation cannot discard pending browser evidence.');
+  }
+}
+
+function assertReconciliationAuthorizationUnused(rootPath, stageId, tokenId, authorizationReference) {
+  const indexPath = resolveInside(rootPath, `stages/${stageId}/artifact-index.json`);
+  const index = readCanonicalJsonFile(indexPath);
+  for (const entry of index.artifacts ?? []) {
+    if (entry.artifact_class !== BROWSER_ATTEMPT_RECONCILIATION_CLASS) continue;
+    const token = entry.path.split('/')[1];
+    const { reconciliation } = readAttemptReconciliation(rootPath, stageId, token, [0o600, 0o400]);
+    if (reconciliation.authorization_reference === authorizationReference && reconciliation.execution_token_id !== tokenId) {
+      throw new EvidenceError('DUPLICATE_RECONCILIATION_AUTHORIZATION', 'Browser attempt reconciliation authorization is already used.');
+    }
+  }
+}
+
+function verifiedExistingReconciliation(rootPath, stageId, token, authorizationReference) {
+  if (!reconciliationArtifactExists(rootPath, stageId, token.token)) return null;
+  const { reconciliation } = readAttemptReconciliation(rootPath, stageId, token.token, [0o600, 0o400]);
+  const { outcome } = readAttemptOutcome(rootPath, stageId, token.token, [0o600, 0o400]);
+  if (!isReconciledBrowserAttemptToken(token)
+    || reconciliation.authorization_reference !== authorizationReference
+    || reconciliation.cleanup_assurance !== outcome.cleanup_assurance
+    || reconciliation.reconciled_token_state !== token.state
+    || outcome.token_terminal_state !== token.state) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Retained browser attempt reconciliation does not match the requested authorization.');
+  }
+  return { reconciliation, outcome };
+}
+
+function cleanupAssuranceForReconciliation({ priorState, browserWorkspace, cleanupAssurance }) {
+  if (priorState === 'claimed') {
+    if (browserWorkspace !== null) throw new EvidenceError('BROWSER_RECONCILIATION_CONFLICT', 'Claimed-only reconciliation cannot accept a browser workspace handle.');
+    if (cleanupAssurance !== null && cleanupAssurance !== 'no_workspace_created') throw new EvidenceError('BROWSER_RECONCILIATION_CLEANUP_INVALID', 'Claimed-only reconciliation requires no-workspace cleanup assurance.');
+    return 'no_workspace_created';
+  }
+  if (browserWorkspace?.cleanupHandle) {
+    try {
+      const cleanup = cleanupBrowserEvidence(browserWorkspace.cleanupHandle);
+      return cleanup.status === 'cleaned' || cleanup.status === 'already_cleaned' ? 'authenticated_in_process_cleanup' : 'cleanup_not_completed';
+    } catch {
+      return 'cleanup_not_completed';
+    }
+  }
+  if (cleanupAssurance === null) return 'cleanup_state_unknown_after_process_loss';
+  if (!CLEANUP_ASSURANCES.includes(cleanupAssurance)) throw new EvidenceError('BROWSER_RECONCILIATION_CLEANUP_INVALID', 'Browser attempt reconciliation cleanup assurance is invalid.');
+  if (cleanupAssurance === 'authenticated_in_process_cleanup' || cleanupAssurance === 'no_workspace_created') {
+    throw new EvidenceError('BROWSER_RECONCILIATION_CLEANUP_INVALID', 'Browser attempt reconciliation cleanup assurance overstates cleanup proof.');
+  }
+  return cleanupAssurance;
+}
+
+function appendReconciliationTerminalEvent(rootPath, metadata, stageId, token, terminalState, timestamp) {
+  const observed = terminalObservedResultForState(terminalState, token.harness_result?.detail ?? null, { code: 'BROWSER_ATTEMPT_RECONCILIATION_INVALID' });
+  return appendEventUnderPacketMutation(rootPath, metadata, verifyEventChain(rootPath).head, {
+    event_id: `${token.token}-completed`,
+    event_type: 'command_completed',
+    action_timestamp: timestamp,
+    archive_timestamp: null,
+    stage_id: stageId,
+    command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+    expected_result: token.expected_result,
+    observed_result: observed,
+    result_classification: observed,
+    exit_code: null,
+    sanitized_artifact_paths: [],
+  });
+}
+
+export function reconcileInterruptedBrowserAttempt(options = {}) {
+  assertExactObject(options, ['operationRoot', 'stageId', 'executionTokenId', 'authorizationReference', 'reasonCode'], ['browserWorkspace', 'cleanupAssurance'], 'browser attempt reconciliation options');
+  const { operationRoot, stageId, executionTokenId, authorizationReference, reasonCode, browserWorkspace = null, cleanupAssurance = null } = options;
+  validateAuthorizationReference(authorizationReference, 'browser attempt reconciliation authorization');
+  validateControlledSlug(reasonCode, 'browser attempt reconciliation reason', { allowUnderscore: true });
+  const { rootPath } = assertOperationRoot(operationRoot, { allowSealed: false });
+  let retained;
+  withPacketMutationLock(rootPath, 'browser-attempt-reconciliation', ({ rootPath: lockedRoot, metadata }) => {
+    const tokenPath = resolveInside(lockedRoot, `tokens/${executionTokenId}.json`);
+    const currentToken = readCanonicalJsonFile(tokenPath);
+    if (currentToken.operation_id !== metadata.operation_id || currentToken.stage_id !== stageId || currentToken.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY) throw new EvidenceError('BROWSER_PACKET_TOKEN_INVALID', 'Browser attempt reconciliation token identity is invalid.');
+    const existing = verifiedExistingReconciliation(lockedRoot, stageId, currentToken, authorizationReference);
+    if (existing) { retained = existing; return; }
+    if (!['claimed', 'started'].includes(currentToken.state)) throw new EvidenceError('BROWSER_RECONCILIATION_TOKEN_STATE_INVALID', 'Browser attempt reconciliation requires an active browser token.');
+    assertReconciliationAuthorizationUnused(lockedRoot, stageId, currentToken.token, authorizationReference);
+    const events = readEvents(lockedRoot);
+    const startedEvents = events.filter((event) => event.event_id === `${currentToken.token}-started`);
+    const terminalEvents = events.filter((event) => event.event_id === `${currentToken.token}-completed`);
+    if (terminalEvents.length !== 0) throw new EvidenceError('BROWSER_RECONCILIATION_CONFLICT', 'Browser attempt already has terminal timeline evidence.');
+    if (currentToken.state === 'claimed' && startedEvents.length !== 0) throw new EvidenceError('BROWSER_RECONCILIATION_CONFLICT', 'Claimed browser attempt has impossible start evidence.');
+    if (currentToken.state === 'started' && startedEvents.length !== 1) throw new EvidenceError('BROWSER_RECONCILIATION_CONFLICT', 'Started browser attempt lacks exact start evidence.');
+    assertNoConflictingReconciliationState(lockedRoot, stageId, currentToken.token);
+    const chainHead = verifyEventChain(lockedRoot).head;
+    const assurance = cleanupAssuranceForReconciliation({ priorState: currentToken.state, browserWorkspace, cleanupAssurance });
+    const terminalState = currentToken.state === 'claimed' ? 'failed_before_execution' : 'interrupted';
+    const detail = currentToken.state === 'claimed' ? 'reconciled_no_start' : 'reconciled_process_lost';
+    const commandResult = terminalState === 'failed_before_execution'
+      ? { exit_kind: 'not_started', exit_code: null, signal_name: null, signal_number: null }
+      : null;
+    const harnessResult = { classification: terminalState === 'failed_before_execution' ? 'failed_before_execution' : 'interrupted', detail, wrapper_signal: null, forwarded_signal: null };
+    const updatedToken = updateExecutionTokenUnderPacketMutation(lockedRoot, metadata, currentToken.token, terminalState, { commandResult, harnessResult });
+    const reconciledAt = ensureMonotonicUtc(Date.parse(verifyEventChain(lockedRoot).lastActionTimestamp));
+    const terminalEvent = appendReconciliationTerminalEvent(lockedRoot, metadata, stageId, updatedToken, terminalState, reconciledAt);
+    const reconciliation = buildAttemptReconciliation({
+      metadata,
+      stageId,
+      token: updatedToken,
+      priorState: currentToken.state,
+      authorizationReference,
+      reasonCode,
+      cleanupAssurance: assurance,
+      transactionStateClass: classifyAttemptTransactionState(lockedRoot, currentToken.token),
+      candidateStateClass: classifyAttemptCandidateState(lockedRoot, stageId, currentToken.token),
+      chainHeadBeforeReconciliation: chainHead,
+      terminalEvent,
+      reconciledAt,
+    });
+    const outcome = buildAttemptOutcome({ metadata, stageId, token: updatedToken, terminalEvent, cleanupAssurance: assurance, retainedAt: reconciledAt });
+    writeOrVerifyJsonArtifact(lockedRoot, stageId, attemptReconciliationPath(updatedToken.token), reconciliation, BROWSER_LIMITS.summary_bytes);
+    writeOrVerifyJsonArtifact(lockedRoot, stageId, attemptOutcomePath(updatedToken.token), outcome, BROWSER_LIMITS.summary_bytes);
+    registerBrowserAttemptEntries(lockedRoot, metadata, stageId, [
+      expectedAttemptEntry(updatedToken.token, BROWSER_ATTEMPT_RECONCILIATION_CLASS),
+      expectedAttemptEntry(updatedToken.token, BROWSER_ATTEMPT_OUTCOME_CLASS),
+    ]);
+    retained = { reconciliation, outcome };
   });
   return retained;
 }

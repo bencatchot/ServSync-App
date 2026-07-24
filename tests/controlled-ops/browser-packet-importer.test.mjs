@@ -32,9 +32,11 @@ import {
 import {
   attemptImportSummaryPath,
   attemptOutcomePath,
+  attemptReconciliationPath,
   attemptSummaryPath,
   BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS,
   BROWSER_ATTEMPT_OUTCOME_CLASS,
+  BROWSER_ATTEMPT_RECONCILIATION_CLASS,
   BROWSER_ATTEMPT_SUMMARY_CLASS,
 } from '../../scripts/controlled-ops/browser-attempts.mjs';
 import {
@@ -43,6 +45,7 @@ import {
   BROWSER_SUMMARY_ARTIFACT,
   createPacketBoundBrowserLaunchContract,
   promoteGeneratedBrowserEvidenceToPacket,
+  reconcileInterruptedBrowserAttempt,
   validateBrowserImportSummary,
 } from '../../scripts/controlled-ops/browser-packet-importer.mjs';
 import {
@@ -207,6 +210,37 @@ function browserEvent(root, token = 'browser-token') {
     .filter(Boolean)
     .map((line) => JSON.parse(line))
     .find((event) => event.event_id === `${token}-browser-evidence`);
+}
+
+function claimRetryBrowserToken(packet, token, prior, authorization = `review:${token}`) {
+  return claimExecutionToken(packet.root, {
+    stageId: 'stage-1',
+    token,
+    commandCategory: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+    expectedResult: 'completed',
+    retryOf: prior,
+    retryAuthorization: authorization,
+  });
+}
+
+function runSuccessfulPacketAttempt(packet, parent, token) {
+  const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
+  const launch = createPacketBoundBrowserLaunchContract({
+    operationRoot: packet.root,
+    stageId: 'stage-1',
+    executionTokenId: token,
+    browserWorkspace: workspace,
+    baseURL: 'http://127.0.0.1:4200',
+    runLabel: 'synthetic-form-submit',
+  });
+  writeCompletePacketBoundJournal(workspace, launch);
+  completeBrowserToken(packet, { token });
+  return promoteGeneratedBrowserEvidenceToPacket({
+    operationRoot: packet.root,
+    stageId: 'stage-1',
+    executionTokenId: token,
+    browserWorkspace: workspace,
+  });
 }
 
 function transactionStatuses(state) {
@@ -1095,5 +1129,233 @@ test('browser packet imports block manifest and seal until browser-aware freeze 
     assert.equal(verifyPacket(run.packet.root, sealed.seal_sha256).status, 'verified');
   } finally {
     run.cleanup();
+  }
+});
+
+test('claimed browser attempts reconcile before execution and allow a later successful retry', () => {
+  const parent = tempRoot('servsync-browser-reconcile-');
+  const packet = makePacket('stage-1', 'op-recon-claim');
+  try {
+    claimBrowserToken(packet, { token: 'attempt-one' });
+    assert.throws(() => claimRetryBrowserToken(packet, 'attempt-two', 'attempt-one', 'review:retry-one'), hasCode('BROWSER_ATTEMPT_ACTIVE'));
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:a',
+    }), hasCode('UNSAFE_CALLER_METADATA'));
+    const retained = reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+    });
+    assert.equal(retained.reconciliation.prior_token_state, 'claimed');
+    assert.equal(retained.reconciliation.reconciled_token_state, 'failed_before_execution');
+    assert.equal(retained.reconciliation.cleanup_assurance, 'no_workspace_created');
+    assert.equal(retained.outcome.attempt_status, 'failed_before_execution');
+    const reconciliationPath = join(packet.root, 'stages', 'stage-1', 'artifacts', attemptReconciliationPath('attempt-one'));
+    assert.equal(existsSync(reconciliationPath), true);
+    const index = readCanonicalJsonFile(join(packet.root, 'stages', 'stage-1', 'artifact-index.json'));
+    assert.ok(index.artifacts.some((entry) => entry.path === attemptReconciliationPath('attempt-one') && entry.artifact_class === BROWSER_ATTEMPT_RECONCILIATION_CLASS));
+    const idempotent = reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+    });
+    assert.equal(canonicalStringify(idempotent.reconciliation), canonicalStringify(retained.reconciliation));
+    claimRetryBrowserToken(packet, 'attempt-two', 'attempt-one', 'review:retry-one');
+    runSuccessfulPacketAttempt(packet, parent, 'attempt-two');
+    assert.equal(freezeStage(packet.root, 'stage-1').lifecycle, 'workflow-frozen');
+    createManifest(packet.root);
+    const sealed = sealOperation(packet.root);
+    assert.equal(verifyPacket(packet.root, sealed.seal_sha256).status, 'verified');
+  } finally {
+    try { packet.cleanup(); } catch {}
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('started browser attempts reconcile with authenticated cleanup and preserve retry lineage', () => {
+  const parent = tempRoot('servsync-browser-reconcile-');
+  const packet = makePacket('stage-1', 'op-recon-start');
+  try {
+    claimBrowserToken(packet, { token: 'attempt-one' });
+    const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
+    createPacketBoundBrowserLaunchContract({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      browserWorkspace: workspace,
+      baseURL: 'http://127.0.0.1:4200',
+      runLabel: 'synthetic-form-submit',
+    });
+    updateExecutionToken(packet.root, 'attempt-one', 'started');
+    appendTokenEvent(packet.root, 'stage-1', 'attempt-one', 'started', 'started');
+    const retained = reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:interrupt-one',
+      browserWorkspace: workspace,
+    });
+    assert.equal(retained.reconciliation.prior_token_state, 'started');
+    assert.equal(retained.reconciliation.reconciled_token_state, 'interrupted');
+    assert.equal(retained.reconciliation.cleanup_assurance, 'authenticated_in_process_cleanup');
+    assert.equal(retained.outcome.command_result, null);
+    assert.equal(existsSync(workspace.root), false);
+    claimRetryBrowserToken(packet, 'attempt-two', 'attempt-one', 'review:retry-one');
+    runSuccessfulPacketAttempt(packet, parent, 'attempt-two');
+    assert.equal(freezeStage(packet.root, 'stage-1').lifecycle, 'workflow-frozen');
+  } finally {
+    try { packet.cleanup(); } catch {}
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('reconciliation rejects missing authorization duplicate authorization and conflicting packet state', () => {
+  const packet = makePacket('stage-1', 'op-recon-conflict');
+  try {
+    claimBrowserToken(packet, { token: 'attempt-one' });
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+    }), hasCode('INVALID_SCHEMA'));
+    writeFileSync(summaryCandidatePath(packet.root), `${canonicalStringify({ status: 'candidate' })}\n`, { mode: 0o600 });
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+  } finally {
+    packet.cleanup();
+  }
+
+  const duplicate = makePacket('stage-1', 'op-recon-dupe');
+  try {
+    claimBrowserToken(duplicate, { token: 'attempt-one' });
+    reconcileInterruptedBrowserAttempt({
+      operationRoot: duplicate.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+    });
+    claimRetryBrowserToken(duplicate, 'attempt-two', 'attempt-one', 'review:retry-one');
+    updateExecutionToken(duplicate.root, 'attempt-two', 'started');
+    appendTokenEvent(duplicate.root, 'stage-1', 'attempt-two', 'started', 'started');
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: duplicate.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-two',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:abandon-one',
+    }), hasCode('DUPLICATE_RECONCILIATION_AUTHORIZATION'));
+  } finally {
+    duplicate.cleanup();
+  }
+});
+
+test('cleanup uncertainty and cleanup failure are retained honestly and block retry', () => {
+  const parent = tempRoot('servsync-browser-reconcile-');
+  const unknown = makePacket('stage-1', 'op-recon-unknown');
+  try {
+    claimBrowserToken(unknown, { token: 'attempt-one' });
+    updateExecutionToken(unknown.root, 'attempt-one', 'started');
+    appendTokenEvent(unknown.root, 'stage-1', 'attempt-one', 'started', 'started');
+    const retained = reconcileInterruptedBrowserAttempt({
+      operationRoot: unknown.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:unknown-one',
+    });
+    assert.equal(retained.reconciliation.cleanup_assurance, 'cleanup_state_unknown_after_process_loss');
+    assert.throws(() => claimRetryBrowserToken(unknown, 'attempt-two', 'attempt-one', 'review:retry-one'), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
+    assert.throws(() => freezeStage(unknown.root, 'stage-1'), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
+  } finally {
+    unknown.cleanup();
+  }
+
+  const failed = makePacket('stage-1', 'op-recon-cleanup');
+  try {
+    claimBrowserToken(failed, { token: 'attempt-one' });
+    const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
+    writeFileSync(join(workspace.root, 'unexpected.txt'), 'local only\n', { mode: 0o600 });
+    updateExecutionToken(failed.root, 'attempt-one', 'started');
+    appendTokenEvent(failed.root, 'stage-1', 'attempt-one', 'started', 'started');
+    const retained = reconcileInterruptedBrowserAttempt({
+      operationRoot: failed.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'cleanup_failed',
+      authorizationReference: 'review:cleanup-failed',
+      browserWorkspace: workspace,
+    });
+    assert.equal(retained.reconciliation.cleanup_assurance, 'cleanup_not_completed');
+    assert.equal(existsSync(workspace.root), true);
+    assert.throws(() => claimRetryBrowserToken(failed, 'attempt-two', 'attempt-one', 'review:retry-one'), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
+  } finally {
+    failed.cleanup();
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('reconciliation tampering and later abandoned tails block final browser selection', () => {
+  const parent = tempRoot('servsync-browser-reconcile-');
+  const packet = makePacket('stage-1', 'op-recon-tamper');
+  try {
+    claimBrowserToken(packet, { token: 'attempt-one' });
+    reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+    });
+    claimRetryBrowserToken(packet, 'attempt-two', 'attempt-one', 'review:retry-one');
+    runSuccessfulPacketAttempt(packet, parent, 'attempt-two');
+    freezeStage(packet.root, 'stage-1');
+    createManifest(packet.root);
+    const sealed = sealOperation(packet.root);
+    const reconciliationPath = join(packet.root, 'stages', 'stage-1', 'artifacts', attemptReconciliationPath('attempt-one'));
+    chmodSync(reconciliationPath, 0o600);
+    const reconciliation = readCanonicalJsonFile(reconciliationPath);
+    writeCanonical(reconciliationPath, { ...reconciliation, reason_code: 'tampered_reason' });
+    assert.throws(() => verifyPacket(packet.root, sealed.seal_sha256), (error) => ['BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'BROWSER_ATTEMPT_SELECTION_INVALID', 'STAGE_MANIFEST_MISMATCH', 'SEAL_MISMATCH'].includes(error?.code));
+  } finally {
+    try { packet.cleanup(); } catch {}
+    rmSync(parent, { recursive: true, force: true });
+  }
+
+  const cherry = makePacket('stage-1', 'op-recon-cherry');
+  const cherryParent = tempRoot('servsync-browser-reconcile-');
+  try {
+    claimBrowserToken(cherry, { token: 'attempt-one' });
+    runSuccessfulPacketAttempt(cherry, cherryParent, 'attempt-one');
+    claimRetryBrowserToken(cherry, 'attempt-two', 'attempt-one', 'review:retry-one');
+    updateExecutionToken(cherry.root, 'attempt-two', 'started');
+    appendTokenEvent(cherry.root, 'stage-1', 'attempt-two', 'started', 'started');
+    reconcileInterruptedBrowserAttempt({
+      operationRoot: cherry.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-two',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:abandon-two',
+      cleanupAssurance: 'packet_recovery_without_global_workspace_absence_proof',
+    });
+    assert.throws(() => freezeStage(cherry.root, 'stage-1'), hasCode('BROWSER_FINAL_ATTEMPT_NOT_SUCCESSFUL'));
+  } finally {
+    try { cherry.cleanup(); } catch {}
+    rmSync(cherryParent, { recursive: true, force: true });
   }
 });

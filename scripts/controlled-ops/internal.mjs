@@ -50,7 +50,7 @@ const TERMINAL_EVENT_EXPECTATIONS = Object.freeze({
   command_failed: { observed: new Set(['command_failed']), exitKinds: new Set(['normal']), artifacts: 'required', startedEvent: 'required' },
   signaled: { observed: new Set(['signaled']), exitKinds: new Set(['signal']), artifacts: 'required', startedEvent: 'required' },
   sanitizer_failed: { observed: new Set(['sanitizer_failed']), exitKinds: new Set(['normal', 'signal']), artifacts: 'forbidden', startedEvent: 'required' },
-  interrupted: { observed: new Set(['interrupted']), exitKinds: new Set(['not_started', 'normal', 'signal']), artifacts: 'forbidden', startedEvent: 'allowed' },
+  interrupted: { observed: new Set(['interrupted']), exitKinds: new Set(['not_started', 'normal', 'signal', 'unknown']), artifacts: 'forbidden', startedEvent: 'allowed' },
   failed_before_execution: { observed: new Set(['failed_before_execution']), exitKinds: new Set(['not_started']), artifacts: 'forbidden', startedEvent: 'forbidden' },
   harness_failed_after_execution: { observed: new Set(['harness_failed', 'affected_rows_mismatch']), exitKinds: new Set(['normal', 'signal']), artifacts: 'allowed', startedEvent: 'required' },
   limit_exceeded: { observed: new Set(['limit_exceeded']), exitKinds: new Set(['signal']), artifacts: 'forbidden', startedEvent: 'required' },
@@ -234,7 +234,8 @@ export function validateTerminalEventBinding(token, events, { code = 'INCOMPLETE
     || terminal.observed_result !== terminalObservedResultForState(token.state, token.harness_result?.detail ?? null, { code })) {
     terminalBindingError(code, `Execution token ${token.token} terminal event classification is incompatible.`);
   }
-  if (!expectation.exitKinds.has(token.command_result?.exit_kind) || terminal.exit_code !== eventExitCode(token.command_result)) {
+  const exitKind = token.command_result?.exit_kind ?? (token.state === 'interrupted' && token.harness_result?.detail === 'reconciled_process_lost' ? 'unknown' : undefined);
+  if (!expectation.exitKinds.has(exitKind) || terminal.exit_code !== eventExitCode(token.command_result)) {
     terminalBindingError(code, `Execution token ${token.token} terminal event exit evidence is incompatible.`);
   }
   if (expectation.artifacts === 'required' && terminal.sanitized_artifact_paths.length === 0) terminalBindingError(code, `Execution token ${token.token} terminal event lacks required artifacts.`);
@@ -242,7 +243,8 @@ export function validateTerminalEventBinding(token, events, { code = 'INCOMPLETE
   if (token.state === 'completed') validateSuccessfulHarnessResult(token.harness_result, { code });
   if (token.state === 'interrupted') {
     const signal = token.harness_result?.wrapper_signal;
-    if (token.command_result.exit_kind === 'not_started' && signal === null) terminalBindingError(code, `Execution token ${token.token} interruption lacks wrapper signal provenance.`);
+    if (token.command_result?.exit_kind === 'not_started' && signal === null) terminalBindingError(code, `Execution token ${token.token} interruption lacks wrapper signal provenance.`);
+    if (token.command_result === null && token.harness_result?.detail !== 'reconciled_process_lost') terminalBindingError(code, `Execution token ${token.token} interruption lacks command result evidence.`);
   }
   return terminal;
 }
