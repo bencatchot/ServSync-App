@@ -16,6 +16,7 @@ import {
   validateCommandCategory,
   validateControlledSlug,
   validateRelativePath,
+  validateTerminalEventBinding,
   validateTimestamp,
   writeJsonAtomic,
 } from './internal.mjs';
@@ -209,6 +210,12 @@ function validateHarnessResult(value) {
   validateControlledSlug(value.detail, 'browser attempt harness detail', { allowUnderscore: true });
 }
 
+function validatePrivacyCount(value, label) {
+  if (!Number.isInteger(value) || value < 0 || value > LIMITS.artifact_count_per_stage) {
+    throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', `${label} is invalid.`);
+  }
+}
+
 export function validateAttemptOutcome(outcome) {
   assertExactObject(outcome, OUTCOME_FIELDS, [], 'browser attempt outcome');
   if (outcome.schema_version !== BROWSER_ATTEMPT_OUTCOME_SCHEMA || outcome.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY) {
@@ -226,9 +233,16 @@ export function validateAttemptOutcome(outcome) {
   validateHarnessResult(outcome.harness_result);
   if (!CLEANUP_ASSURANCES.includes(outcome.cleanup_assurance)) throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Browser attempt cleanup assurance is invalid.');
   assertExactObject(outcome.privacy_scan, ['secret_findings', 'customer_content_findings', 'prohibited_retained_artifact_findings', 'files_scanned'], [], 'browser attempt privacy scan');
-  if (outcome.privacy_scan.secret_findings !== 0 || outcome.privacy_scan.customer_content_findings !== 0 || outcome.privacy_scan.prohibited_retained_artifact_findings !== 0 || !Number.isInteger(outcome.privacy_scan.files_scanned)) throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Browser attempt privacy scan is invalid.');
+  validatePrivacyCount(outcome.privacy_scan.secret_findings, 'Browser attempt secret finding count');
+  validatePrivacyCount(outcome.privacy_scan.customer_content_findings, 'Browser attempt customer finding count');
+  validatePrivacyCount(outcome.privacy_scan.prohibited_retained_artifact_findings, 'Browser attempt prohibited artifact finding count');
+  validatePrivacyCount(outcome.privacy_scan.files_scanned, 'Browser attempt scanned file count');
+  if (outcome.privacy_scan.secret_findings !== 0
+    || outcome.privacy_scan.customer_content_findings !== 0
+    || outcome.privacy_scan.prohibited_retained_artifact_findings !== 0) throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Browser attempt privacy scan is invalid.');
   if (!/^.+-completed$/.test(outcome.terminal_event_id) || !/^[a-f0-9]{64}$/.test(outcome.terminal_event_hash)) throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Browser attempt terminal event binding is invalid.');
   if (outcome.attempt_status === 'succeeded') {
+    if (outcome.privacy_scan.files_scanned !== 2) throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Successful browser attempt privacy scan count is invalid.');
     if (outcome.browser_evidence_status !== 'promoted'
       || typeof outcome.browser_run_id !== 'string'
       || typeof outcome.binding_digest !== 'string'
@@ -242,7 +256,8 @@ export function validateAttemptOutcome(outcome) {
       throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Successful browser attempt outcome is invalid.');
     }
     validateGeneratedBrowserId(outcome.browser_run_id, 'browser attempt run ID');
-  } else if (outcome.browser_evidence_status !== 'not_retained'
+  } else if (outcome.privacy_scan.files_scanned !== 0
+    || outcome.browser_evidence_status !== 'not_retained'
     || outcome.browser_summary_path !== null
     || outcome.browser_summary_sha256 !== null
     || outcome.browser_summary_bytes !== null
@@ -263,9 +278,7 @@ export function readAttemptOutcome(rootPath, stageId, token, modes = [0o600, 0o4
 }
 
 export function terminalEventForToken(events, token) {
-  const matches = events.filter((event) => event.event_id === `${token.token}-completed`);
-  if (matches.length !== 1) throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_INVALID', 'Browser attempt token terminal event must exist exactly once.');
-  return matches[0];
+  return validateTerminalEventBinding(token, events, { code: 'BROWSER_ATTEMPT_OUTCOME_INVALID' });
 }
 
 function privacyScanForContents(contents) {
@@ -274,6 +287,34 @@ function privacyScanForContents(contents) {
     if (scanCustomerContent(content).length > 0) throw new EvidenceError('BROWSER_ATTEMPT_PRIVACY_FAILED', 'Browser attempt retained content failed customer scan.');
   }
   return { secret_findings: 0, customer_content_findings: 0, prohibited_retained_artifact_findings: 0, files_scanned: contents.length };
+}
+
+function attemptPromotionArtifactPaths(stageId, token) {
+  return [
+    `stages/${stageId}/artifacts/${attemptSummaryPath(token)}`,
+    `stages/${stageId}/artifacts/${attemptImportSummaryPath(token)}`,
+    `stages/${stageId}/artifacts/${attemptOutcomePath(token)}`,
+  ];
+}
+
+function promotionEventForSuccessfulAttempt(events, stageId, token) {
+  const matches = events.filter((event) => event.event_id === `${token}-browser-evidence`);
+  if (matches.length !== 1) throw new EvidenceError('BROWSER_ATTEMPT_INVENTORY_INVALID', 'Successful browser attempt promotion event must exist exactly once.');
+  const [event] = matches;
+  const artifactPaths = attemptPromotionArtifactPaths(stageId, token);
+  if (event.stage_id !== stageId
+    || event.event_type !== 'browser-promoted'
+    || event.archive_timestamp !== null
+    || event.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY
+    || event.expected_result !== 'completed'
+    || event.observed_result !== 'browser-promoted'
+    || event.result_classification !== 'passed'
+    || event.exit_code !== null
+    || canonicalStringify(event.sanitized_artifact_paths) !== canonicalStringify(artifactPaths)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_INVENTORY_INVALID', 'Successful browser attempt promotion event does not match retained artifacts.');
+  }
+  validateTimestamp(event.action_timestamp, 'browser attempt promotion event timestamp');
+  return event;
 }
 
 export function buildAttemptOutcome({ metadata, stageId, token, terminalEvent, cleanupAssurance, summary = null, summaryContent = null, importSummary = null, importContent = null, retainedAt = utcNow() }) {
@@ -447,6 +488,7 @@ export function buildAttemptInventory(rootPath, metadata, stageId, events, { req
     } else if (requireOutcomes) {
       throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_MISSING', 'Every browser attempt must have an outcome.');
     }
+    const promotionEvent = token.state === 'completed' ? promotionEventForSuccessfulAttempt(events, stageId, token.token) : null;
     attempts.push({
       attempt_sequence: index + 1,
       execution_token_id: token.token,
@@ -461,8 +503,8 @@ export function buildAttemptInventory(rootPath, metadata, stageId, events, { req
       outcome_bytes: outcomeContent ? Buffer.byteLength(outcomeContent) : null,
       terminal_event_id: terminalEvent.event_id,
       terminal_event_hash: terminalEvent.current_event_hash,
-      promotion_event_id: token.state === 'completed' ? `${token.token}-browser-evidence` : null,
-      promotion_event_hash: null,
+      promotion_event_id: promotionEvent?.event_id ?? null,
+      promotion_event_hash: promotionEvent?.current_event_hash ?? null,
       token,
       outcome,
     });

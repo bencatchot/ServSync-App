@@ -699,7 +699,9 @@ function v2VerificationState(rootPath, metadata, stageId, events, chain, tokens,
     throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Selected browser attempt outcome does not match retained evidence.');
   }
   const promotionEvent = assertPromotionEvent(events, stageId, token.token, selectedAttemptArtifactPaths(stageId, token.token));
-  selected.promotion_event_hash = promotionEvent.current_event_hash;
+  if (selected.promotion_event_id !== promotionEvent.event_id || selected.promotion_event_hash !== promotionEvent.current_event_hash) {
+    throw new EvidenceError('BROWSER_ATTEMPT_SELECTION_INVALID', 'Selected browser attempt inventory does not match the promotion event.');
+  }
   const privacyScan = v2PrivacyScan(rootPath, stageId, [summaryContent, importContent, outcomeRead.content]);
   return { inventory, selected, token, summary, summaryContent, importSummary, importContent, outcome, outcomeContent: outcomeRead.content, binding, promotionEvent, privacyScan };
 }

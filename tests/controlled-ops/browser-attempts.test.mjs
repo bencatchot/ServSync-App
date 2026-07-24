@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createEmptyBrowserObservabilityAggregates } from '../../scripts/controlled-ops/browser-collectors.mjs';
@@ -26,6 +26,7 @@ import {
   updateExecutionToken,
   appendEvent,
   verifyEventChain,
+  readEvents,
   verifyPacket,
 } from '../../scripts/controlled-ops/evidence.mjs';
 import { readCanonicalJsonFile } from '../../scripts/controlled-ops/manifest.mjs';
@@ -34,11 +35,14 @@ import {
   attemptSummaryPath,
   BROWSER_ATTEMPT_LIMIT,
   BROWSER_ATTEMPT_SELECTION_ARTIFACT,
+  buildAttemptInventory,
+  readAttemptOutcome,
 } from '../../scripts/controlled-ops/browser-attempts.mjs';
+import { canonicalStringify, sha256 } from '../../scripts/controlled-ops/internal.mjs';
 import { makePacket } from './helpers.mjs';
 
 let operationCounter = 0;
-const OPERATION_WORDS = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel'];
+const OPERATION_WORDS = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima', 'mike', 'november', 'oscar', 'papa'];
 
 function tempRoot(prefix = 'servsync-browser-attempts-') {
   const root = mkdtempSync(join('/private/tmp', prefix));
@@ -84,6 +88,17 @@ function completeToken(packet, token, { state = 'command_failed', exitCode = 7 }
     harnessResult: { classification: state === 'completed' ? 'completed' : state, detail: state === 'completed' ? 'evidence_retained' : 'local_fixture', wrapper_signal: null, forwarded_signal: null },
   });
   appendTokenEvent(packet.root, 'stage-1', token, 'completed', state === 'completed' ? 'passed' : state, exitCode, [`stages/stage-1/artifacts/${attemptOutcomePath(token)}`]);
+}
+
+function writeCanonical(path, value) {
+  writeFileSync(path, `${canonicalStringify(value)}\n`, { mode: 0o600 });
+}
+
+function mutateOutcome(packet, token, mutator) {
+  const path = join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath(token));
+  const outcome = readCanonicalJsonFile(path);
+  writeCanonical(path, mutator(outcome));
+  return path;
 }
 
 function writePassedJournal(workspace, launch) {
@@ -199,6 +214,23 @@ test('retry launch is blocked until the predecessor terminal outcome is retained
   cleanupBrowserEvidence(workspace.cleanupHandle);
 }));
 
+test('attempt outcome retention rejects misleading terminal event semantics', () => withPacket((packet) => {
+  claimBrowserToken(packet, 'attempt-one');
+  updateExecutionToken(packet.root, 'attempt-one', 'started');
+  appendTokenEvent(packet.root, 'stage-1', 'attempt-one', 'started', 'started');
+  updateExecutionToken(packet.root, 'attempt-one', 'command_failed', {
+    commandResult: { exit_kind: 'normal', exit_code: 7, signal_name: null, signal_number: null },
+    harnessResult: { classification: 'command_failed', detail: 'local_fixture', wrapper_signal: null, forwarded_signal: null },
+  });
+  appendTokenEvent(packet.root, 'stage-1', 'attempt-one', 'completed', 'passed', 0, [`stages/stage-1/artifacts/${attemptOutcomePath('attempt-one')}`]);
+  assert.throws(() => retainTerminalBrowserAttemptOutcome({
+    operationRoot: packet.root,
+    stageId: 'stage-1',
+    executionTokenId: 'attempt-one',
+    cleanupAssurance: 'no_workspace_created',
+  }), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
+}));
+
 test('noncontinuable cleanup assurances are retained but block continuation', () => withPacket((packet, parent) => {
   claimBrowserToken(packet, 'attempt-one');
   completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
@@ -248,6 +280,75 @@ test('browser-aware freeze selects the latest successful lineage tail', () => wi
   assert.equal(selection.selected_attempt_sequence, 2);
   assert.equal(selection.attempt_count, 2);
   assert.equal(selection.selection_rule, 'latest_authorized_terminal_attempt');
+}));
+
+test('invalid privacy counters cannot be read, retried, frozen, sealed, or verified', () => withPacket((packet, parent) => {
+  claimBrowserToken(packet, 'attempt-one');
+  completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
+  retainTerminalBrowserAttemptOutcome({ operationRoot: packet.root, stageId: 'stage-1', executionTokenId: 'attempt-one', cleanupAssurance: 'no_workspace_created' });
+  mutateOutcome(packet, 'attempt-one', (outcome) => ({
+    ...outcome,
+    privacy_scan: { ...outcome.privacy_scan, files_scanned: -1 },
+  }));
+  assert.throws(() => readAttemptOutcome(packet.root, 'stage-1', 'attempt-one'), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
+  assert.throws(() => freezeStage(packet.root, 'stage-1'), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
+  assert.throws(() => createManifest(packet.root), (error) => ['BROWSER_ATTEMPT_OUTCOME_INVALID', 'BROWSER_VERIFICATION_DEFERRED', 'STAGE_NOT_FROZEN'].includes(error?.code));
+  assert.throws(() => sealOperation(packet.root), (error) => ['BROWSER_ATTEMPT_OUTCOME_INVALID', 'BROWSER_VERIFICATION_DEFERRED', 'MANIFEST_MISSING', 'STAGE_NOT_FROZEN'].includes(error?.code));
+  assert.throws(() => verifyPacket(packet.root), (error) => ['BROWSER_ATTEMPT_OUTCOME_INVALID', 'BROWSER_VERIFICATION_DEFERRED', 'MANIFEST_MISSING'].includes(error?.code));
+  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
+  const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
+  assert.throws(() => createPacketBoundBrowserLaunchContract({
+    operationRoot: packet.root,
+    stageId: 'stage-1',
+    executionTokenId: 'attempt-two',
+    browserWorkspace: workspace,
+    baseURL: 'http://127.0.0.1:4200',
+    runLabel: 'synthetic-form-submit',
+  }), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
+  cleanupBrowserEvidence(workspace.cleanupHandle);
+}));
+
+test('outcome privacy file-count equations are outcome-specific', () => withPacket((packet, parent) => {
+  claimBrowserToken(packet, 'attempt-one');
+  completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
+  retainTerminalBrowserAttemptOutcome({ operationRoot: packet.root, stageId: 'stage-1', executionTokenId: 'attempt-one', cleanupAssurance: 'no_workspace_created' });
+  for (const badCount of [1, 1.5, BROWSER_ATTEMPT_LIMIT + 300]) {
+    const original = readCanonicalJsonFile(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath('attempt-one')));
+    writeCanonical(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath('attempt-one')), {
+      ...original,
+      privacy_scan: { ...original.privacy_scan, files_scanned: badCount },
+    });
+    assert.throws(() => readAttemptOutcome(packet.root, 'stage-1', 'attempt-one'), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
+    writeCanonical(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath('attempt-one')), original);
+  }
+
+  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
+  runSuccessfulAttempt(packet, 'attempt-two', parent);
+  const original = readCanonicalJsonFile(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath('attempt-two')));
+  for (const badCount of [0, 1, 3]) {
+    writeCanonical(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath('attempt-two')), {
+      ...original,
+      privacy_scan: { ...original.privacy_scan, files_scanned: badCount },
+    });
+    assert.throws(() => freezeStage(packet.root, 'stage-1'), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
+  }
+}));
+
+test('successful attempt inventory binds promotion events before digesting', () => withPacket((packet, parent) => {
+  claimBrowserToken(packet, 'attempt-one');
+  runSuccessfulAttempt(packet, 'attempt-one', parent);
+  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
+  runSuccessfulAttempt(packet, 'attempt-two', parent);
+  const inventory = buildAttemptInventory(packet.root, readCanonicalJsonFile(join(packet.root, 'operation.json')), 'stage-1', readEvents(packet.root));
+  assert.equal(inventory.attempts.length, 2);
+  for (const attempt of inventory.attempts) {
+    assert.equal(attempt.promotion_event_id, `${attempt.execution_token_id}-browser-evidence`);
+    assert.match(attempt.promotion_event_hash, /^[a-f0-9]{64}$/);
+  }
+  const canonical = inventory.attempts.map(({ token, outcome, ...entry }) => entry);
+  assert.equal(inventory.digest, sha256(canonicalStringify(canonical)));
+  const tamperedEvents = readEvents(packet.root).filter((event) => event.event_id !== 'attempt-one-browser-evidence');
+  assert.throws(() => buildAttemptInventory(packet.root, readCanonicalJsonFile(join(packet.root, 'operation.json')), 'stage-1', tamperedEvents), hasCode('BROWSER_ATTEMPT_INVENTORY_INVALID'));
 }));
 
 test('browser v2 verification remains valid after later nonbrowser events', () => withPacket((packet, parent) => {

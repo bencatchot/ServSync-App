@@ -860,6 +860,12 @@ test('fixed browser artifact paths and classes cannot bypass deferred finalizati
 
   const wrongPath = prepareBoundRun();
   try {
+    promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: wrongPath.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: wrongPath.workspace,
+    });
     const indexPath = join(wrongPath.packet.root, 'stages', 'stage-1', 'artifact-index.json');
     const index = readCanonicalJsonFile(indexPath);
     index.artifacts.push({
