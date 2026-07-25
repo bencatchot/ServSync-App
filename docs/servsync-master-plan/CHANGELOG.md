@@ -4,6 +4,21 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-25
+
+- Branch: `codex/draft-estimate-labor-action-handoff-fix`
+- Files changed: App durable Draft-to-Estimate adoption/focus wiring, focused durable Draft integration tests, durable Draft launch SQL source-contract tests, and this changelog.
+- Summary of change: Fixed the Draft-to-Estimate handoff so a launched Estimate adopts into the saved Estimate record/action view instead of reopening the Draft-style Estimate editor. The handoff now closes the financial composer, clears edit state, focuses the saved Estimate card, and keeps the existing Estimate actions available while preserving the Draft-created Estimate labor mode, labor rate, job-total hours, line-specific hours, line prices, and stable line order.
+- Reason for change: Production observation found that a Draft-created Estimate could appear with Draft-style edit actions after launch and risked confusing the Estimate handoff/labor-review workflow.
+- Tests/checks run: Focused source tests were added for the saved Estimate action handoff and SQL labor inheritance contract. Full validation is recorded in the task report.
+- Known risks or follow-ups: No SQL, deployment, gate, entitlement, or live-environment change is included. Authenticated Production observation remains a separate owner-authorized activity after review and merge.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a narrow remediation to the already-enabled Draft-to-Estimate handoff and does not change feature status, rollout scope, or backlog priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The fix preserves the approved Draft-first workflow and does not change product direction or rollout sequencing.
+
 ## 2026-07-24
 
 - Branch: `codex/draft-inspection-checklist-job-path-v1`
