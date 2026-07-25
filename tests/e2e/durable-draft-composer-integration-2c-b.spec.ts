@@ -34,6 +34,7 @@ import type {
   ContractorWorkDraftLaunchResult,
   ContractorWorkDraftMetadataInput,
 } from '../../src/features/drafts/durableDraftLaunchTypes';
+import { createWorkComposerLineDraft } from '../../src/features/work-composer/workComposerDrafts';
 
 const DRAFT_ID = '00000000-0000-4000-8000-000000000101';
 const CONTRACTOR_ID = '00000000-0000-4000-8000-000000000102';
@@ -260,6 +261,89 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
       removed_item_ids: [],
     });
     expect(form).toEqual(before);
+  });
+
+  test('preserves Estimate labor model choices through resume and durable save payloads', () => {
+    const jobTotalState = canonicalState({
+      intendedOutput: 'estimate',
+      laborMode: 'job_total',
+      laborRateCents: 13500,
+      jobLaborHours: 4.25,
+    });
+    const jobTotal = durableCanonicalStateToComposer(jobTotalState);
+    expect(jobTotal).toMatchObject({
+      intended_output: 'estimate',
+      labor_mode: 'job_total',
+      labor_rate: '135.00',
+      job_labor_hours: '4.25',
+    });
+
+    const jobTotalSave = prepareDurableDraftSave({
+      form: jobTotal,
+      current: jobTotalState,
+      contractorId: CONTRACTOR_ID,
+      removedDurableItemIds: [],
+    });
+    expect(jobTotalSave.payload.draft_id).toBe(DRAFT_ID);
+    expect(jobTotalSave.payload.metadata).toMatchObject({
+      intended_output: 'estimate',
+      work_format: 'standard',
+      labor_mode: 'job_total',
+      labor_rate_cents: 13500,
+      job_labor_hours: 4.25,
+    });
+
+    const lineSpecific = createBlankSharedDraftComposerDraft({
+      intended_output: 'estimate',
+      homeowner_user_id: HOMEOWNER_ID,
+      home_id: HOME_ID,
+      title: 'Line labor estimate',
+      scope: 'Plan labor per line.',
+      labor_mode: 'line_specific',
+      labor_rate: '95',
+      job_labor_hours: '',
+      line_items: [
+        createWorkComposerLineDraft({
+          line_type: 'material',
+          line_title: 'Install valve',
+          description: 'Install valve',
+          quantity: '1',
+          unit: 'each',
+          unit_price: '45',
+          labor_hours: '1.5',
+        }),
+        createWorkComposerLineDraft({
+          line_type: 'labor',
+          line_title: 'Dedicated labor line',
+          description: 'Dedicated labor line',
+          quantity: '2',
+          unit: 'hour',
+          unit_price: '95',
+          labor_hours: '',
+        }),
+      ],
+    });
+    const lineSpecificSave = prepareDurableDraftSave({
+      form: lineSpecific,
+      current: null,
+      contractorId: CONTRACTOR_ID,
+      removedDurableItemIds: [],
+    });
+    expect(lineSpecificSave.payload.metadata).toMatchObject({
+      intended_output: 'estimate',
+      work_format: 'standard',
+      labor_mode: 'line_specific',
+      labor_rate_cents: 9500,
+      job_labor_hours: null,
+    });
+    expect(lineSpecificSave.payload.items.map(item => ({
+      line_type: item.line_type,
+      labor_hours: item.labor_hours,
+      sort_order: item.sort_order,
+    }))).toEqual([
+      { line_type: 'material', labor_hours: 1.5, sort_order: 0 },
+      { line_type: 'labor', labor_hours: null, sort_order: 1 },
+    ]);
   });
 
   test('creates bounded checklist snapshots and converts them into inspection rooms only after launch', () => {
