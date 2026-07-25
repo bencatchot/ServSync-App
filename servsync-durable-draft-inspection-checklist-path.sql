@@ -54,6 +54,28 @@ alter table public.contractor_work_drafts
     )
   );
 
+create or replace function public.servsync_private_canonical_starter_checklist_source(
+  p_source_id text
+)
+returns jsonb
+language plpgsql
+immutable
+security definer
+set search_path = public
+as $function$
+begin
+  case p_source_id
+    when 'starter-general-maintenance-field-work' then return $starter${"schema_version":1,"source_kind":"starter_inspection_checklist","source_id":"starter-general-maintenance-field-work","source_label":"General Home Inspection / Home Maintenance Walkthrough","workflow_kind":"inspection","job_type":"inspection","source_updated_at":null,"rooms":[{"room":"Exterior","room_id":"Exterior","display_name":"Exterior","room_type":"","location_note":"","sort_order":0,"items":["Check exterior siding and trim for damage","Check foundation for visible cracks or movement","Check grading and drainage near the home","Check exterior caulking, gaps, and penetrations","Check decks, porches, steps, and trip hazards"]},{"room":"Roof / Attic","room_id":"Roof / Attic","display_name":"Roof / Attic","room_type":"","location_note":"","sort_order":1,"items":["Check visible roof covering condition","Check flashing, vents, and roof penetrations","Check gutters and downspouts for blockage or damage","Check attic for moisture, staining, or ventilation concerns","Check visible pest evidence where accessible"]},{"room":"Mechanical / Safety","room_id":"Mechanical / Safety","display_name":"Mechanical / Safety","room_type":"","location_note":"","sort_order":2,"items":["Check HVAC filter and visible airflow","Check electrical panel for visible concerns","Check GFCI protection where accessible","Check smoke/CO detectors if accessible","Check water heater area for leaks or corrosion"]},{"room":"Kitchen","room_id":"Kitchen","display_name":"Kitchen","room_type":"","location_note":"","sort_order":3,"items":["Check for active leaks under sinks","Check sink, faucet, and drain operation","Check cabinets, counters, and visible surfaces for damage","Check major appliances for visible concerns","Check kitchen GFCI protection where accessible"]},{"room":"Living Room / Common Areas","room_id":"Living Room / Common Areas","display_name":"Living Room / Common Areas","room_type":"","location_note":"","sort_order":4,"items":["Check walls, ceilings, and floors for visible damage","Check doors and windows for operation","Check outlets and switches for visible damage","Check light fixtures and ceiling fans","Check trip hazards or safety concerns"]},{"room":"Dining Room","room_id":"Dining Room","display_name":"Dining Room","room_type":"","location_note":"","sort_order":5,"items":["Check walls, ceilings, and floors for visible damage","Check doors and windows for operation","Check outlets and switches for visible damage","Check light fixtures and ceiling fans","Check trip hazards or safety concerns"]},{"room":"Primary Bedroom","room_id":"Primary Bedroom","display_name":"Primary Bedroom","room_type":"","location_note":"","sort_order":6,"items":["Check walls, ceilings, and floors for visible damage","Check doors and windows for operation","Check outlets and switches for visible damage","Check light fixtures and ceiling fans","Check smoke/CO detectors if accessible"]},{"room":"Bedroom 2","room_id":"Bedroom 2","display_name":"Bedroom 2","room_type":"","location_note":"","sort_order":7,"items":["Check walls, ceilings, and floors for visible damage","Check doors and windows for operation","Check outlets and switches for visible damage","Check light fixtures and ceiling fans","Check smoke/CO detectors if accessible"]},{"room":"Bedroom 3","room_id":"Bedroom 3","display_name":"Bedroom 3","room_type":"","location_note":"","sort_order":8,"items":["Check walls, ceilings, and floors for visible damage","Check doors and windows for operation","Check outlets and switches for visible damage","Check light fixtures and ceiling fans","Check smoke/CO detectors if accessible"]},{"room":"Primary Bathroom","room_id":"Primary Bathroom","display_name":"Primary Bathroom","room_type":"","location_note":"","sort_order":9,"items":["Check sink, toilet, tub/shower, and drains","Check for active leaks or moisture concerns","Check caulk, grout, walls, ceilings, and flooring","Check exhaust fan or ventilation","Check bathroom GFCI protection where accessible"]},{"room":"Bathroom 2","room_id":"Bathroom 2","display_name":"Bathroom 2","room_type":"","location_note":"","sort_order":10,"items":["Check sink, toilet, tub/shower, and drains","Check for active leaks or moisture concerns","Check caulk, grout, walls, ceilings, and flooring","Check exhaust fan or ventilation","Check bathroom GFCI protection where accessible"]},{"room":"Laundry","room_id":"Laundry","display_name":"Laundry","room_type":"","location_note":"","sort_order":11,"items":["Check washer supply and drain connections","Check dryer vent material, routing, and termination","Check for leaks, moisture, or floor damage","Check laundry GFCI protection where accessible","Check ventilation and appliance clearance"]},{"room":"Garage","room_id":"Garage","display_name":"Garage","room_type":"","location_note":"","sort_order":12,"items":["Check garage door operation and safety concerns","Check garage walls, ceilings, and floors for damage","Check outlets, switches, and fixtures for visible concerns","Check storage, clearance, or access limitations"]},{"room":"Basement / Crawlspace","room_id":"Basement / Crawlspace","display_name":"Basement / Crawlspace","room_type":"","location_note":"","sort_order":13,"items":["Check moisture, staining, ventilation, and insulation","Check visible structural, foundation, or framing concerns","Check drainage, sump, vapor barrier, or crawlspace condition","Check visible pest evidence where accessible","Check storage, clearance, or access limitations"]}],"snapshot_fingerprint":"draft-checklist-v1-1a66de9e"}$starter$::jsonb;
+    when 'starter-hvac-field-work' then return $starter${"schema_version":1,"source_kind":"starter_inspection_checklist","source_id":"starter-hvac-field-work","source_label":"HVAC Maintenance Inspection","workflow_kind":"inspection","job_type":"inspection","source_updated_at":null,"rooms":[{"room":"Indoor Equipment","room_id":"Indoor Equipment","display_name":"Indoor Equipment","room_type":"","location_note":"","sort_order":0,"items":["Model, serial number, age, and visible condition documented","Air filter size and condition checked","Thermostat operation verified","Blower operation, vibration, and noise checked","Condensate drain and overflow protection checked"]},{"room":"Outdoor Equipment","room_id":"Outdoor Equipment","display_name":"Outdoor Equipment","room_type":"","location_note":"","sort_order":1,"items":["Condenser coil and fins checked","Refrigerant line insulation checked","Clearance around unit verified","Disconnect and visible wiring checked","Unit pad and drainage checked"]},{"room":"Recommendations","room_id":"Recommendations","display_name":"Recommendations","room_type":"","location_note":"","sort_order":2,"items":["Temperature split or performance note recorded","Safety concerns documented","Repair or maintenance recommendation added","Next service interval discussed"]}],"snapshot_fingerprint":"draft-checklist-v1-bd2036de"}$starter$::jsonb;
+    when 'starter-electrical-field-work' then return $starter${"schema_version":1,"source_kind":"starter_inspection_checklist","source_id":"starter-electrical-field-work","source_label":"Electrical Safety Check","workflow_kind":"inspection","job_type":"inspection","source_updated_at":null,"rooms":[{"room":"Panel and Power","room_id":"Panel and Power","display_name":"Panel and Power","room_type":"","location_note":"","sort_order":0,"items":["Panel labeling checked","Breaker condition checked for heat, corrosion, or damage","Open knockouts or exposed wiring noted","Grounding and bonding visible where accessible"]},{"room":"Devices and Fixtures","room_id":"Devices and Fixtures","display_name":"Devices and Fixtures","room_type":"","location_note":"","sort_order":1,"items":["GFCI protection tested where required","Switches, outlets, and fixtures checked","Smoke and carbon monoxide detectors noted","Exterior outlets and covers checked"]},{"room":"Repair Notes","room_id":"Repair Notes","display_name":"Repair Notes","room_type":"","location_note":"","sort_order":2,"items":["Homeowner concern documented","Repair or diagnostic work completed","Permit or follow-up recommendation noted","Photos added for homeowner record"]}],"snapshot_fingerprint":"draft-checklist-v1-daeb3a6f"}$starter$::jsonb;
+    when 'starter-plumbing-field-work' then return $starter${"schema_version":1,"source_kind":"starter_inspection_checklist","source_id":"starter-plumbing-field-work","source_label":"Plumbing Inspection","workflow_kind":"inspection","job_type":"inspection","source_updated_at":null,"rooms":[{"room":"Water Heater","room_id":"Water Heater","display_name":"Water Heater","room_type":"","location_note":"","sort_order":0,"items":["Tank or equipment condition checked","Visible leaks, corrosion, or staining noted","Pressure relief valve and discharge pipe checked","Venting, clearance, or electrical/gas safety concerns documented"]},{"room":"Fixtures and Supply","room_id":"Fixtures and Supply","display_name":"Fixtures and Supply","room_type":"","location_note":"","sort_order":1,"items":["Faucets, toilets, and visible fixtures checked","Supply valves and connectors checked","Water pressure or flow concerns documented","Visible leaks or moisture at fixtures documented"]},{"room":"Drains and Waste","room_id":"Drains and Waste","display_name":"Drains and Waste","room_type":"","location_note":"","sort_order":2,"items":["Sink, tub, shower, and floor drains checked where accessible","Slow drain, odor, backup, or trap concern documented","Visible drain piping condition checked","Cleanout or access limitations noted"]},{"room":"Recommendations","room_id":"Recommendations","display_name":"Recommendations","room_type":"","location_note":"","sort_order":3,"items":["Repair recommendation added if needed","Urgent leak or safety concern documented","Preventive maintenance recommendation added","Photos added for homeowner record"]}],"snapshot_fingerprint":"draft-checklist-v1-2297354b"}$starter$::jsonb;
+    when 'starter-pest-control-field-work' then return $starter${"schema_version":1,"source_kind":"starter_inspection_checklist","source_id":"starter-pest-control-field-work","source_label":"Pest Inspection","workflow_kind":"inspection","job_type":"inspection","source_updated_at":null,"rooms":[{"room":"Exterior Conditions","room_id":"Exterior Conditions","display_name":"Exterior Conditions","room_type":"","location_note":"","sort_order":0,"items":["Entry points, gaps, or penetrations checked","Vegetation, moisture, wood contact, or conducive conditions noted","Nests, trails, droppings, or visible activity documented","Foundation, doors, windows, and utility penetrations checked"]},{"room":"Interior Evidence","room_id":"Interior Evidence","display_name":"Interior Evidence","room_type":"","location_note":"","sort_order":1,"items":["Droppings, damage, staining, or odor evidence documented","Kitchen, pantry, attic, crawlspace, or garage areas checked where accessible","Moisture or food-source conditions noted","Photos added for homeowner record"]},{"room":"Recommendations","room_id":"Recommendations","display_name":"Recommendations","room_type":"","location_note":"","sort_order":2,"items":["Treatment or exclusion recommendation added","Sanitation or moisture-control recommendation added","Follow-up timing documented","Urgent structural or health concern documented"]}],"snapshot_fingerprint":"draft-checklist-v1-b57a1041"}$starter$::jsonb;
+    when 'starter-roofing-field-work' then return $starter${"schema_version":1,"source_kind":"starter_inspection_checklist","source_id":"starter-roofing-field-work","source_label":"Roof / Exterior Inspection","workflow_kind":"inspection","job_type":"inspection","source_updated_at":null,"rooms":[{"room":"Roof Covering","room_id":"Roof Covering","display_name":"Roof Covering","room_type":"","location_note":"","sort_order":0,"items":["Roof material and approximate condition documented","Missing, lifted, cracked, damaged, or deteriorated areas noted","Debris, moss, ponding, or surface wear documented","Photos added for notable roof conditions"]},{"room":"Flashing and Penetrations","room_id":"Flashing and Penetrations","display_name":"Flashing and Penetrations","room_type":"","location_note":"","sort_order":1,"items":["Flashing at walls, chimney, valleys, and skylights checked","Pipe boots, vents, and roof penetrations checked","Interior leak concern connected to roof area if known","Urgent water-entry concern documented"]},{"room":"Exterior and Drainage","room_id":"Exterior and Drainage","display_name":"Exterior and Drainage","room_type":"","location_note":"","sort_order":2,"items":["Gutters and downspouts checked for flow, attachment, and extensions","Siding, trim, fascia, soffit, and caulking concerns documented","Grading or drainage concern near structure noted","Repair or maintenance recommendation added"]}],"snapshot_fingerprint":"draft-checklist-v1-97281aa3"}$starter$::jsonb;
+    else return null;
+  end case;
+end;
+$function$;
+
 create or replace function public.servsync_private_work_draft_checklist_source(
   p_source jsonb,
   p_draft public.contractor_work_drafts
@@ -74,6 +96,13 @@ declare
   v_room_count integer := 0;
   v_item_count integer := 0;
   v_source_updated_at text;
+  v_canonical_source jsonb;
+  v_room_ids text[] := '{}';
+  v_room_orders integer[] := '{}';
+  v_room_id_key text;
+  v_room_order integer;
+  v_item_labels text[];
+  v_item_label_key text;
 begin
   if p_source is null or jsonb_typeof(p_source) <> 'object' then
     raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
@@ -111,14 +140,44 @@ begin
   for v_room in select value from jsonb_array_elements(p_source->'rooms')
   loop
     v_room_count := v_room_count + 1;
-    if jsonb_typeof(v_room) <> 'object'
-      or nullif(trim(coalesce(v_room->>'room', '')), '') is null
+    if jsonb_typeof(v_room) <> 'object' then
+      raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
+    end if;
+    if (select array_agg(key order by key) from jsonb_object_keys(v_room) key) <> array[
+      'display_name',
+      'items',
+      'location_note',
+      'room',
+      'room_id',
+      'room_type',
+      'sort_order'
+    ] then
+      raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
+    end if;
+    if nullif(trim(coalesce(v_room->>'room', '')), '') is null
       or nullif(trim(coalesce(v_room->>'room_id', '')), '') is null
       or nullif(trim(coalesce(v_room->>'display_name', '')), '') is null
+      or jsonb_typeof(v_room->'sort_order') <> 'number'
       or jsonb_typeof(v_room->'items') <> 'array'
       or jsonb_array_length(v_room->'items') = 0 then
       raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
     end if;
+
+    begin
+      v_room_order := (v_room->>'sort_order')::integer;
+    exception
+      when invalid_text_representation or numeric_value_out_of_range then
+        raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
+    end;
+
+    v_room_id_key := lower(regexp_replace(trim(v_room->>'room_id'), '\s+', ' ', 'g'));
+    if v_room_id_key = any(v_room_ids) or v_room_order = any(v_room_orders) then
+      raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
+    end if;
+    v_room_ids := array_append(v_room_ids, v_room_id_key);
+    v_room_orders := array_append(v_room_orders, v_room_order);
+    v_item_labels := '{}';
+
     for v_item in select value from jsonb_array_elements(v_room->'items')
     loop
       v_item_count := v_item_count + 1;
@@ -126,6 +185,11 @@ begin
         or nullif(trim(v_item #>> '{}'), '') is null then
         raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
       end if;
+      v_item_label_key := lower(regexp_replace(trim(v_item #>> '{}'), '\s+', ' ', 'g'));
+      if v_item_label_key = any(v_item_labels) then
+        raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
+      end if;
+      v_item_labels := array_append(v_item_labels, v_item_label_key);
     end loop;
   end loop;
 
@@ -134,10 +198,11 @@ begin
   end if;
 
   if v_source_kind = 'starter_inspection_checklist' then
-    if v_source_id !~ '^starter-[a-z0-9-]+-field-work$' then
+    v_canonical_source := public.servsync_private_canonical_starter_checklist_source(v_source_id);
+    if v_canonical_source is null or p_source <> v_canonical_source then
       raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
     end if;
-    return p_source;
+    return v_canonical_source;
   end if;
 
   v_source_uuid := public.servsync_private_work_draft_uuid(v_source_id, 'DRAFT_CHECKLIST_SOURCE_INVALID');
@@ -162,15 +227,28 @@ begin
       raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
     end if;
     if p_draft.subject_type = 'connected_homeowner' and not (
-      (v_template.homeowner_user_id is not null and v_template.homeowner_user_id = p_draft.homeowner_user_id)
-      or (v_template.home_id is not null and v_template.home_id = p_draft.home_id)
+      v_template.home_id is not null
+      and p_draft.home_id is not null
+      and v_template.home_id = p_draft.home_id
+      and (
+        v_template.homeowner_user_id is null
+        or v_template.homeowner_user_id = p_draft.homeowner_user_id
+      )
     ) then
       raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
     end if;
     if p_draft.subject_type = 'local_contact' and not (
-      (v_template.local_contact_id is not null and v_template.local_contact_id = p_draft.local_contact_id)
-      or (v_template.local_home_id is not null and v_template.local_home_id = p_draft.local_home_id)
+      v_template.local_home_id is not null
+      and p_draft.local_home_id is not null
+      and v_template.local_home_id = p_draft.local_home_id
+      and (
+        v_template.local_contact_id is null
+        or v_template.local_contact_id = p_draft.local_contact_id
+      )
     ) then
+      raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
+    end if;
+    if p_draft.subject_type not in ('connected_homeowner', 'local_contact') then
       raise exception using message = 'DRAFT_CHECKLIST_SOURCE_INVALID';
     end if;
   end if;
@@ -216,7 +294,7 @@ as $$
       'findings', (
         select coalesce(jsonb_agg(jsonb_build_object(
           'title', item_value #>> '{}',
-          'status', 'Pass',
+          'status', 'Monitor',
           'notes', '',
           'action', '',
           'due', '',
@@ -537,6 +615,9 @@ revoke execute on function public.servsync_launch_inspection_checklist_work_draf
 revoke execute on function public.servsync_launch_inspection_checklist_work_draft(uuid, text, uuid) from anon;
 grant execute on function public.servsync_launch_inspection_checklist_work_draft(uuid, text, uuid) to authenticated;
 
+revoke execute on function public.servsync_private_canonical_starter_checklist_source(text) from public;
+revoke execute on function public.servsync_private_canonical_starter_checklist_source(text) from anon;
+revoke execute on function public.servsync_private_canonical_starter_checklist_source(text) from authenticated;
 revoke execute on function public.servsync_private_work_draft_checklist_source(jsonb, public.contractor_work_drafts) from public;
 revoke execute on function public.servsync_private_work_draft_checklist_source(jsonb, public.contractor_work_drafts) from anon;
 revoke execute on function public.servsync_private_work_draft_checklist_source(jsonb, public.contractor_work_drafts) from authenticated;

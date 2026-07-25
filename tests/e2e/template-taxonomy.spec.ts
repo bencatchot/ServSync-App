@@ -144,6 +144,22 @@ test.describe('Jobs template taxonomy', () => {
     expect(homeScopedSource).not.toContain('home template');
   });
 
+  test('home-scoped inspection checklist filtering requires exact property binding', () => {
+    const source = appSource();
+    const matcherSource = sourceBetween(
+      source,
+      'function templateMatchesInspectionSubject',
+      'const STARTER_ESTIMATE_TEMPLATES',
+    );
+
+    expect(matcherSource).toContain('template.home_id === context.home_id');
+    expect(matcherSource).toContain('template.local_home_id === context.local_home_id');
+    expect(matcherSource).toContain('template.homeowner_user_id === context.homeowner_user_id');
+    expect(matcherSource).toContain('template.local_contact_id === context.local_contact_id');
+    expect(matcherSource).not.toContain('homeownerMatches || homeMatches');
+    expect(matcherSource).not.toContain('localContactMatches || localHomeMatches');
+  });
+
   test('saved work templates still use estimate template data and inspection checklists still use inspection templates', () => {
     const source = appSource();
     const loadSource = sourceBetween(source, '// Load inspection templates and inspections', 'if (!estimateTemplatesRes.error) setEstimateTemplates');

@@ -130,7 +130,8 @@ import { reviewModerationStatusPresentation } from './features/reviews/statusPre
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
-import type { DraftChecklistSourceOption, DraftChecklistWorkflowKind } from './features/drafts/checklistDraftScope';
+import type { DraftChecklistSourceOption } from './features/drafts/checklistDraftScope';
+import { DRAFT_CHECKLIST_STARTER_OPTIONS } from './features/drafts/checklistStarterCatalog';
 import {
   DurableDraftOutputHeading,
   createDurableDraftOutputFocusCoordinator,
@@ -4674,73 +4675,6 @@ const SERVSYNC_FIELD_WORK_TEMPLATES: ServSyncFieldWorkTemplate[] = TRADE_OPTIONS
   };
 });
 
-const CURATED_INSPECTION_TEMPLATE_CONFIG: Partial<Record<string, {
-  name: string;
-  description: string;
-  kind: FieldWorkflowKind;
-  rooms?: InspectionTemplateRoom[];
-}>> = {
-  'General Maintenance': {
-    name: 'General Home Inspection / Home Maintenance Walkthrough',
-    description: 'Whole-home checklist for room-by-room conditions, safety items, visible maintenance needs, and homeowner-ready reporting.',
-    kind: 'inspection',
-    rooms: DEFAULT_INSPECTION_ROOMS,
-  },
-  HVAC: {
-    name: 'HVAC Maintenance Inspection',
-    description: 'HVAC maintenance checklist for equipment condition, airflow, controls, drainage, safety observations, and recommendations.',
-    kind: 'inspection',
-  },
-  Electrical: {
-    name: 'Electrical Safety Check',
-    description: 'Electrical safety checklist for panels, devices, GFCI/AFCI protection, visible wiring concerns, detectors, and recommendations.',
-    kind: 'inspection',
-  },
-  Plumbing: {
-    name: 'Plumbing Inspection',
-    description: 'Plumbing checklist for water heaters, fixtures, supply lines, drains, leaks, shutoffs, visible moisture, and recommendations.',
-    kind: 'inspection',
-    rooms: [
-      { room: 'Water Heater', items: ['Tank or equipment condition checked', 'Visible leaks, corrosion, or staining noted', 'Pressure relief valve and discharge pipe checked', 'Venting, clearance, or electrical/gas safety concerns documented'] },
-      { room: 'Fixtures and Supply', items: ['Faucets, toilets, and visible fixtures checked', 'Supply valves and connectors checked', 'Water pressure or flow concerns documented', 'Visible leaks or moisture at fixtures documented'] },
-      { room: 'Drains and Waste', items: ['Sink, tub, shower, and floor drains checked where accessible', 'Slow drain, odor, backup, or trap concern documented', 'Visible drain piping condition checked', 'Cleanout or access limitations noted'] },
-      { room: 'Recommendations', items: ['Repair recommendation added if needed', 'Urgent leak or safety concern documented', 'Preventive maintenance recommendation added', 'Photos added for homeowner record'] },
-    ],
-  },
-  'Pest Control': {
-    name: 'Pest Inspection',
-    description: 'Pest inspection checklist for activity evidence, entry points, moisture conditions, damage, treatment recommendations, and follow-up.',
-    kind: 'inspection',
-    rooms: [
-      { room: 'Exterior Conditions', items: ['Entry points, gaps, or penetrations checked', 'Vegetation, moisture, wood contact, or conducive conditions noted', 'Nests, trails, droppings, or visible activity documented', 'Foundation, doors, windows, and utility penetrations checked'] },
-      { room: 'Interior Evidence', items: ['Droppings, damage, staining, or odor evidence documented', 'Kitchen, pantry, attic, crawlspace, or garage areas checked where accessible', 'Moisture or food-source conditions noted', 'Photos added for homeowner record'] },
-      { room: 'Recommendations', items: ['Treatment or exclusion recommendation added', 'Sanitation or moisture-control recommendation added', 'Follow-up timing documented', 'Urgent structural or health concern documented'] },
-    ],
-  },
-  Roofing: {
-    name: 'Roof / Exterior Inspection',
-    description: 'Roof and exterior checklist for roof covering, flashing, penetrations, gutters, siding, drainage, and visible exterior concerns.',
-    kind: 'inspection',
-    rooms: [
-      { room: 'Roof Covering', items: ['Roof material and approximate condition documented', 'Missing, lifted, cracked, damaged, or deteriorated areas noted', 'Debris, moss, ponding, or surface wear documented', 'Photos added for notable roof conditions'] },
-      { room: 'Flashing and Penetrations', items: ['Flashing at walls, chimney, valleys, and skylights checked', 'Pipe boots, vents, and roof penetrations checked', 'Interior leak concern connected to roof area if known', 'Urgent water-entry concern documented'] },
-      { room: 'Exterior and Drainage', items: ['Gutters and downspouts checked for flow, attachment, and extensions', 'Siding, trim, fascia, soffit, and caulking concerns documented', 'Grading or drainage concern near structure noted', 'Repair or maintenance recommendation added'] },
-    ],
-  },
-};
-
-function curatedInspectionStarterTemplate(template: ServSyncFieldWorkTemplate): ServSyncFieldWorkTemplate | null {
-  const config = CURATED_INSPECTION_TEMPLATE_CONFIG[template.trade];
-  if (!config) return null;
-  return {
-    ...template,
-    name: config.name,
-    description: config.description,
-    kind: config.kind,
-    rooms: config.rooms ?? template.rooms,
-  };
-}
-
 function customTemplateLooksInspectionLike(template: Pick<InspectionTemplate, 'name' | 'rooms'>) {
   const haystack = normalizeText([
     template.name,
@@ -4759,14 +4693,20 @@ function templateMatchesInspectionSubject(template: InspectionTemplate, context:
   if (templateScope(template) !== 'home' || !context) return false;
 
   if (context.subject_type === 'connected') {
-    const homeownerMatches = Boolean(template.homeowner_user_id && context.homeowner_user_id && template.homeowner_user_id === context.homeowner_user_id);
-    const homeMatches = Boolean(template.home_id && context.home_id && template.home_id === context.home_id);
-    return homeownerMatches || homeMatches;
+    return Boolean(
+      template.home_id
+      && context.home_id
+      && template.home_id === context.home_id
+      && (!template.homeowner_user_id || template.homeowner_user_id === context.homeowner_user_id),
+    );
   }
 
-  const localContactMatches = Boolean(template.local_contact_id && context.local_contact_id && template.local_contact_id === context.local_contact_id);
-  const localHomeMatches = Boolean(template.local_home_id && context.local_home_id && template.local_home_id === context.local_home_id);
-  return localContactMatches || localHomeMatches;
+  return Boolean(
+    template.local_home_id
+    && context.local_home_id
+    && template.local_home_id === context.local_home_id
+    && (!template.local_contact_id || template.local_contact_id === context.local_contact_id),
+  );
 }
 
 const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(trade => {
@@ -28163,9 +28103,7 @@ function ContractorDashboard({
     if (aRecommended !== bRecommended) return aRecommended - bRecommended;
     return a.name.localeCompare(b.name);
   });
-  const curatedInspectionStarterTemplates = SERVSYNC_FIELD_WORK_TEMPLATES
-    .map(curatedInspectionStarterTemplate)
-    .filter((template): template is ServSyncFieldWorkTemplate => Boolean(template))
+  const curatedInspectionStarterTemplates = [...DRAFT_CHECKLIST_STARTER_OPTIONS]
     .sort((a, b) => {
       const aRecommended = starterTemplateRecommendedForContractor(a.trade) ? 0 : 1;
       const bRecommended = starterTemplateRecommendedForContractor(b.trade) ? 0 : 1;
@@ -28234,9 +28172,6 @@ function ContractorDashboard({
     ...inspectionHomeTemplatesForNewJob,
     ...inspectionContractorTemplatesForNewJob,
   ];
-  const draftChecklistWorkflowKind = (kind: FieldWorkflowKind): DraftChecklistWorkflowKind => (
-    kind === 'maintenance' ? 'maintenance' : kind === 'assessment' ? 'assessment' : 'inspection'
-  );
   const draftChecklistSourceOptions: DraftChecklistSourceOption[] = [
     ...inspectionHomeTemplatesForNewJob.map(template => ({
       source_kind: 'home_inspection_checklist' as const,
@@ -28259,12 +28194,12 @@ function ContractorDashboard({
       group_label: 'Your Inspection Checklists',
     })),
     ...inspectionStarterTemplatesForNewJob.map(template => ({
-      source_kind: 'starter_inspection_checklist' as const,
-      source_id: template.id,
-      source_label: template.name,
-      workflow_kind: draftChecklistWorkflowKind(template.kind),
-      job_type: template.kind === 'maintenance' ? 'maintenance_visit' as const : 'inspection' as const,
-      source_updated_at: null,
+      source_kind: template.source_kind,
+      source_id: template.source_id,
+      source_label: template.source_label,
+      workflow_kind: template.workflow_kind,
+      job_type: template.job_type,
+      source_updated_at: template.source_updated_at,
       rooms: template.rooms,
       group_label: 'Starter Inspection Checklists',
     })),
@@ -29968,7 +29903,7 @@ function ContractorDashboard({
           : []
         : rooms.map((r, index) => ({
             ...roomIdentityFields(r, index),
-            findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
+            findings: r.items.map(item => ({ title: item, status: 'Monitor' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
           }));
 
       const { data, error: rpcErr } = await supabase.rpc('servsync_create_field_work', {

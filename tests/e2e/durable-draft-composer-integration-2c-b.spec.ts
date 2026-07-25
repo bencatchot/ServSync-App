@@ -2,11 +2,13 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  canonicalStarterChecklistSnapshot,
   createDraftChecklistSnapshot,
   draftChecklistRoomsToInspectionRooms,
   parseDraftChecklistSnapshot,
   type DraftChecklistSourceOption,
 } from '../../src/features/drafts/checklistDraftScope';
+import { DRAFT_CHECKLIST_STARTER_OPTIONS } from '../../src/features/drafts/checklistStarterCatalog';
 import { createBlankSharedDraftComposerDraft } from '../../src/features/drafts/draftComposerMappings';
 import {
   durableCanonicalStateToComposer,
@@ -268,11 +270,88 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
       expect.objectContaining({
         room: 'Mechanical Room',
         findings: [
-          expect.objectContaining({ title: 'Inspect filter condition', status: 'Pass', photos: [] }),
-          expect.objectContaining({ title: 'Confirm thermostat operation', status: 'Pass', photos: [] }),
+          expect.objectContaining({ title: 'Inspect filter condition', status: 'Monitor', photos: [] }),
+          expect.objectContaining({ title: 'Confirm thermostat operation', status: 'Monitor', photos: [] }),
         ],
       }),
     ]);
+  });
+
+  test('rejects duplicate checklist rooms, sort orders, and item labels before save or launch', () => {
+    const baseRoom = checklistOption.rooms[0];
+    expect(() => createDraftChecklistSnapshot({
+      ...checklistOption,
+      rooms: [
+        baseRoom,
+        { ...baseRoom, room: 'Mechanical Duplicate', display_name: 'Mechanical Duplicate', sort_order: 1 },
+      ],
+    })).toThrow('DRAFT_CHECKLIST_SOURCE_INVALID');
+    expect(() => createDraftChecklistSnapshot({
+      ...checklistOption,
+      rooms: [
+        baseRoom,
+        { ...baseRoom, room: 'Electrical Room', room_id: 'electrical-room', display_name: 'Electrical Room' },
+      ],
+    })).toThrow('DRAFT_CHECKLIST_SOURCE_INVALID');
+    expect(() => createDraftChecklistSnapshot({
+      ...checklistOption,
+      rooms: [
+        { ...baseRoom, items: ['Inspect filter condition', '  inspect   filter condition  '] },
+      ],
+    })).toThrow('DRAFT_CHECKLIST_SOURCE_INVALID');
+
+    const repeatedLabelAcrossRooms = createDraftChecklistSnapshot({
+      ...checklistOption,
+      rooms: [
+        baseRoom,
+        {
+          ...baseRoom,
+          room: 'Electrical Room',
+          room_id: 'electrical-room',
+          display_name: 'Electrical Room',
+          sort_order: 1,
+          items: ['Inspect filter condition'],
+        },
+      ],
+    });
+    expect(parseDraftChecklistSnapshot(repeatedLabelAcrossRooms)).toEqual(repeatedLabelAcrossRooms);
+  });
+
+  test('accepts only canonical starter checklist snapshots', () => {
+    for (const starter of DRAFT_CHECKLIST_STARTER_OPTIONS) {
+      const snapshot = createDraftChecklistSnapshot(starter);
+      expect(canonicalStarterChecklistSnapshot(starter.source_id)).toEqual(snapshot);
+      expect(parseDraftChecklistSnapshot(snapshot)).toEqual(snapshot);
+    }
+
+    const starter = DRAFT_CHECKLIST_STARTER_OPTIONS[0];
+    const unknownStarter = createDraftChecklistSnapshot({
+      ...starter,
+      source_id: 'starter-forged-field-work',
+    });
+    const relabeledStarter = createDraftChecklistSnapshot({
+      ...starter,
+      source_label: 'Forged Starter Label',
+    });
+    const extraRoomStarter = createDraftChecklistSnapshot({
+      ...starter,
+      rooms: [
+        ...starter.rooms,
+        {
+          room: 'Forged Room',
+          room_id: 'forged-room',
+          display_name: 'Forged Room',
+          room_type: '',
+          location_note: '',
+          sort_order: starter.rooms.length,
+          items: ['Injected checklist item'],
+        },
+      ],
+    });
+
+    expect(parseDraftChecklistSnapshot(unknownStarter)).toBeNull();
+    expect(parseDraftChecklistSnapshot(relabeledStarter)).toBeNull();
+    expect(parseDraftChecklistSnapshot(extraRoomStarter)).toBeNull();
   });
 
   test('prepares checklist Draft saves as Job-only snapshots with no operational line items', () => {
@@ -458,11 +537,29 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
   test('keeps the checklist SQL source additive, gated, and unapplied by default', () => {
     const sql = sourceFile('servsync-durable-draft-inspection-checklist-path.sql');
     expect(sql).toContain('add column if not exists checklist_source jsonb');
+    expect(sql).toContain('servsync_private_canonical_starter_checklist_source');
     expect(sql).toContain('servsync_save_inspection_checklist_work_draft');
     expect(sql).toContain('servsync_launch_inspection_checklist_work_draft');
     expect(sql).toContain("coalesce(nullif(trim(coalesce(p_metadata->>'work_format', '')), ''), 'standard') <> 'inspection_checklist'");
     expect(sql).toContain("or coalesce(nullif(trim(coalesce(p_metadata->>'intended_output', '')), ''), '') <> 'job'");
+    expect(sql).toContain('p_source <> v_canonical_source');
+    for (const starter of DRAFT_CHECKLIST_STARTER_OPTIONS) {
+      const snapshot = canonicalStarterChecklistSnapshot(starter.source_id);
+      expect(snapshot).not.toBeNull();
+      expect(sql).toContain(JSON.stringify(snapshot));
+    }
+    expect(sql).toContain('v_template.home_id = p_draft.home_id');
+    expect(sql).toContain('v_template.local_home_id = p_draft.local_home_id');
+    expect(sql).toContain("p_draft.subject_type not in ('connected_homeowner', 'local_contact')");
+    expect(sql).not.toContain('or (v_template.home_id is not null and v_template.home_id = p_draft.home_id)');
+    expect(sql).not.toContain('or (v_template.local_home_id is not null and v_template.local_home_id = p_draft.local_home_id)');
+    expect(sql).toContain('v_room_id_key = any(v_room_ids)');
+    expect(sql).toContain('v_room_order = any(v_room_orders)');
+    expect(sql).toContain('v_item_label_key = any(v_item_labels)');
+    expect(sql).toContain("'status', 'Monitor'");
+    expect(sql).not.toContain("'status', 'Pass'");
     expect(sql).toContain('revoke execute on function public.servsync_private_work_draft_checklist_source');
+    expect(sql).toContain('revoke execute on function public.servsync_private_canonical_starter_checklist_source');
     expect(sql).toContain('revoke execute on function public.servsync_private_checklist_source_to_rooms_with_findings');
     expect(sql).toContain('or jsonb_array_length(p_items) <> 0');
     expect(sql).toContain('job_origin,');

@@ -1,4 +1,5 @@
 import type { InspectionRoomData, InspectionTemplateRoom } from '../../types';
+import { DRAFT_CHECKLIST_STARTER_OPTIONS } from './checklistStarterCatalog';
 
 export type DraftChecklistSourceKind =
   | 'starter_inspection_checklist'
@@ -76,6 +77,10 @@ function normalizeText(value: unknown, maxLength = 160) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
 }
 
+function duplicateKey(value: unknown, maxLength = 160) {
+  return normalizeText(value, maxLength).toLowerCase();
+}
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (isRecord(value)) {
@@ -95,7 +100,7 @@ function fingerprint(value: unknown) {
 }
 
 export function normalizeDraftChecklistRooms(rooms: readonly InspectionTemplateRoom[]): DraftChecklistRoomSnapshot[] {
-  return rooms
+  const normalized = rooms
     .map((room, index) => {
       const label = normalizeText(room.display_name || room.room || `Room ${index + 1}`, 80) || `Room ${index + 1}`;
       const items = (Array.isArray(room.items) ? room.items : [])
@@ -112,6 +117,26 @@ export function normalizeDraftChecklistRooms(rooms: readonly InspectionTemplateR
       };
     })
     .filter(room => room.items.length > 0);
+  validateDraftChecklistRoomStructure(normalized);
+  return normalized;
+}
+
+function validateDraftChecklistRoomStructure(rooms: readonly DraftChecklistRoomSnapshot[]) {
+  const roomIds = new Set<string>();
+  const roomOrders = new Set<number>();
+  for (const room of rooms) {
+    const roomId = duplicateKey(room.room_id, 80);
+    if (!roomId || roomIds.has(roomId)) throw new Error('DRAFT_CHECKLIST_SOURCE_INVALID');
+    roomIds.add(roomId);
+    if (roomOrders.has(room.sort_order)) throw new Error('DRAFT_CHECKLIST_SOURCE_INVALID');
+    roomOrders.add(room.sort_order);
+    const itemLabels = new Set<string>();
+    for (const item of room.items) {
+      const itemLabel = duplicateKey(item, 140);
+      if (!itemLabel || itemLabels.has(itemLabel)) throw new Error('DRAFT_CHECKLIST_SOURCE_INVALID');
+      itemLabels.add(itemLabel);
+    }
+  }
 }
 
 export function createDraftChecklistSnapshot(option: DraftChecklistSourceOption): DraftChecklistSourceSnapshot {
@@ -175,10 +200,22 @@ export function parseDraftChecklistSnapshot(value: unknown): DraftChecklistSourc
       rooms: rooms as InspectionTemplateRoom[],
       group_label: '',
     });
-    return normalized.snapshot_fingerprint === value.snapshot_fingerprint ? normalized : null;
+    if (normalized.snapshot_fingerprint !== value.snapshot_fingerprint) return null;
+    if (normalized.source_kind === 'starter_inspection_checklist' && !isCanonicalStarterChecklistSnapshot(normalized)) return null;
+    return normalized;
   } catch {
     return null;
   }
+}
+
+export function canonicalStarterChecklistSnapshot(sourceId: string): DraftChecklistSourceSnapshot | null {
+  const option = DRAFT_CHECKLIST_STARTER_OPTIONS.find(starter => starter.source_id === sourceId);
+  return option ? createDraftChecklistSnapshot(option) : null;
+}
+
+export function isCanonicalStarterChecklistSnapshot(snapshot: DraftChecklistSourceSnapshot): boolean {
+  const canonical = canonicalStarterChecklistSnapshot(snapshot.source_id);
+  return Boolean(canonical && stableJson(canonical) === stableJson(snapshot));
 }
 
 export function draftChecklistRoomsToInspectionRooms(rooms: readonly DraftChecklistRoomSnapshot[]): InspectionRoomData[] {
@@ -194,7 +231,7 @@ export function draftChecklistRoomsToInspectionRooms(rooms: readonly DraftCheckl
     last_edited_at: '',
     findings: room.items.map(title => ({
       title,
-      status: 'Pass',
+      status: 'Monitor',
       notes: '',
       action: '',
       due: '',
