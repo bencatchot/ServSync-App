@@ -670,9 +670,18 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(permissionHelper).toContain('contractor.owner_user_id = auth.uid()');
     expect(estimateHelper).toContain('servsync_private_can_create_work_draft_estimate');
     expect(estimateHelper).toContain("line_type in ('material', 'other')");
+    expect(estimateHelper).toContain("p_draft.labor_mode = 'job_total' and p_draft.job_labor_hours is not null");
+    expect(estimateHelper).toContain('round(p_draft.job_labor_hours * p_draft.labor_rate_cents)');
     expect(estimateHelper).toContain("p_draft.labor_mode = 'line_specific'");
+    expect(estimateHelper).toContain('round(coalesce(labor_hours, 0) * p_draft.labor_rate_cents)');
     expect(estimateHelper).toContain("and line_type in ('material', 'other')");
+    expect(estimateHelper).toContain('p_draft.labor_mode,');
+    expect(estimateHelper).toContain('p_draft.labor_rate_cents,');
+    expect(estimateHelper).toContain('p_draft.job_labor_hours,');
+    expect(estimateHelper).toContain('v_labor_line_total + v_schema_labor_total');
+    expect(estimateHelper).toContain('item.unit_price_cents,');
     expect(estimateHelper).toContain("case when item.line_type in ('material', 'other') then item.labor_hours else null end");
+    expect(estimateHelper).toContain('order by item.sort_order asc, item.created_at asc, item.id asc');
     expect(estimateHelper).toContain("'draft'");
     expect(estimateHelper).not.toContain('p_draft.private_notes');
     expect(estimateHelper).not.toContain('source_work_draft_id');

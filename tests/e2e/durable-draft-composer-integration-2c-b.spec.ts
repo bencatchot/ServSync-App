@@ -47,6 +47,14 @@ const IDEMPOTENCY_KEY = '00000000-0000-4000-8000-000000000110';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  expect(startIndex, `Expected source marker ${start}`).toBeGreaterThanOrEqual(0);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex, `Expected source end marker ${end}`).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
+
 const checklistOption: DraftChecklistSourceOption = {
   source_kind: 'contractor_inspection_checklist',
   source_id: '00000000-0000-4000-8000-000000000201',
@@ -612,10 +620,37 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(loader).toContain("return { type: 'estimate', id, record: validated.record }");
     expect(loader).toContain("return { type: 'job', id, record: validated.record }");
     expect(loader).not.toMatch(/setEstimates|setInspections|openEstimateRecord|openInspection/);
-    expect(adopter).toMatch(/setEstimates[\s\S]*openEstimateRecord/);
+    expect(adopter).toMatch(/setEstimates[\s\S]*focusSavedEstimateRecord/);
     expect(adopter).toMatch(/setInspections[\s\S]*openInspection/);
     expect(workspace).toContain('openingOutputOperation.current === operation');
     expect(workspace).toMatch(/await onLoadOutput[\s\S]*if \(!isCurrent\(\)\) return;[\s\S]*onAdoptOutput/);
+  });
+
+  test('Draft-launched Estimates adopt into saved Estimate actions instead of the edit composer', () => {
+    const app = sourceFile('src/App.tsx');
+    const focusContext = sourceBetween(app, 'const focusedDurableOutputType =', 'durableDraftOutputFocusContext.current =');
+    const focusHelper = sourceBetween(app, 'const focusSavedEstimateRecord =', 'const saveEstimateDraft = async');
+    const adopter = app.slice(app.indexOf('const adoptDurableDraftOutput'), app.indexOf('const saveDraftJobComposer'));
+    const estimateCard = sourceBetween(app, 'visibleEstimateRecords.map(estimate => {', "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
+
+    expect(adopter).toMatch(/setEstimates[\s\S]*focusSavedEstimateRecord\(output\.record\)[\s\S]*focusDurableDraftOutputHeading/);
+    expect(adopter).not.toContain('openEstimateRecord(output.record)');
+    expect(focusHelper).toContain("setContractorFinancialRecordKind('estimates');");
+    expect(focusHelper).toContain("setInspectionView('list');");
+    expect(focusHelper).toContain('setEstimateComposerOpen(false);');
+    expect(focusHelper).toContain('setEditingEstimateId(null);');
+    expect(focusHelper).toContain('setFocusedEstimateRecordId(estimate.id);');
+    expect(focusHelper).toContain("setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');");
+    expect(focusContext).toContain('focusedEstimateRecordId');
+    expect(focusContext).toContain("contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial'");
+    expect(focusContext).toContain('editingEstimateId ?? focusedEstimateRecordId');
+    expect(estimateCard).toContain('focusedEstimateRecord?.id === estimate.id');
+    expect(estimateCard).toContain('<DurableDraftOutputHeading');
+    expect(estimateCard).toContain('data-testid="contractor-estimate-card"');
+    expect(estimateCard).toContain('Download PDF');
+    expect(estimateCard).toContain('Save as template');
+    expect(estimateCard).toContain('Edit draft');
+    expect(estimateCard).toContain('data-testid="contractor-send-estimate"');
   });
 
   test('contains only the gated C1 launch path with no role-name policy or automatic output navigation', () => {

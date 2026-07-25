@@ -21686,16 +21686,17 @@ function ContractorDashboard({
   });
   const durableDraftOutputFocusCoordinator = useRef<ReturnType<typeof createDurableDraftOutputFocusCoordinator> | null>(null);
   const focusedDurableOutputType = contractorTab === 'inspections'
-    && contractorJobsView === 'new_financial'
     && contractorFinancialRecordKind === 'estimates'
-    && estimateComposerOpen
-    && editingEstimateId
+    && (
+      (contractorJobsView === 'new_financial' && estimateComposerOpen && editingEstimateId)
+      || ((contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && focusedEstimateRecordId)
+    )
     ? 'estimate'
     : contractorTab === 'inspections' && inspectionView === 'detail' && activeInspection
       ? 'job'
       : null;
   const focusedDurableOutputId = focusedDurableOutputType === 'estimate'
-    ? editingEstimateId
+    ? (editingEstimateId ?? focusedEstimateRecordId)
     : focusedDurableOutputType === 'job'
       ? activeInspection?.id ?? null
       : null;
@@ -23869,6 +23870,31 @@ function ContractorDashboard({
     return { rows: normalizedRows.map(row => row.payload).filter(Boolean), error: '' };
   };
 
+  const focusSavedEstimateRecord = (estimate: Estimate) => {
+    setContractorFinancialRecordKind('estimates');
+    const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
+    const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+    setContractorTab('inspections');
+    setInspectionView('list');
+    setHomeownerWorkspaceEstimateView(
+      estimate.status === 'accepted'
+        ? 'accepted'
+        : estimate.status === 'sent'
+          ? 'sent'
+          : ['declined', 'expired', 'revised'].includes(estimate.status)
+            ? 'closed'
+            : 'draft',
+    );
+    setInvoiceComposerOpen(false);
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setEstimateGuidedBuilderActive(false);
+    setEstimateLineSourcePanel(null);
+    setFocusedEstimateRecordId(estimate.id);
+    setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+  };
+
   const saveEstimateDraft = async (subject: {
     homeownerUserId?: string | null;
     localContactId?: string | null;
@@ -23916,29 +23942,6 @@ function ContractorDashboard({
     }
     setSavingEstimate(true);
     const currentEditingEstimateId = editingEstimateId;
-    const focusSavedEstimateActions = (estimate: Estimate) => {
-      setContractorFinancialRecordKind('estimates');
-      const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
-      const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
-      setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-      setContractorTab('inspections');
-      setInspectionView('list');
-      setHomeownerWorkspaceEstimateView(
-        estimate.status === 'accepted'
-          ? 'accepted'
-          : estimate.status === 'sent'
-            ? 'sent'
-            : ['declined', 'expired', 'revised'].includes(estimate.status)
-              ? 'closed'
-              : 'draft',
-      );
-      setInvoiceComposerOpen(false);
-      setEstimateComposerOpen(false);
-      setEditingEstimateId(null);
-      setEstimateGuidedBuilderActive(false);
-      setFocusedEstimateRecordId(estimate.id);
-      setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
-    };
     try {
       const totals = draftFinancialBreakdown(draftForTotals);
       const taxCents = 0;
@@ -24043,9 +24046,9 @@ function ContractorDashboard({
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
-      focusSavedEstimateActions(savedEstimate);
+      focusSavedEstimateRecord(savedEstimate);
       await loadContractor();
-      focusSavedEstimateActions(savedEstimate);
+      focusSavedEstimateRecord(savedEstimate);
     } catch (err) {
       setError(actionFeedbackMessage(
         'Estimate could not be saved',
@@ -29395,7 +29398,7 @@ function ContractorDashboard({
   const adoptDurableDraftOutput = (output: DurableDraftLoadedOutput, focusToken: symbol) => {
     if (output.type === 'estimate') {
       setEstimates(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
-      openEstimateRecord(output.record);
+      focusSavedEstimateRecord(output.record);
       focusDurableDraftOutputHeading(output, focusToken);
       return;
     }
@@ -38657,7 +38660,18 @@ function ContractorDashboard({
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isInvoice ? 'bg-slate-900 text-white' : 'bg-blue-100 text-blue-700'}`}>{isInvoice ? 'Invoice' : 'Estimate'}</span>
                                     <StatusBadge {...estimateStatusPresentation(estimate.status)} />
                                   </div>
-                                  <p className="mt-2 font-semibold text-slate-950">{estimate.title}</p>
+                                  {focusedEstimateRecord?.id === estimate.id ? (
+                                    <DurableDraftOutputHeading
+                                      as="p"
+                                      outputType="estimate"
+                                      outputId={estimate.id}
+                                      className="mt-2 font-semibold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                                    >
+                                      {estimate.title}
+                                    </DurableDraftOutputHeading>
+                                  ) : (
+                                    <p className="mt-2 font-semibold text-slate-950">{estimate.title}</p>
+                                  )}
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
                                   {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                   {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
