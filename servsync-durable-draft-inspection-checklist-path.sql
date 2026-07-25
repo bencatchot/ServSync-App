@@ -294,7 +294,7 @@ as $$
       'findings', (
         select coalesce(jsonb_agg(jsonb_build_object(
           'title', item_value #>> '{}',
-          'status', 'Monitor',
+          'status', 'Not Recorded',
           'notes', '',
           'action', '',
           'due', '',

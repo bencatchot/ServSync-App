@@ -106,7 +106,10 @@ import {
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from './features/feedback/ActionFeedback';
 import {
   FINDING_STATUS_ORDER,
+  UNANSWERED_FINDING_STATUS,
   findingStatusBorderColor,
+  findingStatusIsRecorded,
+  findingStatusIsUnanswered,
   findingStatusPresentation,
   findingStatusSelectedButtonClass,
 } from './features/findings/statusPresentation';
@@ -2470,6 +2473,10 @@ function isChecklistJob(job: Pick<Inspection, 'job_type' | 'template_id' | 'name
 
 function isSimpleServiceJob(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
   return !isChecklistJob(job);
+}
+
+function initialFindingStatusForJob(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>): FindingStatus {
+  return isSimpleServiceJob(job) ? 'Pass' : UNANSWERED_FINDING_STATUS;
 }
 
 function jobTypeLabel(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
@@ -5204,10 +5211,22 @@ interface ReportSummaryParts {
   savingsDetails: string[];
 }
 
+function recordedInspectionFindings(rooms: InspectionRoomData[]): InspectionRoomFinding[] {
+  return rooms.flatMap(room => room.findings).filter(finding => findingStatusIsRecorded(finding.status));
+}
+
+function unansweredInspectionFindings(rooms: InspectionRoomData[]): InspectionRoomFinding[] {
+  return rooms.flatMap(room => room.findings).filter(finding => findingStatusIsUnanswered(finding.status));
+}
+
+function inspectionHasUnansweredPrompts(rooms: InspectionRoomData[]): boolean {
+  return unansweredInspectionFindings(rooms).length > 0;
+}
+
 function buildProfessionalReportSummary(rooms: InspectionRoomData[]): ReportSummaryParts {
-  const allFindings = rooms.flatMap(r => r.findings);
+  const allFindings = recordedInspectionFindings(rooms);
   if (allFindings.length === 0) return { intro: '', urgentText: '', urgentWithRoom: [], fixedText: '', followUpText: '', savingsDetails: [] };
-  const roomCount = rooms.filter(r => r.findings.length > 0).length;
+  const roomCount = rooms.filter(r => r.findings.some(finding => findingStatusIsRecorded(finding.status))).length;
   const totalItems = allFindings.length;
   const urgent = allFindings.filter(f => f.status === 'Urgent');
   const repair = allFindings.filter(f => f.status === 'Needs Repair');
@@ -29567,25 +29586,28 @@ function ContractorDashboard({
 
   const buildInspectionRoomsSnapshot = (
     findingsByKey: Record<string, LocalFindingState> = localFindings,
-  ): InspectionRoomData[] => activeRooms.map((r, index) => ({
-    ...roomIdentityFields(r, index),
-    findings: r.items.map(item => {
-      const key = findingStateKey(r, item);
-      const local = findingsByKey[key];
-      return {
-        ...(local?.source_key ? { source_key: local.source_key } : {}),
-        ...(local?.source_type ? { source_type: local.source_type } : {}),
-        ...(local?.source_room_id ? { source_room_id: local.source_room_id } : {}),
-        ...(local?.source_finding_id ? { source_finding_id: local.source_finding_id } : {}),
-        title: item,
-        status: (local?.status ?? 'Pass') as FindingStatus,
-        notes: cleanHumanWrittenText(local?.notes ?? ''),
-        action: cleanHumanWrittenText(local?.action ?? ''),
-        due: local?.due ?? '',
-        photos: local?.photos ?? [],
-      };
-    }),
-  }));
+  ): InspectionRoomData[] => {
+    const fallbackStatus = activeInspection ? initialFindingStatusForJob(activeInspection) : 'Pass';
+    return activeRooms.map((r, index) => ({
+      ...roomIdentityFields(r, index),
+      findings: r.items.map(item => {
+        const key = findingStateKey(r, item);
+        const local = findingsByKey[key];
+        return {
+          ...(local?.source_key ? { source_key: local.source_key } : {}),
+          ...(local?.source_type ? { source_type: local.source_type } : {}),
+          ...(local?.source_room_id ? { source_room_id: local.source_room_id } : {}),
+          ...(local?.source_finding_id ? { source_finding_id: local.source_finding_id } : {}),
+          title: item,
+          status: (local?.status ?? fallbackStatus) as FindingStatus,
+          notes: cleanHumanWrittenText(local?.notes ?? ''),
+          action: cleanHumanWrittenText(local?.action ?? ''),
+          due: local?.due ?? '',
+          photos: local?.photos ?? [],
+        };
+      }),
+    }));
+  };
 
   const currentInspectionLayoutSnapshot = () => inspectionLayoutSnapshotFromTemplateRooms(activeRooms);
 
@@ -29903,7 +29925,7 @@ function ContractorDashboard({
           : []
         : rooms.map((r, index) => ({
             ...roomIdentityFields(r, index),
-            findings: r.items.map(item => ({ title: item, status: 'Monitor' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
+            findings: r.items.map(item => ({ title: item, status: UNANSWERED_FINDING_STATUS, notes: '', action: '', due: '', photos: [] })),
           }));
 
       const { data, error: rpcErr } = await supabase.rpc('servsync_create_field_work', {
@@ -30079,6 +30101,14 @@ function ContractorDashboard({
     setFinalizingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
+      if (!isSimpleServiceJob(insp) && inspectionHasUnansweredPrompts(updatedRooms)) {
+        setError('Complete each checklist prompt before finalizing the report.');
+        return;
+      }
+      if (!isSimpleServiceJob(insp) && recordedInspectionFindings(updatedRooms).length === 0) {
+        setError('Record at least one field observation before finalizing the report.');
+        return;
+      }
       const summaryText = inspectionSummary.trim()
         ? cleanHumanWrittenText(inspectionSummary)
         : cleanHumanWrittenText(buildInspectionSummaryText(updatedRooms));
@@ -30171,6 +30201,10 @@ function ContractorDashboard({
     }
     if (insp.status !== 'finalized' || !insp.report_storage_path) {
       setError('Finalize and file the report before sending it to the homeowner.');
+      return;
+    }
+    if (!isSimpleServiceJob(insp) && inspectionHasUnansweredPrompts(insp.rooms_with_findings ?? [])) {
+      setError('This report still has unanswered checklist prompts and cannot be sent.');
       return;
     }
     if (!options?.skipHomeTemplatePrompt && maybeOpenHomeTemplatePrompt(insp, 'send')) return;
@@ -30475,7 +30509,7 @@ function ContractorDashboard({
   const findingHasReviewContent = (finding?: LocalFindingState) => Boolean(
     finding
     && (
-      finding.status !== 'Pass'
+      (findingStatusIsRecorded(finding.status) && finding.status !== 'Pass')
       || finding.notes.trim()
       || finding.action.trim()
       || finding.due.trim()
@@ -30507,7 +30541,7 @@ function ContractorDashboard({
         : room
     )));
     setLocalFindings(prev => {
-      const current = prev[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+      const current = prev[key] ?? { status: activeInspection ? initialFindingStatusForJob(activeInspection) : 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
       return {
         ...prev,
         [key]: {
@@ -30583,7 +30617,7 @@ function ContractorDashboard({
       const path = `${contractor.id}/${activeInspection.id}/${crypto.randomUUID()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('inspection-media').upload(path, file, { contentType: file.type });
       if (uploadErr) throw uploadErr;
-      const current = localFindings[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+      const current = localFindings[key] ?? { status: activeInspection ? initialFindingStatusForJob(activeInspection) : 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
       const nextFindings = { ...localFindings, [key]: { ...current, photos: [...(current.photos ?? []), path] } };
       const nextRooms = buildInspectionRoomsSnapshot(nextFindings);
       setLocalFindings(nextFindings);
@@ -38975,7 +39009,7 @@ function ContractorDashboard({
                             {records.map(insp => {
                           const checklistStyle = isChecklistJob(insp);
                           const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
-                          const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
+                          const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
                           const linkedEstimate = insp.estimate_id ? estimates.find(estimate => estimate.id === insp.estimate_id) ?? null : null;
@@ -40481,7 +40515,7 @@ function ContractorDashboard({
                     {operationalInspections.slice(0, 5).map(insp => {
                       const checklistStyle = isChecklistJob(insp);
                       const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
-                      const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
+                      const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
                       const subjectLabel = fieldWorkSubjectLabel(insp);
                       const subjectAddress = fieldWorkSubjectAddress(insp);
                       return (
@@ -41091,7 +41125,7 @@ function ContractorDashboard({
                   ...(local?.source_room_id ? { source_room_id: local.source_room_id } : {}),
                   ...(local?.source_finding_id ? { source_finding_id: local.source_finding_id } : {}),
                   title: item,
-                  status: (local?.status ?? 'Pass') as FindingStatus,
+                  status: (local?.status ?? initialFindingStatusForJob(activeInspection)) as FindingStatus,
                   notes: local?.notes ?? '',
                   action: local?.action ?? '',
                   due: local?.due ?? '',
@@ -41101,7 +41135,7 @@ function ContractorDashboard({
             }));
             const workingFindings = workingRooms.flatMap(r => r.findings);
             const urgentCountFin = workingFindings.filter(f => f.status === 'Urgent').length;
-            const issueCountFin = workingFindings.filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+            const issueCountFin = workingFindings.filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
             const fixedCountFin = workingFindings.filter(f => f.status === 'Fixed On Site').length;
             const checklistItemCount = activeRooms.reduce((count, room) => count + room.items.length, 0);
             const fieldWorkSteps: Array<{ id: typeof inspectionSubTab; title: string; helper: string; count: string }> = [
@@ -41672,7 +41706,7 @@ function ContractorDashboard({
                           ) : activeRooms.map(rm => {
                             const flagged = rm.items.filter(item => {
                               const f = localFindings[findingStateKey(rm, item)];
-                              return f && !['Pass', 'Fixed On Site'].includes(f.status);
+                              return f && findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status);
                             }).length;
                             const roomKey = roomIdentityKey(rm);
                             const roomLabel = roomDisplayLabel(rm);
@@ -42096,7 +42130,7 @@ function ContractorDashboard({
                               const roomKey = roomIdentityKey(room);
                               const roomLabel = roomDisplayLabel(room);
                               const findings = room.items.map(item => localFindings[findingStateKey(room, item)]);
-                              const issueCount = findings.filter(f => f && !['Pass', 'Fixed On Site'].includes(f.status)).length;
+                              const issueCount = findings.filter(f => f && findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status)).length;
                               const isActive = roomKey === activeWorkRoomKey;
                               return (
                                 <button
@@ -42132,7 +42166,7 @@ function ContractorDashboard({
                             ) : (
                               activeWorkRoom.items.map(item => {
                                 const key = findingStateKey(activeWorkRoom, item);
-                                const current = localFindings[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+                                const current = localFindings[key] ?? { status: initialFindingStatusForJob(activeInspection), notes: '', action: '', due: '', photos: [] };
                                 const status = current.status;
                                 const isUploading = uploadingInspectionPhotoKey === key;
                                 return (
@@ -42181,7 +42215,7 @@ function ContractorDashboard({
                                           onChange={e => setLocalFindings(prev => ({ ...prev, [key]: { ...current, notes: e.target.value } }))}
                                         />
                                       </div>
-                                      {current.status !== 'Pass' && (
+                                      {current.status !== 'Pass' && findingStatusIsRecorded(current.status) && (
                                         <div className="grid grid-cols-2 gap-3">
                                           <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -42501,27 +42535,29 @@ function ContractorDashboard({
                     findings: rm.items.map(item => {
                       const key = findingStateKey(rm, item);
                       const local = localFindings[key];
-                      return { title: item, status: (local?.status ?? 'Pass') as FindingStatus, notes: local?.notes ?? '', action: local?.action ?? '', due: local?.due ?? '', photos: local?.photos ?? [] };
+                      return { title: item, status: (local?.status ?? initialFindingStatusForJob(activeInspection)) as FindingStatus, notes: local?.notes ?? '', action: local?.action ?? '', due: local?.due ?? '', photos: local?.photos ?? [] };
                     }),
                   }));
                   const allReportFindings = reportRooms.flatMap(r => r.findings);
+                  const recordedReportFindings = allReportFindings.filter(finding => findingStatusIsRecorded(finding.status));
+                  const unansweredReportFindings = allReportFindings.filter(finding => findingStatusIsUnanswered(finding.status));
                   const reportSummary = buildProfessionalReportSummary(reportRooms);
-                  const statusCounts = Object.fromEntries(FINDING_STATUS_ORDER.map(s => [s, allReportFindings.filter(f => f.status === s).length])) as Record<FindingStatus, number>;
+                  const statusCounts = Object.fromEntries(FINDING_STATUS_ORDER.map(s => [s, recordedReportFindings.filter(f => f.status === s).length])) as Record<FindingStatus, number>;
                   const openReportFindings = statusCounts.Urgent + statusCounts['Needs Repair'] + statusCounts.Monitor;
                   const clearedReportFindings = statusCounts.Pass + statusCounts['Fixed On Site'];
-                  const reportPhotoCount = allReportFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
-                  const meaningfulReportFindingCount = allReportFindings.filter(finding =>
+                  const reportPhotoCount = recordedReportFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
+                  const meaningfulReportFindingCount = recordedReportFindings.filter(finding =>
                     finding.status !== 'Pass'
                     || Boolean(finding.notes.trim())
                     || Boolean(finding.action.trim())
                     || Boolean(finding.due.trim())
                     || (finding.photos ?? []).length > 0
                   ).length;
-                  const urgentFindings = allReportFindings.filter(f => f.status === 'Urgent');
-                  const repairFindings = allReportFindings.filter(f => f.status === 'Needs Repair');
-                  const monitorFindings = allReportFindings.filter(f => f.status === 'Monitor');
-                  const fixedFindings = allReportFindings.filter(f => f.status === 'Fixed On Site');
-                  const findingsWithPhotos = allReportFindings.filter(f => (f.photos ?? []).length > 0);
+                  const urgentFindings = recordedReportFindings.filter(f => f.status === 'Urgent');
+                  const repairFindings = recordedReportFindings.filter(f => f.status === 'Needs Repair');
+                  const monitorFindings = recordedReportFindings.filter(f => f.status === 'Monitor');
+                  const fixedFindings = recordedReportFindings.filter(f => f.status === 'Fixed On Site');
+                  const findingsWithPhotos = recordedReportFindings.filter(f => (f.photos ?? []).length > 0);
                   const estimateSourceFindings = reportRooms.flatMap(roomData =>
                     roomData.findings
                       .filter(finding => finding.status === 'Urgent' || finding.status === 'Needs Repair')
@@ -42633,6 +42669,14 @@ function ContractorDashboard({
                               <button type="button" onClick={() => {
                                 if (allReportFindings.length === 0) {
                                   setError('There are no checklist items yet. Add items in Checklist first.');
+                                  return;
+                                }
+                                if (unansweredReportFindings.length > 0) {
+                                  setError('Complete each checklist prompt before closing the report for review.');
+                                  return;
+                                }
+                                if (recordedReportFindings.length === 0) {
+                                  setError('Record at least one field observation before closing the report for review.');
                                   return;
                                 }
                                 setInspectionSummary(prev => prev.trim() ? prev : buildInspectionSummaryText(reportRooms));
@@ -42905,13 +42949,15 @@ function ContractorDashboard({
                       )}
                       {reportRooms.map(roomData => {
                         if (roomData.findings.length === 0) return null;
-                        const nonPass = roomData.findings.filter(f => f.status !== 'Pass');
-                        const passWithNotes = roomData.findings.filter(f => f.status === 'Pass' && f.notes);
-                        const passNoNotes = roomData.findings.filter(f => f.status === 'Pass' && !f.notes);
-                        const pass = roomData.findings.filter(f => f.status === 'Pass');
-                        const fixed = roomData.findings.filter(f => f.status === 'Fixed On Site');
+                        const recordedRoomFindings = roomData.findings.filter(f => findingStatusIsRecorded(f.status));
+                        const unansweredRoomFindings = roomData.findings.filter(f => findingStatusIsUnanswered(f.status));
+                        const nonPass = recordedRoomFindings.filter(f => f.status !== 'Pass');
+                        const passWithNotes = recordedRoomFindings.filter(f => f.status === 'Pass' && f.notes);
+                        const passNoNotes = recordedRoomFindings.filter(f => f.status === 'Pass' && !f.notes);
+                        const pass = recordedRoomFindings.filter(f => f.status === 'Pass');
+                        const fixed = recordedRoomFindings.filter(f => f.status === 'Fixed On Site');
                         const hasUrgent = nonPass.some(f => f.status === 'Urgent');
-                        const openCount = roomData.findings.filter(f => f.status === 'Urgent' || f.status === 'Needs Repair').length;
+                        const openCount = recordedRoomFindings.filter(f => f.status === 'Urgent' || f.status === 'Needs Repair').length;
                         return (
                           <div key={roomData.room} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -42920,7 +42966,7 @@ function ContractorDashboard({
                                 <div>
                                   <h3 className="font-semibold text-slate-800">{roomData.room}</h3>
                                   <p className="text-xs text-slate-400">
-                                    {roomData.findings.length} checked · {pass.length + fixed.length} pass · {fixed.length} fixed · {openCount} open
+                                    {recordedRoomFindings.length} recorded · {unansweredRoomFindings.length} not recorded · {pass.length + fixed.length} pass · {fixed.length} fixed · {openCount} open
                                   </p>
                                 </div>
                               </div>
@@ -42928,11 +42974,19 @@ function ContractorDashboard({
                                 <StatusBadge {...findingStatusPresentation('Urgent')} />
                               ) : openCount > 0 ? (
                                 <StatusBadge label="Has Issues" tone={findingStatusPresentation('Needs Repair').tone} />
+                              ) : unansweredRoomFindings.length > 0 ? (
+                                <StatusBadge label="Not Recorded" tone="neutral" />
                               ) : (
                                 <StatusBadge label="Clear" tone={findingStatusPresentation('Pass').tone} />
                               )}
                             </div>
                             <div className="p-5 space-y-3">
+                              {recordedRoomFindings.length === 0 && unansweredRoomFindings.length > 0 && (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <p className="text-sm font-semibold text-slate-700">Checklist prompts are not recorded yet.</p>
+                                  <p className="mt-1 text-xs leading-5 text-slate-500">Select a real condition in Work Notes before this room can be reviewed or included in a report.</p>
+                                </div>
+                              )}
                               {[...nonPass, ...passWithNotes].map((f, i) => (
                                 <div key={i} className="border-l-4 rounded-r-xl overflow-hidden" style={{ borderLeftColor: findingStatusBorderColor(f.status) }}>
                                   <div className="pl-4 pr-4 py-3 bg-slate-50">
@@ -42982,7 +43036,7 @@ function ContractorDashboard({
                         <div className="space-y-2">
                           {reportRooms.map(r => {
                             const rUrgent = r.findings.some(f => f.status === 'Urgent');
-                            const rIssues = r.findings.filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+                            const rIssues = r.findings.filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
                             const rFixed = r.findings.filter(f => f.status === 'Fixed On Site').length;
                             const photoCount = r.findings.reduce((c, f) => c + (f.photos?.length ?? 0), 0);
                             return (
@@ -43019,10 +43073,12 @@ function ContractorDashboard({
                         ) : !SERVSYNC_DEMO_PRESENTATION_MODE ? (
                           <button
                             type="button"
-                            disabled={activeInspection.status !== 'finalized' || !activeInspection.homeowner_user_id || sendingInspectionReportId === activeInspection.id}
+                            disabled={activeInspection.status !== 'finalized' || !activeInspection.homeowner_user_id || inspectionHasUnansweredPrompts(activeInspection.rooms_with_findings ?? []) || sendingInspectionReportId === activeInspection.id}
                             title={
                               activeInspection.status !== 'finalized'
                                 ? 'Finalize the report first before completing the job.'
+                                : inspectionHasUnansweredPrompts(activeInspection.rooms_with_findings ?? [])
+                                  ? 'Complete every checklist prompt before sending the report.'
                                 : !activeInspection.homeowner_user_id
                                   ? 'This report belongs to a new customer who does not have a ServSync homeowner profile yet.'
                                   : 'Send the report and close the linked service request'
@@ -43046,7 +43102,7 @@ function ContractorDashboard({
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && (activeInspection.status === 'draft' ? (
                           <button
                             type="button"
-                            disabled={!inspectionClosedForReview || finalizingInspection}
+                            disabled={!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0 || finalizingInspection}
                             onClick={() => void finalizeInspection(activeInspection)}
                             className="w-full bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
@@ -43079,7 +43135,7 @@ function ContractorDashboard({
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
                           type="button"
-                          disabled={activeInspection.status === 'draft' && !inspectionClosedForReview}
+                          disabled={activeInspection.status === 'draft' && (!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0)}
                           onClick={async () => {
                             const previewInsp: Inspection = activeInspection.status === 'finalized'
                               ? activeInspection
@@ -43093,7 +43149,7 @@ function ContractorDashboard({
                           className="w-full border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <Download size={14} />
-                          {activeInspection.status === 'draft' && !inspectionClosedForReview ? 'Close to Preview PDF' : 'Download Preview PDF'}
+                          {activeInspection.status === 'draft' && (!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0) ? 'Close to Preview PDF' : 'Download Preview PDF'}
                         </button>}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && activeInspection.status !== 'finalized' && (

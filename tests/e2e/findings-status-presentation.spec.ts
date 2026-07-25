@@ -4,9 +4,12 @@ import { resolve } from 'node:path';
 
 import {
   FINDING_STATUS_ORDER,
+  UNANSWERED_FINDING_STATUS,
   findingStatusAccentClass,
   findingStatusBorderColor,
   findingStatusDotClass,
+  findingStatusIsRecorded,
+  findingStatusIsUnanswered,
   findingStatusPresentation,
   findingStatusSelectedButtonClass,
 } from '../../src/features/findings/statusPresentation';
@@ -22,9 +25,11 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Findings condition/status presentation', () => {
-  test('defines canonical presentation for the five existing finding values', () => {
-    expect(FINDING_STATUS_ORDER).toEqual(['Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);
+  test('defines neutral unanswered status plus canonical presentation for the five recorded finding values', () => {
+    expect(FINDING_STATUS_ORDER).toEqual(['Not Recorded', 'Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);
 
+    expect(UNANSWERED_FINDING_STATUS).toBe('Not Recorded');
+    expect(findingStatusPresentation('Not Recorded')).toMatchObject({ label: 'Not Recorded', tone: 'neutral', dotClass: 'bg-slate-400' });
     expect(findingStatusPresentation('Pass')).toMatchObject({ label: 'Pass', tone: 'success', dotClass: 'bg-emerald-500' });
     expect(findingStatusPresentation('Monitor')).toMatchObject({ label: 'Monitor', tone: 'info', dotClass: 'bg-blue-500' });
     expect(findingStatusPresentation('Fixed On Site')).toMatchObject({ label: 'Fixed On Site', tone: 'violet', dotClass: 'bg-violet-500' });
@@ -35,6 +40,9 @@ test.describe('Findings condition/status presentation', () => {
     expect(findingStatusSelectedButtonClass('Needs Repair')).toContain('bg-amber-50');
     expect(findingStatusDotClass('Fixed On Site')).toBe('bg-violet-500');
     expect(findingStatusBorderColor('Urgent')).toBe('#dc2626');
+    expect(findingStatusIsUnanswered('Not Recorded')).toBe(true);
+    expect(findingStatusIsRecorded('Not Recorded')).toBe(false);
+    expect(findingStatusIsRecorded('Monitor')).toBe(true);
   });
 
   test('falls back safely for unknown runtime finding values', () => {
@@ -62,22 +70,28 @@ test.describe('Findings condition/status presentation', () => {
     expect(editor).not.toContain('FINDING_STATUS_CONFIG');
   });
 
-  test('migrates finding cards, report summaries, and count chips without changing count formulas', () => {
+  test('keeps neutral prompts out of report counts while preserving recorded Monitor behavior', () => {
     const source = sourceFile('src/App.tsx');
     const report = sourceBetween(source, "inspectionSubTab === 'report'", 'Right action sidebar');
     const roomSummary = sourceBetween(source, '<h3 className="font-semibold text-slate-800 text-sm mb-3">Room Summary</h3>', 'reportSentAndCompleted');
 
-    expect(report).toContain('FINDING_STATUS_ORDER.map(s => [s, allReportFindings.filter(f => f.status === s).length])');
-    expect(report).toContain("allReportFindings.filter(f => f.status === 'Urgent')");
-    expect(report).toContain("allReportFindings.filter(f => f.status === 'Needs Repair')");
-    expect(report).toContain("allReportFindings.filter(f => f.status === 'Fixed On Site')");
+    expect(report).toContain('const recordedReportFindings = allReportFindings.filter(finding => findingStatusIsRecorded(finding.status));');
+    expect(report).toContain('const unansweredReportFindings = allReportFindings.filter(finding => findingStatusIsUnanswered(finding.status));');
+    expect(report).toContain('FINDING_STATUS_ORDER.map(s => [s, recordedReportFindings.filter(f => f.status === s).length])');
+    expect(report).toContain("recordedReportFindings.filter(f => f.status === 'Urgent')");
+    expect(report).toContain("recordedReportFindings.filter(f => f.status === 'Needs Repair')");
+    expect(report).toContain("recordedReportFindings.filter(f => f.status === 'Fixed On Site')");
     expect(report).toContain("<StatusBadge label={`${statusCounts.Urgent} Urgent`} tone={findingStatusPresentation('Urgent').tone} size=\"md\" />");
     expect(report).toContain("<StatusBadge label=\"Urgent Items Included\" tone={findingStatusPresentation('Urgent').tone}");
     expect(report).toContain('<StatusBadge {...findingStatusPresentation(f.status)} className="flex-shrink-0" />');
     expect(report).toContain('style={{ borderLeftColor: findingStatusBorderColor(f.status) }}');
+    expect(report).toContain("setError('Complete each checklist prompt before closing the report for review.');");
+    expect(report).toContain("setError('Record at least one field observation before closing the report for review.');");
+    expect(source).toContain('disabled={!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0 || finalizingInspection}');
+    expect(source).toContain("activeInspection.status === 'draft' && (!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0)");
 
     expect(roomSummary).toContain("const rUrgent = r.findings.some(f => f.status === 'Urgent');");
-    expect(roomSummary).toContain("const rIssues = r.findings.filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;");
+    expect(roomSummary).toContain("const rIssues = r.findings.filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length;");
     expect(roomSummary).toContain("const rFixed = r.findings.filter(f => f.status === 'Fixed On Site').length;");
     expect(roomSummary).toContain("findingStatusPresentation(rUrgent ? 'Urgent' : 'Needs Repair').tone");
     expect(roomSummary).toContain("findingStatusPresentation('Fixed On Site').tone");
@@ -88,6 +102,8 @@ test.describe('Findings condition/status presentation', () => {
     const helper = sourceFile('src/features/findings/statusPresentation.ts');
 
     expect(source).toContain("if (finding.status === 'Urgent') return 'Diagnostic';");
+    expect(source).toContain("return isSimpleServiceJob(job) ? 'Pass' : UNANSWERED_FINDING_STATUS;");
+    expect(source).toContain('inspectionHasUnansweredPrompts(updatedRooms)');
     expect(source).toContain("const taskComplete = row.finding.status === 'Fixed On Site';");
     expect(source).toContain("const taskComplete = item.status === 'Fixed On Site';");
     expect(source).toContain("finding.status !== 'Fixed On Site'");
@@ -115,6 +131,9 @@ test.describe('Findings condition/status presentation', () => {
     expect(appSource).not.toContain('resolved_at');
 
     expect(pdfSource).toContain('STATUS_PDF');
+    expect(pdfSource).toContain("'Not Recorded': { bg: [241, 245, 249], text: [100, 116, 139] }");
+    expect(pdfSource).toContain("filter(f => f.status !== 'Not Recorded')");
+    expect(pdfSource).toContain("allFindings.length === 0 ? 'NO FINDINGS'");
     expect(pdfSource).toContain('Fixed On Site');
     expect(pdfSource).toContain('Needs Repair');
     expect(pdfSource).toContain('Urgent');

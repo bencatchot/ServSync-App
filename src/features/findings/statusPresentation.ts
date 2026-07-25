@@ -12,7 +12,10 @@ export interface FindingStatusPresentation extends StatusPresentation {
   dotClass: string;
 }
 
+export const UNANSWERED_FINDING_STATUS = 'Not Recorded' satisfies FindingStatus;
+
 export const FINDING_STATUS_ORDER: FindingStatus[] = [
+  UNANSWERED_FINDING_STATUS,
   'Pass',
   'Monitor',
   'Fixed On Site',
@@ -21,6 +24,13 @@ export const FINDING_STATUS_ORDER: FindingStatus[] = [
 ];
 
 const FINDING_STATUS_PRESENTATIONS: Record<FindingStatus, FindingStatusPresentation> = {
+  'Not Recorded': {
+    value: UNANSWERED_FINDING_STATUS,
+    label: 'Not Recorded',
+    tone: 'neutral',
+    borderColor: '#cbd5e1',
+    dotClass: 'bg-slate-400',
+  },
   Pass: {
     value: 'Pass',
     label: 'Pass',
@@ -57,6 +67,14 @@ const FINDING_STATUS_PRESENTATIONS: Record<FindingStatus, FindingStatusPresentat
     dotClass: 'bg-red-500',
   },
 };
+
+export function findingStatusIsUnanswered(status?: FindingStatus | string | null) {
+  return status === UNANSWERED_FINDING_STATUS;
+}
+
+export function findingStatusIsRecorded(status?: FindingStatus | string | null) {
+  return !findingStatusIsUnanswered(status);
+}
 
 const FALLBACK_DOT_CLASSES: Record<StatusTone, string> = {
   neutral: 'bg-slate-400',

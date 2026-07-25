@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
   canonicalStarterChecklistSnapshot,
   createDraftChecklistSnapshot,
+  DRAFT_CHECKLIST_UNANSWERED_STATUS,
   draftChecklistRoomsToInspectionRooms,
   parseDraftChecklistSnapshot,
   type DraftChecklistSourceOption,
@@ -270,11 +271,12 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
       expect.objectContaining({
         room: 'Mechanical Room',
         findings: [
-          expect.objectContaining({ title: 'Inspect filter condition', status: 'Monitor', photos: [] }),
-          expect.objectContaining({ title: 'Confirm thermostat operation', status: 'Monitor', photos: [] }),
+          expect.objectContaining({ title: 'Inspect filter condition', status: DRAFT_CHECKLIST_UNANSWERED_STATUS, photos: [] }),
+          expect.objectContaining({ title: 'Confirm thermostat operation', status: DRAFT_CHECKLIST_UNANSWERED_STATUS, photos: [] }),
         ],
       }),
     ]);
+    expect(DRAFT_CHECKLIST_UNANSWERED_STATUS).toBe('Not Recorded');
   });
 
   test('rejects duplicate checklist rooms, sort orders, and item labels before save or launch', () => {
@@ -556,8 +558,10 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(sql).toContain('v_room_id_key = any(v_room_ids)');
     expect(sql).toContain('v_room_order = any(v_room_orders)');
     expect(sql).toContain('v_item_label_key = any(v_item_labels)');
-    expect(sql).toContain("'status', 'Monitor'");
+    expect(sql).toContain("'status', 'Not Recorded'");
+    expect(sql).not.toContain("'status', 'Monitor'");
     expect(sql).not.toContain("'status', 'Pass'");
+    expect(sourceFile('src/features/drafts/durableDraftOutputValidation.ts')).toContain("const FINDING_STATUSES = new Set(['Not Recorded', 'Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);");
     expect(sql).toContain('revoke execute on function public.servsync_private_work_draft_checklist_source');
     expect(sql).toContain('revoke execute on function public.servsync_private_canonical_starter_checklist_source');
     expect(sql).toContain('revoke execute on function public.servsync_private_checklist_source_to_rooms_with_findings');

@@ -1,5 +1,8 @@
 import type { InspectionRoomData, InspectionTemplateRoom } from '../../types';
+import { UNANSWERED_FINDING_STATUS } from '../findings/statusPresentation';
 import { DRAFT_CHECKLIST_STARTER_OPTIONS } from './checklistStarterCatalog';
+
+export const DRAFT_CHECKLIST_UNANSWERED_STATUS = UNANSWERED_FINDING_STATUS;
 
 export type DraftChecklistSourceKind =
   | 'starter_inspection_checklist'
@@ -231,7 +234,7 @@ export function draftChecklistRoomsToInspectionRooms(rooms: readonly DraftCheckl
     last_edited_at: '',
     findings: room.items.map(title => ({
       title,
-      status: 'Monitor',
+      status: DRAFT_CHECKLIST_UNANSWERED_STATUS,
       notes: '',
       action: '',
       due: '',

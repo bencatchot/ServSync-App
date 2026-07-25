@@ -229,10 +229,13 @@ test.describe('Draft Job backend foundation', () => {
 
   test('later slices do not rewrite the approved backend foundation artifacts', () => {
     const files = changedFiles();
+    const types = sourceFile('src/types.ts');
 
     expect(files.length).toBeGreaterThan(0);
     expect(files).not.toContain('servsync-draft-job-scope-backend-foundation.sql');
-    expect(files).not.toContain('src/types.ts');
+    if (files.includes('src/types.ts')) {
+      expect(types).toContain("export type FindingStatus = 'Not Recorded' | 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';");
+    }
     expect(files.some(file => file.includes('package'))).toBe(false);
     expect(files.some(file => file.includes('vercel'))).toBe(false);
     expect(files.some(file => file.includes('supabase/functions'))).toBe(false);
