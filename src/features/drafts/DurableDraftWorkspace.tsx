@@ -72,6 +72,7 @@ import {
   type PostLaunchNavigationSource,
 } from './durableDraftPostLaunchNavigation';
 import { validateDurableDraftLoadedOutput } from './durableDraftOutputValidation';
+import type { DraftChecklistSourceOption } from './checklistDraftScope';
 
 type DurableDraftWorkspaceProps = {
   client: DurableDraftSupabaseClient;
@@ -83,6 +84,7 @@ type DurableDraftWorkspaceProps = {
   legacyDrafts: Inspection[];
   connectedOptions: DraftJobCustomerOption[];
   localOptions: DraftJobCustomerOption[];
+  checklistOptions?: DraftChecklistSourceOption[];
   customerLabel: (draft: Inspection) => string;
   propertyLabel: (draft: Inspection) => string;
   onStartNew: () => void;
@@ -169,7 +171,10 @@ function validateDraftForLaunch(form: SharedDraftComposerDraft, canonical: Durab
   const saveValidation = validateSharedDraftComposerDraftForSave(form);
   if (saveValidation) return saveValidation;
   if (!form.intended_output) return 'Choose Estimate or Job before creating work from this Draft.';
-  if (!form.line_items.length) return 'Add at least one work item before creating work from this Draft.';
+  if (form.work_format === 'inspection_checklist') {
+    if (form.intended_output !== 'job') return 'Inspection Checklist Drafts can only create a Job.';
+    if (!form.checklist_source) return 'Choose an Inspection Checklist before creating the Job.';
+  } else if (!form.line_items.length) return 'Add at least one work item before creating work from this Draft.';
   if (canonical && canonical.draft.status !== 'active') return 'This Draft is read-only and can no longer create work.';
   const persistedIds = form.line_items.flatMap(item => item.job_work_item_id ? [item.job_work_item_id] : []);
   if (new Set(persistedIds).size !== persistedIds.length) return 'This Draft contains duplicate saved work items. Refresh before trying again.';
@@ -221,6 +226,7 @@ export function DurableDraftWorkspace({
   legacyDrafts,
   connectedOptions,
   localOptions,
+  checklistOptions = [],
   customerLabel,
   propertyLabel,
   onStartNew,
@@ -1115,6 +1121,7 @@ export function DurableDraftWorkspace({
       const result = await launchContractorWorkDraft(operation.client, {
         draft_id: operation.draftId,
         intended_output: operation.outputType,
+        work_format: currentCanonical.draft.workFormat,
         idempotency_key: launchingAttempt.attempt.idempotencyKey,
       });
       if (!launchOperationIsCurrent(operation)) return;
@@ -1633,6 +1640,7 @@ export function DurableDraftWorkspace({
         draft={form}
         connectedOptions={connectedOptionsWithSavedSelection}
         localOptions={localOptionsWithSavedSelection}
+        checklistOptions={checklistOptions}
         currentDraftId={canonical?.draft.draftId ?? null}
         canSave={capabilities.canPersistDraft && saveState !== 'saving'}
         saving={saveState === 'saving'}

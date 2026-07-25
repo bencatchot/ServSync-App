@@ -170,7 +170,6 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(composerSource).not.toContain('createDurableDraftLaunchAttempt');
     expect(composerSource).toContain("composerField('Private notes'");
     expect(composerSource).not.toContain('Payment schedule');
-    expect(composerSource).not.toContain('inspection_checklist');
   });
 
   test('component source keeps mobile and accessibility guardrails visible', () => {
@@ -189,15 +188,18 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(composerSource).not.toContain('overflow-x');
   });
 
-  test('work format is modeled for future expansion without rendering checklist UI', () => {
+  test('work format now includes the gated inspection checklist Draft path without changing standard defaults', () => {
     const typeSource = sourceFile('src/features/drafts/draftComposerTypes.ts');
     const mappingSource = sourceFile('src/features/drafts/draftComposerMappings.ts');
     const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
 
-    expect(typeSource).toContain("export type DraftWorkFormat = 'standard';");
+    expect(typeSource).toContain("export type DraftWorkFormat = 'standard' | 'inspection_checklist';");
     expect(mappingSource).toContain("work_format: 'standard'");
-    expect(composerSource).not.toContain('Work format');
-    expect(composerSource).not.toContain('Checklist');
+    expect(mappingSource).toContain("overrides.work_format === 'inspection_checklist' ? 'job'");
+    expect(composerSource).toContain('Work format');
+    expect(composerSource).toContain('Inspection Checklist');
+    expect(composerSource).toContain("draft.work_format === 'inspection_checklist'");
+    expect(composerSource).toContain('<option value="standard">Standard work scope</option>');
   });
 
   test('existing Draft Job composer remains the gate-off composer and still owns Create Job', () => {

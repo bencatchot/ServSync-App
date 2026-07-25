@@ -60,6 +60,7 @@ export type DurableDraftCanonicalModel = {
   launchedByUserId: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  checklistSource: ContractorWorkDraft['checklist_source'];
 };
 
 export type DurableDraftCanonicalItem = {
@@ -141,6 +142,7 @@ export function durableDraftFromRpc(draft: ContractorWorkDraft): DurableDraftCan
     privateNotes: draft.private_notes,
     intendedOutput: draft.intended_output,
     workFormat: draft.work_format,
+    checklistSource: draft.checklist_source,
     laborMode: draft.labor_mode,
     laborRateCents: draft.labor_rate_cents,
     jobLaborHours: draft.job_labor_hours,
@@ -214,6 +216,7 @@ export function canonicalDraftToSaveMetadata(draft: DurableDraftCanonicalModel):
     private_notes: draft.privateNotes,
     intended_output: draft.intendedOutput,
     work_format: draft.workFormat,
+    checklist_source: draft.checklistSource,
     labor_mode: draft.laborMode,
     labor_rate_cents: draft.laborRateCents,
     job_labor_hours: draft.jobLaborHours,

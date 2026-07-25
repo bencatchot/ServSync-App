@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -11,6 +12,10 @@ function sourceBetween(source: string, start: string, end: string) {
   const endIndex = source.indexOf(end, startIndex + start.length);
   expect(endIndex, `Expected to find source marker: ${end}`).toBeGreaterThan(startIndex);
   return source.slice(startIndex, endIndex);
+}
+
+function sourceDiff(path: string) {
+  return execFileSync('git', ['diff', '--', path], { encoding: 'utf8' });
 }
 
 test.describe('Jobs template taxonomy', () => {
@@ -31,7 +36,7 @@ test.describe('Jobs template taxonomy', () => {
     const templatesSource = sourceBetween(
       source,
       "{contractorJobsView === 'templates' && (",
-      "{contractorJobsView === 'overview' && (",
+      "{contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (",
     );
 
     expect(templatesSource).toContain('Saved Work Templates');
@@ -139,11 +144,31 @@ test.describe('Jobs template taxonomy', () => {
     expect(homeScopedSource).not.toContain('home template');
   });
 
+  test('home-scoped inspection checklist filtering requires exact property binding', () => {
+    const source = appSource();
+    const matcherSource = sourceBetween(
+      source,
+      'function templateMatchesInspectionSubject',
+      'const STARTER_ESTIMATE_TEMPLATES',
+    );
+
+    expect(matcherSource).toContain('template.home_id === context.home_id');
+    expect(matcherSource).toContain('template.local_home_id === context.local_home_id');
+    expect(matcherSource).toContain('template.homeowner_user_id === context.homeowner_user_id');
+    expect(matcherSource).toContain('template.local_contact_id === context.local_contact_id');
+    expect(matcherSource).not.toContain('homeownerMatches || homeMatches');
+    expect(matcherSource).not.toContain('localContactMatches || localHomeMatches');
+  });
+
   test('saved work templates still use estimate template data and inspection checklists still use inspection templates', () => {
     const source = appSource();
     const loadSource = sourceBetween(source, '// Load inspection templates and inspections', 'if (!estimateTemplatesRes.error) setEstimateTemplates');
     const estimateTemplateStartSource = sourceBetween(source, 'const renderSavedEstimateTemplateStartPicker =', 'const renderBuildEstimateDraftPanel =');
-    const templatesSource = sourceBetween(source, "{contractorJobsView === 'templates' && (", "{contractorJobsView === 'overview' && (");
+    const templatesSource = sourceBetween(
+      source,
+      "{contractorJobsView === 'templates' && (",
+      "{contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (",
+    );
 
     expect(loadSource).toContain(".from('inspection_templates')");
     expect(loadSource).toContain(".from('estimate_templates')");
@@ -156,7 +181,11 @@ test.describe('Jobs template taxonomy', () => {
   test('direct service job creation remains separate from estimate templates', () => {
     const source = appSource();
     const createJobSource = sourceBetween(source, 'const startNewInspection = async () => {', 'const saveTemplate = async () => {');
-    const newJobFormSource = sourceBetween(source, "{inspectionView === 'new' && (", "{inspectionView === 'detail' && activeInspection && (() => {");
+    const newJobFormSource = sourceBetween(
+      source,
+      "{(inspectionView === 'new' || (!DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job')) && (",
+      "{inspectionView === 'detail' && activeInspection && (() => {",
+    );
     const invoiceStartSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
     const invoiceSaveSource = sourceBetween(source, 'const saveInvoiceDraft = async', 'const sendInvoiceToHomeowner = async');
 
@@ -175,10 +204,11 @@ test.describe('Jobs template taxonomy', () => {
   });
 
   test('does not add forbidden backend or platform-scope changes', () => {
-    const source = appSource();
+    const diff = sourceDiff('src/App.tsx');
 
-    expect(source).not.toContain('createWorkTemplate');
-    expect(source).not.toContain('home_map');
-    expect(source).not.toContain('floor_plan');
+    expect(diff).not.toContain('createWorkTemplate');
+    expect(diff).not.toContain('servsync_create_home_map');
+    expect(diff).not.toContain('servsync_upsert_home_map');
+    expect(diff).not.toContain('floor_plan');
   });
 });

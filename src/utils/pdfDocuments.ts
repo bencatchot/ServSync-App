@@ -398,6 +398,7 @@ export async function generateInspectionPdf(
   const BORDER = [226, 232, 240] as const;
 
   const STATUS_PDF: Record<FindingStatus, { bg: readonly number[]; text: readonly number[] }> = {
+    'Not Recorded': { bg: [241, 245, 249], text: [100, 116, 139] },
     'Pass':         { bg: [220, 252, 231], text: [22, 163, 74] },
     'Monitor':      { bg: [219, 234, 254], text: [37, 99, 235] },
     'Fixed On Site':{ bg: [237, 233, 254], text: [109, 40, 217] },
@@ -423,8 +424,8 @@ export async function generateInspectionPdf(
     pdf.line(margin, yy, pageW - margin, yy);
   }
 
-  const allFindings = inspection.rooms_with_findings.flatMap(r => r.findings);
-  const findingsWithRoom = inspection.rooms_with_findings.flatMap(r => r.findings.map(f => ({ ...f, room: r.room })));
+  const allFindings = inspection.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Not Recorded');
+  const findingsWithRoom = inspection.rooms_with_findings.flatMap(r => r.findings.map(f => ({ ...f, room: r.room }))).filter(f => f.status !== 'Not Recorded');
   const urgentCount = allFindings.filter(f => f.status === 'Urgent').length;
   const needsRepairCount = allFindings.filter(f => f.status === 'Needs Repair').length;
   const monitorCount = allFindings.filter(f => f.status === 'Monitor').length;
@@ -477,9 +478,9 @@ export async function generateInspectionPdf(
   drawRect(0, 0, pageW, 44, BLUE, 0);
   txt(contractorName, margin, 13, WHITE, 16, true);
   txt('Job Report', margin, 20, [147, 197, 253], 8);
-  const statusLabel = urgentCount > 0 ? `${urgentCount} URGENT` : issueCount > 0 ? `${issueCount} ISSUES` : 'ALL CLEAR';
-  const statusBg = urgentCount > 0 ? STATUS_PDF['Urgent'].bg : issueCount > 0 ? STATUS_PDF['Needs Repair'].bg : STATUS_PDF['Pass'].bg;
-  const statusTxt = urgentCount > 0 ? STATUS_PDF['Urgent'].text : issueCount > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
+  const statusLabel = allFindings.length === 0 ? 'NO FINDINGS' : urgentCount > 0 ? `${urgentCount} URGENT` : issueCount > 0 ? `${issueCount} ISSUES` : 'ALL CLEAR';
+  const statusBg = allFindings.length === 0 ? STATUS_PDF['Not Recorded'].bg : urgentCount > 0 ? STATUS_PDF['Urgent'].bg : issueCount > 0 ? STATUS_PDF['Needs Repair'].bg : STATUS_PDF['Pass'].bg;
+  const statusTxt = allFindings.length === 0 ? STATUS_PDF['Not Recorded'].text : urgentCount > 0 ? STATUS_PDF['Urgent'].text : issueCount > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
   if (contractorLogo) {
     const logoW = 38;
     const logoH = 19;
@@ -608,10 +609,11 @@ export async function generateInspectionPdf(
 
   // Room sections
   for (const roomData of inspection.rooms_with_findings) {
-    if (roomData.findings.length === 0) continue;
-    const nonPassFindings = roomData.findings.filter(f => f.status !== 'Pass');
-    const passFindings = roomData.findings.filter(f => f.status === 'Pass');
-    const hasUrgent = roomData.findings.some(f => f.status === 'Urgent');
+    const recordedFindings = roomData.findings.filter(f => f.status !== 'Not Recorded');
+    if (recordedFindings.length === 0) continue;
+    const nonPassFindings = recordedFindings.filter(f => f.status !== 'Pass');
+    const passFindings = recordedFindings.filter(f => f.status === 'Pass');
+    const hasUrgent = recordedFindings.some(f => f.status === 'Urgent');
 
     checkPageBreak(20);
     drawRect(margin, y, contentW, 12, DARK, 2);
@@ -622,7 +624,7 @@ export async function generateInspectionPdf(
     drawRect(pageW - margin - 32, y + 2, 32, 8, rBadgeBg, 2);
     txt(rBadgeLabel, pageW - margin - 16, y + 7.5, rBadgeTxt, 7, true, 'center');
     y += 14;
-    txt(`${roomData.findings.length} items  ·  ${passFindings.length} passed  ·  ${nonPassFindings.length} need attention`, margin, y, GRAY, 8);
+    txt(`${recordedFindings.length} items  ·  ${passFindings.length} passed  ·  ${nonPassFindings.length} need attention`, margin, y, GRAY, 8);
     y += 7;
 
     if (nonPassFindings.length > 0) {
