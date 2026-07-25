@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-25
 
+- Branch: `codex/draft-composer-labor-model-ui-fix`
+- Files changed: shared Draft composer labor controls, shared work-composer line label support, focused durable Draft composer tests, and this changelog.
+- Summary of change: Added Estimate labor model planning controls to the standard shared Draft composer. When a Draft is intended to launch as an Estimate, contractors can now choose job-total labor or line-specific labor, enter the matching labor rate/hours data in the Draft, see Estimate-specific line-item copy, and preserve the chosen labor model through durable Draft save/resume and launch payloads.
+- Reason for change: Production observation found that the Draft composer could choose `Estimate` as the intended output but did not expose the labor model decision until after launch.
+- Tests/checks run: Focused shared composer source coverage and durable Draft composer integration coverage were added for labor model visibility and persistence. Full validation is recorded in the task report.
+- Known risks or follow-ups: No SQL, deployment, gate, entitlement, Production/Sandbox access, payment, Invoice, homeowner visibility, or checklist Draft behavior is changed. Production observation after review/merge/deploy remains separate.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a narrow UI/wiring remediation for the existing Draft-first Estimate path and does not change feature status, rollout scope, or backlog priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The fix preserves the approved Draft-first workflow and does not change product direction or rollout sequencing.
+
 - Branch: `codex/draft-estimate-labor-action-handoff-fix`
 - Files changed: App durable Draft-to-Estimate adoption/focus wiring, focused durable Draft integration tests, durable Draft launch SQL source-contract tests, and this changelog.
 - Summary of change: Fixed the Draft-to-Estimate handoff so a launched Estimate adopts into the saved Estimate record/action view instead of reopening the Draft-style Estimate editor. The handoff now closes the financial composer, clears edit state, focuses the saved Estimate card, and keeps the existing Estimate actions available while preserving the Draft-created Estimate labor mode, labor rate, job-total hours, line-specific hours, line prices, and stable line order.

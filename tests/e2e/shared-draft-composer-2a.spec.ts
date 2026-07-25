@@ -61,7 +61,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(clean.intended_output).toBeNull();
     expect(clean.work_format).toBe('standard');
 
-    const legacy = sharedDraftComposerDraftFromRecords({
+    const legacyRecord = {
       id: 'draft-1',
       homeowner_user_id: null,
       home_id: null,
@@ -75,7 +75,8 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
       job_origin: 'draft_composer',
       created_at: '',
       updated_at: '',
-    } as any, []);
+    } as Parameters<typeof sharedDraftComposerDraftFromRecords>[0];
+    const legacy = sharedDraftComposerDraftFromRecords(legacyRecord, []);
     expect(legacy.intended_output).toBe('job');
     expect(legacy.title).toBe('Saved Draft Job');
     expect(legacy.scope).toBe('Saved scope');
@@ -110,6 +111,29 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(backToEstimate.scope).toBe('Replace sink valve.');
     expect(backToEstimate.line_items[0].unit_price).toBe('17.99');
     expect(backToEstimate.line_items[0].internal_notes).toBe('Use quarter-turn shutoff');
+  });
+
+  test('Estimate-intended standard Drafts expose labor model planning controls', () => {
+    const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
+    const laborSection = sourceBetween(
+      composerSource,
+      '{showEstimateLaborControls ? (',
+      '{isChecklistDraft ? (',
+    );
+
+    expect(composerSource).toContain("const isEstimateIntent = draft.intended_output === 'estimate';");
+    expect(composerSource).toContain('const showEstimateLaborControls = !isChecklistDraft && isEstimateIntent;');
+    expect(laborSection).toContain('data-testid="durable-draft-estimate-labor-model"');
+    expect(laborSection).toContain('Estimate labor model');
+    expect(laborSection).toContain('Job total labor');
+    expect(laborSection).toContain('Line-specific labor');
+    expect(laborSection).toContain('data-testid="durable-draft-labor-rate"');
+    expect(laborSection).toContain('data-testid="durable-draft-job-labor-hours"');
+    expect(laborSection).toContain('data-testid="durable-draft-line-labor-summary"');
+    expect(laborSection).toContain('Labor rows distinct from Material, Fee, and Other rows');
+    expect(composerSource).toContain("const workItemsHeading = isEstimateIntent ? 'Estimate line items' : 'Job work scope';");
+    expect(composerSource).toContain("itemLabel={isEstimateIntent ? 'draft estimate' : 'draft'}");
+    expect(sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx')).toContain("'draft estimate'");
   });
 
   test('Save Draft maps only currently supported shared fields into existing Draft Job persistence', () => {

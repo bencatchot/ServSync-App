@@ -13,6 +13,7 @@ import {
 } from './checklistDraftScope';
 import { DraftOutcomeSelector } from './DraftOutcomeSelector';
 import type { DraftIntendedOutput, SharedDraftComposerDraft } from './draftComposerTypes';
+import type { EstimateLaborMode } from '../../types';
 
 type ContractorDraftComposerProps = {
   draft: SharedDraftComposerDraft;
@@ -50,6 +51,10 @@ function composerField(label: string, children: React.ReactNode) {
   );
 }
 
+function formatDraftLaborHours(value: number) {
+  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
 export function ContractorDraftComposer({
   draft,
   connectedOptions,
@@ -84,6 +89,17 @@ export function ContractorDraftComposer({
     ? `${draft.checklist_source.source_kind}:${draft.checklist_source.source_id}`
     : '';
   const selectedChecklist = checklistOptions.find(option => `${option.source_kind}:${option.source_id}` === selectedChecklistKey) ?? null;
+  const isEstimateIntent = draft.intended_output === 'estimate';
+  const showEstimateLaborControls = !isChecklistDraft && isEstimateIntent;
+  const workItemsHeading = isEstimateIntent ? 'Estimate line items' : 'Job work scope';
+  const workItemsDescription = isEstimateIntent
+    ? 'Plan the customer-facing estimate lines now; this structure carries into the launched Estimate.'
+    : 'Plan the work scope that can carry into the launched Job.';
+  const addLineLabel = isEstimateIntent ? 'Add estimate line' : 'Add work line';
+  const emptyLinesLabel = isEstimateIntent
+    ? 'No estimate line items yet. Add labor, materials, or fees before saving detailed pricing.'
+    : 'No work scope yet. Add labor, materials, or fees before saving detailed scope.';
+  const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : 'Draft Job total';
 
   useEffect(() => {
     setExpandedLineIds(prev => {
@@ -129,6 +145,10 @@ export function ContractorDraftComposer({
       estimate_session: intendedOutput === 'estimate' ? { ...draft.estimate_session, visited: true } : draft.estimate_session,
       job_session: intendedOutput === 'job' ? { ...draft.job_session, visited: true } : draft.job_session,
     });
+  };
+
+  const updateLaborMode = (laborMode: EstimateLaborMode) => {
+    onChange({ ...draft, labor_mode: laborMode });
   };
 
   const updateWorkFormat = (workFormat: SharedDraftComposerDraft['work_format']) => {
@@ -294,6 +314,85 @@ export function ContractorDraftComposer({
         Contractor-only planning notes. These are not copied to the customer-facing Estimate or Job.
       </p>
 
+      {showEstimateLaborControls ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4" data-testid="durable-draft-estimate-labor-model">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">Estimate labor model</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Choose how labor should carry into the launched Estimate.</p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Estimate labor model">
+              <button
+                type="button"
+                onClick={() => updateLaborMode('job_total')}
+                aria-pressed={draft.labor_mode === 'job_total'}
+                data-testid="durable-draft-labor-mode-job-total"
+                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  draft.labor_mode === 'job_total'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Job total labor
+              </button>
+              <button
+                type="button"
+                onClick={() => updateLaborMode('line_specific')}
+                aria-pressed={draft.labor_mode === 'line_specific'}
+                data-testid="durable-draft-labor-mode-line-specific"
+                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  draft.labor_mode === 'line_specific'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Line-specific labor
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {composerField('Labor rate', (
+              <input
+                aria-label="Draft Estimate labor rate"
+                data-testid="durable-draft-labor-rate"
+                className={fieldClass()}
+                value={draft.labor_rate}
+                onChange={event => onChange({ ...draft, labor_rate: event.target.value })}
+                placeholder="$0.00"
+              />
+            ))}
+            {draft.labor_mode === 'job_total' ? (
+              composerField('Total labor hours', (
+                <input
+                  aria-label="Draft Estimate total labor hours"
+                  data-testid="durable-draft-job-labor-hours"
+                  className={fieldClass()}
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={draft.job_labor_hours}
+                  onChange={event => onChange({ ...draft, job_labor_hours: event.target.value })}
+                  placeholder="0"
+                />
+              ))
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" data-testid="durable-draft-line-labor-summary">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Line labor hours</p>
+                <p className="mt-1 text-sm font-bold text-slate-950">{formatDraftLaborHours(totals.laborHours)} hrs entered</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Use line Type to keep Labor rows distinct from Material, Fee, and Other rows. Material and Other rows can track Labor hrs in More details.
+                </p>
+              </div>
+            )}
+          </div>
+          {totals.missingLaborRate ? (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+              Labor hours are entered without a labor rate. Labor price is excluded until a rate is added.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {isChecklistDraft ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-checklist-scope">
           <div className="mb-3">
@@ -351,17 +450,17 @@ export function ContractorDraftComposer({
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-950">Work items</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Pricing stays visible and editable for both Estimate and Job intent.</p>
+            <h3 className="text-sm font-bold text-slate-950">{workItemsHeading}</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{workItemsDescription}</p>
           </div>
           <button type="button" onClick={addLine} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50">
             <Plus size={15} />
-            Add line
+            {addLineLabel}
           </button>
         </div>
         {draft.line_items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-            No work items yet. Add labor, materials, or fees before saving detailed scope.
+            {emptyLinesLabel}
           </div>
         ) : (
           <div className="space-y-3">
@@ -370,7 +469,7 @@ export function ContractorDraftComposer({
                 key={line.id}
                 line={line}
                 index={index}
-                itemLabel="draft"
+                itemLabel={isEstimateIntent ? 'draft estimate' : 'draft'}
                 laborMode={draft.labor_mode}
                 compactAdvanced
                 advancedDetailsOpen={expandedLineIds.has(line.id)}
@@ -389,7 +488,7 @@ export function ContractorDraftComposer({
       </div>
 
       <WorkComposerTotalsPanel
-        title="Draft work total"
+        title={totalsTitle}
         totalLabel={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.subtotalCents / 100)}
         rows={draftJobTotalsRows(draft)}
         priceRequired={draft.line_items.some(line => !line.unit_price.trim())}
