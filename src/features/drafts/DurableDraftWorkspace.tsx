@@ -216,6 +216,38 @@ function canonicalListPresentation(state: DurableDraftCanonicalState): DurableDr
   };
 }
 
+function durableDraftRowBelongsInPrimaryList(row: DurableDraftListPresentation) {
+  return row.status !== 'consumed' || !row.outputAvailable;
+}
+
+export function durableDraftPrimaryListRows(rows: DurableDraftListPresentation[]) {
+  return rows
+    .filter(durableDraftRowBelongsInPrimaryList)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.draftId.localeCompare(right.draftId));
+}
+
+function durableDraftRowsAfterLaunch(
+  previous: DurableDraftListPresentation[],
+  canonicalState: DurableDraftCanonicalState,
+) {
+  const localRow = canonicalListPresentation(canonicalState);
+  return durableDraftPrimaryListRows([
+    ...(durableDraftRowBelongsInPrimaryList(localRow) ? [localRow] : []),
+    ...previous.filter(row => row.draftId !== localRow.draftId),
+  ]);
+}
+
+function durableDraftRowsAfterLaunchRefresh(
+  refreshed: DurableDraftListPresentation[],
+  canonicalState: DurableDraftCanonicalState,
+) {
+  const localRow = canonicalListPresentation(canonicalState);
+  return durableDraftPrimaryListRows([
+    ...(durableDraftRowBelongsInPrimaryList(localRow) ? [localRow] : []),
+    ...refreshed.filter(row => row.draftId !== localRow.draftId),
+  ]);
+}
+
 export function DurableDraftWorkspace({
   client,
   mode,
@@ -389,7 +421,7 @@ export function DurableDraftWorkspace({
         || current.mode !== 'list'
         || current.client !== client
         || current.contractorId !== contractorId) return;
-      setRows(durableDraftListRowsToPresentation(listRows));
+      setRows(durableDraftPrimaryListRows(durableDraftListRowsToPresentation(listRows)));
       setRowsOwner({ client, contractorId });
       setListState('ready');
     } catch (error) {
@@ -713,14 +745,14 @@ export function DurableDraftWorkspace({
 
   const launchOperationIsCurrent = (operation: DurableDraftLaunchOperation) => {
     const current = context.current;
-    const expectedTarget = operation.draftId ? `durable:${operation.draftId}` : operation.targetKey;
+    const durableTargetKey = operation.draftId ? `durable:${operation.draftId}` : null;
     return mounted.current
       && launchOperation.current === operation
       && current.launchEnabled
       && current.mode === 'editor'
       && current.client === operation.client
       && current.contractorId === operation.contractorId
-      && current.targetKey === expectedTarget
+      && (current.targetKey === operation.targetKey || (durableTargetKey !== null && current.targetKey === durableTargetKey))
       && editorGeneration.current === operation.editorGeneration;
   };
 
@@ -728,9 +760,7 @@ export function DurableDraftWorkspace({
     operation: DurableDraftLaunchOperation,
     canonicalState: DurableDraftCanonicalState,
   ) => {
-    const localRow = canonicalListPresentation(canonicalState);
-    setRows(previous => [localRow, ...previous.filter(row => row.draftId !== localRow.draftId)]
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.draftId.localeCompare(right.draftId)));
+    setRows(previous => durableDraftRowsAfterLaunch(previous, canonicalState));
     setRowsOwner({ client: operation.client, contractorId: operation.contractorId });
     setListState('ready');
     const generation = ++listGeneration.current;
@@ -741,9 +771,7 @@ export function DurableDraftWorkspace({
         || generation !== listGeneration.current
         || current.client !== operation.client
         || current.contractorId !== operation.contractorId) return;
-      const refreshed = durableDraftListRowsToPresentation(listRows);
-      setRows([localRow, ...refreshed.filter(row => row.draftId !== localRow.draftId)]
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.draftId.localeCompare(right.draftId)));
+      setRows(durableDraftRowsAfterLaunchRefresh(durableDraftListRowsToPresentation(listRows), canonicalState));
       setRowsOwner({ client: operation.client, contractorId: operation.contractorId });
     } catch {
       // The canonical consumed row remains authoritative until a later list refresh succeeds.
@@ -766,7 +794,7 @@ export function DurableDraftWorkspace({
     if (operation.navigationEligibilityToken && currentEligibility?.token === operation.navigationEligibilityToken) {
       const refreshedEligibility = {
         ...currentEligibility,
-        targetKey: `durable:${operation.draftId}`,
+        targetKey: operation.targetKey ?? `durable:${operation.draftId}`,
         editorGeneration: operation.editorGeneration,
         workspaceGeneration: workspaceGeneration.current,
         clientGeneration: clientGeneration.current,
@@ -1060,7 +1088,6 @@ export function DurableDraftWorkspace({
         }
         currentCanonical = reconciled;
         operation.draftId = draftId;
-        operation.targetKey = `durable:${draftId}`;
         setCanonical(reconciled);
         setForm(durableCanonicalStateToComposer(reconciled));
         setRemovedItemIds([]);
@@ -1068,21 +1095,6 @@ export function DurableDraftWorkspace({
         setSaveState('saved');
         if (target?.kind === 'new') {
           adoptedDraftId.current = draftId;
-          onOpenTarget({ kind: 'durable', draftId });
-          await new Promise(resolve => setTimeout(resolve, 0));
-          operation.editorGeneration = editorGeneration.current;
-          const currentEligibility = postLaunchEligibility.current;
-          if (currentEligibility?.token === operation.navigationEligibilityToken) {
-            const canonicalizedEligibility = {
-              ...currentEligibility,
-              targetKey: `durable:${draftId}`,
-              editorGeneration: editorGeneration.current,
-              workspaceGeneration: workspaceGeneration.current,
-              clientGeneration: clientGeneration.current,
-            };
-            postLaunchEligibility.current = canonicalizedEligibility;
-            dispatchPostLaunchNavigation({ type: 'ELIGIBLE', eligibility: canonicalizedEligibility });
-          }
         }
         if (!launchOperationIsCurrent(operation)) return;
         dispatchLaunch({ type: 'SAVED', operationToken: operation.token, draftId });
@@ -1307,8 +1319,10 @@ export function DurableDraftWorkspace({
     const contractorId = canonicalState?.draft.contractorId ?? listDraft?.contractorId ?? null;
     const current = context.current;
     const editorContextMatches = current.mode === 'editor'
-      && current.target?.kind === 'durable'
-      && current.target.draftId === draftId
+      && (
+        (current.target?.kind === 'durable' && current.target.draftId === draftId)
+        || (source === 'automatic' && intent && current.target?.kind === 'new' && current.targetKey === intent.targetKey)
+      )
       && canonicalState?.draft.status === 'consumed'
       && canonicalState.draft.launchedOutputType === outputType;
     const listContextMatches = source === 'manual'
@@ -1360,8 +1374,9 @@ export function DurableDraftWorkspace({
       if (!baseCurrent) return false;
       if (operation.mode === 'editor') {
         const currentCanonical = canonicalRef.current;
-        return latest.target?.kind === 'durable'
-          && latest.target.draftId === operation.draftId
+        const targetMatches = (latest.target?.kind === 'durable' && latest.target.draftId === operation.draftId)
+          || (operation.source === 'automatic' && latest.targetKey === operation.targetKey);
+        return targetMatches
           && currentCanonical?.draft.draftId === operation.draftId
           && currentCanonical.draft.contractorId === operation.contractorId
           && currentCanonical.draft.status === 'consumed'
@@ -1466,13 +1481,13 @@ export function DurableDraftWorkspace({
     const visibleLegacy = legacyDraftsWithoutDurableMatches(legacyDrafts.filter(isComposerDraftJob), currentRows)
       .sort((left, right) => right.updated_at.localeCompare(left.updated_at) || left.id.localeCompare(right.id));
     const active = currentRows.filter(row => row.status === 'active');
-    const consumed = currentRows.filter(row => row.status === 'consumed');
+    const consumedRecovery = currentRows.filter(row => row.status === 'consumed');
     return (
       <section className="space-y-3" aria-label="Drafts" data-testid="durable-draft-list">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-950">Drafts</h3>
-            <p className="mt-1 text-sm text-slate-500">Continue active planning or review recently consumed Drafts.</p>
+            <p className="mt-1 text-sm text-slate-500">Continue active planning or recover consumed Drafts whose output is unavailable.</p>
           </div>
           {capabilities.canPersistDraft ? (
             <button type="button" onClick={onStartNew} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
@@ -1488,7 +1503,7 @@ export function DurableDraftWorkspace({
             <span>{capabilityError || listError}</span>
             {!capabilityError ? <button type="button" onClick={() => void loadList()} className="min-h-11 rounded-lg border border-red-300 bg-white px-4 py-2 font-bold text-red-800 hover:bg-red-100">Try Again</button> : null}
           </div>
-        ) : active.length + consumed.length + visibleLegacy.length === 0 ? (
+        ) : active.length + consumedRecovery.length + visibleLegacy.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">No Drafts yet.</div>
         ) : (
           <div className="space-y-2">
@@ -1503,7 +1518,7 @@ export function DurableDraftWorkspace({
                 <button type="button" disabled={!capabilities.canImportLegacyDraft || openingTargetKey === `legacy:${draft.id}`} title={!capabilities.canImportLegacyDraft ? 'You can view this earlier Draft, but cannot prepare it for editing.' : undefined} onClick={() => handleOpenTarget({ kind: 'legacy', inspectionId: draft.id })} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">{openingTargetKey === `legacy:${draft.id}` ? <><Loader2 className="animate-spin" size={15} /> Preparing Draft…</> : <>Continue Draft <ArrowRight size={15} /></>}</button>
               </div>
             ))}
-            {consumed.map(draft => <DurableDraftRow key={draft.draftId} draft={draft} opening={openingTargetKey === `durable:${draft.draftId}`} onOpen={() => handleOpenTarget({ kind: 'durable', draftId: draft.draftId })} onOpenOutput={handleOpenOutput} openingOutputKey={openingOutputKey} />)}
+            {consumedRecovery.map(draft => <DurableDraftRow key={draft.draftId} draft={draft} opening={openingTargetKey === `durable:${draft.draftId}`} onOpen={() => handleOpenTarget({ kind: 'durable', draftId: draft.draftId })} onOpenOutput={handleOpenOutput} openingOutputKey={openingOutputKey} />)}
           </div>
         )}
       </section>
@@ -1715,7 +1730,7 @@ function DurableDraftRow({ draft, opening, onOpen, onOpenOutput, openingOutputKe
         <p className="mt-1 text-xs text-slate-500">{consumed ? `${outputLabel(draft)} created ${formatDraftTime(draft.launchedAt)}` : `Updated ${formatDraftTime(draft.updatedAt)}`}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={opening} onClick={onOpen} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">{opening ? <><Loader2 className="animate-spin" size={15} /> Opening Draft…</> : <>{consumed ? 'View Draft' : 'Continue Draft'} <ArrowRight size={15} /></>}</button>
+        <button type="button" disabled={opening} onClick={onOpen} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">{opening ? <><Loader2 className="animate-spin" size={15} /> Opening Draft…</> : <>{consumed ? 'Review Draft' : 'Continue Draft'} <ArrowRight size={15} /></>}</button>
         {consumed && draft.outputAvailable && draft.launchedOutputType && draft.liveOutputId ? (
           <button type="button" disabled={openingOutputKey !== null} onClick={() => void onOpenOutput(draft.launchedOutputType as 'estimate' | 'job', draft.liveOutputId as string, draft)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">{openingOutputKey === `${draft.launchedOutputType}:${draft.liveOutputId}` ? 'Opening…' : `Open ${outputLabel(draft)}`}</button>
         ) : consumed ? <span className="self-center text-xs font-semibold text-amber-700">Output unavailable</span> : null}

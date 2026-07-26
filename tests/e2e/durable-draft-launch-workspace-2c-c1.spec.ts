@@ -956,15 +956,24 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
       expect(await harnessValue<null>(page, 'h.storageRecord()')).toBeNull();
     });
 
-    test(`local-new ${label} saves canonically before launching`, async ({ page }) => {
+    test(`local-new ${label} saves, launches, and adopts output on the first confirmation`, async ({ page }) => {
       await installLaunchHarness(page, { outputType, targetKind: 'new' });
       await confirmLaunch(page, outputType);
       await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
       expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
       await harnessValue(page, `h.completeRpc('servsync_save_work_draft', h.activeEnvelope('${outputType}'))`);
       await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_launch_work_draft') > 0);
-      const snapshot = await harnessValue<{ openTargets: string[] }>(page, 'h.snapshot()');
-      expect(snapshot.openTargets).toContain(`durable:${DRAFT_ID}`);
+      await harnessValue(page, `h.completeRpc('servsync_launch_work_draft', h.launchResult('${outputType}', 'succeeded', false))`);
+      await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 0);
+      await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('${outputType}', true))`);
+      await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+      await expect(page.getByText(new RegExp(`${label} created\\. Opening ${label}`))).toBeVisible();
+      const snapshot = await harnessValue<{ adoptCount: number; outputLoadCount: number; openTargets: string[] }>(page, 'h.snapshot()');
+      expect(snapshot.adoptCount).toBe(1);
+      expect(snapshot.outputLoadCount).toBe(1);
+      expect(snapshot.openTargets).toEqual([]);
+      expect(await harnessValue<number>(page, "h.callCount('servsync_save_work_draft')")).toBe(1);
+      expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
     });
 
     test(`dirty existing ${label} performs one save before launch`, async ({ page }) => {
@@ -1300,16 +1309,16 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
   });
 
-  test('active-to-consumed list synchronization rejects a stale list response', async ({ page }) => {
+  test('active-to-consumed list synchronization hides available consumed Drafts and rejects stale active rows', async ({ page }) => {
     await installLaunchHarness(page, { outputType: 'estimate' });
     await completeInitialDraft(page, 'estimate');
     await confirmLaunch(page, 'estimate');
     await completeLaunchAndConsume(page, 'estimate', 'succeeded', false);
     await page.getByRole('button', { name: 'Back to Work' }).click();
-    await expect(page.getByTestId('durable-draft-row-consumed')).toHaveCount(1);
+    await expect(page.getByTestId('durable-draft-row-consumed')).toHaveCount(0);
     await expect(page.getByTestId('durable-draft-row-active')).toHaveCount(0);
     await harnessValue(page, "h.completeList([h.listRow('active', 'estimate')])");
-    await expect(page.getByTestId('durable-draft-row-consumed')).toHaveCount(1);
+    await expect(page.getByTestId('durable-draft-row-consumed')).toHaveCount(0);
     await expect(page.getByTestId('durable-draft-row-active')).toHaveCount(0);
   });
 
