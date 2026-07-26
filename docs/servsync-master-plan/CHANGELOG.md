@@ -4,6 +4,21 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-26
+
+- Branch: `codex/draft-launch-output-routing-fix`
+- Files changed: durable Draft workspace launch/routing/list behavior, focused durable Draft launch regression tests, and this changelog.
+- Summary of change: Fixed Draft launch handoff for standard Drafts so a first-click Create Estimate or Create Job from a newly saved Draft continues through save, launch, canonical consumed adoption, and output opening without requiring a refresh or second click. Successful consumed Drafts with an available output are removed from the primary active Draft list, while unavailable-output consumed Drafts remain recoverable as read-only review rows.
+- Reason for change: Production observation showed that Create Estimate could stop after saving, route back to Jobs/Open Jobs instead of the created Estimate, and leave the consumed Draft visible in the active Draft list until a later retry.
+- Tests/checks run: Focused durable Draft launch/workspace/navigation coverage was updated for local-new Estimate/Job first-click adoption and active-list cleanup. Full validation is recorded in the task report.
+- Known risks or follow-ups: No SQL, Supabase, Vercel, Production/Sandbox access, gate, entitlement, payment, Invoice, homeowner visibility, report finalization, or checklist lifecycle behavior is changed. Production source deployment and one-contractor observation remain separate owner-authorized tasks after review and merge.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a narrow runtime bugfix for the already-enabled internal Draft-first workflow and does not change feature status, rollout scope, or backlog priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The fix preserves the approved Draft-first workflow and does not change product direction or rollout sequencing.
+
 ## 2026-07-25
 
 - Branch: `codex/draft-composer-labor-model-ui-fix`
