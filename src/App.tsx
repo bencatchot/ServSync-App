@@ -21727,6 +21727,7 @@ function ContractorDashboard({
   const [durableDraftCapabilityError, setDurableDraftCapabilityError] = useState('');
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const durableDraftComposerRequested = SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED && DRAFT_JOB_UI_ENABLED;
   const globalDurableDraftMasterEnabled = isGlobalDurableDraftMasterEnabled({
     sharedDraftComposerEnabled: SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED,
@@ -21742,12 +21743,32 @@ function ContractorDashboard({
   });
   const durableDraftCohortContextMatches = durableDraftCohortAvailability.contractorId === (contractor?.id ?? null)
     && durableDraftCohortAvailability.sessionIdentity === profile.id;
+  const durableDraftContractorContextPending = globalDurableDraftMasterEnabled
+    && profile.role === 'contractor'
+    && loading
+    && !contractor?.id;
   const durableDraftCohortLoading = globalDurableDraftMasterEnabled
-    && Boolean(contractor?.id)
+    && profile.role === 'contractor'
     && (
-      !durableDraftCohortContextMatches
-      || durableDraftCohortAvailability.status === 'loading'
+      durableDraftContractorContextPending
+      || (
+        Boolean(contractor?.id)
+        && (
+          !durableDraftCohortContextMatches
+          || durableDraftCohortAvailability.status === 'loading'
+        )
+      )
     );
+  const durableDraftCohortUnavailable = globalDurableDraftMasterEnabled
+    && profile.role === 'contractor'
+    && Boolean(contractor?.id)
+    && durableDraftCohortContextMatches
+    && durableDraftCohortAvailability.status === 'error';
+  const durableDraftCohortSafeHold = durableDraftCohortLoading || durableDraftCohortUnavailable;
+  const durableDraftCohortHoldText = durableDraftCohortUnavailable
+    ? 'Work tools could not be verified. Refresh and try again.'
+    : 'Loading work tools...';
+  const durableDraftLegacyFallbackReady = !durableDraftCohortSafeHold;
   const sharedDraftComposerEnabled = canSeeDurableDraftWorkflow({
     globalMasterEnabled: globalDurableDraftMasterEnabled,
     availability: durableDraftCohortAvailability,
@@ -22006,7 +22027,6 @@ function ContractorDashboard({
     setViewedContractorVisitKeys(storedStringSet(contractorViewedCalendarVisitsStorageKey));
   }, [contractorViewedCalendarVisitsStorageKey]);
 
-  const [loading, setLoading] = useState(true);
   const [workflowJobMessageIndicators, setWorkflowJobMessageIndicators] = useState<Record<string, WorkflowJobMessageIndicator>>({});
   const restoredFieldWorkRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -29319,6 +29339,11 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setFocusedEstimateRecordId(null);
+    if (durableDraftCohortSafeHold) {
+      setContractorJobsViewAndScroll('overview');
+      setInspectionView('list');
+      return;
+    }
     if (sharedDraftComposerEnabled) {
       startDraftJobComposer({}, { intendedOutput: 'estimate' });
       return;
@@ -29334,6 +29359,11 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setFocusedEstimateRecordId(null);
+    if (durableDraftCohortSafeHold) {
+      setContractorJobsViewAndScroll('overview');
+      setInspectionView('list');
+      return;
+    }
     if (sharedDraftComposerEnabled) {
       startCleanDraftJobComposer({ intendedOutput: 'estimate' });
       return;
@@ -37312,13 +37342,13 @@ function ContractorDashboard({
               })()}
 
               {contractorJobsView === 'overview' && (
-                durableDraftCohortLoading ? (
+                durableDraftCohortSafeHold ? (
                   <section
                     className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                    data-testid="durable-draft-cohort-loading"
+                    data-testid={durableDraftCohortUnavailable ? 'durable-draft-cohort-unavailable' : 'durable-draft-cohort-loading'}
                     aria-live="polite"
                   >
-                    <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
+                    <p className="text-sm font-semibold text-slate-700">{durableDraftCohortHoldText}</p>
                   </section>
                 ) : sharedDraftComposerEnabled ? (
                   <div className="space-y-4">
@@ -37395,7 +37425,7 @@ function ContractorDashboard({
                 ) : null
               )}
 
-              {contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (
+              {contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (
               <section data-testid="contractor-jobs-overview" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
@@ -37594,6 +37624,17 @@ function ContractorDashboard({
               )}
 
               {contractorJobsView === 'new_financial' && (
+                durableDraftCohortSafeHold ? (
+                <Card title="Work tools" icon={<Receipt size={18} />}>
+                  <div
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    data-testid={durableDraftCohortUnavailable ? 'durable-draft-cohort-unavailable' : 'durable-draft-cohort-loading'}
+                    aria-live="polite"
+                  >
+                    <p className="text-sm font-semibold text-slate-700">{durableDraftCohortHoldText}</p>
+                  </div>
+                </Card>
+                ) : (
                 <Card title={invoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
                   <div className="space-y-4">
                     {!invoiceComposerOpen && (
@@ -38209,6 +38250,7 @@ function ContractorDashboard({
                     )}
                   </div>
                 </Card>
+                )
               )}
 
               {(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (
@@ -38382,7 +38424,11 @@ function ContractorDashboard({
                               {!focusedEstimateRecord && showingEstimates && (
                                 <button
                                   type="button"
-                                  onClick={sharedDraftComposerEnabled ? startDraftFirstEstimateComposer : () => {
+                                  disabled={durableDraftCohortSafeHold}
+                                  onClick={durableDraftCohortSafeHold ? () => {
+                                    setContractorJobsViewAndScroll('overview');
+                                    setInspectionView('list');
+                                  } : sharedDraftComposerEnabled ? startDraftFirstEstimateComposer : () => {
                                     setContractorFinancialRecordKind('estimates');
                                     setContractorJobsViewAndScroll('new_financial');
                                   }}
@@ -38395,11 +38441,14 @@ function ContractorDashboard({
                               {!focusedEstimateRecord && !showingEstimates && (
                                 <button
                                   type="button"
-                                  onClick={sharedDraftComposerEnabled ? () => {
+                                  onClick={durableDraftCohortSafeHold ? () => {
+                                    setContractorJobsViewAndScroll('overview');
+                                    setInspectionView('list');
+                                  } : sharedDraftComposerEnabled ? () => {
                                     setContractorFinancialRecordKind('invoices');
                                     setContractorJobsViewAndScroll('new_financial');
                                   } : () => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
-                                  disabled={!sharedDraftComposerEnabled && !selectedJobsCustomerName}
+                                  disabled={durableDraftCohortSafeHold || (!sharedDraftComposerEnabled && !selectedJobsCustomerName)}
                                   className={buttonClass('primary')}
                                 >
                                   <Plus size={15} />
@@ -38986,13 +39035,13 @@ function ContractorDashboard({
 	                    return (
                       <div className="space-y-4">
                         {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && !sharedDraftComposerEnabled && (
-                          durableDraftCohortLoading ? (
+                          durableDraftCohortSafeHold ? (
                             <div
                               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                              data-testid="durable-draft-cohort-list-loading"
+                              data-testid={durableDraftCohortUnavailable ? 'durable-draft-cohort-list-unavailable' : 'durable-draft-cohort-list-loading'}
                               aria-live="polite"
                             >
-                              <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
+                              <p className="text-sm font-semibold text-slate-700">{durableDraftCohortHoldText}</p>
                             </div>
                           ) : (
                             <DraftJobList
@@ -40606,7 +40655,7 @@ function ContractorDashboard({
               </>
               )}
 
-              {contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (
+              {contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {operationalInspections.length === 0 ? (
                   <EmptyState
@@ -40668,14 +40717,14 @@ function ContractorDashboard({
 
           {/* ── DRAFT JOB COMPOSER VIEW ── */}
           {DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job' && (!sharedDraftComposerEnabled || Boolean(supabase)) && (
-            durableDraftCohortLoading ? (
+            durableDraftCohortSafeHold ? (
               <Card title="Jobs" icon={<Plus size={18} />}>
                 <div
                   className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                  data-testid="durable-draft-cohort-editor-loading"
+                  data-testid={durableDraftCohortUnavailable ? 'durable-draft-cohort-editor-unavailable' : 'durable-draft-cohort-editor-loading'}
                   aria-live="polite"
                 >
-                  <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
+                  <p className="text-sm font-semibold text-slate-700">{durableDraftCohortHoldText}</p>
                 </div>
               </Card>
             ) : (

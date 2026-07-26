@@ -45,7 +45,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(appSource).toContain("import { SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED } from './features/drafts/sharedDraftComposerAvailability';");
     expect(appSource).toContain('const sharedDraftComposerEnabled = canSeeDurableDraftWorkflow({');
     expect(appSource).toContain('useDurableDraftCohortAvailability({');
-    expect(renderSource).toContain('durableDraftCohortLoading ? (');
+    expect(renderSource).toContain('durableDraftCohortSafeHold ? (');
     expect(renderSource).toContain('sharedDraftComposerEnabled && supabase ? (');
     expect(renderSource).toContain('<DurableDraftWorkspace');
     expect(renderSource).toContain('<DraftJobComposer');
@@ -141,7 +141,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     const sharedOverview = sourceBetween(
       appSource,
       "sharedDraftComposerEnabled ? (\n                  <div className=\"space-y-4\">",
-      "{contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled",
+      "{contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled",
     );
     const openJobsSource = sourceBetween(
       appSource,
@@ -181,8 +181,11 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
 
     expect(estimateStart).toContain("startDraftJobComposer({}, { intendedOutput: 'estimate' });");
     expect(estimateStart).toContain("startCleanDraftJobComposer({ intendedOutput: 'estimate' });");
+    expect(estimateStart).toContain('if (durableDraftCohortSafeHold) {');
     expect(appSource).toContain('kind === \'estimates\' && sharedDraftComposerEnabled');
-    expect(openFinancialActions).toContain('onClick={sharedDraftComposerEnabled ? startDraftFirstEstimateComposer');
+    expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold}');
+    expect(openFinancialActions).toContain('onClick={durableDraftCohortSafeHold ? () => {');
+    expect(openFinancialActions).toContain(': sharedDraftComposerEnabled ? startDraftFirstEstimateComposer');
     expect(openFinancialActions).toContain("setContractorFinancialRecordKind('invoices');");
     expect(invoiceUnavailable).toContain('Direct Draft-to-Invoice is not enabled.');
     expect(invoiceUnavailable).toContain('Review estimates');
