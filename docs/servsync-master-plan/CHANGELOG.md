@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-26
 
+- Branch: `codex/draft-first-work-cleanup-v1`
+- Files changed: Work/Draft navigation in `src/App.tsx`, shared Draft composer template guidance, focused shared Draft composer regression coverage, this changelog, and the feature backlog.
+- Summary of change: Cleaned up the enabled Draft-first Work experience so active durable Drafts are surfaced from Work Overview under a `Drafts needing attention` area instead of the Jobs & Reports / Open Jobs list. Estimate creation entry points now route into Draft-first Estimate planning with Estimate intent preselected when the shared Draft workflow is enabled, while direct `New invoice` starts no longer open the legacy invoice composer and instead point contractors back to approved Estimate/Job billing paths. The Draft composer now distinguishes Saved Work Templates, Inspection Checklists, and Home-specific Checklists in the Draft-first flow without merging template categories.
+- Reason for change: Internal Production testing showed the core Draft workflow works, but saved Draft placement, legacy New Estimate/New Invoice starts, and template discoverability still made the Work module feel mixed between legacy and Draft-first behavior.
+- Tests/checks run: Focused shared Draft composer/source coverage was added for Overview Draft placement, Open Jobs exclusion, Draft-first Estimate starts, direct Draft-to-Invoice blocking, template category visibility, and persisted line-item detail boundaries. Full validation is recorded in the task report.
+- Known risks or follow-ups: No SQL, Supabase, Vercel, Production/Sandbox access, gate, entitlement, deployment, payment, Invoice send/payment, homeowner visibility, report lifecycle, or checklist launch behavior is changed. Model/spec and supply-status Draft line-item parity remains deferred because the durable Draft item schema/RPC contract does not currently persist those fields.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the deferred durable Draft item metadata parity gap for model/spec and supply-status fields.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The cleanup preserves the approved Draft-first workflow direction and does not change rollout sequencing or product strategy.
+
 - Branch: `codex/draft-launch-output-routing-fix`
 - Files changed: durable Draft workspace launch/routing/list behavior, focused durable Draft launch regression tests, and this changelog.
 - Summary of change: Fixed Draft launch handoff for standard Drafts so a first-click Create Estimate or Create Job from a newly saved Draft continues through save, launch, canonical consumed adoption, and output opening without requiring a refresh or second click. Successful consumed Drafts with an available output are removed from the primary active Draft list, while unavailable-output consumed Drafts remain recoverable as read-only review rows.

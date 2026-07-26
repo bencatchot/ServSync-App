@@ -28535,6 +28535,10 @@ function ContractorDashboard({
     setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new');
   };
   const openFinancialOnboardingWorkspace = (kind: ContractorFinancialRecordKind = 'estimates') => {
+    if (kind === 'estimates' && sharedDraftComposerEnabled) {
+      startCleanDraftFirstEstimateComposer();
+      return;
+    }
     setContractorTab('inspections');
     setContractorFinancialRecordKind(kind);
     setContractorJobsView('new_financial');
@@ -29241,7 +29245,10 @@ function ContractorDashboard({
     return data as Inspection;
   };
 
-  const startDraftJobComposer = (overrides: Partial<DraftJobComposerDraft> = {}) => {
+  const startDraftJobComposer = (
+    overrides: Partial<DraftJobComposerDraft> = {},
+    options: { intendedOutput?: 'estimate' | 'job' | null } = {},
+  ) => {
     if (!DRAFT_JOB_UI_ENABLED) {
       setInspectionView('new');
       setContractorJobsView('new_jobs');
@@ -29265,10 +29272,15 @@ function ContractorDashboard({
       if (!durableDraftCapabilities.canPersistDraft) {
         setError('You do not have access to save contractor Drafts.');
         setInspectionView('list');
-        setContractorJobsViewAndScroll('open_jobs');
+        setContractorJobsViewAndScroll('overview');
         return;
       }
-      const initialDraft = sharedDraftComposerDraftFromDraftJob(nextDraft, { intendedOutput: null });
+      const intendedOutput = options.intendedOutput ?? null;
+      const initialDraft = sharedDraftComposerDraftFromDraftJob(nextDraft, {
+        intendedOutput,
+        estimateSession: intendedOutput === 'estimate' ? { visited: true } : undefined,
+        jobSession: intendedOutput === 'job' ? { visited: true } : undefined,
+      });
       setDurableDraftOpenTarget({ kind: 'new', initialDraft });
       setInspectionView('draft_job');
       setContractorJobsView('new_jobs');
@@ -29284,7 +29296,7 @@ function ContractorDashboard({
     setContractorTab('inspections');
   };
 
-  const startCleanDraftJobComposer = () => {
+  const startCleanDraftJobComposer = (options: { intendedOutput?: 'estimate' | 'job' | null } = {}) => {
     setJobsCustomerFilterSubjectId(null);
     startDraftJobComposer({
       subject_type: 'connected',
@@ -29297,7 +29309,37 @@ function ContractorDashboard({
       scope: '',
       notes: '',
       line_items: [],
-    });
+    }, options);
+  };
+
+  const startDraftFirstEstimateComposer = () => {
+    setContractorFinancialRecordKind('estimates');
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setFocusedEstimateRecordId(null);
+    if (sharedDraftComposerEnabled) {
+      startDraftJobComposer({}, { intendedOutput: 'estimate' });
+      return;
+    }
+    setContractorJobsView('new_financial');
+    setInspectionView('list');
+  };
+
+  const startCleanDraftFirstEstimateComposer = () => {
+    setContractorFinancialRecordKind('estimates');
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setFocusedEstimateRecordId(null);
+    if (sharedDraftComposerEnabled) {
+      startCleanDraftJobComposer({ intendedOutput: 'estimate' });
+      return;
+    }
+    setContractorJobsView('new_financial');
+    setInspectionView('list');
   };
 
   const continueDraftJob = async (draft: Inspection) => {
@@ -37279,47 +37321,77 @@ function ContractorDashboard({
                     <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
                   </section>
                 ) : sharedDraftComposerEnabled ? (
-                  <ContractorWorkDashboard
-                    loading={loading}
-                    loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
-                    canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && (sharedDraftComposerEnabled
-                      ? durableDraftCapabilities.canPersistDraft
-                      : DRAFT_JOB_UI_ENABLED && canManageDraftJobs)}
-                    draftsToContinue={sharedDraftComposerEnabled
-                      ? []
-                      : DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}
-                    activeJobs={openJobs}
-                    workReadyToStart={acceptedEstimatesNeedingJobs}
-                    readyToInvoiceJobs={completedJobsReadyToInvoice}
-                    invoicesNeedingAttention={invoiceAttentionRecords}
-                    upcomingWorkCount={scheduleSnapshotCount}
-                    onStartNewDraft={startCleanDraftJobComposer}
-                    onViewDrafts={() => {
-                      setContractorJobsViewAndScroll('open_jobs');
-                      setInspectionView('list');
-                    }}
-                    onContinueDraft={draft => void continueDraftJob(draft)}
-                    onViewOpenJobs={() => {
-                      setContractorJobsViewAndScroll('open_jobs');
-                      setInspectionView('list');
-                    }}
-                    onOpenJob={job => openInspection(job)}
-                    onReviewAcceptedEstimates={openAcceptedEstimatesNeedingJobs}
-                    onReviewBilling={() => {
-                      if (completedJobsReadyToInvoice.length > 0) {
-                        openCompletedJobsReadyToInvoice();
-                        return;
-                      }
-                      setContractorFinancialRecordKind('invoices');
-                      setContractorJobsViewAndScroll('open_financial');
-                      setInspectionView('list');
-                    }}
-                    onViewUpcomingWork={() => setContractorTab('calendar')}
-                    onViewJobHistory={() => {
-                      setContractorJobsViewAndScroll('closed_jobs');
-                      setInspectionView('list');
-                    }}
-                  />
+                  <div className="space-y-4">
+                    {supabase ? (
+                      <section data-testid="contractor-work-durable-drafts-overview" className="space-y-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Drafts needing attention</p>
+                          <h3 className="mt-1 text-lg font-bold text-slate-950">Saved Drafts</h3>
+                        </div>
+                        <DurableDraftWorkspace
+                          client={supabase}
+                          mode="list"
+                          capabilities={durableDraftCapabilities}
+                          capabilityLoading={durableDraftCapabilityLoading}
+                          capabilityError={durableDraftCapabilityError}
+                          legacyDrafts={composerDraftJobs}
+                          connectedOptions={draftJobConnectedOptionsForComposer}
+                          localOptions={draftJobLocalOptionsForComposer}
+                          checklistOptions={draftChecklistSourceOptions}
+                          customerLabel={fieldWorkSubjectLabel}
+                          propertyLabel={fieldWorkSubjectAddress}
+                          onStartNew={startCleanDraftJobComposer}
+                          onOpenTarget={target => {
+                            setDurableDraftOpenTarget(target);
+                            setInspectionView('draft_job');
+                            setContractorJobsView('new_jobs');
+                          }}
+                          onBack={() => setContractorJobsViewAndScroll('overview')}
+                          launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
+                          onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}
+                          onLoadOutput={loadDurableDraftOutput}
+                          onAdoptOutput={adoptDurableDraftOutput}
+                        />
+                      </section>
+                    ) : null}
+                    <ContractorWorkDashboard
+                      loading={loading}
+                      loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
+                      canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && durableDraftCapabilities.canPersistDraft}
+                      draftsToContinue={[]}
+                      activeJobs={openJobs}
+                      workReadyToStart={acceptedEstimatesNeedingJobs}
+                      readyToInvoiceJobs={completedJobsReadyToInvoice}
+                      invoicesNeedingAttention={invoiceAttentionRecords}
+                      upcomingWorkCount={scheduleSnapshotCount}
+                      onStartNewDraft={startCleanDraftJobComposer}
+                      onViewDrafts={() => {
+                        setContractorJobsViewAndScroll('overview');
+                        setInspectionView('list');
+                      }}
+                      onContinueDraft={draft => void continueDraftJob(draft)}
+                      onViewOpenJobs={() => {
+                        setContractorJobsViewAndScroll('open_jobs');
+                        setInspectionView('list');
+                      }}
+                      onOpenJob={job => openInspection(job)}
+                      onReviewAcceptedEstimates={openAcceptedEstimatesNeedingJobs}
+                      onReviewBilling={() => {
+                        if (completedJobsReadyToInvoice.length > 0) {
+                          openCompletedJobsReadyToInvoice();
+                          return;
+                        }
+                        setContractorFinancialRecordKind('invoices');
+                        setContractorJobsViewAndScroll('open_financial');
+                        setInspectionView('list');
+                      }}
+                      onViewUpcomingWork={() => setContractorTab('calendar')}
+                      onViewJobHistory={() => {
+                        setContractorJobsViewAndScroll('closed_jobs');
+                        setInspectionView('list');
+                      }}
+                    />
+                  </div>
                 ) : null
               )}
 
@@ -37561,7 +37633,9 @@ function ContractorDashboard({
                             Back to Jobs Overview
                           </button>
                         </div>
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE
+                          && !estimateComposerOpen
+                          && (!sharedDraftComposerEnabled || contractorFinancialRecordKind === 'estimates') && (
                         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
@@ -37592,7 +37666,9 @@ function ContractorDashboard({
                             <button
                               type="button"
                               disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}
-                              onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                              onClick={() => sharedDraftComposerEnabled
+                                ? startDraftFirstEstimateComposer()
+                                : beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
                               title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
                               className={buttonClass('primary')}
                             >
@@ -37614,7 +37690,43 @@ function ContractorDashboard({
                         </div>
                         )}
 
-                        {!selectedJobsCustomerName && (
+                        {sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen ? (
+                          <div
+                            className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                            data-testid="durable-draft-direct-invoice-unavailable"
+                          >
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-800">Invoice start</p>
+                            <h3 className="mt-1 text-lg font-bold text-amber-950">Create invoices from approved work</h3>
+                            <p className="mt-1 text-sm leading-6 text-amber-900">
+                              Direct Draft-to-Invoice is not enabled. Use an approved Estimate, a completed Job, or an available payment schedule row to prepare an invoice.
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setContractorFinancialRecordKind('estimates');
+                                  setContractorJobsViewAndScroll('open_financial');
+                                  setInspectionView('list');
+                                  setFocusedEstimateRecordId(null);
+                                }}
+                                className={buttonClass('secondary')}
+                              >
+                                <FileText size={15} />
+                                Review estimates
+                              </button>
+                              <button
+                                type="button"
+                                onClick={openCompletedJobsReadyToInvoice}
+                                className={buttonClass('secondary')}
+                              >
+                                <ClipboardCheck size={15} />
+                                Review completed jobs
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {!selectedJobsCustomerName && !(sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen) && (
                           <Notice tone="info" text={contractorFinancialRecordKind === 'estimates' ? 'Choose a connected homeowner or new customer before creating an estimate.' : 'Choose a connected homeowner or new customer before creating an invoice.'} />
                         )}
                         {readOnlyContractorActionReason && (
@@ -38270,7 +38382,7 @@ function ContractorDashboard({
                               {!focusedEstimateRecord && showingEstimates && (
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={sharedDraftComposerEnabled ? startDraftFirstEstimateComposer : () => {
                                     setContractorFinancialRecordKind('estimates');
                                     setContractorJobsViewAndScroll('new_financial');
                                   }}
@@ -38283,8 +38395,11 @@ function ContractorDashboard({
                               {!focusedEstimateRecord && !showingEstimates && (
                                 <button
                                   type="button"
-                                  onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
-                                  disabled={!selectedJobsCustomerName}
+                                  onClick={sharedDraftComposerEnabled ? () => {
+                                    setContractorFinancialRecordKind('invoices');
+                                    setContractorJobsViewAndScroll('new_financial');
+                                  } : () => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                                  disabled={!sharedDraftComposerEnabled && !selectedJobsCustomerName}
                                   className={buttonClass('primary')}
                                 >
                                   <Plus size={15} />
@@ -38870,7 +38985,7 @@ function ContractorDashboard({
 	                    ].filter((label): label is string => Boolean(label));
 	                    return (
                       <div className="space-y-4">
-                        {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && (
+                        {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && !sharedDraftComposerEnabled && (
                           durableDraftCohortLoading ? (
                             <div
                               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
@@ -38879,31 +38994,6 @@ function ContractorDashboard({
                             >
                               <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
                             </div>
-                          ) : sharedDraftComposerEnabled && supabase ? (
-                            <DurableDraftWorkspace
-                              client={supabase}
-                              mode="list"
-                              capabilities={durableDraftCapabilities}
-                              capabilityLoading={durableDraftCapabilityLoading}
-                              capabilityError={durableDraftCapabilityError}
-                              legacyDrafts={composerDraftJobs}
-                              connectedOptions={draftJobConnectedOptionsForComposer}
-                              localOptions={draftJobLocalOptionsForComposer}
-                              checklistOptions={draftChecklistSourceOptions}
-                              customerLabel={fieldWorkSubjectLabel}
-                              propertyLabel={fieldWorkSubjectAddress}
-                              onStartNew={startCleanDraftJobComposer}
-                              onOpenTarget={target => {
-                                setDurableDraftOpenTarget(target);
-                                setInspectionView('draft_job');
-                                setContractorJobsView('new_jobs');
-                              }}
-                              onBack={() => setContractorJobsViewAndScroll('overview')}
-                              launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
-                              onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}
-                              onLoadOutput={loadDurableDraftOutput}
-                              onAdoptOutput={adoptDurableDraftOutput}
-                            />
                           ) : (
                             <DraftJobList
                               drafts={selectedJobsCustomerDrafts}
@@ -40609,7 +40699,7 @@ function ContractorDashboard({
                   onBack={() => {
                     setDurableDraftOpenTarget(null);
                     setInspectionView('list');
-                    setContractorJobsViewAndScroll('open_jobs');
+                    setContractorJobsViewAndScroll('overview');
                   }}
                   launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
                   onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}

@@ -136,6 +136,83 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx')).toContain("'draft estimate'");
   });
 
+  test('shared Work overview owns active durable Draft visibility and Open Jobs stays operational', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const sharedOverview = sourceBetween(
+      appSource,
+      "sharedDraftComposerEnabled ? (\n                  <div className=\"space-y-4\">",
+      "{contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled",
+    );
+    const openJobsSource = sourceBetween(
+      appSource,
+      "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{contractorJobsView === 'templates' && (",
+    );
+    const sharedEditorSource = sourceBetween(
+      appSource,
+      "{DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job'",
+      "{/* ── NEW VIEW ── */}",
+    );
+
+    expect(sharedOverview).toContain('data-testid="contractor-work-durable-drafts-overview"');
+    expect(sharedOverview).toContain('Drafts needing attention');
+    expect(sharedOverview).toContain('mode="list"');
+    expect(sharedOverview).toContain('onOpenTarget={target => {');
+    expect(sharedOverview).toContain("setContractorJobsView('new_jobs');");
+    expect(openJobsSource).toContain("DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && !sharedDraftComposerEnabled");
+    expect(openJobsSource).toContain('<DraftJobList');
+    expect(openJobsSource).not.toContain('sharedDraftComposerEnabled && supabase ? (');
+    expect(sharedEditorSource).toContain("setContractorJobsViewAndScroll('overview');");
+  });
+
+  test('shared creation entry points route Estimates through Drafts and block direct Draft-to-Invoice start', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const estimateStart = sourceBetween(appSource, 'const startDraftFirstEstimateComposer =', 'const continueDraftJob = async');
+    const invoiceUnavailable = sourceBetween(
+      appSource,
+      'data-testid="durable-draft-direct-invoice-unavailable"',
+      '{!selectedJobsCustomerName && !(sharedDraftComposerEnabled',
+    );
+    const openFinancialActions = sourceBetween(
+      appSource,
+      'const invoiceStatusFilterLabels',
+      "{focusedEstimateRecord && (",
+    );
+
+    expect(estimateStart).toContain("startDraftJobComposer({}, { intendedOutput: 'estimate' });");
+    expect(estimateStart).toContain("startCleanDraftJobComposer({ intendedOutput: 'estimate' });");
+    expect(appSource).toContain('kind === \'estimates\' && sharedDraftComposerEnabled');
+    expect(openFinancialActions).toContain('onClick={sharedDraftComposerEnabled ? startDraftFirstEstimateComposer');
+    expect(openFinancialActions).toContain("setContractorFinancialRecordKind('invoices');");
+    expect(invoiceUnavailable).toContain('Direct Draft-to-Invoice is not enabled.');
+    expect(invoiceUnavailable).toContain('Review estimates');
+    expect(invoiceUnavailable).toContain('Review completed jobs');
+    expect(appSource).toContain('beginInvoiceDraftFromEstimate');
+    expect(appSource).not.toContain("startDraftJobComposer({}, { intendedOutput: 'invoice'");
+  });
+
+  test('Draft template guidance stays source-specific and line detail UI matches persisted durable fields', () => {
+    const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
+    const guidance = sourceBetween(
+      composerSource,
+      'data-testid="durable-draft-template-guidance"',
+      "{composerField('Draft title'",
+    );
+    const launchTypes = sourceFile('src/features/drafts/durableDraftLaunchTypes.ts');
+    const lineRow = sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
+
+    expect(guidance).toContain('Saved Work Templates');
+    expect(guidance).toContain('Inspection Checklists');
+    expect(guidance).toContain('Home-specific Checklists');
+    expect(guidance).not.toContain('Generic templates');
+    expect(launchTypes).toContain('room_label: string | null;');
+    expect(launchTypes).toContain('location_label: string | null;');
+    expect(launchTypes).toContain('internal_notes: string;');
+    expect(launchTypes).not.toContain('model_spec');
+    expect(launchTypes).not.toContain('supply_status');
+    expect(lineRow).toContain("itemLabel !== 'draft estimate'");
+  });
+
   test('Save Draft maps only currently supported shared fields into existing Draft Job persistence', () => {
     const shared = createBlankSharedDraftComposerDraft({
       intended_output: 'estimate',

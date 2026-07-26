@@ -569,8 +569,7 @@ test.describe('durable Draft cohort App integration boundaries', () => {
   test('keeps cohort presentation separate from existing persistence and launch authority', () => {
     const app = sourceFile('src/App.tsx');
     expect(app).toContain('capabilities={durableDraftCapabilities}');
-    expect(app).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && (sharedDraftComposerEnabled');
-    expect(app).toContain('? durableDraftCapabilities.canPersistDraft');
+    expect(app).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && durableDraftCapabilities.canPersistDraft}');
     expect(app).not.toMatch(/durable_draft_beta_enabled/);
   });
 
