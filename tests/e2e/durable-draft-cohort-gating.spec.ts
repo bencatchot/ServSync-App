@@ -557,13 +557,46 @@ test.describe('durable Draft cohort App integration boundaries', () => {
     expect(app).toContain('const globalDurableDraftMasterEnabled = isGlobalDurableDraftMasterEnabled({');
     expect(app).toContain('const sharedDraftComposerEnabled = canSeeDurableDraftWorkflow({');
     expect(app).toContain('useDurableDraftCohortAvailability({');
-    expect(app).toContain("data-testid=\"durable-draft-cohort-loading\"");
-    expect(app).toContain("data-testid=\"durable-draft-cohort-list-loading\"");
-    expect(app).toContain("data-testid=\"durable-draft-cohort-editor-loading\"");
-    expect(app).toContain("contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled");
+    expect(app).toContain("'durable-draft-cohort-loading'");
+    expect(app).toContain("'durable-draft-cohort-list-loading'");
+    expect(app).toContain("'durable-draft-cohort-editor-loading'");
+    expect(app).toContain('const durableDraftCohortSafeHold = durableDraftCohortLoading || durableDraftCohortUnavailable;');
+    expect(app).toContain('const durableDraftLegacyFallbackReady = !durableDraftCohortSafeHold;');
+    expect(app).toContain("contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled");
     expect(app).toContain('if (!sharedDraftComposerEnabled || !supabase)');
     expect(app).toContain('if (entitlementDefinitivelyUnavailable) setDurableDraftOpenTarget(null);');
     expect(app).toContain('launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}');
+  });
+
+  test('fails closed in App while contractor eligibility is unresolved or unavailable', () => {
+    const app = sourceFile('src/App.tsx');
+    const overviewSource = app.slice(
+      app.indexOf("{contractorJobsView === 'overview' && ("),
+      app.indexOf("{contractorJobsView === 'new_financial' && ("),
+    );
+    const newFinancialSource = app.slice(
+      app.indexOf("{contractorJobsView === 'new_financial' && ("),
+      app.indexOf("{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && ("),
+    );
+    const openFinancialActions = app.slice(
+      app.indexOf('const invoiceStatusFilterLabels'),
+      app.indexOf('{focusedEstimateRecord && ('),
+    );
+
+    expect(app).toContain('const durableDraftContractorContextPending = globalDurableDraftMasterEnabled');
+    expect(app).toContain("&& profile.role === 'contractor'");
+    expect(app).toContain('&& loading');
+    expect(app).toContain('&& !contractor?.id;');
+    expect(app).toContain("&& durableDraftCohortAvailability.status === 'error';");
+    expect(app).toContain("'Work tools could not be verified. Refresh and try again.'");
+    expect(app).toContain("'Loading work tools...'");
+    expect(overviewSource).toContain('durableDraftCohortSafeHold ? (');
+    expect(overviewSource).toContain('durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled');
+    expect(newFinancialSource).toContain('durableDraftCohortSafeHold ? (');
+    expect(newFinancialSource).toContain('<Card title="Work tools"');
+    expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold}');
+    expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold || (!sharedDraftComposerEnabled && !selectedJobsCustomerName)}');
+    expect(openFinancialActions).toContain("setContractorJobsViewAndScroll('overview');");
   });
 
   test('keeps cohort presentation separate from existing persistence and launch authority', () => {

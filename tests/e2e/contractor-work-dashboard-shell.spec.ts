@@ -181,22 +181,18 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     );
     const recentJobsSource = sourceBetween(
       appSource,
-      '{contractorJobsView === \'overview\' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (',
+      '{contractorJobsView === \'overview\' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (',
       '{/* ── DRAFT JOB COMPOSER VIEW ── */}',
     );
 
     expect(appSource).toContain("import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';");
     expect(appSource).toContain("import { ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';");
     expect(appSource).toContain('const globalDurableDraftMasterEnabled = isGlobalDurableDraftMasterEnabled({');
-    expect(overviewSource).toContain('durableDraftCohortLoading ? (');
+    expect(overviewSource).toContain('durableDraftCohortSafeHold ? (');
     expect(overviewSource).toContain('sharedDraftComposerEnabled ? (');
     expect(overviewSource).toContain('<ContractorWorkDashboard');
-    expect(overviewSource).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && (sharedDraftComposerEnabled');
-    expect(overviewSource).toContain('? durableDraftCapabilities.canPersistDraft');
-    expect(overviewSource).toContain(': DRAFT_JOB_UI_ENABLED && canManageDraftJobs)}');
-    expect(overviewSource).toContain('draftsToContinue={sharedDraftComposerEnabled');
-    expect(overviewSource).toContain('? []');
-    expect(overviewSource).toContain(': DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}');
+    expect(overviewSource).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && durableDraftCapabilities.canPersistDraft}');
+    expect(overviewSource).toContain('draftsToContinue={[]}');
     expect(overviewSource).toContain('onStartNewDraft={startCleanDraftJobComposer}');
     expect(overviewSource).toContain('onContinueDraft={draft => void continueDraftJob(draft)}');
     expect(overviewSource).toContain('activeJobs={openJobs}');
@@ -236,12 +232,12 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     const appSource = sourceFile('src/App.tsx');
     const contextualStartSource = sourceBetween(
       appSource,
-      'const startDraftJobComposer = (overrides: Partial<DraftJobComposerDraft> = {}) => {',
-      'const startCleanDraftJobComposer = () => {',
+      'const startDraftJobComposer = (',
+      'const startCleanDraftJobComposer = (',
     );
     const cleanStartSource = sourceBetween(
       appSource,
-      'const startCleanDraftJobComposer = () => {',
+      'const startCleanDraftJobComposer = (',
       'const continueDraftJob = async',
     );
     const overviewSource = sourceBetween(

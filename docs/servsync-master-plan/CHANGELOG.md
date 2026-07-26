@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-26
 
+- Branch: `codex/draft-first-work-fail-closed-remediation`
+- Files changed: contractor Work/Draft gating in `src/App.tsx`, focused durable Draft cohort/shared composer/Work dashboard/template taxonomy regression coverage, and this changelog.
+- Summary of change: Hardened the Draft-first Work rollout surface so contractor sessions fail closed while durable Draft eligibility or capability state is unresolved. During pending contractor/cohort resolution or entitlement RPC errors, Work Overview, Open Jobs legacy Draft rows, Draft editor entry, and financial New Estimate/New Invoice entry points now show a neutral Work tools state instead of temporarily exposing legacy creation paths. Once entitlement resolves true, the Draft-first Work UI appears as before; once it resolves false or gates are off, legacy/off behavior remains available.
+- Reason for change: Production diagnostic after PR #336 showed Draft-first Work renders correctly after state settles, but enabled internal contractors could click legacy New Estimate / Estimate workspace during the unresolved window before entitlement/capability state finished loading.
+- Tests/checks run: Focused cohort, shared Draft composer, contractor Work dashboard, and template taxonomy coverage was updated for the fail-closed guard, safe unavailable copy, Draft-first Estimate routing guard, direct Draft-to-Invoice blocking, and legacy/off preservation. Full validation is recorded in the task report.
+- Known risks or follow-ups: No SQL, Supabase, Vercel, Production/Sandbox access, gate, entitlement, deployment, payment, Invoice send/payment, homeowner visibility, report lifecycle, or checklist launch behavior is changed. Production deployment and one-contractor observation remain separate owner-authorized tasks after review and merge.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a narrow remediation for the already-enabled internal Draft-first rollout and does not change feature status, rollout scope, backlog priority, or deferred capability boundaries.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The fix preserves the approved Draft-first workflow and internal rollout sequencing without changing product strategy.
+
 - Branch: `codex/draft-first-work-cleanup-v1`
 - Files changed: Work/Draft navigation in `src/App.tsx`, shared Draft composer template guidance, focused shared Draft composer regression coverage, this changelog, and the feature backlog.
 - Summary of change: Cleaned up the enabled Draft-first Work experience so active durable Drafts are surfaced from Work Overview under a `Drafts needing attention` area instead of the Jobs & Reports / Open Jobs list. Estimate creation entry points now route into Draft-first Estimate planning with Estimate intent preselected when the shared Draft workflow is enabled, while direct `New invoice` starts no longer open the legacy invoice composer and instead point contractors back to approved Estimate/Job billing paths. The Draft composer now distinguishes Saved Work Templates, Inspection Checklists, and Home-specific Checklists in the Draft-first flow without merging template categories.

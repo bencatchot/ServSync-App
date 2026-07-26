@@ -36,7 +36,7 @@ test.describe('Jobs template taxonomy', () => {
     const templatesSource = sourceBetween(
       source,
       "{contractorJobsView === 'templates' && (",
-      "{contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (",
+      "{contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (",
     );
 
     expect(templatesSource).toContain('Saved Work Templates');
@@ -167,7 +167,7 @@ test.describe('Jobs template taxonomy', () => {
     const templatesSource = sourceBetween(
       source,
       "{contractorJobsView === 'templates' && (",
-      "{contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (",
+      "{contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (",
     );
 
     expect(loadSource).toContain(".from('inspection_templates')");
