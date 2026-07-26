@@ -281,6 +281,29 @@ export function ContractorDraftComposer({
         </p>
       ) : null}
 
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-950">Template starting points</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Keep each source type separate so pricing templates and checklist templates do not get mixed.</p>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          <div className="rounded-xl border border-white bg-white px-3 py-2">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved Work Templates</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">Use from Templates for Estimate starts.</p>
+          </div>
+          <div className="rounded-xl border border-white bg-white px-3 py-2">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Inspection Checklists</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">Choose Inspection Checklist as the work format.</p>
+          </div>
+          <div className="rounded-xl border border-white bg-white px-3 py-2">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Home-specific Checklists</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">Available after the customer and property are selected.</p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3">
         {composerField('Draft title', (
           <input
