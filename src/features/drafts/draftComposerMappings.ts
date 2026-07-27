@@ -15,6 +15,7 @@ type SharedDraftOptions = {
   intendedOutput?: DraftIntendedOutput | null;
   estimateSession?: DraftOutcomeSessionState;
   jobSession?: DraftOutcomeSessionState;
+  invoiceSession?: DraftOutcomeSessionState;
 };
 
 const EMPTY_OUTCOME_SESSION: DraftOutcomeSessionState = { visited: false };
@@ -30,6 +31,7 @@ export function createBlankSharedDraftComposerDraft(
     checklist_source: overrides.checklist_source ?? null,
     estimate_session: overrides.estimate_session ?? EMPTY_OUTCOME_SESSION,
     job_session: overrides.job_session ?? EMPTY_OUTCOME_SESSION,
+    invoice_session: overrides.invoice_session ?? EMPTY_OUTCOME_SESSION,
   };
 }
 
@@ -44,6 +46,7 @@ export function sharedDraftComposerDraftFromDraftJob(
     checklist_source: null,
     estimate_session: options.estimateSession ?? EMPTY_OUTCOME_SESSION,
     job_session: options.jobSession ?? EMPTY_OUTCOME_SESSION,
+    invoice_session: options.invoiceSession ?? EMPTY_OUTCOME_SESSION,
   };
 }
 
@@ -66,6 +69,7 @@ export function sharedDraftComposerDraftToDraftJobDraft(
     checklist_source: _checklistSource,
     estimate_session: _estimateSession,
     job_session: _jobSession,
+    invoice_session: _invoiceSession,
     ...draftJob
   } = draft;
   return draftJob;

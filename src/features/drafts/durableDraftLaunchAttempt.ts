@@ -64,7 +64,7 @@ function parseAttempt(value: string | null): DurableDraftLaunchAttemptRecord | n
     if (record.schemaVersion !== 1
       || !isDurableDraftUuid(record.contractorId)
       || !isDurableDraftUuid(record.draftId)
-      || (record.outputType !== 'estimate' && record.outputType !== 'job')
+      || (record.outputType !== 'estimate' && record.outputType !== 'job' && record.outputType !== 'invoice')
       || !isDurableDraftUuid(record.idempotencyKey)
       || !isLaunchAttemptPhase(record.phase)
       || !isDurableDraftTimestamp(record.createdAt)
@@ -73,12 +73,14 @@ function parseAttempt(value: string | null): DurableDraftLaunchAttemptRecord | n
       || !optionalNullableUuid(record.launchId)
       || !optionalNullableUuid(record.estimateId)
       || !optionalNullableUuid(record.jobId)
+      || !optionalNullableUuid(record.invoiceId)
       || !optionalNullableUuid(record.outputIdSnapshot)
       || (record.outputAvailable !== undefined && typeof record.outputAvailable !== 'boolean')) return null;
 
     const successFieldsPresent = record.launchId !== undefined
       || record.estimateId !== undefined
       || record.jobId !== undefined
+      || record.invoiceId !== undefined
       || record.outputIdSnapshot !== undefined
       || record.outputAvailable !== undefined;
     if (record.phase !== 'succeeded' && successFieldsPresent) return null;
@@ -86,11 +88,20 @@ function parseAttempt(value: string | null): DurableDraftLaunchAttemptRecord | n
       if (record.launchId === undefined
         || record.estimateId === undefined
         || record.jobId === undefined
+        || record.invoiceId === undefined
         || !isDurableDraftUuid(record.outputIdSnapshot)
         || typeof record.outputAvailable !== 'boolean') return null;
-      const liveId = record.outputType === 'estimate' ? record.estimateId : record.jobId;
-      const wrongId = record.outputType === 'estimate' ? record.jobId : record.estimateId;
-      if (wrongId !== null || (liveId !== null && !isDurableDraftUuid(liveId))) return null;
+      const liveId = record.outputType === 'estimate'
+        ? record.estimateId
+        : record.outputType === 'job'
+          ? record.jobId
+          : record.invoiceId;
+      const wrongIds = record.outputType === 'estimate'
+        ? [record.jobId, record.invoiceId]
+        : record.outputType === 'job'
+          ? [record.estimateId, record.invoiceId]
+          : [record.estimateId, record.jobId];
+      if (wrongIds.some(id => id !== null) || (liveId !== null && !isDurableDraftUuid(liveId))) return null;
       if (record.outputAvailable !== (liveId !== null)) return null;
       if (liveId !== null && liveId !== record.outputIdSnapshot) return null;
     }
@@ -107,6 +118,7 @@ function parseAttempt(value: string | null): DurableDraftLaunchAttemptRecord | n
       ...(record.launchId !== undefined ? { launchId: record.launchId as string | null } : {}),
       ...(record.estimateId !== undefined ? { estimateId: record.estimateId as string | null } : {}),
       ...(record.jobId !== undefined ? { jobId: record.jobId as string | null } : {}),
+      ...(record.invoiceId !== undefined ? { invoiceId: record.invoiceId as string | null } : {}),
       ...(record.outputIdSnapshot !== undefined ? { outputIdSnapshot: record.outputIdSnapshot as string } : {}),
       ...(record.outputAvailable !== undefined ? { outputAvailable: record.outputAvailable } : {}),
     };
@@ -128,6 +140,7 @@ function safeRecord(attempt: DurableDraftLaunchAttemptRecord): DurableDraftLaunc
     ...(attempt.launchId !== undefined ? { launchId: attempt.launchId } : {}),
     ...(attempt.estimateId !== undefined ? { estimateId: attempt.estimateId } : {}),
     ...(attempt.jobId !== undefined ? { jobId: attempt.jobId } : {}),
+    ...(attempt.invoiceId !== undefined ? { invoiceId: attempt.invoiceId } : {}),
     ...(attempt.outputIdSnapshot !== undefined ? { outputIdSnapshot: attempt.outputIdSnapshot } : {}),
     ...(attempt.outputAvailable !== undefined ? { outputAvailable: attempt.outputAvailable } : {}),
   };
@@ -244,6 +257,7 @@ export function recordDurableDraftLaunchSuccess(
     launchId: canonicalResult.launch_id,
     estimateId: canonicalResult.estimate_id,
     jobId: canonicalResult.job_id,
+    invoiceId: canonicalResult.invoice_id ?? null,
     outputIdSnapshot: canonicalResult.output_id_snapshot,
     outputAvailable: canonicalResult.output_available,
   });

@@ -37,9 +37,11 @@ export function DurableDraftLaunchConfirmation({
   }, [open]);
 
   if (!open || !outputType) return null;
-  const label = outputType === 'estimate' ? 'Estimate' : 'Job';
+  const label = outputType === 'estimate' ? 'Estimate' : outputType === 'invoice' ? 'Draft Invoice' : 'Job';
   const description = outputType === 'estimate'
     ? 'An unsent Estimate will be created. This Draft will become consumed and read-only, and the Estimate can be reviewed before sending.'
+    : outputType === 'invoice'
+      ? 'A draft Invoice will be created. This Draft will become consumed and read-only. The Invoice will not be sent, marked viewed, marked paid, or shared with the customer by this action.'
     : 'A Job will be created. This Draft will become consumed and read-only, and the Job can be opened for continued work.';
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {

@@ -79,6 +79,7 @@ export function durableCanonicalStateToComposer(state: DurableDraftCanonicalStat
     job_labor_hours: numberToInput(draft.jobLaborHours),
     estimate_session: { visited: draft.intendedOutput === 'estimate' },
     job_session: { visited: draft.intendedOutput === 'job' },
+    invoice_session: { visited: draft.intendedOutput === 'invoice' },
     line_items: state.items.map(item => createWorkComposerLineDraft({
       id: item.rowId,
       job_work_item_id: item.durableItemId,
@@ -164,8 +165,10 @@ export function prepareDurableDraftSave(input: {
       launchedOutputType: currentDraft?.launchedOutputType ?? null,
       launchedEstimateId: currentDraft?.launchedEstimateId ?? null,
       launchedJobId: currentDraft?.launchedJobId ?? null,
+      launchedInvoiceId: currentDraft?.launchedInvoiceId ?? null,
       launchedEstimateIdSnapshot: currentDraft?.launchedEstimateIdSnapshot ?? null,
       launchedJobIdSnapshot: currentDraft?.launchedJobIdSnapshot ?? null,
+      launchedInvoiceIdSnapshot: currentDraft?.launchedInvoiceIdSnapshot ?? null,
       launchedAt: currentDraft?.launchedAt ?? null,
       launchedByUserId: currentDraft?.launchedByUserId ?? null,
       createdAt: currentDraft?.createdAt ?? null,

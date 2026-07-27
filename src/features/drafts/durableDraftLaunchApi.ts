@@ -89,8 +89,10 @@ function hasValidDraftOutputState(draft: Record<string, unknown>) {
     return draft.status !== 'consumed'
       && draft.launched_estimate_id === null
       && draft.launched_job_id === null
+      && draft.launched_invoice_id === null
       && draft.launched_estimate_id_snapshot === null
       && draft.launched_job_id_snapshot === null
+      && draft.launched_invoice_id_snapshot === null
       && draft.launched_at === null;
   }
   if (draft.status !== 'consumed' || !isDurableDraftTimestamp(draft.launched_at)) return false;
@@ -100,7 +102,9 @@ function hasValidDraftOutputState(draft: Record<string, unknown>) {
       && isDurableDraftUuid(draft.launched_estimate_id_snapshot)
       && (draft.launched_estimate_id === null || draft.launched_estimate_id === draft.launched_estimate_id_snapshot)
       && draft.launched_job_id === null
-      && draft.launched_job_id_snapshot === null;
+      && draft.launched_job_id_snapshot === null
+      && draft.launched_invoice_id === null
+      && draft.launched_invoice_id_snapshot === null;
   }
   if (outputType === 'job') {
     return draft.intended_output === 'job'
@@ -108,7 +112,19 @@ function hasValidDraftOutputState(draft: Record<string, unknown>) {
       && isDurableDraftUuid(draft.launched_job_id_snapshot)
       && (draft.launched_job_id === null || draft.launched_job_id === draft.launched_job_id_snapshot)
       && draft.launched_estimate_id === null
-      && draft.launched_estimate_id_snapshot === null;
+      && draft.launched_estimate_id_snapshot === null
+      && draft.launched_invoice_id === null
+      && draft.launched_invoice_id_snapshot === null;
+  }
+  if (outputType === 'invoice') {
+    return draft.intended_output === 'invoice'
+      && isNullableUuid(draft.launched_invoice_id)
+      && isDurableDraftUuid(draft.launched_invoice_id_snapshot)
+      && (draft.launched_invoice_id === null || draft.launched_invoice_id === draft.launched_invoice_id_snapshot)
+      && draft.launched_estimate_id === null
+      && draft.launched_estimate_id_snapshot === null
+      && draft.launched_job_id === null
+      && draft.launched_job_id_snapshot === null;
   }
   return false;
 }
@@ -133,7 +149,7 @@ function parseDraft(value: unknown): ContractorWorkDraft | null {
     || !isString(value.title)
     || !isString(value.scope_description)
     || !isString(value.private_notes)
-    || (intendedOutput !== null && intendedOutput !== 'estimate' && intendedOutput !== 'job')
+    || (intendedOutput !== null && intendedOutput !== 'estimate' && intendedOutput !== 'job' && intendedOutput !== 'invoice')
     || (value.work_format !== 'standard' && value.work_format !== 'inspection_checklist')
     || (value.labor_mode !== null && value.labor_mode !== 'job_total' && value.labor_mode !== 'line_specific')
     || !isNullableSafeInteger(value.labor_rate_cents)
@@ -142,8 +158,10 @@ function parseDraft(value: unknown): ContractorWorkDraft | null {
     || !isNullableUuid(value.legacy_inspection_id)
     || !isNullableUuid(value.launched_estimate_id)
     || !isNullableUuid(value.launched_job_id)
+    || !isNullableUuid(value.launched_invoice_id)
     || !isNullableUuid(value.launched_estimate_id_snapshot)
     || !isNullableUuid(value.launched_job_id_snapshot)
+    || !isNullableUuid(value.launched_invoice_id_snapshot)
     || !isNullableUuid(value.launched_by_user_id)
     || !isDurableDraftTimestamp(value.created_at)
     || !isDurableDraftTimestamp(value.updated_at)
@@ -192,12 +210,14 @@ function parseLaunch(value: unknown): ContractorWorkDraftLaunch | null {
     || !isDurableDraftUuid(value.draft_id)
     || !isDurableDraftUuid(value.contractor_id)
     || !isDurableDraftUuid(value.idempotency_key)
-    || (value.requested_output !== 'estimate' && value.requested_output !== 'job')
+    || (value.requested_output !== 'estimate' && value.requested_output !== 'job' && value.requested_output !== 'invoice')
     || value.status !== 'succeeded'
     || !isNullableUuid(value.launched_estimate_id)
     || !isNullableUuid(value.launched_job_id)
+    || !isNullableUuid(value.launched_invoice_id)
     || !isNullableUuid(value.launched_estimate_id_snapshot)
     || !isNullableUuid(value.launched_job_id_snapshot)
+    || !isNullableUuid(value.launched_invoice_id_snapshot)
     || !isNullableUuid(value.requested_by_user_id)
     || !isDurableDraftTimestamp(value.created_at)
     || !isDurableDraftTimestamp(value.completed_at)
@@ -205,10 +225,19 @@ function parseLaunch(value: unknown): ContractorWorkDraftLaunch | null {
   if (value.requested_output === 'estimate') {
     if (!isDurableDraftUuid(value.launched_estimate_id_snapshot)
       || (value.launched_estimate_id !== null && value.launched_estimate_id !== value.launched_estimate_id_snapshot)
+      || value.launched_job_id !== null || value.launched_job_id_snapshot !== null
+      || value.launched_invoice_id !== null || value.launched_invoice_id_snapshot !== null) return null;
+  } else if (value.requested_output === 'job') {
+    if (!isDurableDraftUuid(value.launched_job_id_snapshot)
+      || (value.launched_job_id !== null && value.launched_job_id !== value.launched_job_id_snapshot)
+      || value.launched_estimate_id !== null || value.launched_estimate_id_snapshot !== null
+      || value.launched_invoice_id !== null || value.launched_invoice_id_snapshot !== null) return null;
+  } else if (value.requested_output === 'invoice') {
+    if (!isDurableDraftUuid(value.launched_invoice_id_snapshot)
+      || (value.launched_invoice_id !== null && value.launched_invoice_id !== value.launched_invoice_id_snapshot)
+      || value.launched_estimate_id !== null || value.launched_estimate_id_snapshot !== null
       || value.launched_job_id !== null || value.launched_job_id_snapshot !== null) return null;
-  } else if (!isDurableDraftUuid(value.launched_job_id_snapshot)
-    || (value.launched_job_id !== null && value.launched_job_id !== value.launched_job_id_snapshot)
-    || value.launched_estimate_id !== null || value.launched_estimate_id_snapshot !== null) return null;
+  }
   return value as ContractorWorkDraftLaunch;
 }
 
@@ -264,15 +293,17 @@ function parseDraftListRow(value: unknown): ContractorWorkDraftListRow | null {
     || !isString(value.subject_display_name_snapshot)
     || !isString(value.property_display_snapshot)
     || !isString(value.title)
-    || (value.intended_output !== null && value.intended_output !== 'estimate' && value.intended_output !== 'job')
+    || (value.intended_output !== null && value.intended_output !== 'estimate' && value.intended_output !== 'job' && value.intended_output !== 'invoice')
     || (value.work_format !== 'standard' && value.work_format !== 'inspection_checklist')
     || (value.status !== 'active' && value.status !== 'consumed' && value.status !== 'discarded')
     || !isNullableUuid(value.legacy_inspection_id)
-    || (value.launched_output_type !== null && value.launched_output_type !== 'estimate' && value.launched_output_type !== 'job')
+    || (value.launched_output_type !== null && value.launched_output_type !== 'estimate' && value.launched_output_type !== 'job' && value.launched_output_type !== 'invoice')
     || !isNullableUuid(value.launched_estimate_id)
     || !isNullableUuid(value.launched_job_id)
+    || !isNullableUuid(value.launched_invoice_id)
     || !isNullableUuid(value.launched_estimate_id_snapshot)
     || !isNullableUuid(value.launched_job_id_snapshot)
+    || !isNullableUuid(value.launched_invoice_id_snapshot)
     || (value.launched_at !== null && !isDurableDraftTimestamp(value.launched_at))
     || !isDurableDraftTimestamp(value.created_at)
     || !isDurableDraftTimestamp(value.updated_at)
@@ -284,18 +315,31 @@ function parseDraftListRow(value: unknown): ContractorWorkDraftListRow | null {
       if (!isDurableDraftUuid(value.launched_estimate_id_snapshot)
         || (value.launched_estimate_id !== null && value.launched_estimate_id !== value.launched_estimate_id_snapshot)
         || value.launched_job_id !== null
-        || value.launched_job_id_snapshot !== null) return null;
+        || value.launched_job_id_snapshot !== null
+        || value.launched_invoice_id !== null
+        || value.launched_invoice_id_snapshot !== null) return null;
     } else if (value.launched_output_type === 'job') {
       if (!isDurableDraftUuid(value.launched_job_id_snapshot)
         || (value.launched_job_id !== null && value.launched_job_id !== value.launched_job_id_snapshot)
         || value.launched_estimate_id !== null
-        || value.launched_estimate_id_snapshot !== null) return null;
+        || value.launched_estimate_id_snapshot !== null
+        || value.launched_invoice_id !== null
+        || value.launched_invoice_id_snapshot !== null) return null;
+    } else if (value.launched_output_type === 'invoice') {
+      if (!isDurableDraftUuid(value.launched_invoice_id_snapshot)
+        || (value.launched_invoice_id !== null && value.launched_invoice_id !== value.launched_invoice_id_snapshot)
+        || value.launched_estimate_id !== null
+        || value.launched_estimate_id_snapshot !== null
+        || value.launched_job_id !== null
+        || value.launched_job_id_snapshot !== null) return null;
     } else return null;
   } else if (value.launched_output_type !== null
     || value.launched_estimate_id !== null
     || value.launched_job_id !== null
+    || value.launched_invoice_id !== null
     || value.launched_estimate_id_snapshot !== null
     || value.launched_job_id_snapshot !== null
+    || value.launched_invoice_id_snapshot !== null
     || value.launched_at !== null) return null;
 
   if (value.work_format === 'inspection_checklist') {
@@ -483,8 +527,10 @@ const DRAFT_LIST_COLUMNS = [
   'launched_output_type',
   'launched_estimate_id',
   'launched_job_id',
+  'launched_invoice_id',
   'launched_estimate_id_snapshot',
   'launched_job_id_snapshot',
+  'launched_invoice_id_snapshot',
   'launched_at',
   'created_at',
   'updated_at',

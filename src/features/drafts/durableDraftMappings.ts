@@ -54,8 +54,10 @@ export type DurableDraftCanonicalModel = {
   launchedOutputType: ContractorWorkDraftLaunchOutput | null;
   launchedEstimateId: string | null;
   launchedJobId: string | null;
+  launchedInvoiceId: string | null;
   launchedEstimateIdSnapshot: string | null;
   launchedJobIdSnapshot: string | null;
+  launchedInvoiceIdSnapshot: string | null;
   launchedAt: string | null;
   launchedByUserId: string | null;
   createdAt: string | null;
@@ -151,8 +153,10 @@ export function durableDraftFromRpc(draft: ContractorWorkDraft): DurableDraftCan
     launchedOutputType: draft.launched_output_type,
     launchedEstimateId: draft.launched_estimate_id,
     launchedJobId: draft.launched_job_id,
+    launchedInvoiceId: draft.launched_invoice_id,
     launchedEstimateIdSnapshot: draft.launched_estimate_id_snapshot,
     launchedJobIdSnapshot: draft.launched_job_id_snapshot,
+    launchedInvoiceIdSnapshot: draft.launched_invoice_id_snapshot,
     launchedAt: draft.launched_at,
     launchedByUserId: draft.launched_by_user_id,
     createdAt: draft.created_at,
@@ -349,11 +353,16 @@ export function durableDraftListRowsToPresentation(
   return [...rows]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id))
     .map(row => {
-      const estimate = row.launched_output_type === 'estimate';
-      const liveOutputId = estimate ? row.launched_estimate_id : row.launched_job_id;
-      const outputIdSnapshot = estimate
+      const liveOutputId = row.launched_output_type === 'estimate'
+        ? row.launched_estimate_id
+        : row.launched_output_type === 'job'
+          ? row.launched_job_id
+          : row.launched_invoice_id;
+      const outputIdSnapshot = row.launched_output_type === 'estimate'
         ? row.launched_estimate_id_snapshot
-        : row.launched_job_id_snapshot;
+        : row.launched_output_type === 'job'
+          ? row.launched_job_id_snapshot
+          : row.launched_invoice_id_snapshot;
       return {
         draftId: row.id,
         contractorId: row.contractor_id,

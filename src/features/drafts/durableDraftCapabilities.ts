@@ -40,6 +40,7 @@ export function capabilitiesFromCompatibilityChecks(
       canImportLegacyDraft: false,
       canLaunchJob: false,
       canLaunchEstimate: false,
+      canLaunchInvoice: false,
     };
   }
 
@@ -50,6 +51,7 @@ export function capabilitiesFromCompatibilityChecks(
     canImportLegacyDraft: checks.canManageBilling,
     canLaunchJob: checks.canWriteJobs,
     canLaunchEstimate: checks.contractorOwnerUserId === checks.currentUserId,
+    canLaunchInvoice: checks.canManageBilling,
   };
 }
 

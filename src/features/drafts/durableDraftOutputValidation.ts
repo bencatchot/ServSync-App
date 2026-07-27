@@ -5,6 +5,9 @@ import type {
   Inspection,
   InspectionRoomData,
   InspectionRoomFinding,
+  Invoice,
+  InvoiceBacklogItem,
+  InvoiceLineItem,
 } from '../../types';
 import { isDurableDraftTimestamp, isDurableDraftUuid } from './durableDraftLaunchApi';
 
@@ -35,6 +38,9 @@ const JOB_TYPES = new Set(['service_visit', 'repair', 'install', 'estimate_visit
 const JOB_STATUSES = new Set(['draft', 'scheduled', 'in_progress', 'completed', 'closed', 'cancelled']);
 const JOB_ORIGINS = new Set(['direct', 'estimate', 'draft_composer', 'invoice_direct', 'imported', 'other']);
 const FINDING_STATUSES = new Set(['Not Recorded', 'Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);
+const INVOICE_STATUSES = new Set(['draft', 'sent', 'viewed', 'paid', 'partially_paid', 'void', 'overdue']);
+const INVOICE_TYPES = new Set(['total', 'deposit', 'progress', 'final']);
+const INVOICE_DISCOUNT_TYPES = new Set(['amount', 'percentage']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -118,6 +124,42 @@ function isEstimatePaymentScheduleItem(value: unknown): value is EstimatePayment
     && isString(value.due_trigger)
     && isSafeInteger(value.sort_order)
     && isOptionalNullableUuid(value.linked_invoice_id)
+    && isDurableDraftTimestamp(value.created_at)
+    && isDurableDraftTimestamp(value.updated_at);
+}
+
+function isInvoiceLineItem(value: unknown): value is InvoiceLineItem {
+  if (!isRecord(value)) return false;
+  return isDurableDraftUuid(value.id)
+    && isDurableDraftUuid(value.invoice_id)
+    && isOptionalNullableUuid(value.job_work_item_id)
+    && isString(value.line_type) && ESTIMATE_LINE_TYPES.has(value.line_type)
+    && isString(value.description)
+    && isOptionalNullableString(value.line_title)
+    && isOptionalNullableString(value.customer_description)
+    && isOptionalNullableString(value.model_spec)
+    && (value.supply_status === undefined || value.supply_status === null
+      || (isString(value.supply_status) && ESTIMATE_SUPPLY_STATUSES.has(value.supply_status)))
+    && isFiniteNumber(value.quantity) && value.quantity > 0
+    && isString(value.unit)
+    && (value.unit_price_cents === null || isSafeInteger(value.unit_price_cents))
+    && isOptionalNullableFiniteNumber(value.labor_hours)
+    && isSafeInteger(value.sort_order)
+    && isDurableDraftTimestamp(value.created_at)
+    && isDurableDraftTimestamp(value.updated_at);
+}
+
+function isInvoiceBacklogItem(value: unknown): value is InvoiceBacklogItem {
+  if (!isRecord(value)) return false;
+  return isDurableDraftUuid(value.id)
+    && isDurableDraftUuid(value.invoice_id)
+    && isOptionalNullableUuid(value.job_work_item_id)
+    && isNonemptyString(value.title)
+    && isString(value.description)
+    && isString(value.completion_status)
+    && isString(value.billing_status)
+    && isString(value.not_included_reason)
+    && isSafeInteger(value.sort_order)
     && isDurableDraftTimestamp(value.created_at)
     && isDurableDraftTimestamp(value.updated_at);
 }
@@ -225,10 +267,62 @@ export function validateDurableDraftJobRecord(value: unknown): DurableDraftOutpu
     : { ok: false, reason: 'invalid_record' };
 }
 
+export function validateDurableDraftInvoiceRecord(value: unknown): DurableDraftOutputValidationResult<Invoice> {
+  if (!isRecord(value)) return { ok: false, reason: 'invalid_record' };
+  const valid = isDurableDraftUuid(value.id)
+    && isDurableDraftUuid(value.contractor_id)
+    && isNullableUuid(value.homeowner_user_id)
+    && isNullableUuid(value.local_contact_id)
+    && hasValidSubject(value)
+    && isNullableUuid(value.service_request_id)
+    && isNullableUuid(value.job_id)
+    && isNullableUuid(value.estimate_id)
+    && isOptionalNullableUuid(value.home_id)
+    && isOptionalNullableUuid(value.local_home_id)
+    && isOptionalNullableString(value.home_label)
+    && isOptionalNullableString(value.home_address)
+    && isString(value.invoice_number)
+    && isString(value.invoice_type) && INVOICE_TYPES.has(value.invoice_type)
+    && (value.invoice_sequence === undefined || value.invoice_sequence === null || isSafeInteger(value.invoice_sequence))
+    && isNonemptyString(value.title)
+    && isString(value.scope)
+    && isString(value.notes)
+    && isString(value.terms)
+    && isString(value.status) && INVOICE_STATUSES.has(value.status)
+    && isSafeInteger(value.subtotal_cents)
+    && (value.labor_mode === undefined || value.labor_mode === null
+      || (isString(value.labor_mode) && ESTIMATE_LABOR_MODES.has(value.labor_mode)))
+    && isOptionalNullableFiniteNumber(value.labor_rate_cents)
+    && isOptionalNullableFiniteNumber(value.job_labor_hours)
+    && isOptionalNullableFiniteNumber(value.material_total_cents)
+    && isOptionalNullableFiniteNumber(value.labor_total_cents)
+    && isOptionalNullableFiniteNumber(value.fee_total_cents)
+    && isOptionalNullableFiniteNumber(value.other_total_cents)
+    && isSafeInteger(value.tax_cents)
+    && isOptionalNullableFiniteNumber(value.tax_rate_percent)
+    && isSafeInteger(value.discount_cents)
+    && (value.discount_type === undefined || (isString(value.discount_type) && INVOICE_DISCOUNT_TYPES.has(value.discount_type)))
+    && (value.discount_value === undefined || isFiniteNumber(value.discount_value))
+    && (value.discount_reason === undefined || isString(value.discount_reason))
+    && isSafeInteger(value.total_cents)
+    && isSafeInteger(value.amount_paid_cents)
+    && isOptionalNullableTimestamp(value.issued_at)
+    && isOptionalNullableTimestamp(value.due_at)
+    && isOptionalNullableTimestamp(value.paid_at)
+    && isOptionalNullableTimestamp(value.voided_at)
+    && isDurableDraftTimestamp(value.created_at)
+    && isDurableDraftTimestamp(value.updated_at)
+    && Array.isArray(value.line_items) && value.line_items.every(isInvoiceLineItem)
+    && Array.isArray(value.backlog_items) && value.backlog_items.every(isInvoiceBacklogItem);
+  return valid
+    ? { ok: true, record: value as unknown as Invoice }
+    : { ok: false, reason: 'invalid_record' };
+}
+
 export function validateDurableDraftLoadedOutput(
   value: unknown,
-  expected: { outputType: 'estimate' | 'job'; outputId: string; contractorId: string },
-): DurableDraftOutputValidationResult<Estimate | Inspection> {
+  expected: { outputType: 'estimate' | 'job' | 'invoice'; outputId: string; contractorId: string },
+): DurableDraftOutputValidationResult<Estimate | Inspection | Invoice> {
   if (!isRecord(value)) return { ok: false, reason: 'invalid_record' };
   const loaded = value as LoadedOutputLike;
   if (loaded.type !== expected.outputType) return { ok: false, reason: 'wrong_family' };
@@ -238,5 +332,7 @@ export function validateDurableDraftLoadedOutput(
   if (loaded.record.contractor_id !== expected.contractorId) return { ok: false, reason: 'contractor_mismatch' };
   return expected.outputType === 'estimate'
     ? validateDurableDraftEstimateRecord(loaded.record)
-    : validateDurableDraftJobRecord(loaded.record);
+    : expected.outputType === 'job'
+      ? validateDurableDraftJobRecord(loaded.record)
+      : validateDurableDraftInvoiceRecord(loaded.record);
 }

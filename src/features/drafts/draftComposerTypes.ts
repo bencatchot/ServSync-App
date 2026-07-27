@@ -1,7 +1,7 @@
 import type { DraftJobComposerDraft } from '../jobs/draftJobMappings';
 import type { DraftChecklistSourceSnapshot } from './checklistDraftScope';
 
-export type DraftIntendedOutput = 'estimate' | 'job';
+export type DraftIntendedOutput = 'estimate' | 'job' | 'invoice';
 export type DraftWorkFormat = 'standard' | 'inspection_checklist';
 
 export type DraftOutcomeSessionState = {
@@ -14,4 +14,5 @@ export type SharedDraftComposerDraft = DraftJobComposerDraft & {
   checklist_source: DraftChecklistSourceSnapshot | null;
   estimate_session: DraftOutcomeSessionState;
   job_session: DraftOutcomeSessionState;
+  invoice_session: DraftOutcomeSessionState;
 };

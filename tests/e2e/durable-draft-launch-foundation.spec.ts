@@ -737,7 +737,7 @@ test.describe('Durable Draft Launch foundation', () => {
     }
   });
 
-  test('frontend save contract is a strict full snapshot and launch UI remains hidden', () => {
+  test('frontend save contract is a strict full snapshot and draft Invoice launch remains gated and side-effect free', () => {
     const apiSource = sourceFile('src/features/drafts/durableDraftLaunchApi.ts');
     const typesSource = sourceFile('src/features/drafts/durableDraftLaunchTypes.ts');
     const mappingsSource = sourceFile('src/features/drafts/durableDraftMappings.ts');
@@ -755,7 +755,11 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(appSource).not.toContain('launchContractorWorkDraft');
     expect(sharedComposerSource).not.toContain('Create Estimate');
     expect(sharedComposerSource).not.toContain('Create Job');
-    expect(sharedComposerSource).not.toContain('Create Invoice');
+    expect(sharedComposerSource).toContain('invoiceOutputAvailable');
+    expect(sharedComposerSource).toContain('shared-draft-invoice-outcome-panel');
+    expect(sharedComposerSource).toContain('does not send it to the customer');
+    expect(sharedComposerSource).not.toContain('sendInvoice');
+    expect(sharedComposerSource).not.toContain('createPayment');
     expect(sharedComposerSource).not.toContain('Launch Draft');
   });
 

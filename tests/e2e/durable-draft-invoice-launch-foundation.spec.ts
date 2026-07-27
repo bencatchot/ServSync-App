@@ -252,18 +252,21 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
     expect(validator).toContain('home.local_contact_id = p_draft.local_contact_id');
   });
 
-  test('frontend contract parses invoice launch responses without exposing invoice UI requests yet', () => {
+  test('frontend contract parses invoice launch responses behind gated app wiring', () => {
     const types = read('src/features/drafts/durableDraftLaunchTypes.ts');
     const api = read('src/features/drafts/durableDraftLaunchApi.ts');
     const composer = read('src/features/drafts/ContractorDraftComposer.tsx');
+    const selector = read('src/features/drafts/DraftOutcomeSelector.tsx');
 
     expect(types).toContain("output_type: 'invoice'");
     expect(types).toContain('invoice_id: string | null');
     expect(api).toContain("value.output_type !== 'estimate' && value.output_type !== 'job' && value.output_type !== 'invoice'");
     expect(api).toContain('const invoiceId = value.invoice_id ?? null');
     expect(api).toContain("if (value.output_type === 'invoice'");
-    expect(types).toContain("export type ContractorWorkDraftLaunchOutput = 'estimate' | 'job'");
-    expect(composer).not.toContain("value=\"invoice\"");
-    expect(composer).not.toContain('Create Invoice');
+    expect(types).toContain("export type ContractorWorkDraftLaunchOutput = 'estimate' | 'job' | 'invoice'");
+    expect(selector).toContain('invoiceAvailable');
+    expect(selector).toContain("label: 'Draft Invoice'");
+    expect(composer).toContain('invoiceOutputAvailable');
+    expect(composer).not.toContain('sendInvoiceToHomeowner');
   });
 });

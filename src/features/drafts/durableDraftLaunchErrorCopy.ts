@@ -1,4 +1,5 @@
 import { DurableDraftError, normalizeDurableDraftError } from './durableDraftLaunchApi';
+import type { ContractorWorkDraftLaunchOutput } from './durableDraftLaunchTypes';
 
 export type DurableDraftLaunchFailureKind = 'fixable' | 'denied' | 'reconcile' | 'ambiguous' | 'storage' | 'unknown';
 
@@ -39,9 +40,9 @@ export function classifyDurableDraftLaunchFailure(error: unknown): DurableDraftL
   if (code && FIXABLE_CODES.has(code)) {
     const messages: Record<string, string> = {
       DRAFT_INVALID: 'Review the Draft details and work items before trying again.',
-      INTENDED_OUTPUT_REQUIRED: 'Choose Estimate or Job before creating work from this Draft.',
+      INTENDED_OUTPUT_REQUIRED: 'Choose Estimate, Job, or draft Invoice before creating work from this Draft.',
       INTENDED_OUTPUT_MISMATCH: 'The saved Draft intent changed. Review it before trying again.',
-      UNSUPPORTED_OUTPUT: 'Choose Estimate or Job before trying again.',
+      UNSUPPORTED_OUTPUT: 'Choose Estimate, Job, or draft Invoice before trying again.',
       CUSTOMER_INVALID: 'Choose an available customer before trying again.',
       PROPERTY_INVALID: 'Choose an available property before trying again.',
       PROPERTY_NOT_SHARED: 'That property is no longer shared for this work.',
@@ -55,6 +56,7 @@ export function classifyDurableDraftLaunchFailure(error: unknown): DurableDraftL
   return { kind: 'ambiguous', message: 'ServSync could not confirm whether the output was created.' };
 }
 
-export function durableDraftStorageUnavailableCopy(outputType: 'estimate' | 'job') {
-  return `ServSync cannot safely create this ${outputType === 'estimate' ? 'Estimate' : 'Job'} because retry protection is unavailable in this browser.`;
+export function durableDraftStorageUnavailableCopy(outputType: ContractorWorkDraftLaunchOutput) {
+  const label = outputType === 'estimate' ? 'Estimate' : outputType === 'job' ? 'Job' : 'Draft Invoice';
+  return `ServSync cannot safely create this ${label} because retry protection is unavailable in this browser.`;
 }

@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-27
 
+- Branch: `codex/draft-to-invoice-app-wiring`
+- Files changed: Draft-first Work routing in `src/App.tsx`, shared Draft composer/Durable Draft launch wiring, durable Draft API/parser/mapping/capability types, focused Draft-to-Invoice and Draft/Work regression coverage, this changelog, and the feature backlog.
+- Summary of change: Wired visible Draft-to-Invoice planning into the existing Draft-first Work experience behind the existing global gates, durable cohort entitlement, resolved contractor context, and frontend billing authority. Billing-capable entitled contractors can now choose a clearly labeled draft Invoice intended output, reach Invoice-oriented Draft planning from New invoice, save/resume Invoice-intended Drafts, launch through the durable RPC path, and focus the created draft Invoice in the Invoices workspace. No-billing, non-entitled, and gate-off users keep safe/legacy behavior, and the Invoice path states that creating a draft Invoice does not send it to the customer.
+- Reason for change: The Draft-to-Invoice SQL/RPC foundation has been applied and runtime validated in Production, so the next bounded source slice is app wiring that exposes only draft Invoice creation behind existing gates and authority checks.
+- Tests/checks run: Focused Draft-to-Invoice app wiring, shared Draft composer, durable Draft adapter/parser, composer integration, launch workspace, post-launch navigation, workspace behavior, cohort/fail-closed, Work dashboard, and template taxonomy coverage was updated and run. Full validation is recorded in the task report.
+- Known risks or follow-ups: SQL was not applied, no Vercel/Supabase/Production/Sandbox/Preview/Demo live environment was accessed, and no deployment, gate, entitlement, send/payment/PDF/storage/notification/Home History/appointment/report finalization, homeowner-facing output, or rollout change is included. Production deployment, one-contractor app-flow observation, app-flow invoice visibility/RLS, mobile review, telemetry, and rollout remain separate approval gates.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records that the SQL/RPC foundation is installed and runtime validated, app wiring exists in source behind gates/cohort/billing authority, and Production deployment/observation remains pending.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The change implements the next approved Draft-first Work slice without changing product strategy or rollout sequencing.
+
 - Branch: `codex/draft-to-invoice-discount-type-fix`
 - Files changed: Draft-to-Invoice SQL source, focused SQL/static regression coverage, and this changelog.
 - Summary of change: Corrected the source-only Draft-to-Invoice invoice launch helper so draft Invoice inserts use the deployed-valid no-discount pair `discount_type = 'amount'` and `discount_value = 0`. Focused static coverage now rejects the stale `discount_type = 'none'` helper insert patterns.
