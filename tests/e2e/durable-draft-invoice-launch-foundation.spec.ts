@@ -21,6 +21,86 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Durable Draft-to-Invoice launch foundation source checks', () => {
+  test('predecessor invoice-column check matches deployed invoice schema names', () => {
+    const sql = sqlSource();
+    const columnCheck = sourceBetween(
+      sql,
+      'with expected(table_name, column_name) as (',
+      "if v_mismatch is not null then\n    raise exception 'DRAFT_TO_INVOICE_FOUNDATION_COLUMN_MISMATCH",
+    );
+
+    for (const column of [
+      'id',
+      'contractor_id',
+      'homeowner_user_id',
+      'home_id',
+      'local_contact_id',
+      'local_home_id',
+      'service_request_id',
+      'job_id',
+      'estimate_id',
+      'title',
+      'scope',
+      'notes',
+      'terms',
+      'status',
+      'invoice_type',
+      'labor_mode',
+      'labor_rate_cents',
+      'job_labor_hours',
+      'subtotal_cents',
+      'material_total_cents',
+      'labor_total_cents',
+      'fee_total_cents',
+      'other_total_cents',
+      'tax_rate_percent',
+      'tax_cents',
+      'discount_type',
+      'discount_value',
+      'discount_cents',
+      'discount_reason',
+      'total_cents',
+      'amount_paid_cents',
+    ]) {
+      expect(columnCheck).toContain(`('invoices', '${column}')`);
+    }
+
+    for (const staleColumn of [
+      'customer_name',
+      'customer_email',
+      'description',
+      'materials_subtotal_cents',
+      'labor_subtotal_cents',
+      'payment_terms',
+    ]) {
+      expect(columnCheck).not.toContain(`('invoices', '${staleColumn}')`);
+    }
+  });
+
+  test('predecessor line-item column check covers invoice line insert requirements', () => {
+    const sql = sqlSource();
+    const columnCheck = sourceBetween(
+      sql,
+      'with expected(table_name, column_name) as (',
+      "if v_mismatch is not null then\n    raise exception 'DRAFT_TO_INVOICE_FOUNDATION_COLUMN_MISMATCH",
+    );
+
+    for (const column of [
+      'invoice_id',
+      'line_type',
+      'description',
+      'line_title',
+      'customer_description',
+      'quantity',
+      'unit',
+      'unit_price_cents',
+      'labor_hours',
+      'sort_order',
+    ]) {
+      expect(columnCheck).toContain(`('invoice_line_items', '${column}')`);
+    }
+  });
+
   test('adds invoice-specific linkage without generalizing existing output references', () => {
     const sql = sqlSource();
 
