@@ -4,6 +4,21 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-27
+
+- Branch: `codex/draft-to-invoice-sql-column-check-fix`
+- Files changed: Draft-to-Invoice SQL source, focused SQL/static regression coverage, and this changelog.
+- Summary of change: Corrected the source-only Draft-to-Invoice SQL predecessor invoice-column check so it matches the deployed invoice schema and the SQL body's own draft Invoice insert columns. The check now requires `scope`, `notes`, `terms`, singular invoice total fields, and existing invoice linkage/context columns instead of stale/nonexistent customer-name/email, description, plural-total, and payment-terms names.
+- Reason for change: Sandbox SQL application preflight blocked before application because the SQL opening DO block expected invoice columns that are not present in the deployed schema even though the launch helper already inserts through the deployed column names.
+- Tests/checks run: Focused Draft-to-Invoice SQL/static coverage was updated to assert the predecessor column check matches deployed invoice schema names, rejects the stale names, still covers invoice line item insert requirements, and preserves no visible Invoice Draft UI wiring. Full validation is recorded in the task report.
+- Known risks or follow-ups: SQL was not applied to Sandbox, Production, Preview, Demo, or any live database. No Vercel, gates, entitlement, deployment, visible UI, customer-facing Invoice launch, payment, send, notification, PDF/storage, Home History, appointment, or homeowner visibility behavior is changed. Sandbox SQL preflight must be rerun after merge before any SQL application.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a source-preflight correction for the existing Draft-to-Invoice SQL foundation status; SQL application, app wiring, runtime validation, and rollout remain pending separate approvals.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The correction preserves the approved hidden/source-only Draft-to-Invoice foundation direction without changing product strategy or rollout sequencing.
+
 ## 2026-07-26
 
 - Branch: `codex/draft-to-invoice-sql-foundation`
