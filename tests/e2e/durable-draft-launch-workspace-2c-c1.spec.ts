@@ -24,14 +24,16 @@ const JOB_ID = '00000000-0000-4000-8000-000000000308';
 const LAUNCH_ID = '00000000-0000-4000-8000-000000000309';
 const ATTEMPT_KEY = '00000000-0000-4000-8000-00000000030a';
 const OTHER_ATTEMPT_KEY = '00000000-0000-4000-8000-00000000030b';
+const INVOICE_ID = '00000000-0000-4000-8000-00000000030c';
 
-type OutputType = 'estimate' | 'job';
+type OutputType = 'estimate' | 'job' | 'invoice';
 
 async function installLaunchHarness(page: Page, options: {
   outputType?: OutputType | null;
   launchEnabled?: boolean;
   canLaunchEstimate?: boolean;
   canLaunchJob?: boolean;
+  canLaunchInvoice?: boolean;
   canPersistDraft?: boolean;
   targetKind?: 'durable' | 'new';
   storedAttempt?: 'prepared' | 'launching' | 'ambiguous' | 'succeeded' | 'malformed';
@@ -140,7 +142,7 @@ async function installLaunchHarness(page: Page, options: {
       created_at: '2026-07-19T10:00:00.000Z',
       updated_at: '2026-07-19T10:00:00.000Z',
     });
-    const rawDraft = (status: 'active' | 'consumed' | 'discarded' = 'active', outputType: 'estimate' | 'job' | null = options.outputType ?? null, available = true) => ({
+    const rawDraft = (status: 'active' | 'consumed' | 'discarded' = 'active', outputType: OutputType | null = options.outputType ?? null, available = true) => ({
       id: ids.draftId,
       contractor_id: ids.contractorId,
       created_by_user_id: null,
@@ -165,34 +167,56 @@ async function installLaunchHarness(page: Page, options: {
       launched_output_type: status === 'consumed' ? outputType : null,
       launched_estimate_id: status === 'consumed' && outputType === 'estimate' && available ? ids.estimateId : null,
       launched_job_id: status === 'consumed' && outputType === 'job' && available ? ids.jobId : null,
+      launched_invoice_id: status === 'consumed' && outputType === 'invoice' && available ? ids.invoiceId : null,
       launched_estimate_id_snapshot: status === 'consumed' && outputType === 'estimate' ? ids.estimateId : null,
       launched_job_id_snapshot: status === 'consumed' && outputType === 'job' ? ids.jobId : null,
+      launched_invoice_id_snapshot: status === 'consumed' && outputType === 'invoice' ? ids.invoiceId : null,
       launched_at: status === 'consumed' ? '2026-07-19T10:05:00.000Z' : null,
       launched_by_user_id: null,
       created_at: '2026-07-19T10:00:00.000Z',
       updated_at: status === 'consumed' ? '2026-07-19T10:05:00.000Z' : '2026-07-19T10:00:00.000Z',
     });
-    const envelope = (status: 'active' | 'consumed' | 'discarded' = 'active', outputType: 'estimate' | 'job' | null = options.outputType ?? null, available = true) => ({
+    const envelope = (status: 'active' | 'consumed' | 'discarded' = 'active', outputType: OutputType | null = options.outputType ?? null, available = true) => ({
       draft: rawDraft(status, outputType, available),
       items: [rawItem(ids.draftId)],
       launches: [],
     });
-    const loadedOutputRecord = (type: string, id: string) => type === 'estimate' ? {
-      id, contractor_id: ids.contractorId, homeowner_user_id: ids.homeownerId, local_contact_id: null,
-      service_request_id: ids.requestId, inspection_id: null, home_id: ids.homeId, local_home_id: null,
-      title: 'Water heater Estimate', scope: 'Replace water heater', notes: '', terms: '', status: 'draft',
-      subtotal_cents: 50000, total_cents: 50000, labor_mode: 'line_specific', labor_rate_cents: null,
-      job_labor_hours: null, material_total_cents: 0, labor_total_cents: 50000, fee_total_cents: 0,
-      other_total_cents: 0, tax_rate_percent: 0, tax_cents: 0,
-      created_at: '2026-07-19T10:05:00.000Z', updated_at: '2026-07-19T10:05:00.000Z',
-      line_items: [], payment_schedule_items: [],
-    } : {
-      id, contractor_id: ids.contractorId, homeowner_user_id: ids.homeownerId, home_id: ids.homeId,
-      local_contact_id: null, local_home_id: null, service_request_id: ids.requestId, template_id: null,
-      name: 'Water heater Job', summary: 'Replace water heater', status: 'draft', job_type: 'service_visit',
-      job_status: 'draft', job_origin: 'direct', estimate_id: null, rooms_with_findings: [],
-      report_storage_path: null, report_file_name: null, created_at: '2026-07-19T10:05:00.000Z',
-      updated_at: '2026-07-19T10:05:00.000Z',
+    const loadedOutputRecord = (type: string, id: string) => {
+      if (type === 'estimate') {
+        return {
+          id, contractor_id: ids.contractorId, homeowner_user_id: ids.homeownerId, local_contact_id: null,
+          service_request_id: ids.requestId, inspection_id: null, home_id: ids.homeId, local_home_id: null,
+          title: 'Water heater Estimate', scope: 'Replace water heater', notes: '', terms: '', status: 'draft',
+          subtotal_cents: 50000, total_cents: 50000, labor_mode: 'line_specific', labor_rate_cents: null,
+          job_labor_hours: null, material_total_cents: 0, labor_total_cents: 50000, fee_total_cents: 0,
+          other_total_cents: 0, tax_rate_percent: 0, tax_cents: 0,
+          created_at: '2026-07-19T10:05:00.000Z', updated_at: '2026-07-19T10:05:00.000Z',
+          line_items: [], payment_schedule_items: [],
+        };
+      }
+      if (type === 'invoice') {
+        return {
+          id, contractor_id: ids.contractorId, homeowner_user_id: ids.homeownerId, local_contact_id: null,
+          service_request_id: ids.requestId, job_id: null, estimate_id: null, home_id: ids.homeId,
+          local_home_id: null, invoice_number: 'INV-DRAFT-1', invoice_type: 'total', invoice_sequence: 1,
+          title: 'Water heater Invoice', scope: 'Replace water heater', notes: '', terms: '', status: 'draft',
+          subtotal_cents: 50000, total_cents: 50000, amount_paid_cents: 0, labor_mode: 'line_specific',
+          labor_rate_cents: null, job_labor_hours: null, material_total_cents: 0, labor_total_cents: 50000,
+          fee_total_cents: 0, other_total_cents: 0, tax_rate_percent: 0, tax_cents: 0, discount_cents: 0,
+          discount_type: 'amount', discount_value: 0, discount_reason: '',
+          issued_at: null, due_at: null, paid_at: null, voided_at: null,
+          created_at: '2026-07-19T10:05:00.000Z', updated_at: '2026-07-19T10:05:00.000Z',
+          line_items: [], backlog_items: [],
+        };
+      }
+      return {
+        id, contractor_id: ids.contractorId, homeowner_user_id: ids.homeownerId, home_id: ids.homeId,
+        local_contact_id: null, local_home_id: null, service_request_id: ids.requestId, template_id: null,
+        name: 'Water heater Job', summary: 'Replace water heater', status: 'draft', job_type: 'service_visit',
+        job_status: 'draft', job_origin: 'direct', estimate_id: null, rooms_with_findings: [],
+        report_storage_path: null, report_file_name: null, created_at: '2026-07-19T10:05:00.000Z',
+        updated_at: '2026-07-19T10:05:00.000Z',
+      };
     };
     const state = {
       client,
@@ -208,6 +232,7 @@ async function installLaunchHarness(page: Page, options: {
         canImportLegacyDraft: true,
         canLaunchJob: options.canLaunchJob ?? true,
         canLaunchEstimate: options.canLaunchEstimate ?? true,
+        canLaunchInvoice: options.canLaunchInvoice ?? true,
       },
       refreshedCapabilities: null as Record<string, unknown> | null,
       backCount: 0,
@@ -262,7 +287,8 @@ async function installLaunchHarness(page: Page, options: {
             launchId: ids.launchId,
             estimateId: outputType === 'estimate' ? ids.estimateId : null,
             jobId: outputType === 'job' ? ids.jobId : null,
-            outputIdSnapshot: outputType === 'estimate' ? ids.estimateId : ids.jobId,
+            invoiceId: outputType === 'invoice' ? ids.invoiceId : null,
+            outputIdSnapshot: outputType === 'estimate' ? ids.estimateId : outputType === 'job' ? ids.jobId : ids.invoiceId,
             outputAvailable: true,
           } : {}),
         }));
@@ -287,7 +313,8 @@ async function installLaunchHarness(page: Page, options: {
         output_type: outputType,
         estimate_id: outputType === 'estimate' ? ids.estimateId : null,
         job_id: outputType === 'job' ? ids.jobId : null,
-        output_id_snapshot: outputType === 'estimate' ? ids.estimateId : ids.jobId,
+        invoice_id: outputType === 'invoice' ? ids.invoiceId : null,
+        output_id_snapshot: outputType === 'estimate' ? ids.estimateId : outputType === 'job' ? ids.jobId : ids.invoiceId,
         output_available: true,
         launch_id: ids.launchId,
         idempotent,
@@ -354,7 +381,8 @@ async function installLaunchHarness(page: Page, options: {
             launchId: ids.launchId,
             estimateId: outputType === 'estimate' ? ids.estimateId : null,
             jobId: outputType === 'job' ? ids.jobId : null,
-            outputIdSnapshot: outputType === 'estimate' ? ids.estimateId : ids.jobId,
+            invoiceId: outputType === 'invoice' ? ids.invoiceId : null,
+            outputIdSnapshot: outputType === 'estimate' ? ids.estimateId : outputType === 'job' ? ids.jobId : ids.invoiceId,
             outputAvailable: true,
           } : {}),
         });
@@ -403,6 +431,7 @@ async function installLaunchHarness(page: Page, options: {
     requestId: REQUEST_ID,
     estimateId: ESTIMATE_ID,
     jobId: JOB_ID,
+    invoiceId: INVOICE_ID,
     launchId: LAUNCH_ID,
     attemptKey: ATTEMPT_KEY,
   }, options });
@@ -422,7 +451,7 @@ async function completeInitialDraft(page: Page, outputType: OutputType | null = 
 }
 
 async function confirmLaunch(page: Page, outputType: OutputType) {
-  const label = outputType === 'estimate' ? 'Estimate' : 'Job';
+  const label = outputType === 'estimate' ? 'Estimate' : outputType === 'job' ? 'Job' : 'Draft Invoice';
   await page.getByTestId('durable-draft-create-output').click();
   await expect(page.getByRole('dialog', { name: `Create ${label}?` })).toBeVisible();
   await page.getByRole('dialog').getByRole('button', { name: `Create ${label}` }).click();
@@ -802,13 +831,15 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
   test('null intent provides guidance without a generic launch action', async ({ page }) => {
     await installLaunchHarness(page, { outputType: null });
     await completeInitialDraft(page, null);
-    await expect(page.getByTestId('durable-draft-launch-guidance')).toContainText('Choose Estimate or Job');
+    await expect(page.getByTestId('durable-draft-launch-guidance')).toContainText('Choose Estimate, Job, or draft Invoice');
     await expect(page.getByTestId('durable-draft-create-output')).toHaveCount(0);
     await expect(page.getByText('Launch Draft', { exact: true })).toHaveCount(0);
   });
 
-  for (const outputType of ['estimate', 'job'] as const) {
-    const label = outputType === 'estimate' ? 'Estimate' : 'Job';
+  for (const outputType of ['estimate', 'job', 'invoice'] as const) {
+    const label = outputType === 'estimate' ? 'Estimate' : outputType === 'job' ? 'Job' : 'Draft Invoice';
+    const launchFlag = outputType === 'estimate' ? 'canLaunchEstimate' : outputType === 'job' ? 'canLaunchJob' : 'canLaunchInvoice';
+    const article = outputType === 'estimate' ? 'an' : 'a';
 
     test(`${label} action appears with authority`, async ({ page }) => {
       await installLaunchHarness(page, { outputType });
@@ -818,7 +849,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     });
 
     test(`${label} action fails closed without output authority`, async ({ page }) => {
-      await installLaunchHarness(page, { outputType, ...(outputType === 'estimate' ? { canLaunchEstimate: false } : { canLaunchJob: false }) });
+      await installLaunchHarness(page, { outputType, [launchFlag]: false });
       await completeInitialDraft(page, outputType);
       await expect(page.getByTestId('durable-draft-create-output')).toBeDisabled();
       await expect(page.getByTestId('durable-draft-launch-disabled-reason')).toContainText(`does not allow creating this ${label}`);
@@ -886,10 +917,11 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
       await completeInitialDraft(page, outputType);
       await confirmLaunch(page, outputType);
       await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_launch_work_draft') > 0);
-      await harnessValue(page, `h.completeRpc('servsync_launch_work_draft', { ...h.launchResult('${outputType}', 'succeeded', false), ${outputType === 'estimate' ? 'estimate_id' : 'job_id'}: null, output_available: false })`);
+      const nullOutputColumn = outputType === 'estimate' ? 'estimate_id' : outputType === 'job' ? 'job_id' : 'invoice_id';
+      await harnessValue(page, `h.completeRpc('servsync_launch_work_draft', { ...h.launchResult('${outputType}', 'succeeded', false), ${nullOutputColumn}: null, output_available: false })`);
       await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
       await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('${outputType}', false))`);
-      await expect(page.getByText(`This Draft created an ${label} that is no longer available.`)).toBeVisible();
+      await expect(page.getByText(`This Draft created ${article} ${label} that is no longer available.`)).toBeVisible();
       await expect(page.getByTestId('durable-draft-create-output')).toHaveCount(0);
     });
 
@@ -947,7 +979,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
 
     test(`${label} capability loss after save prevents attempt and RPC`, async ({ page }) => {
       await installLaunchHarness(page, { outputType, targetKind: 'new' });
-      await harnessValue(page, `h.setRefreshedCapabilities({ ${outputType === 'estimate' ? 'canLaunchEstimate' : 'canLaunchJob'}: false })`);
+      await harnessValue(page, `h.setRefreshedCapabilities({ ${launchFlag}: false })`);
       await confirmLaunch(page, outputType);
       await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
       await harnessValue(page, `h.completeRpc('servsync_save_work_draft', h.activeEnvelope('${outputType}'))`);
@@ -1062,7 +1094,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
   }
 
   test('viewer-style read-only state exposes neither Save nor Create', async ({ page }) => {
-    await installLaunchHarness(page, { outputType: 'estimate', canPersistDraft: false, canLaunchEstimate: false, canLaunchJob: false });
+    await installLaunchHarness(page, { outputType: 'estimate', canPersistDraft: false, canLaunchEstimate: false, canLaunchJob: false, canLaunchInvoice: false });
     await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 0);
     await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.activeEnvelope('estimate'))");
     await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
@@ -1089,7 +1121,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
   });
 
   test('platform-admin-like unresolved contractor context exposes no mutation controls', async ({ page }) => {
-    await installLaunchHarness(page, { outputType: 'job', canPersistDraft: false, canLaunchEstimate: false, canLaunchJob: false });
+    await installLaunchHarness(page, { outputType: 'job', canPersistDraft: false, canLaunchEstimate: false, canLaunchJob: false, canLaunchInvoice: false });
     await page.evaluate(() => {
       const h = (window as typeof window & { __launchHarness: { snapshot: () => { capabilities: Record<string, unknown> }; render: () => void } }).__launchHarness;
       h.snapshot().capabilities.contractorId = null;
@@ -1099,10 +1131,20 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
   });
 
-  test('there is no Draft-to-Invoice action in the rendered durable workspace', async ({ page }) => {
-    await installLaunchHarness(page, { outputType: 'estimate' });
-    await completeInitialDraft(page, 'estimate');
-    await expect(page.getByText(/Create Invoice|Launch Draft|Finish Draft/)).toHaveCount(0);
+  test('Draft Invoice planning option is hidden without invoice authority', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: null, canLaunchInvoice: false });
+    await completeInitialDraft(page, null);
+    await expect(page.getByRole('radio', { name: 'Draft Invoice' })).toHaveCount(0);
+    await expect(page.getByText('Create Draft Invoice')).toHaveCount(0);
+  });
+
+  test('Draft Invoice planning option appears with invoice authority and remains draft-only', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: null, canLaunchInvoice: true });
+    await completeInitialDraft(page, null);
+    await page.getByRole('radio', { name: 'Draft Invoice' }).check({ force: true });
+    await expect(page.getByTestId('shared-draft-invoice-outcome-panel')).toContainText('does not send it to the customer');
+    await expect(page.getByTestId('durable-draft-create-output')).toHaveText('Create Draft Invoice');
+    await expect(page.getByText(/Send Invoice|Mark Paid|Generate PDF|Home History/)).toHaveCount(0);
   });
 
   test('an ordinary pending save blocks launch commitment', async ({ page }) => {

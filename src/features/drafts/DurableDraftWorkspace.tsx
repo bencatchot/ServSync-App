@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
-import type { Estimate, Inspection } from '../../types';
+import type { Estimate, Inspection, Invoice } from '../../types';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
 import { draftJobOptionsWithSavedSelection } from '../jobs/draftJobMappings';
 import { isComposerDraftJob } from '../jobs/jobRecordSelectors';
@@ -92,7 +92,7 @@ type DurableDraftWorkspaceProps = {
   onBack: () => void;
   launchEnabled: boolean;
   onRefreshCapabilities: () => Promise<DurableDraftCompatibilityCapabilities>;
-  onLoadOutput: (type: 'estimate' | 'job', id: string) => Promise<DurableDraftLoadedOutput>;
+  onLoadOutput: (type: ContractorWorkDraftLaunchOutput, id: string) => Promise<DurableDraftLoadedOutput>;
   onAdoptOutput: (output: DurableDraftLoadedOutput, focusToken: symbol) => void;
 };
 
@@ -130,7 +130,8 @@ type DurableDraftOutputOperation = {
 
 export type DurableDraftLoadedOutput =
   | { type: 'estimate'; id: string; record: Estimate }
-  | { type: 'job'; id: string; record: Inspection };
+  | { type: 'job'; id: string; record: Inspection }
+  | { type: 'invoice'; id: string; record: Invoice };
 
 function formatDraftTime(value: string | null) {
   if (!value) return '';
@@ -138,7 +139,15 @@ function formatDraftTime(value: string | null) {
 }
 
 function outputLabel(draft: DurableDraftListPresentation) {
-  return draft.launchedOutputType === 'estimate' ? 'Estimate' : draft.launchedOutputType === 'job' ? 'Job' : 'Output';
+  return outputFamilyLabel(draft.launchedOutputType);
+}
+
+function outputFamilyLabel(outputType: ContractorWorkDraftLaunchOutput | null | undefined) {
+  return outputType === 'estimate' ? 'Estimate' : outputType === 'job' ? 'Job' : outputType === 'invoice' ? 'Draft Invoice' : 'Output';
+}
+
+function outputArticle(outputType: ContractorWorkDraftLaunchOutput | null | undefined) {
+  return outputType === 'estimate' ? 'an' : 'a';
 }
 
 function openTargetKey(target: DurableDraftOpenTarget | null) {
@@ -156,7 +165,11 @@ function browserLaunchAttemptStorage(): DurableDraftLaunchAttemptStorage | null 
 }
 
 function launchCapability(capabilities: DurableDraftCompatibilityCapabilities, outputType: ContractorWorkDraftLaunchOutput) {
-  return outputType === 'estimate' ? capabilities.canLaunchEstimate : capabilities.canLaunchJob;
+  return outputType === 'estimate'
+    ? capabilities.canLaunchEstimate
+    : outputType === 'job'
+      ? capabilities.canLaunchJob
+      : capabilities.canLaunchInvoice;
 }
 
 function outputLoadWasNotFound(error: unknown) {
@@ -170,7 +183,7 @@ function outputLoadWasNotFound(error: unknown) {
 function validateDraftForLaunch(form: SharedDraftComposerDraft, canonical: DurableDraftCanonicalState | null) {
   const saveValidation = validateSharedDraftComposerDraftForSave(form);
   if (saveValidation) return saveValidation;
-  if (!form.intended_output) return 'Choose Estimate or Job before creating work from this Draft.';
+  if (!form.intended_output) return 'Choose Estimate, Job, or draft Invoice before creating work from this Draft.';
   if (form.work_format === 'inspection_checklist') {
     if (form.intended_output !== 'job') return 'Inspection Checklist Drafts can only create a Job.';
     if (!form.checklist_source) return 'Choose an Inspection Checklist before creating the Job.';
@@ -190,12 +203,16 @@ function canonicalListPresentation(state: DurableDraftCanonicalState): DurableDr
     ? draft.launchedEstimateId
     : draft.launchedOutputType === 'job'
       ? draft.launchedJobId
-      : null;
+      : draft.launchedOutputType === 'invoice'
+        ? draft.launchedInvoiceId
+        : null;
   const outputIdSnapshot = draft.launchedOutputType === 'estimate'
     ? draft.launchedEstimateIdSnapshot
     : draft.launchedOutputType === 'job'
       ? draft.launchedJobIdSnapshot
-      : null;
+      : draft.launchedOutputType === 'invoice'
+        ? draft.launchedInvoiceIdSnapshot
+        : null;
   return {
     draftId: draft.draftId,
     contractorId: draft.contractorId,
@@ -812,7 +829,8 @@ export function DurableDraftWorkspace({
       || nextCanonical.draft.contractorId !== operation.contractorId
       || nextCanonical.draft.launchedOutputType !== result.output_type
       || (result.output_type === 'estimate' && nextCanonical.draft.launchedEstimateIdSnapshot !== result.output_id_snapshot)
-      || (result.output_type === 'job' && nextCanonical.draft.launchedJobIdSnapshot !== result.output_id_snapshot)) {
+      || (result.output_type === 'job' && nextCanonical.draft.launchedJobIdSnapshot !== result.output_id_snapshot)
+      || (result.output_type === 'invoice' && nextCanonical.draft.launchedInvoiceIdSnapshot !== result.output_id_snapshot)) {
       throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'get');
     }
     if (!launchOperationIsCurrent(operation)) return;
@@ -821,10 +839,14 @@ export function DurableDraftWorkspace({
     setForm(durableCanonicalStateToComposer(nextCanonical));
     const outputId = result.output_type === 'estimate'
       ? nextCanonical.draft.launchedEstimateId
-      : nextCanonical.draft.launchedJobId;
+      : result.output_type === 'job'
+        ? nextCanonical.draft.launchedJobId
+        : nextCanonical.draft.launchedInvoiceId;
     const outputIdSnapshot = result.output_type === 'estimate'
       ? nextCanonical.draft.launchedEstimateIdSnapshot
-      : nextCanonical.draft.launchedJobIdSnapshot;
+      : result.output_type === 'job'
+        ? nextCanonical.draft.launchedJobIdSnapshot
+        : nextCanonical.draft.launchedInvoiceIdSnapshot;
     const eligibility = postLaunchEligibility.current;
     const navigationIntent = eligibility && operation.navigationEligibilityToken === eligibility.token
       ? resolvePostLaunchNavigationIntent({
@@ -859,8 +881,8 @@ export function DurableDraftWorkspace({
     setFeedback({
       tone: 'success',
       title: navigationIntent && navigationContextMatches
-        ? `${result.output_type === 'estimate' ? 'Estimate' : 'Job'} created. Opening ${result.output_type === 'estimate' ? 'Estimate' : 'Job'}…`
-        : `${nextCanonical.draft.launchedOutputType === 'estimate' ? 'Estimate' : 'Job'} created.`,
+        ? `${outputFamilyLabel(result.output_type)} created. Opening ${outputFamilyLabel(result.output_type)}…`
+        : `${outputFamilyLabel(nextCanonical.draft.launchedOutputType)} created.`,
       body: navigationIntent && navigationContextMatches ? 'The Draft is consumed and read-only.' : 'The Draft is now consumed and read-only.',
       testId: 'durable-draft-launch-success',
     });
@@ -1013,7 +1035,7 @@ export function DurableDraftWorkspace({
       return;
     }
     if (!launchCapability(capabilities, outputType)) {
-      setFeedback({ tone: 'error', title: `Your current access does not allow creating this ${outputType === 'estimate' ? 'Estimate' : 'Job'}.`, testId: 'durable-draft-launch-error' });
+      setFeedback({ tone: 'error', title: `Your current access does not allow creating this ${outputFamilyLabel(outputType)}.`, testId: 'durable-draft-launch-error' });
       return;
     }
     const storage = browserLaunchAttemptStorage();
@@ -1185,7 +1207,6 @@ export function DurableDraftWorkspace({
 
   const handleRetryConsumedReconciliation = async () => {
     if (!launchEnabled || launchOperation.current || !launchProof || !canonical?.draft.draftId || !capabilities.contractorId) return;
-    if (launchProof.output_type === 'invoice') return;
     const operation: DurableDraftLaunchOperation = {
       token: Symbol('durable-draft-reconcile'),
       client,
@@ -1222,22 +1243,37 @@ export function DurableDraftWorkspace({
           output_type: 'estimate',
           estimate_id: attempt.estimateId ?? null,
           job_id: null,
+          invoice_id: null,
           output_id_snapshot: attempt.outputIdSnapshot as string,
           output_available: attempt.outputAvailable as boolean,
           launch_id: attempt.launchId ?? null,
           idempotent: true,
         }
-      : {
-          draft_id: attempt.draftId,
-          status: 'succeeded',
-          output_type: 'job',
-          estimate_id: null,
-          job_id: attempt.jobId ?? null,
-          output_id_snapshot: attempt.outputIdSnapshot as string,
-          output_available: attempt.outputAvailable as boolean,
-          launch_id: attempt.launchId ?? null,
-          idempotent: true,
-        };
+      : attempt.outputType === 'job'
+        ? {
+            draft_id: attempt.draftId,
+            status: 'succeeded',
+            output_type: 'job',
+            estimate_id: null,
+            job_id: attempt.jobId ?? null,
+            invoice_id: null,
+            output_id_snapshot: attempt.outputIdSnapshot as string,
+            output_available: attempt.outputAvailable as boolean,
+            launch_id: attempt.launchId ?? null,
+            idempotent: true,
+          }
+        : {
+            draft_id: attempt.draftId,
+            status: 'succeeded',
+            output_type: 'invoice',
+            estimate_id: null,
+            job_id: null,
+            invoice_id: attempt.invoiceId ?? null,
+            output_id_snapshot: attempt.outputIdSnapshot as string,
+            output_available: attempt.outputAvailable as boolean,
+            launch_id: attempt.launchId ?? null,
+            idempotent: true,
+          };
     if (!attempt.outputIdSnapshot || attempt.outputAvailable === undefined) return;
     const operation: DurableDraftLaunchOperation = {
       token: Symbol('durable-draft-recovered-success'),
@@ -1409,7 +1445,7 @@ export function DurableDraftWorkspace({
       }
     } catch (error) {
       if (!isCurrent()) return;
-      const label = outputType === 'estimate' ? 'Estimate' : 'Job';
+      const label = outputFamilyLabel(outputType);
       let unavailable = false;
       if (outputLoadWasNotFound(error)) {
         try {
@@ -1418,10 +1454,14 @@ export function DurableDraftWorkspace({
           if (!isCurrent()) return;
           const liveOutputId = outputType === 'estimate'
             ? refreshed.draft.launchedEstimateId
-            : refreshed.draft.launchedJobId;
+            : outputType === 'job'
+              ? refreshed.draft.launchedJobId
+              : refreshed.draft.launchedInvoiceId;
           const snapshot = outputType === 'estimate'
             ? refreshed.draft.launchedEstimateIdSnapshot
-            : refreshed.draft.launchedJobIdSnapshot;
+            : outputType === 'job'
+              ? refreshed.draft.launchedJobIdSnapshot
+              : refreshed.draft.launchedInvoiceIdSnapshot;
           if (refreshed.draft.draftId !== operation.draftId
             || refreshed.draft.contractorId !== operation.contractorId
             || refreshed.draft.status !== 'consumed'
@@ -1458,7 +1498,7 @@ export function DurableDraftWorkspace({
     }
   };
 
-  const handleOpenOutput = async (type: 'estimate' | 'job', id: string, listDraft?: DurableDraftListPresentation) => {
+  const handleOpenOutput = async (type: ContractorWorkDraftLaunchOutput, id: string, listDraft?: DurableDraftListPresentation) => {
     if (!canonical && !listDraft) return;
     await openConsumedDraftOutput({
       source: 'manual',
@@ -1548,7 +1588,7 @@ export function DurableDraftWorkspace({
     );
   }
   if (launchProof && canonical?.draft.status === 'active') {
-    const label = launchProof.output_type === 'estimate' ? 'Estimate' : 'Job';
+    const label = outputFamilyLabel(launchProof.output_type);
     return (
       <section className="space-y-4" data-testid="durable-draft-consumed-reconciliation">
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -1565,7 +1605,13 @@ export function DurableDraftWorkspace({
   }
   if (canonical && (canonical.draft.status !== 'active' || !capabilities.canPersistDraft)) {
     const outputType = canonical.draft.launchedOutputType;
-    const liveOutputId = outputType === 'estimate' ? canonical.draft.launchedEstimateId : canonical.draft.launchedJobId;
+    const liveOutputId = outputType === 'estimate'
+      ? canonical.draft.launchedEstimateId
+      : outputType === 'job'
+        ? canonical.draft.launchedJobId
+        : outputType === 'invoice'
+          ? canonical.draft.launchedInvoiceId
+          : null;
     const unavailable = canonical.draft.status === 'consumed' && (!liveOutputId || !outputType);
     const statusLabel = canonical.draft.status === 'consumed'
       ? 'Consumed'
@@ -1578,19 +1624,19 @@ export function DurableDraftWorkspace({
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold text-slate-950">{canonical.draft.title || 'Untitled Draft'}</h2><span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">{statusLabel}</span></div>
           <p className="mt-2 text-sm text-slate-600">{canonical.draft.subjectDisplayNameSnapshot}{canonical.draft.propertyDisplaySnapshot ? ` · ${canonical.draft.propertyDisplaySnapshot}` : ''}</p>
-          {canonical.draft.launchedAt ? <p className="mt-1 text-xs text-slate-500">Created {outputType === 'estimate' ? 'Estimate' : 'Job'} {formatDraftTime(canonical.draft.launchedAt)}</p> : null}
+          {canonical.draft.launchedAt ? <p className="mt-1 text-xs text-slate-500">Created {outputFamilyLabel(outputType)} {formatDraftTime(canonical.draft.launchedAt)}</p> : null}
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-lg border border-slate-200 p-4"><h3 className="text-sm font-bold text-slate-950">Scope</h3><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{canonical.draft.scopeDescription || 'No scope description saved.'}</p></div>
           <div className="rounded-lg border border-slate-200 p-4"><h3 className="text-sm font-bold text-slate-950">Private notes</h3><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{canonical.draft.privateNotes || 'No private notes saved.'}</p></div>
         </div>
         <div className="rounded-lg border border-slate-200 p-4"><h3 className="text-sm font-bold text-slate-950">Work items</h3>{canonical.items.length ? <ul className="mt-2 divide-y divide-slate-100">{canonical.items.map(item => <li key={item.rowId} className="py-2 text-sm text-slate-700">{item.title || item.description}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">No work items saved.</p>}</div>
-        {unavailable ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This Draft created an {outputType === 'estimate' ? 'Estimate' : 'Job'} that is no longer available.</div> : null}
+        {unavailable ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This Draft created {outputArticle(outputType)} {outputFamilyLabel(outputType)} that is no longer available.</div> : null}
         {outputError ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{outputError}</div> : null}
         <div className="flex flex-wrap gap-2">
           {canonical.draft.status === 'consumed' && outputType && liveOutputId ? (
             <button type="button" disabled={openingOutputKey !== null} onClick={() => void handleOpenOutput(outputType, liveOutputId)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
-              {openingOutputKey === `${outputType}:${liveOutputId}` ? <><Loader2 className="animate-spin" size={16} /> Opening…</> : <><FileText size={16} /> Open {outputType === 'estimate' ? 'Estimate' : 'Job'}</>}
+              {openingOutputKey === `${outputType}:${liveOutputId}` ? <><Loader2 className="animate-spin" size={16} /> Opening…</> : <><FileText size={16} /> Open {outputFamilyLabel(outputType)}</>}
             </button>
           ) : null}
           <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Work</button>
@@ -1624,15 +1670,15 @@ export function DurableDraftWorkspace({
   const launchBusy = durableDraftLaunchIsBusy(launchState);
   const launchFrozen = !durableDraftLaunchAllowsEditing(launchState);
   const launchLabel = launchEnabled && capabilities.canPersistDraft && outputType
-    ? `Create ${outputType === 'estimate' ? 'Estimate' : 'Job'}`
+    ? `Create ${outputFamilyLabel(outputType)}`
     : null;
   const recoveryLabel = durableDraftLaunchCanRetry(launchState) && outputType
-    ? `Retry Create ${outputType === 'estimate' ? 'Estimate' : 'Job'}`
+    ? `Retry Create ${outputFamilyLabel(outputType)}`
     : launchState.phase === 'preparing' && launchState.idempotencyKey && outputType
-      ? `Continue Create ${outputType === 'estimate' ? 'Estimate' : 'Job'}`
+      ? `Continue Create ${outputFamilyLabel(outputType)}`
       : null;
   const launchDisabledReason = outputType && launchEnabled && capabilities.canPersistDraft && !outputAuthority
-    ? `Your current access does not allow creating this ${outputType === 'estimate' ? 'Estimate' : 'Job'}. You can still save the Draft.`
+    ? `Your current access does not allow creating this ${outputFamilyLabel(outputType)}. You can still save the Draft.`
     : launchState.phase === 'permission_denied'
       ? launchState.message
     : launchState.phase === 'storage_unavailable'
@@ -1651,7 +1697,7 @@ export function DurableDraftWorkspace({
   return (
     <div className="space-y-3">
       <div ref={errorSummaryRef} tabIndex={-1} className="outline-none" />
-      <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : launchState.phase === 'preparing' ? 'Preparing launch protection' : launchState.phase === 'launching' ? `Creating ${outputType === 'estimate' ? 'Estimate' : 'Job'}` : launchState.phase === 'reconciling_consumed' || launchState.phase === 'reconciling_lifecycle' ? 'Refreshing canonical Draft status' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
+      <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : launchState.phase === 'preparing' ? 'Preparing launch protection' : launchState.phase === 'launching' ? `Creating ${outputFamilyLabel(outputType)}` : launchState.phase === 'reconciling_consumed' || launchState.phase === 'reconciling_lifecycle' ? 'Refreshing canonical Draft status' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
       <ContractorDraftComposer
         draft={form}
         connectedOptions={connectedOptionsWithSavedSelection}
@@ -1661,6 +1707,8 @@ export function DurableDraftWorkspace({
         canSave={capabilities.canPersistDraft && saveState !== 'saving'}
         saving={saveState === 'saving'}
         interactionDisabled={launchFrozen}
+        invoiceOutputAvailable={capabilities.canLaunchInvoice}
+        invoiceOutputUnavailableReason="Draft Invoice planning requires billing access."
         launchLabel={launchLabel}
         launchDisabled={!outputAuthority || launchBusy || saveState === 'saving' || launchState.phase === 'permission_denied' || launchState.phase === 'storage_unavailable'}
         launchDisabledReason={launchDisabledReason}
@@ -1719,21 +1767,27 @@ function DurableDraftRow({ draft, opening, onOpen, onOpenOutput, openingOutputKe
   draft: DurableDraftListPresentation;
   opening: boolean;
   onOpen: () => void;
-  onOpenOutput: (type: 'estimate' | 'job', id: string, draft: DurableDraftListPresentation) => Promise<void>;
+  onOpenOutput: (type: ContractorWorkDraftLaunchOutput, id: string, draft: DurableDraftListPresentation) => Promise<void>;
   openingOutputKey: string | null;
 }) {
   const consumed = draft.status === 'consumed';
+  const availableOutputType = draft.outputAvailable && draft.launchedOutputType && draft.liveOutputId
+    ? draft.launchedOutputType
+    : null;
+  const availableOutputId = draft.outputAvailable && draft.launchedOutputType && draft.liveOutputId
+    ? draft.liveOutputId
+    : null;
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between" data-testid={`durable-draft-row-${draft.status}`}>
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-950">{draft.title || 'Untitled Draft'}</p><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${consumed ? 'bg-slate-100 text-slate-700' : 'bg-blue-50 text-blue-700'}`}>{consumed ? 'Consumed' : 'Active Draft'}</span>{draft.intendedOutput ? <span className="text-xs font-semibold text-slate-500">{draft.intendedOutput === 'estimate' ? 'Estimate' : 'Job'} planned</span> : null}</div>
+        <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-950">{draft.title || 'Untitled Draft'}</p><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${consumed ? 'bg-slate-100 text-slate-700' : 'bg-blue-50 text-blue-700'}`}>{consumed ? 'Consumed' : 'Active Draft'}</span>{draft.intendedOutput ? <span className="text-xs font-semibold text-slate-500">{outputFamilyLabel(draft.intendedOutput)} planned</span> : null}</div>
         <p className="mt-1 text-sm text-slate-600">{draft.subjectLabel || 'Customer'}{draft.propertyLabel ? ` · ${draft.propertyLabel}` : ''}</p>
         <p className="mt-1 text-xs text-slate-500">{consumed ? `${outputLabel(draft)} created ${formatDraftTime(draft.launchedAt)}` : `Updated ${formatDraftTime(draft.updatedAt)}`}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={opening} onClick={onOpen} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">{opening ? <><Loader2 className="animate-spin" size={15} /> Opening Draft…</> : <>{consumed ? 'Review Draft' : 'Continue Draft'} <ArrowRight size={15} /></>}</button>
-        {consumed && draft.outputAvailable && draft.launchedOutputType && draft.liveOutputId ? (
-          <button type="button" disabled={openingOutputKey !== null} onClick={() => void onOpenOutput(draft.launchedOutputType as 'estimate' | 'job', draft.liveOutputId as string, draft)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">{openingOutputKey === `${draft.launchedOutputType}:${draft.liveOutputId}` ? 'Opening…' : `Open ${outputLabel(draft)}`}</button>
+        {consumed && availableOutputType && availableOutputId ? (
+          <button type="button" disabled={openingOutputKey !== null} onClick={() => void onOpenOutput(availableOutputType, availableOutputId, draft)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">{openingOutputKey === `${availableOutputType}:${availableOutputId}` ? 'Opening…' : `Open ${outputLabel(draft)}`}</button>
         ) : consumed ? <span className="self-center text-xs font-semibold text-amber-700">Output unavailable</span> : null}
       </div>
     </div>

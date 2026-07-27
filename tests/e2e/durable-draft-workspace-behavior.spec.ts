@@ -94,6 +94,7 @@ async function installWorkspaceHarness(page: Page) {
       canImportLegacyDraft: true,
       canLaunchJob: true,
       canLaunchEstimate: true,
+      canLaunchInvoice: false,
     });
     const render = () => root.render(state.activeOutput
       ? React.createElement('div', { 'data-testid': 'adopted-output' }, state.activeOutput)
@@ -165,8 +166,10 @@ async function installWorkspaceHarness(page: Page) {
       launched_output_type: null,
       launched_estimate_id: null,
       launched_job_id: null,
+      launched_invoice_id: null,
       launched_estimate_id_snapshot: null,
       launched_job_id_snapshot: null,
+      launched_invoice_id_snapshot: null,
       launched_at: null,
       launched_by_user_id: null,
       created_at: '2026-07-19T10:00:00.000Z',
@@ -192,8 +195,10 @@ async function installWorkspaceHarness(page: Page) {
       launched_output_type: null,
       launched_estimate_id: null,
       launched_job_id: null,
+      launched_invoice_id: null,
       launched_estimate_id_snapshot: null,
       launched_job_id_snapshot: null,
+      launched_invoice_id_snapshot: null,
       launched_at: null,
       created_at: '2026-07-19T10:00:00.000Z',
       updated_at: '2026-07-19T10:00:00.000Z',
@@ -616,7 +621,9 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
         launched_at: '2026-07-19T11:00:00.000Z',
       })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
       await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
-      await expect(page.getByText(new RegExp(`created an ${output.type === 'estimate' ? 'Estimate' : 'Job'} that is no longer available`))).toBeVisible();
+      const article = output.type === 'estimate' ? 'an' : 'a';
+      const label = output.type === 'estimate' ? 'Estimate' : 'Job';
+      await expect(page.getByText(new RegExp(`created ${article} ${label} that is no longer available`))).toBeVisible();
       await expect(page.getByRole('button', { name: new RegExp(`Open ${output.type}`, 'i') })).toHaveCount(0);
     });
   }

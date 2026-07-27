@@ -24,6 +24,8 @@ type ContractorDraftComposerProps = {
   canSave: boolean;
   saving: boolean;
   interactionDisabled?: boolean;
+  invoiceOutputAvailable?: boolean;
+  invoiceOutputUnavailableReason?: string;
   launchLabel?: string | null;
   launchDisabled?: boolean;
   launchDisabledReason?: string;
@@ -64,6 +66,8 @@ export function ContractorDraftComposer({
   canSave,
   saving,
   interactionDisabled = false,
+  invoiceOutputAvailable = false,
+  invoiceOutputUnavailableReason = '',
   launchLabel = null,
   launchDisabled = false,
   launchDisabledReason = '',
@@ -90,16 +94,21 @@ export function ContractorDraftComposer({
     : '';
   const selectedChecklist = checklistOptions.find(option => `${option.source_kind}:${option.source_id}` === selectedChecklistKey) ?? null;
   const isEstimateIntent = draft.intended_output === 'estimate';
+  const isInvoiceIntent = draft.intended_output === 'invoice';
   const showEstimateLaborControls = !isChecklistDraft && isEstimateIntent;
-  const workItemsHeading = isEstimateIntent ? 'Estimate line items' : 'Job work scope';
+  const workItemsHeading = isEstimateIntent ? 'Estimate line items' : isInvoiceIntent ? 'Draft Invoice line items' : 'Job work scope';
   const workItemsDescription = isEstimateIntent
     ? 'Plan the customer-facing estimate lines now; this structure carries into the launched Estimate.'
-    : 'Plan the work scope that can carry into the launched Job.';
-  const addLineLabel = isEstimateIntent ? 'Add estimate line' : 'Add work line';
+    : isInvoiceIntent
+      ? 'Plan the draft Invoice lines now; launch creates a draft only and does not send it.'
+      : 'Plan the work scope that can carry into the launched Job.';
+  const addLineLabel = isEstimateIntent ? 'Add estimate line' : isInvoiceIntent ? 'Add invoice line' : 'Add work line';
   const emptyLinesLabel = isEstimateIntent
     ? 'No estimate line items yet. Add labor, materials, or fees before saving detailed pricing.'
-    : 'No work scope yet. Add labor, materials, or fees before saving detailed scope.';
-  const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : 'Draft Job total';
+    : isInvoiceIntent
+      ? 'No draft Invoice line items yet. Add labor, materials, or fees before creating the draft Invoice.'
+      : 'No work scope yet. Add labor, materials, or fees before saving detailed scope.';
+  const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : isInvoiceIntent ? 'Draft Invoice total' : 'Draft Job total';
 
   useEffect(() => {
     setExpandedLineIds(prev => {
@@ -144,6 +153,7 @@ export function ContractorDraftComposer({
       intended_output: intendedOutput,
       estimate_session: intendedOutput === 'estimate' ? { ...draft.estimate_session, visited: true } : draft.estimate_session,
       job_session: intendedOutput === 'job' ? { ...draft.job_session, visited: true } : draft.job_session,
+      invoice_session: intendedOutput === 'invoice' ? { ...draft.invoice_session, visited: true } : draft.invoice_session,
     });
   };
 
@@ -159,6 +169,7 @@ export function ContractorDraftComposer({
       checklist_source: workFormat === 'inspection_checklist' ? draft.checklist_source : null,
       estimate_session: workFormat === 'inspection_checklist' ? draft.estimate_session : draft.estimate_session,
       job_session: workFormat === 'inspection_checklist' ? { ...draft.job_session, visited: true } : draft.job_session,
+      invoice_session: draft.invoice_session,
     });
   };
 
@@ -180,7 +191,7 @@ export function ContractorDraftComposer({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Start New Draft</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">{currentDraftId ? 'Continue Draft' : 'Draft composer'}</h2>
-            <p className="mt-1 text-sm leading-6 text-blue-950">Save contractor-only planning details, then create one Estimate or Job when the Draft is ready.</p>
+            <p className="mt-1 text-sm leading-6 text-blue-950">Save contractor-only planning details, then create one Estimate, Job, or draft Invoice when the Draft is ready.</p>
           </div>
           <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">Draft planning</span>
         </div>
@@ -207,7 +218,13 @@ export function ContractorDraftComposer({
             <p className="mt-1 text-sm font-semibold text-blue-950">Creates one Job with checklist/report structure</p>
           </div>
         ) : (
-          <DraftOutcomeSelector value={draft.intended_output} onChange={updateIntent} disabled={interactionDisabled} />
+          <DraftOutcomeSelector
+            value={draft.intended_output}
+            onChange={updateIntent}
+            disabled={interactionDisabled}
+            invoiceAvailable={invoiceOutputAvailable}
+            invoiceUnavailableReason={invoiceOutputUnavailableReason}
+          />
         )}
       </div>
 
@@ -291,7 +308,7 @@ export function ContractorDraftComposer({
         <div className="mt-3 grid gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-white bg-white px-3 py-2">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved Work Templates</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Use from Templates for Estimate starts.</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">Use from Templates for Estimate or draft Invoice starts.</p>
           </div>
           <div className="rounded-xl border border-white bg-white px-3 py-2">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Inspection Checklists</p>
@@ -329,12 +346,12 @@ export function ContractorDraftComposer({
           className={`${fieldClass()} min-h-[96px] resize-y`}
           value={draft.notes}
           onChange={event => onChange({ ...draft, notes: event.target.value })}
-          placeholder="Visible only to your company and not copied to the customer-facing Estimate or Job."
+          placeholder="Visible only to your company and not copied to the customer-facing Estimate, Job, or Invoice."
           aria-describedby="durable-draft-private-notes-help"
         />
       ))}
       <p id="durable-draft-private-notes-help" className="text-xs leading-5 text-slate-500">
-        Contractor-only planning notes. These are not copied to the customer-facing Estimate or Job.
+        Contractor-only planning notes. These are not copied to the customer-facing Estimate, Job, or Invoice.
       </p>
 
       {showEstimateLaborControls ? (
@@ -492,7 +509,7 @@ export function ContractorDraftComposer({
                 key={line.id}
                 line={line}
                 index={index}
-                itemLabel={isEstimateIntent ? 'draft estimate' : 'draft'}
+                itemLabel={isEstimateIntent ? 'draft estimate' : isInvoiceIntent ? 'invoice' : 'draft'}
                 laborMode={draft.labor_mode}
                 compactAdvanced
                 advancedDetailsOpen={expandedLineIds.has(line.id)}
@@ -521,10 +538,15 @@ export function ContractorDraftComposer({
 
       {draft.intended_output === 'estimate' ? <section aria-label="Estimate outcome details" data-testid="shared-draft-estimate-outcome-panel" /> : null}
       {draft.intended_output === 'job' ? <section aria-label="Job outcome details" data-testid="shared-draft-job-outcome-panel" /> : null}
+      {draft.intended_output === 'invoice' ? (
+        <section aria-label="Draft Invoice outcome details" data-testid="shared-draft-invoice-outcome-panel" className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+          Creating the Invoice makes a draft only and does not send it to the customer.
+        </section>
+      ) : null}
       </fieldset>
 
       {!draft.intended_output ? (
-        <p className="text-sm font-medium text-slate-600" data-testid="durable-draft-launch-guidance">Choose Estimate or Job before creating work from this Draft.</p>
+        <p className="text-sm font-medium text-slate-600" data-testid="durable-draft-launch-guidance">Choose Estimate, Job, or draft Invoice before creating work from this Draft.</p>
       ) : null}
       {launchDisabledReason ? <p className="text-sm font-medium text-amber-800" data-testid="durable-draft-launch-disabled-reason">{launchDisabledReason}</p> : null}
 

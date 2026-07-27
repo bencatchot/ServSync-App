@@ -131,8 +131,8 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(laborSection).toContain('data-testid="durable-draft-job-labor-hours"');
     expect(laborSection).toContain('data-testid="durable-draft-line-labor-summary"');
     expect(laborSection).toContain('Labor rows distinct from Material, Fee, and Other rows');
-    expect(composerSource).toContain("const workItemsHeading = isEstimateIntent ? 'Estimate line items' : 'Job work scope';");
-    expect(composerSource).toContain("itemLabel={isEstimateIntent ? 'draft estimate' : 'draft'}");
+    expect(composerSource).toContain("const workItemsHeading = isEstimateIntent ? 'Estimate line items' : isInvoiceIntent ? 'Draft Invoice line items' : 'Job work scope';");
+    expect(composerSource).toContain("itemLabel={isEstimateIntent ? 'draft estimate' : isInvoiceIntent ? 'invoice' : 'draft'}");
     expect(sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx')).toContain("'draft estimate'");
   });
 
@@ -165,12 +165,13 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(sharedEditorSource).toContain("setContractorJobsViewAndScroll('overview');");
   });
 
-  test('shared creation entry points route Estimates through Drafts and block direct Draft-to-Invoice start', () => {
+  test('shared creation entry points route Estimates and draft Invoices through Drafts', () => {
     const appSource = sourceFile('src/App.tsx');
     const estimateStart = sourceBetween(appSource, 'const startDraftFirstEstimateComposer =', 'const continueDraftJob = async');
-    const invoiceUnavailable = sourceBetween(
+    const invoiceStart = sourceBetween(appSource, 'const startDraftFirstInvoiceComposer =', 'const continueDraftJob = async');
+    const invoicePlanning = sourceBetween(
       appSource,
-      'data-testid="durable-draft-direct-invoice-unavailable"',
+      'data-testid={durableDraftInvoiceLaunchAvailable ?',
       '{!selectedJobsCustomerName && !(sharedDraftComposerEnabled',
     );
     const openFinancialActions = sourceBetween(
@@ -186,12 +187,16 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold}');
     expect(openFinancialActions).toContain('onClick={durableDraftCohortSafeHold ? () => {');
     expect(openFinancialActions).toContain(': sharedDraftComposerEnabled ? startDraftFirstEstimateComposer');
-    expect(openFinancialActions).toContain("setContractorFinancialRecordKind('invoices');");
-    expect(invoiceUnavailable).toContain('Direct Draft-to-Invoice is not enabled.');
-    expect(invoiceUnavailable).toContain('Review estimates');
-    expect(invoiceUnavailable).toContain('Review completed jobs');
+    expect(openFinancialActions).toContain(': sharedDraftComposerEnabled ? startDraftFirstInvoiceComposer');
+    expect(invoiceStart).toContain("startDraftJobComposer({}, { intendedOutput: 'invoice' });");
+    expect(invoiceStart).toContain("startCleanDraftJobComposer({ intendedOutput: 'invoice' });");
+    expect(invoicePlanning).toContain('durable-draft-invoice-planning-entry');
+    expect(invoicePlanning).toContain('durable-draft-invoice-planning-unavailable');
+    expect(invoicePlanning).toContain('Start draft Invoice');
+    expect(invoicePlanning).toContain('Creating it does not send it to the customer.');
+    expect(invoicePlanning).toContain('Review estimates');
+    expect(invoicePlanning).toContain('Review completed jobs');
     expect(appSource).toContain('beginInvoiceDraftFromEstimate');
-    expect(appSource).not.toContain("startDraftJobComposer({}, { intendedOutput: 'invoice'");
   });
 
   test('Draft template guidance stays source-specific and line detail UI matches persisted durable fields', () => {
@@ -205,6 +210,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     const lineRow = sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
 
     expect(guidance).toContain('Saved Work Templates');
+    expect(guidance).toContain('Estimate or draft Invoice starts');
     expect(guidance).toContain('Inspection Checklists');
     expect(guidance).toContain('Home-specific Checklists');
     expect(guidance).not.toContain('Generic templates');
@@ -262,16 +268,17 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(selectorSource).toContain("label: 'Estimate'");
     expect(selectorSource).toContain("label: 'Job'");
     expect(selectorSource).toContain("label: 'Not decided'");
-    expect(selectorSource).not.toContain('Invoice');
+    expect(selectorSource).toContain("label: 'Draft Invoice'");
+    expect(selectorSource).toContain('invoiceAvailable');
+    expect(selectorSource).toContain('It will not be sent.');
     expect(composerSource).toContain('data-testid="shared-draft-composer"');
     expect(composerSource).toContain('Save Draft');
     expect(composerSource).toContain('Back to Work');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Job');
-    expect(composerSource).not.toContain('Create Invoice');
-    expect(composerSource).toContain('launchLabel');
     expect(composerSource).not.toContain('launchContractorWorkDraft');
     expect(composerSource).not.toContain('createDurableDraftLaunchAttempt');
+    expect(composerSource).toContain('launchLabel');
     expect(composerSource).toContain("composerField('Private notes'");
     expect(composerSource).not.toContain('Payment schedule');
   });
@@ -286,7 +293,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(selectorSource).toContain('type="radio"');
     expect(selectorSource).toContain('focus-within:ring-2');
     expect(selectorSource).toContain('min-h-11');
-    expect(selectorSource).toContain('sm:grid-cols-3');
+    expect(selectorSource).toContain("invoiceAvailable ? 'sm:grid-cols-4' : 'sm:grid-cols-3'");
     expect(composerSource).toContain('min-h-11');
     expect(composerSource).not.toContain('fixed bottom');
     expect(composerSource).not.toContain('overflow-x');

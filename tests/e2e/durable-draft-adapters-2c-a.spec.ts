@@ -90,8 +90,10 @@ function draft(overrides: Partial<ContractorWorkDraft> = {}): ContractorWorkDraf
     launched_output_type: null,
     launched_estimate_id: null,
     launched_job_id: null,
+    launched_invoice_id: null,
     launched_estimate_id_snapshot: null,
     launched_job_id_snapshot: null,
+    launched_invoice_id_snapshot: null,
     launched_at: null,
     launched_by_user_id: null,
     created_at: '2026-07-19T10:00:00.000Z',
@@ -512,7 +514,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     });
   });
 
-  test('capability combinations preserve independent persistence, Job, Estimate, and read boundaries', () => {
+  test('capability combinations preserve independent persistence, Job, Estimate, Invoice, and read boundaries', () => {
     const base = {
       contractorId: CONTRACTOR_ID,
       currentUserId: 'user-1',
@@ -524,30 +526,39 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       canImportLegacyDraft: true,
       canLaunchJob: false,
       canLaunchEstimate: false,
+      canLaunchInvoice: true,
     });
     expect(capabilitiesFromCompatibilityChecks({ ...base, canManageBilling: false, canWriteJobs: true })).toMatchObject({
       canPersistDraft: true,
       canImportLegacyDraft: false,
       canLaunchJob: true,
       canLaunchEstimate: false,
+      canLaunchInvoice: false,
     });
     expect(capabilitiesFromCompatibilityChecks({ ...base, canManageBilling: false, canWriteJobs: false })).toMatchObject({
       canReadDrafts: true,
       canPersistDraft: false,
       canLaunchJob: false,
+      canLaunchInvoice: false,
     });
     expect(capabilitiesFromCompatibilityChecks({
       ...base,
       contractorOwnerUserId: 'user-1',
       canManageBilling: true,
       canWriteJobs: true,
-    }).canLaunchEstimate).toBe(true);
+    })).toMatchObject({ canLaunchEstimate: true, canLaunchInvoice: true });
     expect(capabilitiesFromCompatibilityChecks({
       ...base,
       contractorId: null,
       canManageBilling: true,
       canWriteJobs: true,
-    })).toMatchObject({ contractorId: null, canPersistDraft: false, canLaunchJob: false, canLaunchEstimate: false });
+    })).toMatchObject({
+      contractorId: null,
+      canPersistDraft: false,
+      canLaunchJob: false,
+      canLaunchEstimate: false,
+      canLaunchInvoice: false,
+    });
   });
 
   test('capability adapter has no role-name policy or private helper browser call', () => {
@@ -584,6 +595,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       canImportLegacyDraft: false,
       canLaunchJob: true,
       canLaunchEstimate: false,
+      canLaunchInvoice: false,
     });
     expect(calls).toEqual([
       'servsync_current_contractor_profile',
@@ -784,7 +796,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     rejects({ contractorId: 'bad' });
     rejects({ draftId: 'bad' });
     rejects({ idempotencyKey: 'bad' });
-    rejects({ outputType: 'invoice' });
+    rejects({ outputType: 'receipt' });
     rejects({ phase: 'unknown' });
     rejects({ createdAt: 'not-a-date' });
     rejects({ updatedAt: '2026-07-19T11:59:00.000Z' });
@@ -833,7 +845,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       idempotent: false,
       ...overrides,
     });
-    const launch = (value: unknown, intended_output: 'estimate' | 'job' = 'job') => launchContractorWorkDraft(rpcClient(value).client, {
+    const launch = (value: unknown, intended_output: 'estimate' | 'job' | 'invoice' = 'job') => launchContractorWorkDraft(rpcClient(value).client, {
       draft_id: DRAFT_ID, intended_output, idempotency_key: IDEMPOTENCY_ID,
     });
     await expect(launch(result())).resolves.toMatchObject({ output_type: 'job', job_id: JOB_ID });
@@ -858,6 +870,13 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       output_type: 'estimate', estimate_id: null, job_id: null,
       output_id_snapshot: ESTIMATE_ID, output_available: false, status: 'already_consumed', idempotent: false,
     }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', output_available: false });
+    await expect(launch(result({
+      output_type: 'invoice',
+      estimate_id: null,
+      job_id: null,
+      invoice_id: INVOICE_ID,
+      output_id_snapshot: INVOICE_ID,
+    }), 'invoice')).resolves.toMatchObject({ output_type: 'invoice', invoice_id: INVOICE_ID });
     expect(parseContractorWorkDraftLaunchResult({
       ...result({
         output_type: 'invoice',

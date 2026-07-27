@@ -142,6 +142,7 @@ import {
 } from './features/drafts/DurableDraftOutputFocus';
 import {
   validateDurableDraftEstimateRecord,
+  validateDurableDraftInvoiceRecord,
   validateDurableDraftJobRecord,
 } from './features/drafts/durableDraftOutputValidation';
 import { DraftNotice } from './features/drafts/DraftNotice';
@@ -159,6 +160,7 @@ import type { DurableDraftCompatibilityCapabilities } from './features/drafts/du
 import {
   sharedDraftComposerDraftFromDraftJob,
 } from './features/drafts/draftComposerMappings';
+import type { DraftIntendedOutput } from './features/drafts/draftComposerTypes';
 import { SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED } from './features/drafts/sharedDraftComposerAvailability';
 import { WorkComposerLineItemRow } from './features/work-composer/WorkComposerLineItemRow';
 import { WorkComposerTotalsPanel, type WorkComposerTotalsRow } from './features/work-composer/WorkComposerTotals';
@@ -21692,11 +21694,19 @@ function ContractorDashboard({
       || ((contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && focusedEstimateRecordId)
     )
     ? 'estimate'
-    : contractorTab === 'inspections' && inspectionView === 'detail' && activeInspection
-      ? 'job'
-      : null;
+    : contractorTab === 'inspections'
+      && contractorFinancialRecordKind === 'invoices'
+      && contractorJobsView === 'new_financial'
+      && invoiceComposerOpen
+      && editingInvoiceId
+      ? 'invoice'
+      : contractorTab === 'inspections' && inspectionView === 'detail' && activeInspection
+        ? 'job'
+        : null;
   const focusedDurableOutputId = focusedDurableOutputType === 'estimate'
     ? (editingEstimateId ?? focusedEstimateRecordId)
+    : focusedDurableOutputType === 'invoice'
+      ? editingInvoiceId
     : focusedDurableOutputType === 'job'
       ? activeInspection?.id ?? null
       : null;
@@ -21722,6 +21732,7 @@ function ContractorDashboard({
     canImportLegacyDraft: false,
     canLaunchJob: false,
     canLaunchEstimate: false,
+    canLaunchInvoice: false,
   });
   const [durableDraftCapabilityLoading, setDurableDraftCapabilityLoading] = useState(false);
   const [durableDraftCapabilityError, setDurableDraftCapabilityError] = useState('');
@@ -21795,6 +21806,7 @@ function ContractorDashboard({
         canImportLegacyDraft: false,
         canLaunchJob: false,
         canLaunchEstimate: false,
+        canLaunchInvoice: false,
       });
       return;
     }
@@ -21814,6 +21826,7 @@ function ContractorDashboard({
             canImportLegacyDraft: false,
             canLaunchJob: false,
             canLaunchEstimate: false,
+            canLaunchInvoice: false,
           });
         }
       })
@@ -22125,6 +22138,27 @@ function ContractorDashboard({
   const sendInvoiceCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_send_invoices');
   const inviteTeamCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_invite_team_members');
   const readOnlyContractorActionReason = getContractorDisabledReason(contractorEntitlementState.entitlements, 'can_create_estimates');
+  const effectiveDurableDraftCapabilities: DurableDraftCompatibilityCapabilities = {
+    ...durableDraftCapabilities,
+    canLaunchInvoice: durableDraftCapabilities.canLaunchInvoice && !createInvoiceCapability.disabled,
+  };
+  const durableDraftInvoiceLaunchAvailable = sharedDraftComposerEnabled
+    && !durableDraftCapabilityLoading
+    && !durableDraftCapabilityError
+    && effectiveDurableDraftCapabilities.canPersistDraft
+    && effectiveDurableDraftCapabilities.canLaunchInvoice;
+  const durableDraftInvoiceUnavailableReason = createInvoiceCapability.disabled
+    ? createInvoiceCapability.reason
+    : durableDraftCapabilityLoading
+      ? 'Invoice Draft planning is checking billing access.'
+      : durableDraftCapabilityError || 'Draft Invoice planning requires billing access.';
+  const refreshEffectiveDurableDraftCapabilities = async () => {
+    const capabilities = await loadDurableDraftCapabilities(supabase!);
+    return {
+      ...capabilities,
+      canLaunchInvoice: capabilities.canLaunchInvoice && !createInvoiceCapability.disabled,
+    };
+  };
 
   const contractorDraftSnapFeet = (value: number, min: number, max: number) => {
     if (!Number.isFinite(value)) return min;
@@ -28559,6 +28593,10 @@ function ContractorDashboard({
       startCleanDraftFirstEstimateComposer();
       return;
     }
+    if (kind === 'invoices' && sharedDraftComposerEnabled) {
+      startCleanDraftFirstInvoiceComposer();
+      return;
+    }
     setContractorTab('inspections');
     setContractorFinancialRecordKind(kind);
     setContractorJobsView('new_financial');
@@ -29267,7 +29305,7 @@ function ContractorDashboard({
 
   const startDraftJobComposer = (
     overrides: Partial<DraftJobComposerDraft> = {},
-    options: { intendedOutput?: 'estimate' | 'job' | null } = {},
+    options: { intendedOutput?: DraftIntendedOutput | null } = {},
   ) => {
     if (!DRAFT_JOB_UI_ENABLED) {
       setInspectionView('new');
@@ -29300,6 +29338,7 @@ function ContractorDashboard({
         intendedOutput,
         estimateSession: intendedOutput === 'estimate' ? { visited: true } : undefined,
         jobSession: intendedOutput === 'job' ? { visited: true } : undefined,
+        invoiceSession: intendedOutput === 'invoice' ? { visited: true } : undefined,
       });
       setDurableDraftOpenTarget({ kind: 'new', initialDraft });
       setInspectionView('draft_job');
@@ -29316,7 +29355,7 @@ function ContractorDashboard({
     setContractorTab('inspections');
   };
 
-  const startCleanDraftJobComposer = (options: { intendedOutput?: 'estimate' | 'job' | null } = {}) => {
+  const startCleanDraftJobComposer = (options: { intendedOutput?: DraftIntendedOutput | null } = {}) => {
     setJobsCustomerFilterSubjectId(null);
     startDraftJobComposer({
       subject_type: 'connected',
@@ -29366,6 +29405,46 @@ function ContractorDashboard({
     }
     if (sharedDraftComposerEnabled) {
       startCleanDraftJobComposer({ intendedOutput: 'estimate' });
+      return;
+    }
+    setContractorJobsView('new_financial');
+    setInspectionView('list');
+  };
+
+  const startDraftFirstInvoiceComposer = () => {
+    setContractorFinancialRecordKind('invoices');
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setFocusedEstimateRecordId(null);
+    if (durableDraftCohortSafeHold) {
+      setContractorJobsViewAndScroll('overview');
+      setInspectionView('list');
+      return;
+    }
+    if (sharedDraftComposerEnabled && durableDraftInvoiceLaunchAvailable) {
+      startDraftJobComposer({}, { intendedOutput: 'invoice' });
+      return;
+    }
+    setContractorJobsView('new_financial');
+    setInspectionView('list');
+  };
+
+  const startCleanDraftFirstInvoiceComposer = () => {
+    setContractorFinancialRecordKind('invoices');
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setFocusedEstimateRecordId(null);
+    if (durableDraftCohortSafeHold) {
+      setContractorJobsViewAndScroll('overview');
+      setInspectionView('list');
+      return;
+    }
+    if (sharedDraftComposerEnabled && durableDraftInvoiceLaunchAvailable) {
+      startCleanDraftJobComposer({ intendedOutput: 'invoice' });
       return;
     }
     setContractorJobsView('new_financial');
@@ -29424,7 +29503,7 @@ function ContractorDashboard({
     }
   };
 
-  const loadDurableDraftOutput = async (type: 'estimate' | 'job', id: string): Promise<DurableDraftLoadedOutput> => {
+  const loadDurableDraftOutput = async (type: 'estimate' | 'job' | 'invoice', id: string): Promise<DurableDraftLoadedOutput> => {
     if (!supabase) throw new Error('ServSync is not configured.');
     if (type === 'estimate') {
       let rawEstimate: unknown = estimates.find(candidate => candidate.id === id) ?? null;
@@ -29440,6 +29519,13 @@ function ContractorDashboard({
       const validated = validateDurableDraftEstimateRecord(rawEstimate);
       if (!validated.ok || validated.record.id !== id) throw new Error('DRAFT_OUTPUT_INVALID');
       return { type: 'estimate', id, record: validated.record };
+    }
+    if (type === 'invoice') {
+      let rawInvoice: unknown = invoices.find(candidate => candidate.id === id) ?? null;
+      if (!rawInvoice) rawInvoice = await loadInvoiceById(id);
+      const validated = validateDurableDraftInvoiceRecord(rawInvoice);
+      if (!validated.ok || validated.record.id !== id) throw new Error('DRAFT_OUTPUT_INVALID');
+      return { type: 'invoice', id, record: validated.record };
     }
     const rawJob: unknown = inspections.find(candidate => candidate.id === id) ?? await fetchDraftJobRecord(id);
     if (!rawJob) throw new Error('Job not found.');
@@ -29471,6 +29557,12 @@ function ContractorDashboard({
     if (output.type === 'estimate') {
       setEstimates(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
       focusSavedEstimateRecord(output.record);
+      focusDurableDraftOutputHeading(output, focusToken);
+      return;
+    }
+    if (output.type === 'invoice') {
+      setInvoices(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
+      openInvoiceRecord(output.record);
       focusDurableDraftOutputHeading(output, focusToken);
       return;
     }
@@ -37361,7 +37453,7 @@ function ContractorDashboard({
                         <DurableDraftWorkspace
                           client={supabase}
                           mode="list"
-                          capabilities={durableDraftCapabilities}
+                          capabilities={effectiveDurableDraftCapabilities}
                           capabilityLoading={durableDraftCapabilityLoading}
                           capabilityError={durableDraftCapabilityError}
                           legacyDrafts={composerDraftJobs}
@@ -37378,7 +37470,7 @@ function ContractorDashboard({
                           }}
                           onBack={() => setContractorJobsViewAndScroll('overview')}
                           launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
-                          onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}
+                          onRefreshCapabilities={refreshEffectiveDurableDraftCapabilities}
                           onLoadOutput={loadDurableDraftOutput}
                           onAdoptOutput={adoptDurableDraftOutput}
                         />
@@ -37387,7 +37479,7 @@ function ContractorDashboard({
                     <ContractorWorkDashboard
                       loading={loading}
                       loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
-                      canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && durableDraftCapabilities.canPersistDraft}
+                      canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canPersistDraft}
                       draftsToContinue={[]}
                       activeJobs={openJobs}
                       workReadyToStart={acceptedEstimatesNeedingJobs}
@@ -37651,6 +37743,15 @@ function ContractorDashboard({
                               >
                                 Estimate workspace
                               </DurableDraftOutputHeading>
+                            ) : contractorFinancialRecordKind === 'invoices' && editingInvoiceId ? (
+                              <DurableDraftOutputHeading
+                                as="h3"
+                                outputType="invoice"
+                                outputId={editingInvoiceId}
+                                className="mt-1 text-lg font-bold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                              >
+                                Invoice workspace
+                              </DurableDraftOutputHeading>
                             ) : (
                               <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
                             )}
@@ -37733,15 +37834,30 @@ function ContractorDashboard({
 
                         {sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen ? (
                           <div
-                            className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
-                            data-testid="durable-draft-direct-invoice-unavailable"
+                            className={`rounded-2xl border p-4 ${durableDraftInvoiceLaunchAvailable ? 'border-blue-200 bg-blue-50' : 'border-amber-200 bg-amber-50'}`}
+                            data-testid={durableDraftInvoiceLaunchAvailable ? 'durable-draft-invoice-planning-entry' : 'durable-draft-invoice-planning-unavailable'}
                           >
-                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-800">Invoice start</p>
-                            <h3 className="mt-1 text-lg font-bold text-amber-950">Create invoices from approved work</h3>
-                            <p className="mt-1 text-sm leading-6 text-amber-900">
-                              Direct Draft-to-Invoice is not enabled. Use an approved Estimate, a completed Job, or an available payment schedule row to prepare an invoice.
+                            <p className={`text-xs font-bold uppercase tracking-[0.14em] ${durableDraftInvoiceLaunchAvailable ? 'text-blue-700' : 'text-amber-800'}`}>Invoice start</p>
+                            <h3 className={`mt-1 text-lg font-bold ${durableDraftInvoiceLaunchAvailable ? 'text-blue-950' : 'text-amber-950'}`}>
+                              {durableDraftInvoiceLaunchAvailable ? 'Plan a draft Invoice' : 'Create invoices from approved work'}
+                            </h3>
+                            <p className={`mt-1 text-sm leading-6 ${durableDraftInvoiceLaunchAvailable ? 'text-blue-950' : 'text-amber-900'}`}>
+                              {durableDraftInvoiceLaunchAvailable
+                                ? 'Start a contractor-only Draft, choose draft Invoice as the intended output, then create one draft Invoice when it is ready. Creating it does not send it to the customer.'
+                                : durableDraftInvoiceUnavailableReason}
                             </p>
                             <div className="mt-3 flex flex-wrap gap-2">
+                              {durableDraftInvoiceLaunchAvailable ? (
+                                <button
+                                  type="button"
+                                  onClick={startDraftFirstInvoiceComposer}
+                                  className={buttonClass('primary')}
+                                  data-testid="durable-draft-start-invoice-planning"
+                                >
+                                  <Receipt size={15} />
+                                  Start draft Invoice
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -38444,10 +38560,7 @@ function ContractorDashboard({
                                   onClick={durableDraftCohortSafeHold ? () => {
                                     setContractorJobsViewAndScroll('overview');
                                     setInspectionView('list');
-                                  } : sharedDraftComposerEnabled ? () => {
-                                    setContractorFinancialRecordKind('invoices');
-                                    setContractorJobsViewAndScroll('new_financial');
-                                  } : () => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                                  } : sharedDraftComposerEnabled ? startDraftFirstInvoiceComposer : () => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
                                   disabled={durableDraftCohortSafeHold || (!sharedDraftComposerEnabled && !selectedJobsCustomerName)}
                                   className={buttonClass('primary')}
                                 >
@@ -40733,7 +40846,7 @@ function ContractorDashboard({
                 <DurableDraftWorkspace
                   client={supabase}
                   mode="editor"
-                  capabilities={durableDraftCapabilities}
+                  capabilities={effectiveDurableDraftCapabilities}
                   capabilityLoading={durableDraftCapabilityLoading}
                   capabilityError={durableDraftCapabilityError}
                   target={durableDraftOpenTarget}
@@ -40751,7 +40864,7 @@ function ContractorDashboard({
                     setContractorJobsViewAndScroll('overview');
                   }}
                   launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
-                  onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}
+                  onRefreshCapabilities={refreshEffectiveDurableDraftCapabilities}
                   onLoadOutput={loadDurableDraftOutput}
                   onAdoptOutput={adoptDurableDraftOutput}
                 />

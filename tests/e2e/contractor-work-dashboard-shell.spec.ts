@@ -191,7 +191,7 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     expect(overviewSource).toContain('durableDraftCohortSafeHold ? (');
     expect(overviewSource).toContain('sharedDraftComposerEnabled ? (');
     expect(overviewSource).toContain('<ContractorWorkDashboard');
-    expect(overviewSource).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && durableDraftCapabilities.canPersistDraft}');
+    expect(overviewSource).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canPersistDraft}');
     expect(overviewSource).toContain('draftsToContinue={[]}');
     expect(overviewSource).toContain('onStartNewDraft={startCleanDraftJobComposer}');
     expect(overviewSource).toContain('onContinueDraft={draft => void continueDraftJob(draft)}');

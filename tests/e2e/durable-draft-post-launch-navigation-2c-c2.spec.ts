@@ -384,8 +384,10 @@ async function installHarness(page: Page, options: {
       legacy_inspection_id: null, launched_output_type: status === 'consumed' ? type : null,
       launched_estimate_id: status === 'consumed' && type === 'estimate' && available ? ids.estimate : null,
       launched_job_id: status === 'consumed' && type === 'job' && available ? ids.job : null,
+      launched_invoice_id: null,
       launched_estimate_id_snapshot: status === 'consumed' && type === 'estimate' ? ids.estimate : null,
       launched_job_id_snapshot: status === 'consumed' && type === 'job' ? ids.job : null,
+      launched_invoice_id_snapshot: null,
       launched_at: status === 'consumed' ? '2026-07-20T10:01:00.000Z' : null, launched_by_user_id: null,
       created_at: '2026-07-20T10:00:00.000Z', updated_at: '2026-07-20T10:01:00.000Z',
     });
@@ -412,8 +414,8 @@ async function installHarness(page: Page, options: {
     });
     const workspaceElement = () => React.createElement(Workspace, {
       client: state.client, mode: state.mode, target: state.target,
-      capabilities: { contractorId: state.contractorId, canReadDrafts: true, canPersistDraft: true, canImportLegacyDraft: true, canLaunchEstimate: true, canLaunchJob: true },
-      launchEnabled: state.launchEnabled, onRefreshCapabilities: async () => ({ contractorId: state.contractorId, canReadDrafts: true, canPersistDraft: true, canImportLegacyDraft: true, canLaunchEstimate: true, canLaunchJob: true }),
+      capabilities: { contractorId: state.contractorId, canReadDrafts: true, canPersistDraft: true, canImportLegacyDraft: true, canLaunchEstimate: true, canLaunchJob: true, canLaunchInvoice: false },
+      launchEnabled: state.launchEnabled, onRefreshCapabilities: async () => ({ contractorId: state.contractorId, canReadDrafts: true, canPersistDraft: true, canImportLegacyDraft: true, canLaunchEstimate: true, canLaunchJob: true, canLaunchInvoice: false }),
       legacyDrafts: [], connectedOptions: [{ id: ids.homeowner, label: 'Customer', properties: [{ id: ids.home, label: 'Home' }] }], localOptions: [], customerLabel: () => '', propertyLabel: () => '', onStartNew: () => undefined,
       onOpenTarget: (target: Record<string, unknown>) => { state.target = target; render(); },
       onBack: () => { state.backCount += 1; state.mode = 'list'; state.target = null; render(); },
@@ -432,11 +434,11 @@ async function installHarness(page: Page, options: {
       : workspaceElement());
     if (options.storedAttempt) {
       const type = outputType;
-      localStorage.setItem(attemptKey(ids.contractor, ids.draft), JSON.stringify({ schemaVersion: 1, contractorId: ids.contractor, draftId: ids.draft, outputType: type, idempotencyKey: ids.attempt, phase: options.storedAttempt, createdAt: '2020-07-20T10:00:00.000Z', updatedAt: '2020-07-20T10:01:00.000Z', ...(options.storedAttempt === 'succeeded' ? { launchId: ids.launch, estimateId: type === 'estimate' ? ids.estimate : null, jobId: type === 'job' ? ids.job : null, outputIdSnapshot: outputId(type), outputAvailable: true } : {}) }));
+      localStorage.setItem(attemptKey(ids.contractor, ids.draft), JSON.stringify({ schemaVersion: 1, contractorId: ids.contractor, draftId: ids.draft, outputType: type, idempotencyKey: ids.attempt, phase: options.storedAttempt, createdAt: '2020-07-20T10:00:00.000Z', updatedAt: '2020-07-20T10:01:00.000Z', ...(options.storedAttempt === 'succeeded' ? { launchId: ids.launch, estimateId: type === 'estimate' ? ids.estimate : null, jobId: type === 'job' ? ids.job : null, invoiceId: null, outputIdSnapshot: outputId(type), outputAvailable: true } : {}) }));
     }
     const harness = {
       render, envelope,
-      launchResult: (type: OutputType = outputType, status: 'succeeded' | 'already_consumed' = 'succeeded', idempotent = false) => ({ draft_id: ids.draft, status, output_type: type, estimate_id: type === 'estimate' ? ids.estimate : null, job_id: type === 'job' ? ids.job : null, output_id_snapshot: outputId(type), output_available: true, launch_id: ids.launch, idempotent }),
+      launchResult: (type: OutputType = outputType, status: 'succeeded' | 'already_consumed' = 'succeeded', idempotent = false) => ({ draft_id: ids.draft, status, output_type: type, estimate_id: type === 'estimate' ? ids.estimate : null, job_id: type === 'job' ? ids.job : null, invoice_id: null, output_id_snapshot: outputId(type), output_available: true, launch_id: ids.launch, idempotent }),
       completeRpc(name: string, data: unknown) { const call = calls.find(item => !item.settled && item.kind === 'rpc' && item.name === name); if (!call) throw new Error(`missing ${name}`); call.settled = true; call.resolve({ data, error: null, status: 200 }); },
       completeLastRpc(name: string, data: unknown) { const matching = calls.filter(item => !item.settled && item.kind === 'rpc' && item.name === name); const call = matching[matching.length - 1]; if (!call) throw new Error(`missing ${name}`); call.settled = true; call.resolve({ data, error: null, status: 200 }); },
       failRpc(name: string, error: unknown) { const call = calls.find(item => !item.settled && item.kind === 'rpc' && item.name === name); if (!call) throw new Error(`missing ${name}`); call.settled = true; call.resolve({ data: null, error, status: 500 }); },
@@ -819,7 +821,7 @@ test.describe('Slice 2C-C2 rendered post-launch navigation', () => {
     await openActive(page, outputType);
     await page.evaluate(({ ids, outputType }) => {
       const h = (window as typeof window & { __c2: { storageKey: string } }).__c2;
-      const value = JSON.stringify({ schemaVersion: 1, contractorId: ids.contractor, draftId: ids.draft, outputType, idempotencyKey: ids.attempt, phase: 'succeeded', createdAt: '2020-07-20T10:00:00.000Z', updatedAt: '2020-07-20T10:01:00.000Z', launchId: ids.launch, estimateId: outputType === 'estimate' ? ids.estimate : null, jobId: outputType === 'job' ? ids.job : null, outputIdSnapshot: outputType === 'estimate' ? ids.estimate : ids.job, outputAvailable: true });
+      const value = JSON.stringify({ schemaVersion: 1, contractorId: ids.contractor, draftId: ids.draft, outputType, idempotencyKey: ids.attempt, phase: 'succeeded', createdAt: '2020-07-20T10:00:00.000Z', updatedAt: '2020-07-20T10:01:00.000Z', launchId: ids.launch, estimateId: outputType === 'estimate' ? ids.estimate : null, jobId: outputType === 'job' ? ids.job : null, invoiceId: null, outputIdSnapshot: outputType === 'estimate' ? ids.estimate : ids.job, outputAvailable: true });
       localStorage.setItem(h.storageKey, value);
       window.dispatchEvent(new StorageEvent('storage', { key: h.storageKey, newValue: value, storageArea: localStorage }));
     }, { ids: IDS, outputType });
@@ -834,7 +836,7 @@ test.describe('Slice 2C-C2 rendered post-launch navigation', () => {
     await openActive(page, 'estimate');
     const dispatchSucceeded = () => page.evaluate(ids => {
       const harness = (window as typeof window & { __c2: { storageKey: string } }).__c2;
-      const value = JSON.stringify({ schemaVersion: 1, contractorId: ids.contractor, draftId: ids.draft, outputType: 'estimate', idempotencyKey: ids.attempt, phase: 'succeeded', createdAt: '2020-07-20T10:00:00.000Z', updatedAt: '2020-07-20T10:01:00.000Z', launchId: ids.launch, estimateId: ids.estimate, jobId: null, outputIdSnapshot: ids.estimate, outputAvailable: true });
+      const value = JSON.stringify({ schemaVersion: 1, contractorId: ids.contractor, draftId: ids.draft, outputType: 'estimate', idempotencyKey: ids.attempt, phase: 'succeeded', createdAt: '2020-07-20T10:00:00.000Z', updatedAt: '2020-07-20T10:01:00.000Z', launchId: ids.launch, estimateId: ids.estimate, jobId: null, invoiceId: null, outputIdSnapshot: ids.estimate, outputAvailable: true });
       localStorage.setItem(harness.storageKey, value);
       window.dispatchEvent(new StorageEvent('storage', { key: harness.storageKey, newValue: value, storageArea: localStorage }));
     }, IDS);
@@ -971,9 +973,9 @@ test.describe('Slice 2C-C2 rendered post-launch navigation', () => {
     expect(await h<number>(page, `h.count('output', 'job')`)).toBe(0);
   });
 
-  test('C2 contains no Invoice launch or navigation path', async ({ page }) => {
+  test('C2 does not expose Invoice navigation when Invoice launch is unavailable', async ({ page }) => {
     await installHarness(page, { outputType: 'estimate' });
     await openActive(page, 'estimate');
-    await expect(page.getByText(/Create Invoice|Open Invoice|Opening Invoice/)).toHaveCount(0);
+    await expect(page.getByText(/Create Draft Invoice|Open Draft Invoice|Opening Draft Invoice/)).toHaveCount(0);
   });
 });

@@ -1,13 +1,13 @@
 import type { DraftChecklistSourceSnapshot } from './checklistDraftScope';
 
-export type ContractorWorkDraftIntendedOutput = 'estimate' | 'job';
+export type ContractorWorkDraftIntendedOutput = 'estimate' | 'job' | 'invoice';
 export type ContractorWorkDraftWorkFormat = 'standard' | 'inspection_checklist';
 export type ContractorWorkDraftStatus = 'active' | 'consumed' | 'discarded';
 export type ContractorWorkDraftSubjectType = 'connected_homeowner' | 'local_contact';
 export type ContractorWorkDraftLaborMode = 'job_total' | 'line_specific' | null;
 export type ContractorWorkDraftLineType = 'labor' | 'material' | 'fee' | 'other';
 export type ContractorWorkDraftLaunchStatus = 'succeeded';
-export type ContractorWorkDraftLaunchOutput = 'estimate' | 'job';
+export type ContractorWorkDraftLaunchOutput = 'estimate' | 'job' | 'invoice';
 
 export type ContractorWorkDraft = {
   id: string;
@@ -35,8 +35,10 @@ export type ContractorWorkDraft = {
   launched_output_type: ContractorWorkDraftLaunchOutput | null;
   launched_estimate_id: string | null;
   launched_job_id: string | null;
+  launched_invoice_id: string | null;
   launched_estimate_id_snapshot: string | null;
   launched_job_id_snapshot: string | null;
+  launched_invoice_id_snapshot: string | null;
   launched_at: string | null;
   launched_by_user_id: string | null;
   created_at: string;
@@ -73,8 +75,10 @@ export type ContractorWorkDraftLaunch = {
   status: ContractorWorkDraftLaunchStatus;
   launched_estimate_id: string | null;
   launched_job_id: string | null;
+  launched_invoice_id: string | null;
   launched_estimate_id_snapshot: string | null;
   launched_job_id_snapshot: string | null;
+  launched_invoice_id_snapshot: string | null;
   requested_by_user_id: string | null;
   created_at: string;
   completed_at: string;
@@ -148,8 +152,10 @@ export type ContractorWorkDraftListRow = Pick<
   | 'launched_output_type'
   | 'launched_estimate_id'
   | 'launched_job_id'
+  | 'launched_invoice_id'
   | 'launched_estimate_id_snapshot'
   | 'launched_job_id_snapshot'
+  | 'launched_invoice_id_snapshot'
   | 'launched_at'
   | 'created_at'
   | 'updated_at'
@@ -264,6 +270,7 @@ export type DurableDraftCompatibilityCapabilities = {
   canImportLegacyDraft: boolean;
   canLaunchJob: boolean;
   canLaunchEstimate: boolean;
+  canLaunchInvoice: boolean;
 };
 
 export type DurableDraftLaunchAttemptPhase = 'prepared' | 'launching' | 'succeeded' | 'ambiguous';
@@ -280,6 +287,7 @@ export type DurableDraftLaunchAttemptRecord = {
   launchId?: string | null;
   estimateId?: string | null;
   jobId?: string | null;
+  invoiceId?: string | null;
   outputIdSnapshot?: string;
   outputAvailable?: boolean;
 };

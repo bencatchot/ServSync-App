@@ -108,8 +108,10 @@ function rawDraft(overrides: Partial<ContractorWorkDraft> = {}): ContractorWorkD
     launched_output_type: null,
     launched_estimate_id: null,
     launched_job_id: null,
+    launched_invoice_id: null,
     launched_estimate_id_snapshot: null,
     launched_job_id_snapshot: null,
+    launched_invoice_id_snapshot: null,
     launched_at: null,
     launched_by_user_id: null,
     created_at: '2026-07-19T10:00:00.000Z',
@@ -488,8 +490,10 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
       launched_output_type: null,
       launched_estimate_id: null,
       launched_job_id: null,
+      launched_invoice_id: null,
       launched_estimate_id_snapshot: null,
       launched_job_id_snapshot: null,
+      launched_invoice_id_snapshot: null,
       launched_at: null,
       created_at: '2026-07-19T10:00:00.000Z',
       updated_at: '2026-07-19T10:00:00.000Z',
@@ -525,6 +529,7 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
           output_type: 'job',
           estimate_id: null,
           job_id: JOB_ID,
+          invoice_id: null,
           output_id_snapshot: JOB_ID,
           output_available: true,
           launch_id: LAUNCH_ID,
@@ -616,8 +621,10 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
       launched_output_type: null,
       launched_estimate_id: null,
       launched_job_id: null,
+      launched_invoice_id: null,
       launched_estimate_id_snapshot: null,
       launched_job_id_snapshot: null,
+      launched_invoice_id_snapshot: null,
       launched_at: null,
       created_at: '2026-07-19T10:00:00.000Z',
       updated_at: '2026-07-19T10:00:00.000Z',
@@ -703,8 +710,10 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     const adopter = app.slice(app.indexOf('const adoptDurableDraftOutput'), app.indexOf('const saveDraftJobComposer'));
     expect(loader).toContain("return { type: 'estimate', id, record: validated.record }");
     expect(loader).toContain("return { type: 'job', id, record: validated.record }");
-    expect(loader).not.toMatch(/setEstimates|setInspections|openEstimateRecord|openInspection/);
+    expect(loader).toContain("return { type: 'invoice', id, record: validated.record }");
+    expect(loader).not.toMatch(/setEstimates|setInspections|openEstimateRecord|openInspection|openInvoiceRecord/);
     expect(adopter).toMatch(/setEstimates[\s\S]*focusSavedEstimateRecord/);
+    expect(adopter).toMatch(/setInvoices[\s\S]*openInvoiceRecord/);
     expect(adopter).toMatch(/setInspections[\s\S]*openInspection/);
     expect(workspace).toContain('openingOutputOperation.current === operation');
     expect(workspace).toMatch(/await onLoadOutput[\s\S]*if \(!isCurrent\(\)\) return;[\s\S]*onAdoptOutput/);
@@ -747,7 +756,7 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(workspace).toContain('createDurableDraftLaunchAttempt');
     expect(workspace).toContain('launchEnabled');
     expect(workspace).toContain('Do not create it again.');
-    expect(workspace).not.toContain('Create Invoice');
+    expect(workspace).toContain('Create ${outputFamilyLabel(outputType)}');
     expect(consumedAdoption).not.toContain('onAdoptOutput');
     expect(app).not.toContain("from './features/drafts/durableDraftLaunchAttempt'");
     for (const role of ['field_tech', 'office', 'admin', 'viewer']) {
@@ -770,7 +779,7 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     const composer = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const workspace = sourceFile('src/features/drafts/DurableDraftWorkspace.tsx');
     expect(composer).toContain("composerField('Private notes'");
-    expect(composer).toContain('not copied to the customer-facing Estimate or Job');
+    expect(composer).toContain('not copied to the customer-facing Estimate, Job, or Invoice');
     expect(workspace).toContain('aria-live="polite"');
     expect(workspace).toContain('errorSummaryRef.current?.focus()');
     expect(workspace).toContain('min-h-11');

@@ -1,6 +1,6 @@
 import type { ElementType, ReactNode } from 'react';
 
-export type DurableDraftOutputFocusType = 'estimate' | 'job';
+export type DurableDraftOutputFocusType = 'estimate' | 'job' | 'invoice';
 
 export type DurableDraftOutputFocusRequest = {
   token: symbol;
