@@ -60,6 +60,7 @@ const IDEMPOTENCY_ID = '00000000-0000-4000-8000-000000000008';
 const JOB_ID = '00000000-0000-4000-8000-000000000009';
 const ESTIMATE_ID = '00000000-0000-4000-8000-00000000000a';
 const LAUNCH_ID = '00000000-0000-4000-8000-00000000000b';
+const INVOICE_ID = '00000000-0000-4000-8000-00000000000c';
 const OTHER_DRAFT_ID = '00000000-0000-4000-8000-00000000000e';
 const OTHER_ITEM_ID = '00000000-0000-4000-8000-00000000000f';
 
@@ -857,6 +858,36 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       output_type: 'estimate', estimate_id: null, job_id: null,
       output_id_snapshot: ESTIMATE_ID, output_available: false, status: 'already_consumed', idempotent: false,
     }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', output_available: false });
+    expect(parseContractorWorkDraftLaunchResult({
+      ...result({
+        output_type: 'invoice',
+        estimate_id: null,
+        job_id: null,
+        invoice_id: INVOICE_ID,
+        output_id_snapshot: INVOICE_ID,
+      }),
+    })).toMatchObject({ output_type: 'invoice', invoice_id: INVOICE_ID, output_available: true });
+    expect(parseContractorWorkDraftLaunchResult({
+      ...result({
+        output_type: 'invoice',
+        estimate_id: null,
+        job_id: null,
+        invoice_id: null,
+        output_id_snapshot: INVOICE_ID,
+        output_available: false,
+        status: 'already_consumed',
+        idempotent: false,
+      }),
+    })).toMatchObject({ output_type: 'invoice', invoice_id: null, output_available: false });
+    expect(parseContractorWorkDraftLaunchResult({
+      ...result({
+        output_type: 'invoice',
+        estimate_id: ESTIMATE_ID,
+        job_id: null,
+        invoice_id: INVOICE_ID,
+        output_id_snapshot: INVOICE_ID,
+      }),
+    })).toBeNull();
 
     const contradictory = [
       result({ status: 'already_consumed', idempotent: true }),

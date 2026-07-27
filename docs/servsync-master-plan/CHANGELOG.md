@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-26
 
+- Branch: `codex/draft-to-invoice-sql-foundation`
+- Files changed: additive durable Draft-to-Invoice SQL/RPC foundation source, non-visible durable launch result parser/types, focused SQL/static regression coverage, this changelog, and the feature backlog.
+- Summary of change: Added source-only durable Draft-to-Invoice launch foundation using invoice-specific linkage. The unapplied SQL source extends standard durable Work Drafts and launch ledger rows with Invoice output linkage/snapshots, accepts `invoice` in backend output checks, requires billing authority for Invoice-intended saves and launches, creates one draft Invoice with ordered invoice line items, preserves idempotent launch and deleted-output recovery, and keeps private helper execution revoked. The frontend change is limited to parsing an Invoice launch result shape; no visible Invoice Draft option or routing is exposed.
+- Reason for change: Draft-to-Invoice app wiring is blocked until the durable Draft save/launch SQL/RPC contract can create exactly one draft Invoice with lineage, idempotency, billing safety, and no customer-facing side effects.
+- Tests/checks run: Focused SQL/static source checks and durable Draft adapter parser coverage were added for Invoice output constraints, helper privacy, billing authority, launch ledger/linkage, deleted-output recovery, side-effect boundaries, and Estimate/Job parser preservation. Full validation is recorded in the task report.
+- Known risks or follow-ups: SQL was not applied to Sandbox, Production, Preview, Demo, or any live database. No Vercel, gates, entitlement, deployment, visible UI, customer-facing Invoice launch, payment, send, notification, PDF/storage, Home History, appointment, or homeowner visibility behavior is changed. Future work still requires focused SQL/RPC review, later SQL application preflight/application authorization, app wiring, runtime validation, and rollout gates.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records that Draft-to-Invoice SQL/RPC foundation exists only in source, while app wiring and live SQL application remain pending and no customer-facing Invoice Draft launch is live.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This implements a deferred foundation slice inside the approved Draft-first workflow direction without changing rollout strategy or visible product behavior.
+
 - Branch: `codex/draft-first-work-fail-closed-remediation`
 - Files changed: contractor Work/Draft gating in `src/App.tsx`, focused durable Draft cohort/shared composer/Work dashboard/template taxonomy regression coverage, and this changelog.
 - Summary of change: Hardened the Draft-first Work rollout surface so contractor sessions fail closed while durable Draft eligibility or capability state is unresolved. During pending contractor/cohort resolution or entitlement RPC errors, Work Overview, Open Jobs legacy Draft rows, Draft editor entry, and financial New Estimate/New Invoice entry points now show a neutral Work tools state instead of temporarily exposing legacy creation paths. Once entitlement resolves true, the Draft-first Work UI appears as before; once it resolves false or gates are off, legacy/off behavior remains available.

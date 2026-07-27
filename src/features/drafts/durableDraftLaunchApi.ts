@@ -232,17 +232,25 @@ export function parseContractorWorkDraftLaunchResult(value: unknown): Contractor
   if (!isRecord(value)
     || !isDurableDraftUuid(value.draft_id)
     || (value.status !== 'succeeded' && value.status !== 'already_consumed')
-    || (value.output_type !== 'estimate' && value.output_type !== 'job')
+    || (value.output_type !== 'estimate' && value.output_type !== 'job' && value.output_type !== 'invoice')
     || typeof value.output_available !== 'boolean'
     || !isNullableUuid(value.launch_id)
     || typeof value.idempotent !== 'boolean'
     || !isNullableUuid(value.estimate_id)
     || !isNullableUuid(value.job_id)
+    || (value.invoice_id !== undefined && !isNullableUuid(value.invoice_id))
     || !isDurableDraftUuid(value.output_id_snapshot)) return null;
   if (value.status === 'succeeded' && value.launch_id === null) return null;
   if (value.status === 'already_consumed' && value.idempotent !== false) return null;
-  const liveId = value.output_type === 'estimate' ? value.estimate_id : value.job_id;
-  if (value.output_type === 'estimate' ? value.job_id !== null : value.estimate_id !== null) return null;
+  const invoiceId = value.invoice_id ?? null;
+  const liveId = value.output_type === 'estimate'
+    ? value.estimate_id
+    : value.output_type === 'job'
+      ? value.job_id
+      : invoiceId;
+  if (value.output_type === 'estimate' && (value.job_id !== null || invoiceId !== null)) return null;
+  if (value.output_type === 'job' && (value.estimate_id !== null || invoiceId !== null)) return null;
+  if (value.output_type === 'invoice' && (value.estimate_id !== null || value.job_id !== null || value.invoice_id === undefined)) return null;
   if (value.output_available !== (liveId !== null)) return null;
   if (liveId !== null && liveId !== value.output_id_snapshot) return null;
   return value as ContractorWorkDraftLaunchResult;
