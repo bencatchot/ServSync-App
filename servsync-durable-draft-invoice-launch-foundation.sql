@@ -1099,7 +1099,7 @@ begin
     0,
     0,
     0,
-    'none',
+    'amount',
     0,
     '',
     v_subtotal,

@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-27
 
+- Branch: `codex/draft-to-invoice-discount-type-fix`
+- Files changed: Draft-to-Invoice SQL source, focused SQL/static regression coverage, and this changelog.
+- Summary of change: Corrected the source-only Draft-to-Invoice invoice launch helper so draft Invoice inserts use the deployed-valid no-discount pair `discount_type = 'amount'` and `discount_value = 0`. Focused static coverage now rejects the stale `discount_type = 'none'` helper insert patterns.
+- Reason for change: Sandbox runtime validation after the `discount_value` correction reached the Invoice insert but failed because the deployed `invoices_discount_type_check` constraint allows only `amount` or `percentage`.
+- Tests/checks run: Focused Draft-to-Invoice SQL/static coverage was updated for the deployed discount-type insert contract. Full validation is recorded in the task report.
+- Known risks or follow-ups: SQL was not applied to Sandbox, Production, Preview, Demo, or any live database. Sandbox currently has the prior helper definition installed and requires a separate owner-authorized corrective helper replacement before runtime validation can resume. No Vercel, gates, entitlement, deployment, visible UI, customer-facing Invoice launch, payment, send, notification, PDF/storage, Home History, appointment, or homeowner visibility behavior is changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a narrow source correction for the existing Draft-to-Invoice SQL foundation blocker; app wiring, runtime validation, Production SQL, and rollout remain pending separate approvals.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The correction preserves the approved hidden/source-only Draft-to-Invoice foundation direction without changing product strategy or rollout sequencing.
+
 - Branch: `codex/draft-to-invoice-discount-value-fix`
 - Files changed: Draft-to-Invoice SQL source, focused SQL/static regression coverage, and this changelog.
 - Summary of change: Corrected the source-only Draft-to-Invoice invoice launch helper so draft Invoice inserts supply `discount_value = 0`, matching the deployed `public.invoices.discount_value` non-null/default contract. Focused static coverage now asserts the helper includes the deployed discount columns and does not insert `NULL` for the discount value.
