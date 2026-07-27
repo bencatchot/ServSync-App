@@ -180,6 +180,9 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
     expect(helper).toContain('set search_path = public');
     expect(helper).toContain('servsync_private_can_create_work_draft_invoice(p_draft.contractor_id)');
     expect(helper).toMatch(/insert into public\.invoices \([\s\S]*invoice_type,[\s\S]*status,[\s\S]*subtotal_cents,[\s\S]*total_cents,[\s\S]*amount_paid_cents/i);
+    expect(helper).toMatch(/discount_cents,\s+discount_type,\s+discount_value,\s+discount_reason,/i);
+    expect(helper).toMatch(/v_subtotal,\s+0,\s+0,\s+0,\s+'none',\s+0,\s+'',\s+v_subtotal,\s+0\s*\)/i);
+    expect(helper).not.toMatch(/'none',\s+null,\s+''/i);
     expect(helper).toContain("'total'");
     expect(helper).toContain("'draft'");
     expect(helper).toContain("''");

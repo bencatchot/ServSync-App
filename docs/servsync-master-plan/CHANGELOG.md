@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-27
 
+- Branch: `codex/draft-to-invoice-discount-value-fix`
+- Files changed: Draft-to-Invoice SQL source, focused SQL/static regression coverage, and this changelog.
+- Summary of change: Corrected the source-only Draft-to-Invoice invoice launch helper so draft Invoice inserts supply `discount_value = 0`, matching the deployed `public.invoices.discount_value` non-null/default contract. Focused static coverage now asserts the helper includes the deployed discount columns and does not insert `NULL` for the discount value.
+- Reason for change: Sandbox runtime validation after the SQL foundation application showed Invoice launch failed because the helper inserted `NULL` into the non-null `discount_value` column.
+- Tests/checks run: Focused Draft-to-Invoice SQL/static coverage was updated for the discount-value insert contract. Full validation is recorded in the task report.
+- Known risks or follow-ups: SQL was not applied to Sandbox, Production, Preview, Demo, or any live database. Sandbox currently has the prior SQL foundation installed and requires a separate owner-authorized corrective SQL application before runtime validation can resume. No Vercel, gates, entitlement, deployment, visible UI, customer-facing Invoice launch, payment, send, notification, PDF/storage, Home History, appointment, or homeowner visibility behavior is changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This is a narrow source correction for the existing Draft-to-Invoice SQL foundation blocker; app wiring, runtime validation, Production SQL, and rollout remain pending separate approvals.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The correction preserves the approved hidden/source-only Draft-to-Invoice foundation direction without changing product strategy or rollout sequencing.
+
 - Branch: `codex/draft-to-invoice-sql-column-check-fix`
 - Files changed: Draft-to-Invoice SQL source, focused SQL/static regression coverage, and this changelog.
 - Summary of change: Corrected the source-only Draft-to-Invoice SQL predecessor invoice-column check so it matches the deployed invoice schema and the SQL body's own draft Invoice insert columns. The check now requires `scope`, `notes`, `terms`, singular invoice total fields, and existing invoice linkage/context columns instead of stale/nonexistent customer-name/email, description, plural-total, and payment-terms names.

@@ -1100,7 +1100,7 @@ begin
     0,
     0,
     'none',
-    null,
+    0,
     '',
     v_subtotal,
     0
