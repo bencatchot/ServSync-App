@@ -187,6 +187,7 @@ export type ContractorWorkDraftEstimateLaunchResult = ContractorWorkDraftLaunchR
   output_type: 'estimate';
   estimate_id: string | null;
   job_id: null;
+  invoice_id?: null;
   // The public RPC returns one immutable snapshot selected by output_type.
   output_id_snapshot: string;
 };
@@ -195,13 +196,24 @@ export type ContractorWorkDraftJobLaunchResult = ContractorWorkDraftLaunchResult
   output_type: 'job';
   estimate_id: null;
   job_id: string | null;
+  invoice_id?: null;
+  // The public RPC returns one immutable snapshot selected by output_type.
+  output_id_snapshot: string;
+};
+
+export type ContractorWorkDraftInvoiceLaunchResult = ContractorWorkDraftLaunchResultBase & {
+  output_type: 'invoice';
+  estimate_id: null;
+  job_id: null;
+  invoice_id: string | null;
   // The public RPC returns one immutable snapshot selected by output_type.
   output_id_snapshot: string;
 };
 
 export type ContractorWorkDraftLaunchResult =
   | ContractorWorkDraftEstimateLaunchResult
-  | ContractorWorkDraftJobLaunchResult;
+  | ContractorWorkDraftJobLaunchResult
+  | ContractorWorkDraftInvoiceLaunchResult;
 
 export type DurableDraftOperationPhase =
   | 'save'

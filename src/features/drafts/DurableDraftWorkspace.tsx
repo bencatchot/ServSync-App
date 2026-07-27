@@ -1185,6 +1185,7 @@ export function DurableDraftWorkspace({
 
   const handleRetryConsumedReconciliation = async () => {
     if (!launchEnabled || launchOperation.current || !launchProof || !canonical?.draft.draftId || !capabilities.contractorId) return;
+    if (launchProof.output_type === 'invoice') return;
     const operation: DurableDraftLaunchOperation = {
       token: Symbol('durable-draft-reconcile'),
       client,
