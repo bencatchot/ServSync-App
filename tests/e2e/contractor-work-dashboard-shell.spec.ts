@@ -228,6 +228,39 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     expect(dashboardSource).not.toContain('Waiting on Customer');
   });
 
+  test('keeps Work overview attention cards shrinkable on mobile', () => {
+    const dashboardSource = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
+    const attentionSectionSource = sourceBetween(
+      dashboardSource,
+      'function AttentionSection({',
+      'export function ContractorWorkDashboard({',
+    );
+    const dashboardGridSource = sourceBetween(
+      dashboardSource,
+      '<div className="grid min-w-0 gap-4 xl:grid-cols-2">',
+      '<section data-testid="contractor-work-job-history-link"',
+    );
+    const historySource = sourceBetween(
+      dashboardSource,
+      '<section data-testid="contractor-work-job-history-link"',
+      '</section>',
+    );
+
+    expect(attentionSectionSource).toContain('className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"');
+    expect(attentionSectionSource).toContain('className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"');
+    expect(attentionSectionSource).toContain('className="min-w-0 break-words text-sm font-bold text-slate-950"');
+    expect(attentionSectionSource).toContain('className="mt-2 break-words text-sm leading-5 text-slate-500"');
+    expect(attentionSectionSource).toContain('className="mt-3 inline-flex min-h-[2.5rem] max-w-full items-center gap-2');
+    expect(attentionSectionSource).toContain('<span className="min-w-0 break-words">{actionLabel}</span>');
+    expect(dashboardSource).toContain('className="grid min-w-0 gap-4 xl:grid-cols-2"');
+    expect(dashboardGridSource).toContain('testId="contractor-work-active-jobs-section"');
+    expect(dashboardGridSource).toContain('testId="contractor-work-ready-to-start-section"');
+    expect(historySource).toContain('className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4"');
+    expect(historySource).toContain('className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"');
+    expect(historySource).toContain('<span className="min-w-0 break-words">View Job History</span>');
+    expect(attentionSectionSource).not.toContain('overflow-x-auto');
+  });
+
   test('starts dashboard Drafts clean while preserving contextual Draft starts elsewhere', () => {
     const appSource = sourceFile('src/App.tsx');
     const contextualStartSource = sourceBetween(
