@@ -5,6 +5,7 @@
 --   1. servsync-durable-draft-launch-foundation.sql
 --   2. servsync-durable-draft-launch-permission-parity-correction.sql
 --   3. servsync-durable-draft-inspection-checklist-path.sql
+--   4. servsync-durable-draft-cohort-entitlement.sql
 --
 -- This additive source extends the durable Draft save/launch backend contract
 -- to support one draft Invoice output with lineage and idempotency. It does
@@ -25,6 +26,7 @@ begin
       ('public.contractor_work_drafts'),
       ('public.contractor_work_draft_launches'),
       ('public.contractor_work_draft_items'),
+      ('public.contractor_billing_accounts'),
       ('public.invoices'),
       ('public.invoice_line_items'),
       ('public.estimates'),
@@ -129,7 +131,9 @@ begin
       ('invoice_line_items', 'unit'),
       ('invoice_line_items', 'unit_price_cents'),
       ('invoice_line_items', 'labor_hours'),
-      ('invoice_line_items', 'sort_order')
+      ('invoice_line_items', 'sort_order'),
+      ('contractor_billing_accounts', 'contractor_id'),
+      ('contractor_billing_accounts', 'durable_draft_beta_enabled')
   )
   select string_agg(
     format('public.%I.%I', expected.table_name, expected.column_name),
@@ -279,6 +283,24 @@ create unique index if not exists contractor_work_draft_launches_invoice_snapsho
   on public.contractor_work_draft_launches(launched_invoice_id_snapshot)
   where status = 'succeeded' and launched_invoice_id_snapshot is not null;
 
+create or replace function public.servsync_private_contractor_has_durable_draft_entitlement(
+  p_contractor_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_contractor_id is not null
+    and exists (
+      select 1
+        from public.contractor_billing_accounts account
+       where account.contractor_id = p_contractor_id
+         and account.durable_draft_beta_enabled is true
+    );
+$$;
+
 create or replace function public.servsync_private_can_create_work_draft_invoice(
   p_contractor_id uuid
 )
@@ -289,6 +311,7 @@ security definer
 set search_path = public
 as $$
   select p_contractor_id is not null
+    and public.servsync_private_contractor_has_durable_draft_entitlement(p_contractor_id)
     and public.servsync_private_can_persist_work_draft(p_contractor_id)
     and public.current_user_can_manage_contractor_billing(p_contractor_id);
 $$;
@@ -371,6 +394,10 @@ begin
     into v_contractor_id
     from public.servsync_current_contractor_profile()
    limit 1;
+
+  if not public.servsync_private_contractor_has_durable_draft_entitlement(v_contractor_id) then
+    raise exception using message = 'DRAFT_ENTITLEMENT_REQUIRED';
+  end if;
 
   if not public.servsync_private_can_persist_work_draft(v_contractor_id) then
     raise exception using message = 'DRAFT_PERMISSION_DENIED';
@@ -1193,6 +1220,10 @@ begin
     raise exception using message = 'DRAFT_NOT_FOUND';
   end if;
 
+  if not public.servsync_private_contractor_has_durable_draft_entitlement(v_draft.contractor_id) then
+    raise exception using message = 'DRAFT_ENTITLEMENT_REQUIRED';
+  end if;
+
   perform pg_advisory_xact_lock(
     hashtextextended(v_draft.contractor_id::text || ':' || p_idempotency_key::text, 0)
   );
@@ -1438,6 +1469,10 @@ grant execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, js
 revoke execute on function public.servsync_launch_work_draft(uuid, text, uuid) from public;
 revoke execute on function public.servsync_launch_work_draft(uuid, text, uuid) from anon;
 grant execute on function public.servsync_launch_work_draft(uuid, text, uuid) to authenticated;
+
+revoke all on function public.servsync_private_contractor_has_durable_draft_entitlement(uuid) from public;
+revoke all on function public.servsync_private_contractor_has_durable_draft_entitlement(uuid) from anon;
+revoke all on function public.servsync_private_contractor_has_durable_draft_entitlement(uuid) from authenticated;
 
 revoke all on function public.servsync_private_can_create_work_draft_invoice(uuid) from public;
 revoke all on function public.servsync_private_can_create_work_draft_invoice(uuid) from anon;

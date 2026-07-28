@@ -687,6 +687,13 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     });
     expect(durableDraftSafeMessage(error, 'save')).toBe('You do not have access to change this Draft.');
     expect(durableDraftSafeMessage(error, 'save')).not.toContain('private database detail');
+
+    const entitlementError = new DurableDraftError({
+      ...error,
+      applicationCode: 'DRAFT_ENTITLEMENT_REQUIRED',
+      safeMessage: 'DRAFT_ENTITLEMENT_REQUIRED',
+    });
+    expect(durableDraftSafeMessage(entitlementError, 'save')).toBe('You do not have access to change this Draft.');
   });
 
   test('wires adapters only through the effective durable branch and preserves the legacy fallback', () => {

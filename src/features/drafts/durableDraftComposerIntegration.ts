@@ -206,6 +206,7 @@ export function durableDraftSafeMessage(error: unknown, phase: DurableDraftOpera
   const normalized = error instanceof DurableDraftError ? error : normalizeDurableDraftError(error, phase);
   const messages: Record<string, string> = {
     DRAFT_PERMISSION_DENIED: 'You do not have access to change this Draft.',
+    DRAFT_ENTITLEMENT_REQUIRED: 'You do not have access to change this Draft.',
     DRAFT_NOT_FOUND: 'This Draft is no longer available.',
     DRAFT_NOT_ACTIVE: 'This Draft is read-only and can no longer be changed.',
     DRAFT_INVALID: 'Review the Draft details and try again.',

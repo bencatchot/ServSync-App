@@ -4,6 +4,21 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-28
+
+- Branch: `codex/durable-draft-rpc-entitlement-hardening`
+- Files changed: Draft-to-Invoice durable SQL/RPC source, durable Draft error parsing/copy, focused durable Draft SQL/static and adapter regression coverage, this changelog, and the feature backlog.
+- Summary of change: Hardened the durable Draft save/launch backend contract so `servsync_save_work_draft` and `servsync_launch_work_draft` require the contractor's durable Draft cohort entitlement before creating or launching durable Draft records. The Invoice launch capability helper also requires the entitlement predicate, the SQL predecessor checks now require the cohort entitlement foundation table/columns, and frontend error normalization recognizes `DRAFT_ENTITLEMENT_REQUIRED` as an authorization denial.
+- Reason for change: Sandbox role/profile testing confirmed non-entitled contractors remain off in the UI and isolated from enabled-contractor data, but direct authenticated durable Draft save RPC calls for the comparison contractor's own context were not entitlement-blocked.
+- Tests/checks run: Focused durable Draft SQL/static, adapter/parser, launch error-copy, and composer error-copy coverage was updated for the entitlement guard. Full validation is recorded in the task report.
+- Known risks or follow-ups: SQL was not applied to Sandbox, Production, Preview, Demo, or any live database. No deployment, Vercel gate, cohort entitlement, live data, visible UI feature, send/payment/PDF/storage/notification/Home History/appointment/report finalization, homeowner-facing output, or rollout change is included. Separate SQL preflight/application and Sandbox/Production runtime validation remain required before relying on the hardening in live environments.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the direct durable Draft RPC entitlement gap found during Sandbox role testing and the source hardening, with SQL application/runtime validation still separate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The change enforces the existing cohort-gated Draft-first rollout rule without changing product strategy.
+
 ## 2026-07-27
 
 - Branch: `codex/draft-to-invoice-app-wiring`

@@ -65,6 +65,11 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
       expect(columnCheck).toContain(`('invoices', '${column}')`);
     }
 
+    expect(sql).toContain('servsync-durable-draft-cohort-entitlement.sql');
+    expect(sql).toContain("('public.contractor_billing_accounts')");
+    expect(columnCheck).toContain("('contractor_billing_accounts', 'contractor_id')");
+    expect(columnCheck).toContain("('contractor_billing_accounts', 'durable_draft_beta_enabled')");
+
     for (const staleColumn of [
       'customer_name',
       'customer_email',
@@ -75,6 +80,48 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
     ]) {
       expect(columnCheck).not.toContain(`('invoices', '${staleColumn}')`);
     }
+  });
+
+  test('durable Draft save and launch require contractor cohort entitlement before mutation', () => {
+    const sql = sqlSource();
+    const helper = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_contractor_has_durable_draft_entitlement',
+      'create or replace function public.servsync_private_can_create_work_draft_invoice',
+    );
+    const saveRpc = sourceBetween(
+      sql,
+      'create or replace function public.servsync_save_work_draft',
+      'create or replace function public.servsync_private_validate_work_draft_relationships',
+    );
+    const launchRpc = sourceBetween(
+      sql,
+      'create or replace function public.servsync_launch_work_draft',
+      'revoke execute on function public.servsync_save_work_draft',
+    );
+
+    expect(helper).toContain('security definer');
+    expect(helper).toContain('set search_path = public');
+    expect(helper).toContain('from public.contractor_billing_accounts account');
+    expect(helper).toContain('account.contractor_id = p_contractor_id');
+    expect(helper).toContain('account.durable_draft_beta_enabled is true');
+    expect(helper).not.toMatch(/current_user_can_access_contractor|current_user_is_platform_admin/i);
+
+    expect(saveRpc).toContain('servsync_private_contractor_has_durable_draft_entitlement(v_contractor_id)');
+    expect(saveRpc).toContain("raise exception using message = 'DRAFT_ENTITLEMENT_REQUIRED'");
+    expect(saveRpc.indexOf('servsync_private_contractor_has_durable_draft_entitlement(v_contractor_id)'))
+      .toBeLessThan(saveRpc.indexOf('insert into public.contractor_work_drafts'));
+    expect(saveRpc.indexOf('DRAFT_ENTITLEMENT_REQUIRED'))
+      .toBeLessThan(saveRpc.indexOf('DRAFT_PERMISSION_DENIED'));
+
+    expect(launchRpc).toContain('servsync_private_contractor_has_durable_draft_entitlement(v_draft.contractor_id)');
+    expect(launchRpc).toContain("raise exception using message = 'DRAFT_ENTITLEMENT_REQUIRED'");
+    expect(launchRpc.indexOf('servsync_private_contractor_has_durable_draft_entitlement(v_draft.contractor_id)'))
+      .toBeLessThan(launchRpc.indexOf('insert into public.contractor_work_draft_launches'));
+    expect(launchRpc.indexOf('DRAFT_ENTITLEMENT_REQUIRED'))
+      .toBeLessThan(launchRpc.indexOf('servsync_private_launch_work_draft_as_estimate'));
+    expect(launchRpc.indexOf('DRAFT_ENTITLEMENT_REQUIRED'))
+      .toBeLessThan(launchRpc.indexOf('servsync_private_launch_work_draft_as_invoice'));
   });
 
   test('predecessor line-item column check covers invoice line insert requirements', () => {
@@ -154,16 +201,25 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
 
   test('save accepts invoice only through standard Drafts with billing authority', () => {
     const sql = sqlSource();
+    const invoiceCapability = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_can_create_work_draft_invoice',
+      'create or replace function public.servsync_save_work_draft',
+    );
     const saveRpc = sourceBetween(
       sql,
       'create or replace function public.servsync_save_work_draft',
       'create or replace function public.servsync_private_validate_work_draft_relationships',
     );
 
+    expect(invoiceCapability).toContain('servsync_private_contractor_has_durable_draft_entitlement(p_contractor_id)');
+    expect(invoiceCapability).toContain('servsync_private_can_persist_work_draft(p_contractor_id)');
+    expect(invoiceCapability).toContain('current_user_can_manage_contractor_billing(p_contractor_id)');
     expect(saveRpc).toContain("v_intended_output not in ('estimate', 'job', 'invoice')");
     expect(saveRpc).toContain("if v_work_format <> 'standard'");
     expect(saveRpc).toContain("if v_intended_output = 'invoice'");
     expect(saveRpc).toContain('servsync_private_can_create_work_draft_invoice(v_contractor_id)');
+    expect(saveRpc).toContain('DRAFT_ENTITLEMENT_REQUIRED');
     expect(saveRpc).toContain('DRAFT_PERMISSION_DENIED');
     expect(saveRpc).toContain('servsync_private_can_persist_work_draft(v_contractor_id)');
   });
@@ -212,6 +268,8 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
     expect(launchRpc).toContain('else v_existing_launch.launched_invoice_id_snapshot');
     expect(launchRpc).toContain("v_draft.launched_output_type = 'invoice'");
     expect(launchRpc).toContain("'invoice_id', v_draft.launched_invoice_id");
+    expect(launchRpc).toContain('servsync_private_contractor_has_durable_draft_entitlement(v_draft.contractor_id)');
+    expect(launchRpc).toContain('DRAFT_ENTITLEMENT_REQUIRED');
     expect(launchRpc).toContain('servsync_private_can_create_work_draft_invoice(v_draft.contractor_id)');
     expect(launchRpc).toContain('servsync_private_launch_work_draft_as_invoice(v_draft)');
     expect(launchRpc).toMatch(/insert into public\.contractor_work_draft_launches \([\s\S]*launched_invoice_id,[\s\S]*launched_invoice_id_snapshot/i);
@@ -224,6 +282,7 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
     const sql = sqlSource();
 
     for (const fn of [
+      'servsync_private_contractor_has_durable_draft_entitlement(uuid)',
       'servsync_private_can_create_work_draft_invoice(uuid)',
       'servsync_private_launch_work_draft_as_invoice(public.contractor_work_drafts)',
       'servsync_private_validate_work_draft_relationships(public.contractor_work_drafts, text)',
