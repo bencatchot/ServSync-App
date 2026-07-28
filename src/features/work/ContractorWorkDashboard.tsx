@@ -74,7 +74,7 @@ function PreviewList<T extends DashboardRecord>({
             key={item.id}
             type="button"
             onClick={() => onOpen?.(item)}
-            className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
+            className="flex min-h-[3.25rem] w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
           >
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-slate-950">{recordTitle(item)}</span>
@@ -108,25 +108,25 @@ function AttentionSection({
   children?: ReactNode;
 }) {
   return (
-    <section data-testid={testId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <section data-testid={testId} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="rounded-lg bg-blue-50 p-1.5 text-blue-700">{icon}</span>
-            <h3 className="text-sm font-bold text-slate-950">{title}</h3>
+            <h3 className="min-w-0 break-words text-sm font-bold text-slate-950">{title}</h3>
           </div>
-          <p className="mt-2 text-sm leading-5 text-slate-500">{helper}</p>
+          <p className="mt-2 break-words text-sm leading-5 text-slate-500">{helper}</p>
         </div>
-        <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">{count}</span>
+        <span className="w-fit max-w-full shrink-0 break-words rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">{count}</span>
       </div>
       {children}
       <button
         type="button"
         onClick={onAction}
-        className="mt-3 inline-flex min-h-[2.5rem] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
+        className="mt-3 inline-flex min-h-[2.5rem] max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
       >
-        {actionLabel}
-        <ArrowRight size={15} />
+        <span className="min-w-0 break-words">{actionLabel}</span>
+        <ArrowRight size={15} className="shrink-0" />
       </button>
     </section>
   );
@@ -200,7 +200,7 @@ export function ContractorWorkDashboard({
               type="button"
               data-testid="contractor-work-start-draft-header"
               onClick={onStartNewDraft}
-              className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50"
+              className="inline-flex min-h-[2.75rem] max-w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50"
             >
               <Plus size={16} />
               Start New Draft
@@ -210,7 +210,7 @@ export function ContractorWorkDashboard({
       </div>
 
       {empty ? (
-        <section data-testid="contractor-work-dashboard-empty" className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
+        <section data-testid="contractor-work-dashboard-empty" className="min-w-0 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700">
             <ClipboardCheck size={20} />
           </div>
@@ -223,7 +223,7 @@ export function ContractorWorkDashboard({
               type="button"
               data-testid="contractor-work-start-draft-empty"
               onClick={onStartNewDraft}
-              className="mt-4 inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              className="mt-4 inline-flex min-h-[2.75rem] max-w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
             >
               <Plus size={16} />
               Start New Draft
@@ -231,7 +231,7 @@ export function ContractorWorkDashboard({
           )}
         </section>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-2">
           {draftsToContinue.length > 0 && (
             <AttentionSection
               testId="contractor-work-drafts-section"
@@ -298,24 +298,24 @@ export function ContractorWorkDashboard({
             />
           )}
 
-          <section data-testid="contractor-work-job-history-link" className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
+          <section data-testid="contractor-work-job-history-link" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className="rounded-lg bg-white p-1.5 text-slate-600">
                     <FolderOpen size={16} />
                   </span>
-                  <h3 className="text-sm font-bold text-slate-950">Job History</h3>
+                  <h3 className="min-w-0 break-words text-sm font-bold text-slate-950">Job History</h3>
                 </div>
-                <p className="mt-2 text-sm leading-5 text-slate-500">Review completed and closed Jobs without treating history as attention work.</p>
+                <p className="mt-2 break-words text-sm leading-5 text-slate-500">Review completed and closed Jobs without treating history as attention work.</p>
               </div>
               <button
                 type="button"
                 onClick={onViewJobHistory}
-                className="inline-flex min-h-[2.5rem] shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
+                className="inline-flex min-h-[2.5rem] max-w-full shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
               >
-                View Job History
-                <ArrowRight size={15} />
+                <span className="min-w-0 break-words">View Job History</span>
+                <ArrowRight size={15} className="shrink-0" />
               </button>
             </div>
           </section>

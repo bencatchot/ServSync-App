@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-28
 
+- Branch: `codex/draft-first-mobile-readiness-fix`
+- Starting main SHA: `679ed7bfa32782580e4d44347f7ace917b89c1b4`
+- Files changed:
+  - `src/features/work/ContractorWorkDashboard.tsx`
+  - `tests/e2e/contractor-work-dashboard-shell.spec.ts`
+  - `tests/e2e/homeowner-smoke.spec.ts`
+  - `tests/e2e/mobile-smoke.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened Draft-first Work Overview mobile layout so active-work cards, preview rows, action buttons, and Job History wrap within small mobile widths, and updated stale smoke assertions to match current homeowner record copy and contractor customer-search wording.
+- Reason for change: Sandbox role-matrix/mobile readiness found Draft-first role behavior acceptable, but mobile Jobs/Work Overview overflow and stale `mobile-smoke.spec.ts` assertions blocked a clean readiness pass.
+- Tests/checks run:
+  - `git diff --check`
+  - `TEST_APP_URL=http://127.0.0.1:1 npx playwright test tests/e2e/contractor-work-dashboard-shell.spec.ts tests/e2e/mobile-role-shell-navigation.spec.ts tests/e2e/shared-draft-composer-2a.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:1 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium --list`
+  - `npm run typecheck`
+  - `npm run build`
+  - `VITE_DRAFT_JOB_UI_ENABLED=true VITE_CONTRACTOR_WORK_UI_ENABLED=true VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED=true npm run build`
+  - `npx eslint src/features/work/ContractorWorkDashboard.tsx tests/e2e/contractor-work-dashboard-shell.spec.ts tests/e2e/homeowner-smoke.spec.ts tests/e2e/mobile-smoke.spec.ts` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
+  - `npm run lint` attempted; blocked by the same inherited ESLint startup failure.
+  - changed-file scope, credential-shaped secret, generated-artifact, and forbidden SQL/env/config/package scope scans.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth behavior, entitlement/cohort behavior, billing/payment behavior, invoice send/PDF/storage/notification/Home History/report-finalize behavior, deployment, or production data mutation is included.
+  - Real-device mobile coverage, broader role-matrix coverage, real-traffic concurrency, telemetry, billing UX, rollback-after-real-data, and external beta readiness remain future gates.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: Backlog reviewed; this closes the focused mobile readiness blocker without adding a new deferred mobile scope.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this supports existing mobile beta-readiness direction without changing product strategy, rollout posture, or backend workflow behavior.
+
 - Branch: `codex/durable-draft-rpc-entitlement-hardening`
 - Files changed: Draft-to-Invoice durable SQL/RPC source, durable Draft error parsing/copy, focused durable Draft SQL/static and adapter regression coverage, this changelog, and the feature backlog.
 - Summary of change: Hardened the durable Draft save/launch backend contract so `servsync_save_work_draft` and `servsync_launch_work_draft` require the contractor's durable Draft cohort entitlement before creating or launching durable Draft records. The Invoice launch capability helper also requires the entitlement predicate, the SQL predecessor checks now require the cohort entitlement foundation table/columns, and frontend error normalization recognizes `DRAFT_ENTITLEMENT_REQUIRED` as an authorization denial.
