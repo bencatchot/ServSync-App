@@ -236,6 +236,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_revoke_home_property_proposal',
   'servsync_homeowner_respond_to_service_agreement_offer',
   'servsync_send_service_agreement_offer',
+  'servsync_update_local_contact_profile',
   'servsync_update_local_home',
   'servsync_update_project',
   'servsync_attach_job_to_project',

@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-28
 
+- Branch: `codex/local-customer-profile-edit`
+- Starting main SHA: `846ad5dda335b1ea2893ac16741dfd2f25800e57`
+- Files changed:
+  - `servsync-local-customer-profile-edit.sql`
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-customer.spec.ts`
+  - `tests/e2e/local-customer-profile-edit.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a narrow source slice for contractor-side editing of unclaimed contractor-created local customer profiles. Contractors can edit only customer name, phone, email, and contractor-private notes through a guarded `servsync_update_local_contact_profile(...)` RPC; claimed/homeowner-linked local customers remain homeowner-controlled, and changes to copied claim-invite fields revoke pending claim invites so stale links are not left active.
+- Reason for change: The local customer audit approved profile editing as Task 1 before separate operational document delivery authorization hardening. The implementation keeps property editing unchanged while closing the stale-invite edge for edited local customer contact details.
+- Tests/checks run:
+  - Focused local customer profile edit SQL/static tests and browser-flow regression coverage were added.
+  - Full validation is recorded in the task report.
+- Known risks or follow-ups:
+  - SQL was not applied to Production, Sandbox, Preview, Demo, or any live database. The new RPC source requires a separate SQL preflight/application before the UI path can work in live environments.
+  - Operational document delivery authorization and send-RPC hardening remain separate Task 2 work; this slice does not change estimate/invoice send behavior, notification delivery, PDF/storage, Home History filing, gates, entitlement, deployment, or Production data.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003 now records the pre-claim local customer profile edit boundary and leaves operational delivery authorization hardening as a separate guarded follow-up.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor local customer plan now distinguishes editable contractor-created customer basics from homeowner-controlled claimed profiles and stale claim-invite handling.
+
 - Branch: `codex/draft-first-mobile-readiness-fix`
 - Starting main SHA: `679ed7bfa32782580e4d44347f7ace917b89c1b4`
 - Files changed:

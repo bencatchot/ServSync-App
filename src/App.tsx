@@ -5420,6 +5420,20 @@ const EMPTY_LOCAL_HOME_DRAFT: LocalHomeDraft = {
   notes: '',
 };
 
+type LocalCustomerProfileEditDraft = {
+  display_name: string;
+  phone: string;
+  email: string;
+  notes: string;
+};
+
+const EMPTY_LOCAL_CUSTOMER_PROFILE_EDIT_DRAFT: LocalCustomerProfileEditDraft = {
+  display_name: '',
+  phone: '',
+  email: '',
+  notes: '',
+};
+
 type ConnectedPropertyProposalStatus = 'pending' | 'accepted' | 'rejected' | 'revoked';
 
 type ConnectedPropertyProposal = {
@@ -5514,6 +5528,24 @@ function localHomeDraftFromHome(home: ContractorLocalHome): LocalHomeDraft {
     zip_code: home.zip_code ?? '',
     notes: home.notes ?? '',
   };
+}
+
+function localCustomerProfileEditDraftFromContact(contact: ContractorLocalContact): LocalCustomerProfileEditDraft {
+  return {
+    display_name: contact.display_name ?? '',
+    phone: contact.phone ?? '',
+    email: contact.email ?? '',
+    notes: contact.notes ?? '',
+  };
+}
+
+function localCustomerProfileIsClaimed(contact?: ContractorLocalContact | null) {
+  if (!contact) return false;
+  return Boolean(
+    contact.homeowner_user_id
+      || contact.claimed_at
+      || sortedLocalHomes(contact.homes).some(home => home.home_id || home.claimed_at),
+  );
 }
 
 function compactAddressLabel(home?: Pick<HomeProfile | ContractorLocalHome | ContractorConnectedHomeownerHome | ConnectedPropertyProposal, 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
@@ -21671,6 +21703,9 @@ function ContractorDashboard({
   const [editingLocalHome, setEditingLocalHome] = useState<{ contactId: string; homeId: string } | null>(null);
   const [editingLocalHomeDraft, setEditingLocalHomeDraft] = useState<LocalHomeDraft>(EMPTY_LOCAL_HOME_DRAFT);
   const [savingLocalHomeEditId, setSavingLocalHomeEditId] = useState<string | null>(null);
+  const [editingLocalCustomerProfileId, setEditingLocalCustomerProfileId] = useState<string | null>(null);
+  const [editingLocalCustomerProfileDraft, setEditingLocalCustomerProfileDraft] = useState<LocalCustomerProfileEditDraft>(EMPTY_LOCAL_CUSTOMER_PROFILE_EDIT_DRAFT);
+  const [savingLocalCustomerProfileEditId, setSavingLocalCustomerProfileEditId] = useState<string | null>(null);
   const [connectedPropertyProposalsByConnectionId, setConnectedPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [loadingConnectedPropertyProposalsFor, setLoadingConnectedPropertyProposalsFor] = useState<string | null>(null);
   const [suggestingPropertyConnectionId, setSuggestingPropertyConnectionId] = useState<string | null>(null);
@@ -31436,6 +31471,72 @@ function ContractorDashboard({
     });
   };
 
+  const openEditLocalCustomerProfileForm = (contact: ContractorLocalContact) => {
+    if (localCustomerProfileIsClaimed(contact)) return;
+    setEditingLocalCustomerProfileId(contact.id);
+    setEditingLocalCustomerProfileDraft(localCustomerProfileEditDraftFromContact(contact));
+    setHomeownerDetailTab('profile');
+  };
+
+  const closeEditLocalCustomerProfileForm = () => {
+    setEditingLocalCustomerProfileId(null);
+    setEditingLocalCustomerProfileDraft(EMPTY_LOCAL_CUSTOMER_PROFILE_EDIT_DRAFT);
+  };
+
+  const saveLocalCustomerProfileEdit = async (contact: ContractorLocalContact) => {
+    if (!supabase) return;
+    if (localCustomerProfileIsClaimed(contact)) {
+      setError('This customer is linked to a homeowner profile. Customer details are homeowner-controlled after claim.');
+      return;
+    }
+    if (!editingLocalCustomerProfileDraft.display_name.trim()) {
+      setError('Enter a customer name before saving this customer.');
+      return;
+    }
+
+    setSavingLocalCustomerProfileEditId(contact.id);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: updateError } = await supabase.rpc('servsync_update_local_contact_profile', {
+        p_local_contact_id: contact.id,
+        p_display_name: editingLocalCustomerProfileDraft.display_name,
+        p_phone: editingLocalCustomerProfileDraft.phone,
+        p_email: editingLocalCustomerProfileDraft.email,
+        p_notes: cleanHumanWrittenText(editingLocalCustomerProfileDraft.notes),
+      });
+      if (updateError) throw updateError;
+
+      const updatedContact = data as (ContractorLocalContact & { revoked_pending_claim_invite_count?: number }) | null;
+      if (updatedContact?.id) {
+        setLocalContacts(prev => prev.map(item => item.id === updatedContact.id
+          ? { ...item, ...updatedContact, homes: item.homes ?? [] }
+          : item
+        ));
+        if ((updatedContact.revoked_pending_claim_invite_count ?? 0) > 0) {
+          const nowIso = new Date().toISOString();
+          setLocalClaimInvites(prev => prev.map(invite => (
+            invite.local_contact_id === updatedContact.id && effectiveLocalClaimInviteStatus(invite) === 'pending'
+              ? { ...invite, status: 'revoked', revoked_at: invite.revoked_at ?? nowIso, updated_at: nowIso }
+              : invite
+          )));
+          if (showQrForLocalClaimInvite) setShowQrForLocalClaimInvite(null);
+        }
+        closeEditLocalCustomerProfileForm();
+        setSelectedHomeownerSubjectId(`local:${updatedContact.id}`);
+        setNotice((updatedContact.revoked_pending_claim_invite_count ?? 0) > 0
+          ? 'Customer profile updated. The pending claim invite was revoked so it cannot use stale copied details.'
+          : 'Customer profile updated.'
+        );
+      }
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update customer profile.'));
+    } finally {
+      setSavingLocalCustomerProfileEditId(null);
+    }
+  };
+
   const openAddLocalHomeForm = (contact: ContractorLocalContact) => {
     setAddingLocalHomeContactId(contact.id);
     setLocalHomeDrafts(prev => ({
@@ -35000,7 +35101,7 @@ function ContractorDashboard({
                       : [];
                     const pendingLocalClaimInvite = localClaimInvitesForCustomer.find(invite => effectiveLocalClaimInviteStatus(invite) === 'pending') ?? null;
                     const latestLocalClaimInvite = pendingLocalClaimInvite ?? localClaimInvitesForCustomer[0] ?? null;
-                    const localClaimStatus = localCustomer?.homeowner_user_id || localCustomer?.claimed_at || localHomes.some(home => home.home_id || home.claimed_at)
+                    const localClaimStatus = localCustomerProfileIsClaimed(localCustomer)
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
@@ -36115,9 +36216,22 @@ function ContractorDashboard({
                             <div className="space-y-4 max-w-3xl">
                               {renderDemoPresentationCurrentJobSummary()}
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                                <div className="mb-4 flex items-center gap-2">
-                                  <Home size={18} className="text-blue-700" />
-                                  <h3 className="font-bold text-slate-950">Profile</h3>
+                                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <Home size={18} className="text-blue-700" />
+                                    <h3 className="font-bold text-slate-950">Profile</h3>
+                                  </div>
+                                  {localCustomer && !localCustomerIsClaimed && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditLocalCustomerProfileForm(localCustomer)}
+                                      disabled={editingLocalCustomerProfileId === localCustomer.id || savingLocalCustomerProfileEditId === localCustomer.id}
+                                      className={buttonClass('secondary')}
+                                    >
+                                      <Pencil size={14} />
+                                      {editingLocalCustomerProfileId === localCustomer.id ? 'Editing...' : 'Edit customer'}
+                                    </button>
+                                  )}
                                 </div>
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   {conn && perm && (
@@ -36145,6 +36259,73 @@ function ContractorDashboard({
                                         <p className="text-xs text-slate-400 font-medium mb-0.5">Status</p>
                                         <p className="text-sm text-slate-800 font-medium">{localClaimStatus ? LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus] : 'Not invited'}</p>
                                       </div>
+                                      {editingLocalCustomerProfileId === localCustomer.id && (
+                                        <div role="dialog" aria-modal="true" aria-labelledby="edit-local-customer-profile-title" className="sm:col-span-2 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Local customer profile</p>
+                                              <h4 id="edit-local-customer-profile-title" className="mt-1 text-lg font-bold text-slate-950">Edit customer</h4>
+                                              <p className="mt-1 text-xs leading-5 text-slate-600">
+                                                These contractor-only customer details can be edited until the homeowner claims the profile. Updating name, phone, or email revokes any pending claim invite so the old link cannot use stale copied details.
+                                              </p>
+                                            </div>
+                                            <button type="button" onClick={closeEditLocalCustomerProfileForm} className="text-sm font-semibold text-slate-500 hover:text-slate-800">Close</button>
+                                          </div>
+                                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                            <label className="text-xs font-semibold text-slate-600">
+                                              Customer name
+                                              <input
+                                                className={inputClass()}
+                                                value={editingLocalCustomerProfileDraft.display_name}
+                                                onChange={event => setEditingLocalCustomerProfileDraft(prev => ({ ...prev, display_name: event.target.value }))}
+                                                placeholder="Customer name"
+                                              />
+                                            </label>
+                                            <label className="text-xs font-semibold text-slate-600">
+                                              Phone
+                                              <input
+                                                className={inputClass()}
+                                                autoComplete="tel"
+                                                value={editingLocalCustomerProfileDraft.phone}
+                                                onChange={event => setEditingLocalCustomerProfileDraft(prev => ({ ...prev, phone: formatPhoneInputValue(event.target.value) }))}
+                                                placeholder="(555) 555-5555"
+                                              />
+                                            </label>
+                                            <label className="text-xs font-semibold text-slate-600">
+                                              Email
+                                              <input
+                                                className={inputClass()}
+                                                type="email"
+                                                autoComplete="email"
+                                                value={editingLocalCustomerProfileDraft.email}
+                                                onChange={event => setEditingLocalCustomerProfileDraft(prev => ({ ...prev, email: event.target.value }))}
+                                                placeholder="customer@example.com"
+                                              />
+                                            </label>
+                                            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                                              Contractor-private notes
+                                              <textarea
+                                                className={`${inputClass()} min-h-[88px] resize-y`}
+                                                {...writingAssistProps}
+                                                value={editingLocalCustomerProfileDraft.notes}
+                                                onChange={event => setEditingLocalCustomerProfileDraft(prev => ({ ...prev, notes: event.target.value }))}
+                                                placeholder="Private notes for your team. These are not copied into homeowner-facing profile fields."
+                                              />
+                                            </label>
+                                          </div>
+                                          <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                            <button type="button" onClick={closeEditLocalCustomerProfileForm} className={buttonClass('secondary')}>Cancel</button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void saveLocalCustomerProfileEdit(localCustomer)}
+                                              disabled={savingLocalCustomerProfileEditId === localCustomer.id || !editingLocalCustomerProfileDraft.display_name.trim()}
+                                              className={buttonClass('primary')}
+                                            >
+                                              {savingLocalCustomerProfileEditId === localCustomer.id ? 'Saving...' : 'Save changes'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
                                       <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                           <div>
