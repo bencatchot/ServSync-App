@@ -336,6 +336,8 @@ Future backlog guardrails:
 - Do not treat this as full public go-live readiness.
 - Do not imply broad shared-home work-record access, full Home History sharing, notification delivery, media sharing expansion, new permission categories, or contractor visibility beyond authorized connection/property/workflow rules.
 - Any new permission category, broader shared-home work-record access, Home History sharing, notification, media, contractor messaging, or visibility-broadening change needs its own narrow audit/implementation slice.
+- Local customer profile editing is allowed only before homeowner claim and only for contractor-created customer name, phone, email, and contractor-private notes. Claimed/homeowner-linked profiles remain homeowner-controlled, property editing remains a separate guarded path, and pending claim invites must be revoked or replaced when copied customer profile fields change.
+- Operational estimate/invoice/document delivery authorization and send-RPC hardening remain separate from local customer profile editing. Do not use the profile edit slice as approval to broaden delivery after revoked connections, stale invites, unshared properties, or inconsistent contractor team-role states.
 
 ### FB-004 — Contractor Reports
 

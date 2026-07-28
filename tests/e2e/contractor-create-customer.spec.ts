@@ -292,4 +292,144 @@ test.describe('contractor mutating customer creation', () => {
 
     await consoleErrors.assertClean(testInfo);
   });
+
+  test('edits an unclaimed local customer profile and revokes stale claim invites', async ({ page }, testInfo) => {
+    requireApprovedSandboxForMutation();
+
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+    const timestamp = timestampForRecord();
+    const customerName = `E2E Editable Customer ${timestamp}`;
+    const editedCustomerName = `E2E Edited Customer ${timestamp}`;
+    const customerEmail = `e2e-edit-customer-${timestamp}@example.com`;
+    const editedCustomerEmail = `e2e-edited-customer-${timestamp}@example.com`;
+    const editedCustomerPhone = '(555) 010-9090';
+
+    await loginAs(page, 'contractor');
+    await openSidebarTab(page, /Homeowners/i);
+    await expectActiveTabHeading(page, /^Homeowners$/i);
+
+    await main.getByRole('button', { name: /^Add$/i }).click();
+    await expect(main.getByRole('heading', { name: /^Add new customer$/i })).toBeVisible();
+    await main.getByPlaceholder(/e\.g\. Becky Thomas/i).fill(customerName);
+    await main.getByPlaceholder(/\(555\) 555-5555/i).fill('555-010-8080');
+    await main.getByPlaceholder(/customer@example\.com/i).fill(customerEmail);
+    await main.getByPlaceholder(/^Main home$/i).fill(`Editable E2E Property ${timestamp}`);
+    await main.getByPlaceholder(/^Street address$/i).fill('810 Edit Source Lane');
+    await main.getByLabel(/^City$/i).fill('Testville');
+    await main.getByPlaceholder(/Start typing a state/i).fill('AL');
+    await main.getByLabel(/^ZIP$/i).fill('36532');
+
+    const createContactResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_create_local_contact'),
+      { timeout: 10_000 },
+    );
+    await main.getByRole('button', { name: /^Save new customer$/i }).click();
+    const createContactResponse = await createContactResponsePromise;
+    expect(createContactResponse.ok()).toBeTruthy();
+
+    const search = main.getByPlaceholder(/Search homeowner, city, address/i);
+    await expect(search).toBeVisible();
+    await search.fill(customerName);
+    const customerResult = main.getByRole('button').filter({ hasText: customerName }).first();
+    await expect(customerResult).toBeVisible({ timeout: 30_000 });
+    await customerResult.click();
+    await expect(main.getByRole('heading', { level: 2, name: new RegExp(`^${escapeRegExp(customerName)}$`, 'i') })).toBeVisible();
+
+    const createInviteResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_create_local_customer_claim_invite'),
+      { timeout: 10_000 },
+    );
+    await main.getByRole('button', { name: /^Invite to ServSync$/i }).click();
+    const createInviteResponse = await createInviteResponsePromise;
+    expect(createInviteResponse.ok()).toBeTruthy();
+    await expect(main.getByRole('button', { name: /^Copy Claim Link$/i })).toBeVisible({ timeout: 10_000 });
+
+    await main.getByRole('button', { name: /^Edit customer$/i }).click();
+    const editDialog = page.getByRole('dialog', { name: /^Edit customer$/i });
+    await expect(editDialog).toBeVisible();
+    await editDialog.getByLabel(/^Customer name$/i).fill(editedCustomerName);
+    await editDialog.getByLabel(/^Phone$/i).fill(editedCustomerPhone);
+    await editDialog.getByLabel(/^Email$/i).fill(editedCustomerEmail);
+    await editDialog.getByLabel(/^Contractor-private notes$/i).fill('Updated contractor-private customer notes.');
+    const [updateProfileResponse] = await Promise.all([
+      page.waitForResponse(
+        response => response.url().includes('/rpc/servsync_update_local_contact_profile'),
+        { timeout: 10_000 },
+      ),
+      editDialog.getByRole('button', { name: /^Save changes$/i }).click(),
+    ]);
+    expect(updateProfileResponse.ok()).toBeTruthy();
+    await expect(editDialog).toBeHidden();
+    await expect(main.getByRole('heading', { level: 2, name: new RegExp(`^${escapeRegExp(editedCustomerName)}$`, 'i') })).toBeVisible({ timeout: 15_000 });
+    await expect(main.getByText(editedCustomerEmail)).toBeVisible();
+    await expect(main.getByText(/Customer profile updated\. The pending claim invite was revoked/i)).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Create New ServSync Invite$/i })).toBeVisible();
+    await expect(main.getByText(/Last invite: Revoked/i)).toBeVisible();
+    await expect(main.getByText(/Updated contractor-private customer notes/i)).toBeVisible();
+
+    const contractorClient = await signInAs('contractor');
+    const otherContractorClient = await signInAs('contractorB');
+    if (!contractorClient || !otherContractorClient) {
+      testInfo.annotations.push({
+        type: 'coverage-gap',
+        description: 'Skipped direct local customer profile RPC probes because VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY were not configured for this local run.',
+      });
+    } else {
+      try {
+        const { data: editedContact, error: lookupError } = await contractorClient
+          .from('contractor_local_contacts')
+          .select('id, display_name, phone, email, notes')
+          .eq('email', editedCustomerEmail)
+          .maybeSingle();
+        expect(lookupError).toBeNull();
+        expect(editedContact?.id).toBeTruthy();
+        expect(editedContact?.display_name).toBe(editedCustomerName);
+        expect(editedContact?.phone).toBe(editedCustomerPhone);
+        expect(editedContact?.notes).toBe('Updated contractor-private customer notes.');
+
+        const { data: revokedInvite, error: inviteLookupError } = await contractorClient
+          .from('contractor_local_customer_claim_invites')
+          .select('id, status, revoked_at')
+          .eq('local_contact_id', editedContact!.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        expect(inviteLookupError).toBeNull();
+        expect(revokedInvite?.status).toBe('revoked');
+        expect(revokedInvite?.revoked_at).toBeTruthy();
+
+        const { error: deniedUpdateError } = await otherContractorClient.rpc('servsync_update_local_contact_profile', {
+          p_local_contact_id: editedContact!.id,
+          p_display_name: `Denied edit ${timestamp}`,
+          p_phone: '',
+          p_email: '',
+          p_notes: '',
+        });
+        expect(deniedUpdateError, 'Unrelated contractor must not edit another contractor local customer profile').toBeTruthy();
+
+        const { error: markClaimedError } = await contractorClient
+          .from('contractor_local_contacts')
+          .update({ claimed_at: new Date().toISOString() })
+          .eq('id', editedContact!.id);
+        expect(markClaimedError).toBeNull();
+
+        const { error: claimedUpdateError } = await contractorClient.rpc('servsync_update_local_contact_profile', {
+          p_local_contact_id: editedContact!.id,
+          p_display_name: `Claimed edit ${timestamp}`,
+          p_phone: '',
+          p_email: '',
+          p_notes: '',
+        });
+        expect(claimedUpdateError, 'Claimed local customer profile details must not be silently overwritten').toBeTruthy();
+      } finally {
+        await Promise.all([
+          contractorClient.auth.signOut().catch(() => undefined),
+          otherContractorClient.auth.signOut().catch(() => undefined),
+        ]);
+      }
+    }
+
+    await consoleErrors.assertClean(testInfo);
+  });
 });
