@@ -231,6 +231,7 @@ export type DurableDraftOperationPhase =
 
 export type DurableDraftApplicationErrorCode =
   | 'DRAFT_PERMISSION_DENIED'
+  | 'DRAFT_ENTITLEMENT_REQUIRED'
   | 'DRAFT_NOT_FOUND'
   | 'DRAFT_NOT_ACTIVE'
   | 'DRAFT_ALREADY_CONSUMED'

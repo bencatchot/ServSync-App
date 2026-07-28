@@ -773,11 +773,12 @@ test.describe('Slice 2C-C1 launch machine', () => {
   });
 
   test('error taxonomy separates denied, fixable, reconcile, and ambiguous outcomes', () => {
-    const error = (code: 'DRAFT_PERMISSION_DENIED' | 'DRAFT_INVALID' | 'DRAFT_NOT_ACTIVE' | 'DRAFT_RESPONSE_INVALID') => new DurableDraftError({
+    const error = (code: 'DRAFT_PERMISSION_DENIED' | 'DRAFT_ENTITLEMENT_REQUIRED' | 'DRAFT_INVALID' | 'DRAFT_NOT_ACTIVE' | 'DRAFT_RESPONSE_INVALID') => new DurableDraftError({
       name: 'DurableDraftError', phase: 'launch', kind: 'application', applicationCode: code,
       postgresCode: null, details: null, hint: null, httpStatus: 400, transportClassification: null, safeMessage: code,
     });
     expect(classifyDurableDraftLaunchFailure(error('DRAFT_PERMISSION_DENIED')).kind).toBe('denied');
+    expect(classifyDurableDraftLaunchFailure(error('DRAFT_ENTITLEMENT_REQUIRED')).kind).toBe('denied');
     expect(classifyDurableDraftLaunchFailure(error('DRAFT_INVALID')).kind).toBe('fixable');
     expect(classifyDurableDraftLaunchFailure(error('DRAFT_NOT_ACTIVE')).kind).toBe('reconcile');
     expect(classifyDurableDraftLaunchFailure(error('DRAFT_RESPONSE_INVALID')).kind).toBe('ambiguous');

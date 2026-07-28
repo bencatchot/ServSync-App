@@ -25,7 +25,7 @@ const FIXABLE_CODES = new Set([
 export function classifyDurableDraftLaunchFailure(error: unknown): DurableDraftLaunchFailure {
   const normalized = error instanceof DurableDraftError ? error : normalizeDurableDraftError(error, 'launch');
   const code = normalized.applicationCode;
-  if (code === 'DRAFT_PERMISSION_DENIED') {
+  if (code === 'DRAFT_PERMISSION_DENIED' || code === 'DRAFT_ENTITLEMENT_REQUIRED') {
     return { kind: 'denied', message: 'Your current access does not allow creating this output.' };
   }
   if (code === 'DRAFT_NOT_FOUND' || code === 'DRAFT_NOT_ACTIVE' || code === 'DRAFT_ALREADY_CONSUMED') {

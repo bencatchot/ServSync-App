@@ -318,6 +318,14 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       safeMessage: 'DRAFT_PERMISSION_DENIED',
     });
 
+    expect(normalizeDurableDraftError({ message: 'DRAFT_ENTITLEMENT_REQUIRED', code: 'P0001' }, 'launch'))
+      .toMatchObject({
+        applicationCode: 'DRAFT_ENTITLEMENT_REQUIRED',
+        postgresCode: 'P0001',
+        kind: 'application',
+        safeMessage: 'DRAFT_ENTITLEMENT_REQUIRED',
+      });
+
     const malformedUuid = normalizeDurableDraftError({ message: 'raw internal cast text', code: '22P02' }, 'get');
     expect(malformedUuid.safeMessage).toBe('DRAFT_INVALID');
     expect(malformedUuid.message).not.toContain('raw internal cast text');
