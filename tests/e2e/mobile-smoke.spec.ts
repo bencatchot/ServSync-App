@@ -107,7 +107,19 @@ test.describe('mobile read-only smoke', () => {
 
     await openMobileTab(page, /^Jobs\b/i, 'Jobs');
     await expect(main.getByRole('heading', { level: 2, name: /^Jobs$/i })).toBeVisible();
-    await expect(main.getByRole('heading', { level: 3, name: /^Estimates \/ Invoices$/i })).toBeVisible();
+    const draftFirstWorkOverview = main.locator(
+      '[data-testid="contractor-work-durable-drafts-overview"], [data-testid="contractor-work-dashboard"], [data-testid="contractor-work-dashboard-empty"]',
+    );
+    const draftFirstVisible = await expect(draftFirstWorkOverview.first()).toBeVisible({ timeout: 10_000 }).then(
+      () => true,
+      () => false,
+    );
+    if (draftFirstVisible) {
+      await expect(main.getByRole('button', { name: /Start New Draft/i }).first()).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    } else {
+      await expect(main.getByRole('heading', { level: 3, name: /^Estimates \/ Invoices$/i })).toBeVisible();
+    }
 
     await openMobileTab(page, /^Calendar\b/i, 'Calendar');
     await expect(main.getByRole('heading', { level: 2, name: /^Calendar$/i })).toBeVisible();
