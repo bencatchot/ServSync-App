@@ -379,7 +379,7 @@ test.describe('contractor mutating customer creation', () => {
       try {
         const { data: editedContact, error: lookupError } = await contractorClient
           .from('contractor_local_contacts')
-          .select('id, display_name, phone, email, notes')
+          .select('id, contractor_id, display_name, phone, email, notes')
           .eq('email', editedCustomerEmail)
           .maybeSingle();
         expect(lookupError).toBeNull();
@@ -388,13 +388,11 @@ test.describe('contractor mutating customer creation', () => {
         expect(editedContact?.phone).toBe(editedCustomerPhone);
         expect(editedContact?.notes).toBe('Updated contractor-private customer notes.');
 
-        const { data: revokedInvite, error: inviteLookupError } = await contractorClient
-          .from('contractor_local_customer_claim_invites')
-          .select('id, status, revoked_at')
-          .eq('local_contact_id', editedContact!.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const { data: inviteRows, error: inviteLookupError } = await contractorClient.rpc('servsync_list_local_customer_claim_invites', {
+          p_contractor_id: editedContact!.contractor_id,
+        });
+        const revokedInvite = ((inviteRows || []) as Array<{ local_contact_id: string; status: string; revoked_at: string | null }>)
+          .find(invite => invite.local_contact_id === editedContact!.id) ?? null;
         expect(inviteLookupError).toBeNull();
         expect(revokedInvite?.status).toBe('revoked');
         expect(revokedInvite?.revoked_at).toBeTruthy();
