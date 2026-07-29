@@ -14,6 +14,15 @@ function sourceBetween(haystack: string, start: string, end: string) {
   return haystack.slice(startIndex, endIndex);
 }
 
+function expectInOrder(haystack: string, markers: string[]) {
+  let previousIndex = -1;
+  for (const marker of markers) {
+    const index = haystack.indexOf(marker, previousIndex + 1);
+    expect(index, `Expected source marker: ${marker}`).toBeGreaterThan(previousIndex);
+    previousIndex = index;
+  }
+}
+
 test.describe('local customer claim invite delivery source checks', () => {
   test('SQL limits token preparation to owner/admin/office and keeps token generation private', () => {
     const sql = source('servsync-local-customer-claim-invites.sql');
@@ -54,6 +63,60 @@ test.describe('local customer claim invite delivery source checks', () => {
     expect(prepareRpc).toContain('revoke execute on function public.servsync_prepare_local_customer_claim_invite_delivery(uuid) from public;');
     expect(prepareRpc).toContain('revoke execute on function public.servsync_prepare_local_customer_claim_invite_delivery(uuid) from anon;');
     expect(prepareRpc).toContain('grant execute on function public.servsync_prepare_local_customer_claim_invite_delivery(uuid) to authenticated;');
+  });
+
+  test('SQL prepare and accept paths keep contact/home/invite lock ordering compatible with profile edits', () => {
+    const sql = source('servsync-local-customer-claim-invites.sql');
+    const profileEditSql = source('servsync-local-customer-profile-edit.sql');
+    const prepareRpc = sourceBetween(
+      sql,
+      'create or replace function public.servsync_prepare_local_customer_claim_invite_delivery',
+      'create or replace function public.servsync_accept_local_customer_claim',
+    );
+    const acceptRpc = sourceBetween(
+      sql,
+      'create or replace function public.servsync_accept_local_customer_claim',
+      'grant execute on function public.servsync_accept_local_customer_claim',
+    );
+    const profileEditRpc = sourceBetween(
+      profileEditSql,
+      'create or replace function public.servsync_update_local_contact_profile',
+      'revoke execute on function public.servsync_update_local_contact_profile',
+    );
+    const preparePreLockLookup = sourceBetween(
+      prepareRpc,
+      'select invite.contractor_id,',
+      'select *',
+    );
+
+    expect(preparePreLockLookup).not.toContain('invite_token');
+    expect(preparePreLockLookup.toLowerCase()).not.toContain('for update');
+    expectInOrder(prepareRpc, [
+      'from public.contractor_local_contacts',
+      'for update',
+      'from public.contractor_local_homes',
+      'for update',
+      'from public.contractor_local_customer_claim_invites',
+      'where id = p_invite_id',
+      'for update',
+      "v_invite.status <> 'pending'",
+      "'invite_token', v_invite.invite_token",
+    ]);
+    expectInOrder(acceptRpc, [
+      'from public.contractor_local_contacts',
+      'for update',
+      'from public.contractor_local_homes',
+      'for update',
+      'from public.contractor_local_customer_claim_invites',
+      'where id = v_invite_id',
+      'for update',
+      "v_invite.status <> 'pending'",
+    ]);
+    expectInOrder(profileEditRpc, [
+      'from public.contractor_local_contacts',
+      'for update',
+      'update public.contractor_local_customer_claim_invites',
+    ]);
   });
 
   test('SQL create and lookup paths reject stale or claimed local customer targets', () => {
@@ -114,10 +177,40 @@ test.describe('local customer claim invite delivery source checks', () => {
     expect(createSection).not.toContain('invite_token');
     expect(prepareSection).toContain("supabase.rpc('servsync_prepare_local_customer_claim_invite_delivery'");
     expect(prepareSection).toContain('navigator.clipboard?.writeText(localCustomerClaimInviteUrl(token))');
-    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({ inviteId: invite.id, token })');
+    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token })');
     expect(claimInviteUi).not.toContain('localClaimInviteLink');
     expect(claimInviteUi).toContain('ServSync does not email or text this invite');
     expect(claimInviteUi).toContain('Only the contractor owner, admin, or office role');
+  });
+
+  test('app clears prepared QR tokens across context changes and stale async preparation', () => {
+    const app = source('src/App.tsx');
+    const qrStateSection = sourceBetween(
+      app,
+      'const [copyingLocalClaimInviteId',
+      'const [selectedHomeownerWorkspaceLocalHomeId',
+    );
+    const qrCleanupSection = sourceBetween(
+      app,
+      'const canPrepareLocalCustomerClaimInvites = userCanPrepareLocalCustomerClaimInvitesUi',
+      "const contractorReferralRoleDeniedReason = 'Only the contractor owner, admin, or office role can submit contractor referrals.'",
+    );
+    const prepareSection = sourceBetween(
+      app,
+      'const toggleLocalCustomerClaimInviteQr = async',
+      'const revokeLocalCustomerClaimInvite = async',
+    );
+
+    expect(qrStateSection).toContain('localContactId: string; token: string');
+    expect(qrStateSection).toContain('localClaimInviteQrRequestIdRef');
+    expect(qrCleanupSection).toContain('clearPreparedLocalClaimInviteQr');
+    expect(qrCleanupSection).toContain('setPreparedLocalClaimInviteQr(null)');
+    expect(qrCleanupSection).toContain('[selectedHomeownerSubjectId, homeownerDetailTab, contractorTab, clearPreparedLocalClaimInviteQr]');
+    expect(qrCleanupSection).toContain('selectedLocalContactId !== preparedLocalClaimInviteQr.localContactId');
+    expect(qrCleanupSection).toContain("effectiveLocalClaimInviteStatus(preparedInvite) !== 'pending'");
+    expect(prepareSection).toContain('const requestId = localClaimInviteQrRequestIdRef.current + 1');
+    expect(prepareSection).toContain('if (localClaimInviteQrRequestIdRef.current !== requestId) return;');
+    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token })');
   });
 
   test('final containment SQL removes broad direct claim-invite table reads', () => {

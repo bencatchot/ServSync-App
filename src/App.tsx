@@ -21708,7 +21708,8 @@ function ContractorDashboard({
   const [revokingLocalClaimInviteId, setRevokingLocalClaimInviteId] = useState<string | null>(null);
   const [copyingLocalClaimInviteId, setCopyingLocalClaimInviteId] = useState<string | null>(null);
   const [preparingQrLocalClaimInviteId, setPreparingQrLocalClaimInviteId] = useState<string | null>(null);
-  const [preparedLocalClaimInviteQr, setPreparedLocalClaimInviteQr] = useState<{ inviteId: string; token: string } | null>(null);
+  const [preparedLocalClaimInviteQr, setPreparedLocalClaimInviteQr] = useState<{ inviteId: string; localContactId: string; token: string } | null>(null);
+  const localClaimInviteQrRequestIdRef = useRef(0);
   const [selectedHomeownerWorkspaceLocalHomeId, setSelectedHomeownerWorkspaceLocalHomeId] = useState('');
   const [addingLocalHomeContactId, setAddingLocalHomeContactId] = useState<string | null>(null);
   const [savingLocalHomeContactId, setSavingLocalHomeContactId] = useState<string | null>(null);
@@ -30979,6 +30980,37 @@ function ContractorDashboard({
   const canManageServiceAgreements = userCanManageServiceAgreementUi(contractorDraft, teamAccess, profile.id);
   const canSubmitContractorReferral = userCanSubmitContractorReferralUi(contractorDraft, teamAccess, profile.id);
   const canPrepareLocalCustomerClaimInvites = userCanPrepareLocalCustomerClaimInvitesUi(contractorDraft, teamAccess, profile.id);
+  const clearPreparedLocalClaimInviteQr = useCallback(() => {
+    localClaimInviteQrRequestIdRef.current += 1;
+    setPreparedLocalClaimInviteQr(null);
+  }, []);
+  useEffect(() => {
+    clearPreparedLocalClaimInviteQr();
+  }, [selectedHomeownerSubjectId, homeownerDetailTab, contractorTab, clearPreparedLocalClaimInviteQr]);
+  useEffect(() => {
+    if (!preparedLocalClaimInviteQr) return;
+    const selectedLocalContactId = selectedHomeownerSubjectId?.startsWith('local:')
+      ? selectedHomeownerSubjectId.slice('local:'.length)
+      : null;
+    const preparedInvite = localClaimInvites.find(invite => invite.id === preparedLocalClaimInviteQr.inviteId) ?? null;
+    if (
+      !canPrepareLocalCustomerClaimInvites
+      || homeownerDetailTab !== 'profile'
+      || selectedLocalContactId !== preparedLocalClaimInviteQr.localContactId
+      || !preparedInvite
+      || preparedInvite.local_contact_id !== preparedLocalClaimInviteQr.localContactId
+      || effectiveLocalClaimInviteStatus(preparedInvite) !== 'pending'
+    ) {
+      clearPreparedLocalClaimInviteQr();
+    }
+  }, [
+    canPrepareLocalCustomerClaimInvites,
+    clearPreparedLocalClaimInviteQr,
+    homeownerDetailTab,
+    localClaimInvites,
+    preparedLocalClaimInviteQr,
+    selectedHomeownerSubjectId,
+  ]);
   const contractorReferralRoleDeniedReason = 'Only the contractor owner, admin, or office role can submit contractor referrals.';
   const contractorReferralActionsDisabledReason = isContractorReadOnly(contractorEntitlementState.entitlements)
     ? contractorEntitlementState.entitlements?.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
@@ -31532,7 +31564,7 @@ function ContractorDashboard({
               ? { ...invite, status: 'revoked', revoked_at: invite.revoked_at ?? nowIso, updated_at: nowIso }
               : invite
           )));
-          setPreparedLocalClaimInviteQr(null);
+          clearPreparedLocalClaimInviteQr();
         }
         closeEditLocalCustomerProfileForm();
         setSelectedHomeownerSubjectId(`local:${updatedContact.id}`);
@@ -31732,7 +31764,7 @@ function ContractorDashboard({
           updated_at: new Date().toISOString(),
         };
         setLocalClaimInvites(prev => [newInvite, ...prev.filter(invite => invite.id !== newInvite.id)]);
-        setPreparedLocalClaimInviteQr(null);
+        clearPreparedLocalClaimInviteQr();
       }
       setHomeownerDetailTab('profile');
       setNotice(inviteResult?.reused_existing
@@ -31797,7 +31829,7 @@ function ContractorDashboard({
 
   const toggleLocalCustomerClaimInviteQr = async (invite: LocalCustomerClaimInvite) => {
     if (preparedLocalClaimInviteQr?.inviteId === invite.id) {
-      setPreparedLocalClaimInviteQr(null);
+      clearPreparedLocalClaimInviteQr();
       return;
     }
     if (!canPrepareLocalCustomerClaimInvites) {
@@ -31806,12 +31838,15 @@ function ContractorDashboard({
     }
     setError('');
     setPreparingQrLocalClaimInviteId(invite.id);
+    const requestId = localClaimInviteQrRequestIdRef.current + 1;
+    localClaimInviteQrRequestIdRef.current = requestId;
     try {
       const token = await prepareLocalCustomerClaimInviteDelivery(invite);
-      setPreparedLocalClaimInviteQr({ inviteId: invite.id, token });
+      if (localClaimInviteQrRequestIdRef.current !== requestId) return;
+      setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token });
       setNotice('Claim invite QR code is ready to share manually. No email, SMS, or notification was sent.');
     } catch (err) {
-      setPreparedLocalClaimInviteQr(null);
+      clearPreparedLocalClaimInviteQr();
       await loadContractor();
       setError(readableError(err, 'Unable to prepare claim invite QR code.'));
     } finally {
@@ -31834,7 +31869,7 @@ function ContractorDashboard({
           ? { ...item, status: 'revoked', revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() }
           : item
       )));
-      if (preparedLocalClaimInviteQr?.inviteId === invite.id) setPreparedLocalClaimInviteQr(null);
+      if (preparedLocalClaimInviteQr?.inviteId === invite.id) clearPreparedLocalClaimInviteQr();
       setNotice('Claim invite revoked.');
       await loadContractor();
     } catch (err) {

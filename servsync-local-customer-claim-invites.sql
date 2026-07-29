@@ -443,7 +443,7 @@ declare
 begin
   select *
     into v_invite
-    from public.contractor_local_customer_claim_invites
+    from public.contractor_local_customer_claim_invites invite
    where invite_token = lower(trim(coalesce(p_token, '')))
    limit 1;
 
@@ -550,9 +550,65 @@ declare
   v_invite public.contractor_local_customer_claim_invites;
   v_contact public.contractor_local_contacts;
   v_home public.contractor_local_homes;
+  v_invite_contractor_id uuid;
+  v_invite_local_contact_id uuid;
+  v_invite_local_home_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in.';
+  end if;
+
+  -- Read only routing identifiers first, then acquire row locks in the same
+  -- contact/home/invite order used by create and profile-edit revocation.
+  select invite.contractor_id,
+         invite.local_contact_id,
+         invite.local_home_id
+    into v_invite_contractor_id,
+         v_invite_local_contact_id,
+         v_invite_local_home_id
+    from public.contractor_local_customer_claim_invites invite
+   where id = p_invite_id
+   limit 1;
+
+  if v_invite_contractor_id is null then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  select *
+    into v_contact
+    from public.contractor_local_contacts
+   where id = v_invite_local_contact_id
+     and contractor_id = v_invite_contractor_id
+   for update;
+
+  if v_contact.id is null
+     or v_contact.homeowner_user_id is not null
+     or v_contact.claimed_at is not null then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  if v_invite_local_home_id is not null then
+    select *
+      into v_home
+      from public.contractor_local_homes
+     where id = v_invite_local_home_id
+       and contractor_id = v_invite_contractor_id
+       and local_contact_id = v_invite_local_contact_id
+     for update;
+
+    if v_home.id is null
+       or v_home.home_id is not null
+       or v_home.claimed_at is not null then
+      raise exception 'Claim invite not found or no longer available.';
+    end if;
+  elsif exists (
+    select 1
+      from public.contractor_local_homes home
+     where home.contractor_id = v_invite_contractor_id
+       and home.local_contact_id = v_invite_local_contact_id
+       and (home.home_id is not null or home.claimed_at is not null)
+  ) then
+    raise exception 'Claim invite not found or no longer available.';
   end if;
 
   select *
@@ -561,7 +617,10 @@ begin
    where id = p_invite_id
    for update;
 
-  if v_invite.id is null then
+  if v_invite.id is null
+     or v_invite.contractor_id is distinct from v_invite_contractor_id
+     or v_invite.local_contact_id is distinct from v_invite_local_contact_id
+     or v_invite.local_home_id is distinct from v_invite_local_home_id then
     raise exception 'Claim invite not found or no longer available.';
   end if;
 
@@ -573,45 +632,8 @@ begin
     raise exception 'Claim invite not found or no longer available.';
   end if;
 
-  select *
-    into v_contact
-    from public.contractor_local_contacts
-   where id = v_invite.local_contact_id
-     and contractor_id = v_invite.contractor_id
-   for update;
-
-  if v_contact.id is null
-     or v_contact.homeowner_user_id is not null
-     or v_contact.claimed_at is not null then
-    raise exception 'Claim invite not found or no longer available.';
-  end if;
-
   if v_invite.invited_email is distinct from nullif(trim(v_contact.email), '')
      or v_invite.invited_phone is distinct from nullif(trim(v_contact.phone), '') then
-    raise exception 'Claim invite not found or no longer available.';
-  end if;
-
-  if v_invite.local_home_id is not null then
-    select *
-      into v_home
-      from public.contractor_local_homes
-     where id = v_invite.local_home_id
-       and contractor_id = v_invite.contractor_id
-       and local_contact_id = v_invite.local_contact_id
-     for update;
-
-    if v_home.id is null
-       or v_home.home_id is not null
-       or v_home.claimed_at is not null then
-      raise exception 'Claim invite not found or no longer available.';
-    end if;
-  elsif exists (
-    select 1
-      from public.contractor_local_homes home
-     where home.contractor_id = v_invite.contractor_id
-       and home.local_contact_id = v_invite.local_contact_id
-       and (home.home_id is not null or home.claimed_at is not null)
-  ) then
     raise exception 'Claim invite not found or no longer available.';
   end if;
 
@@ -654,6 +676,10 @@ declare
   v_share_contact boolean;
   v_share_home_overview boolean;
   v_share_address boolean;
+  v_invite_id uuid;
+  v_invite_contractor_id uuid;
+  v_invite_local_contact_id uuid;
+  v_invite_local_home_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in.';
@@ -669,25 +695,27 @@ begin
     raise exception 'Only homeowner accounts can claim a local customer profile.';
   end if;
 
-  select *
-    into v_invite
+  select invite.id,
+         invite.contractor_id,
+         invite.local_contact_id,
+         invite.local_home_id
+    into v_invite_id,
+         v_invite_contractor_id,
+         v_invite_local_contact_id,
+         v_invite_local_home_id
     from public.contractor_local_customer_claim_invites
    where invite_token = lower(trim(coalesce(p_token, '')))
-   for update;
+   limit 1;
 
-  if v_invite.id is null then
-    raise exception 'Claim link not found or no longer active.';
-  end if;
-
-  if v_invite.status <> 'pending' or v_invite.expires_at <= now() then
+  if v_invite_id is null then
     raise exception 'Claim link not found or no longer active.';
   end if;
 
   select *
     into v_contact
     from public.contractor_local_contacts
-   where id = v_invite.local_contact_id
-     and contractor_id = v_invite.contractor_id
+   where id = v_invite_local_contact_id
+     and contractor_id = v_invite_contractor_id
    for update;
 
   if v_contact.id is null then
@@ -698,13 +726,13 @@ begin
     raise exception 'This local customer profile has already been claimed.';
   end if;
 
-  if v_invite.local_home_id is not null then
+  if v_invite_local_home_id is not null then
     select *
       into v_local_home
       from public.contractor_local_homes
-     where id = v_invite.local_home_id
-       and contractor_id = v_invite.contractor_id
-       and local_contact_id = v_invite.local_contact_id
+     where id = v_invite_local_home_id
+       and contractor_id = v_invite_contractor_id
+       and local_contact_id = v_invite_local_contact_id
      for update;
 
     if v_local_home.id is null then
@@ -714,6 +742,24 @@ begin
     if v_local_home.home_id is not null or v_local_home.claimed_at is not null then
       raise exception 'This local home has already been claimed.';
     end if;
+  end if;
+
+  select *
+    into v_invite
+    from public.contractor_local_customer_claim_invites
+   where id = v_invite_id
+   for update;
+
+  if v_invite.id is null
+     or v_invite.contractor_id is distinct from v_invite_contractor_id
+     or v_invite.local_contact_id is distinct from v_invite_local_contact_id
+     or v_invite.local_home_id is distinct from v_invite_local_home_id
+     or v_invite.invite_token is distinct from lower(trim(coalesce(p_token, ''))) then
+    raise exception 'Claim link not found or no longer active.';
+  end if;
+
+  if v_invite.status <> 'pending' or v_invite.expires_at <= now() then
+    raise exception 'Claim link not found or no longer active.';
   end if;
 
   v_profile_updates := coalesce(p_profile_updates, '{}'::jsonb);
