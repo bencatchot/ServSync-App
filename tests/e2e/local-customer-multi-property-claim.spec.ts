@@ -241,7 +241,11 @@ test.describe('local customer multi-property claim source checks', () => {
     expect(homeNormalizer).toContain('nickname: sharedFieldDisplayValue(row.nickname)');
     expect(homeNormalizer).toContain('year_built: sharedFieldDisplayValue(row.year_built)');
     expect(homeNormalizer).toContain('square_feet: sharedFieldDisplayValue(row.square_feet)');
-    expect(connectionNormalizer).toContain('permissions: normalizeSharingPermissions(connection.permissions)');
+    expect(connectionNormalizer).toContain("const row = connection as unknown as Record<string, unknown>");
+    expect(connectionNormalizer).toContain('connection_id: sharedFieldDisplayValue(row.connection_id)');
+    expect(connectionNormalizer).toContain('display_name: sharedFieldDisplayValue(row.display_name)');
+    expect(connectionNormalizer).toContain('permissions: normalizeSharingPermissions(row.permissions');
+    expect(connectionNormalizer).not.toContain('...connection');
     expect(loadSection).toContain('.map(normalizeContractorConnectedHomeowner)');
     expect(sharedField).toContain('value?: unknown');
     expect(sharedField).toContain('const displayValue = sharedFieldDisplayValue(value)');

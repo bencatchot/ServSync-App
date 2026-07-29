@@ -6838,10 +6838,20 @@ async function invokeGeocodeLocation(area: Pick<ContractorServiceArea, 'location
   return data as GeocodeLocationResult;
 }
 
+function booleanPermissionValue(value: unknown): boolean {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
 function normalizeSharingPermissions(permissions?: Partial<SharingPermissions> | null): SharingPermissions {
+  const row = permissions && typeof permissions === 'object' && !Array.isArray(permissions)
+    ? permissions as Record<string, unknown>
+    : {};
   return {
-    ...EMPTY_PERMISSIONS,
-    ...(permissions || {}),
+    share_contact: booleanPermissionValue(row.share_contact),
+    share_home_overview: booleanPermissionValue(row.share_home_overview),
+    share_address: booleanPermissionValue(row.share_address),
+    share_preferred_vendors: booleanPermissionValue(row.share_preferred_vendors),
+    share_photos: booleanPermissionValue(row.share_photos),
   };
 }
 
@@ -6872,17 +6882,29 @@ function normalizeConnectedHomeRecord(home: unknown): ContractorConnectedHomeown
 }
 
 function normalizeContractorConnectedHomeowner(connection: ContractorConnectedHomeowner): ContractorConnectedHomeowner {
-  const rawHomes = Array.isArray(connection.homes) ? connection.homes : [];
+  const row = connection as unknown as Record<string, unknown>;
+  const rawHomes = Array.isArray(row.homes) ? row.homes : [];
   const homes = rawHomes
     .map(home => normalizeConnectedHomeRecord(home))
     .filter((home): home is ContractorConnectedHomeownerHome => Boolean(home));
-  const fallbackHome = normalizeConnectedHomeRecord(connection.home);
+  const fallbackHome = normalizeConnectedHomeRecord(row.home);
   const normalizedHomes = homes.length > 0 ? homes : fallbackHome ? [fallbackHome] : [];
+  const status = sharedFieldDisplayValue(row.status);
   return {
-    ...connection,
-    permissions: normalizeSharingPermissions(connection.permissions),
+    connection_id: sharedFieldDisplayValue(row.connection_id),
+    homeowner_user_id: sharedFieldDisplayValue(row.homeowner_user_id),
+    display_name: sharedFieldDisplayValue(row.display_name),
+    phone: sharedFieldDisplayValue(row.phone),
+    city: sharedFieldDisplayValue(row.city),
+    state: sharedFieldDisplayValue(row.state),
+    zip_code: sharedFieldDisplayValue(row.zip_code),
+    status: (status === 'pending' || status === 'active' || status === 'declined' || status === 'revoked' || status === 'dismissed' ? status : 'active') as ConnectionStatus,
+    permissions: normalizeSharingPermissions(row.permissions as Partial<SharingPermissions> | null),
     home: fallbackHome ?? normalizedHomes[0] ?? null,
     homes: normalizedHomes,
+    created_at: sharedFieldDisplayValue(row.created_at),
+    updated_at: sharedFieldDisplayValue(row.updated_at),
+    source: sharedFieldDisplayValue(row.source),
   };
 }
 

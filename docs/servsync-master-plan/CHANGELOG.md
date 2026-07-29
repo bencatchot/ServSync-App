@@ -36,6 +36,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Email, SMS, notification, provider delivery, reliable receipt, and delivery-attempt tracking remain explicitly excluded.
   - Preview regression follow-up: hardened the selected-homeowner workspace so connected-homeowner rendering uses optional permission/profile access and does not execute local-customer-only claim-selection derivation; added focused regression coverage after a connected homeowner opened to a blank screen in the PR preview.
   - Preview regression follow-up: connected-homeowner shared fields now coerce unexpected RPC object/JSON values to safe display text and normalize shared `homes/home` records before property-card rendering.
+  - Preview regression follow-up: connected-homeowner RPC rows now normalize all top-level display/status/permission fields before the contractor Homeowners detail workspace renders, protecting the header, sidebar, property scope, and detail tabs from older or wider Sandbox response shapes.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-003 now records the multi-property local-customer claim redesign, explicit selected-property membership, atomic homeowner mapping/acceptance, and Production-release gating.
