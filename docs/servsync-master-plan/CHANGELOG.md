@@ -4,6 +4,34 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-29
+
+- Branch: `codex/backlog-structure-cleanup-v1`
+- Starting main SHA: `74498d90466af4f134c170fd747fc2f8130624bd`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reconciled the feature backlog through the current main branch, moved completed v1 milestones into a completed-feature archive, consolidated overlapping backlog IDs, split mixed completed/unfinished entries, and replaced long active-entry implementation diaries with concise unfinished-outcome summaries and a readable ID crosswalk.
+- Reason for change: The active backlog was still reconciled only through PR #198 while main had advanced through PR #349, leaving completed milestones and stale rollout language mixed into the active backlog.
+- Tests/checks run:
+  - Repository/GitHub state inspection for current main, PR #349, PR #348, and open PRs #73, #150, #183, #187, and #256.
+  - Markdown/internal-link validation for the updated planning docs.
+  - `git diff --check`
+  - Changed-file scope and docs-only guard scan.
+  - Credential-shaped secret scan of changed files.
+- Known risks or follow-ups:
+  - Documentation-only cleanup. No app code, SQL, Supabase/Vercel setting, Production data, gate, cohort, or deployment behavior changed.
+  - PR #348 remains active draft work for local-customer multi-property claim and is not marked complete.
+  - Open PRs #73, #183, #187, and #256 still require separate owner disposition.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: This task directly restructures the active backlog and completed-feature archive.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan reconciliation sentence now points at the current backlog/archive/changelog structure instead of the stale PR #145/FB-033 state.
+
 ## 2026-07-28
 
 - Branch: `codex/local-claim-invite-delivery-guard`
