@@ -194,6 +194,9 @@ test.describe('local customer multi-property claim source checks', () => {
     expect(homeownerWorkspace).toContain('? {');
     expect(homeownerWorkspace).toContain('selectedHomeIds: selectedClaimInviteHomeIdsForContact(localCustomer)');
     expect(homeownerWorkspace).toContain('selectedHomeIds: [] as string[]');
+    expect(homeownerWorkspace).toContain('preparedLocalClaimInviteQr && latestLocalClaimInvite');
+    expect(homeownerWorkspace).toContain('preparedLocalClaimInviteQr.inviteId === latestLocalClaimInvite.id');
+    expect(homeownerWorkspace).not.toContain('preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite?.id');
     expect(homeownerWorkspace).toContain('perm?.share_contact');
     expect(homeownerWorkspace).toContain('perm?.share_address');
     expect(homeownerWorkspace).not.toContain('perm!.');

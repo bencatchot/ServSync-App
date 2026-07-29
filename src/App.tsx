@@ -35480,7 +35480,7 @@ function ContractorDashboard({
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
-                    const preparedLocalClaimInviteLink = preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite?.id
+                    const preparedLocalClaimInviteLink = preparedLocalClaimInviteQr && latestLocalClaimInvite && preparedLocalClaimInviteQr.inviteId === latestLocalClaimInvite.id
                       ? localCustomerClaimInviteUrl(preparedLocalClaimInviteQr.token)
                       : '';
                     const rawFieldWork = conn ? fieldWorkForHomeowner(conn.homeowner_user_id) : (localCustomer ? fieldWorkForLocalContact(localCustomer.id) : []);
