@@ -1169,6 +1169,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.servsync_accept_local_customer_claim(text, uuid, jsonb, jsonb) from public;
+revoke execute on function public.servsync_accept_local_customer_claim(text, uuid, jsonb, jsonb) from anon;
 grant execute on function public.servsync_accept_local_customer_claim(text, uuid, jsonb, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';

@@ -8,6 +8,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 - Branch: `codex/local-customer-multi-property-claim-v1`
 - Starting main SHA: `45cc8ad84721619fbd7a1533a8fdd19c16ddeca7`
+- SQL SHA-256: `0eb3df557b7d746c4630f91815601040c20e03934043a59c5e7ec8a6b2ceea52`
 - Files changed:
   - `servsync-local-customer-multi-property-claim.sql`
   - `scripts/apply-blank-supabase-schema.sh`
