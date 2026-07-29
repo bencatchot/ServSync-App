@@ -199,4 +199,54 @@ test.describe('local customer multi-property claim source checks', () => {
     expect(homeownerWorkspace).not.toContain('perm!.');
     expect(homeownerWorkspace).not.toContain('localCustomer!.display_name');
   });
+
+  test('connected-homeowner shared fields normalize RPC home data before rendering', () => {
+    const app = source('src/App.tsx');
+    const displayFormatter = sourceBetween(
+      app,
+      'function sharedFieldDisplayValue',
+      'function normalizeConnectedHomeRecord',
+    );
+    const homeNormalizer = sourceBetween(
+      app,
+      'function normalizeConnectedHomeRecord',
+      'function normalizeContractorConnectedHomeowner',
+    );
+    const connectionNormalizer = sourceBetween(
+      app,
+      'function normalizeContractorConnectedHomeowner',
+      'function connectionSourceLabel',
+    );
+    const loadSection = sourceBetween(
+      app,
+      'const loadedConnections = ((connectionsRes.data || []) as ContractorConnectedHomeowner[])',
+      'const connectionIds = [',
+    );
+    const sharedField = sourceBetween(
+      app,
+      'function SharedField',
+      'function pendingSharedPropertyAddress',
+    );
+    const connectedHomeList = sourceBetween(
+      app,
+      'function connectedHomeList',
+      'function ConnectedHomeProperties',
+    );
+
+    expect(displayFormatter).toContain("typeof value === 'string'");
+    expect(displayFormatter).toContain("typeof value === 'number'");
+    expect(displayFormatter).toContain("typeof value === 'boolean'");
+    expect(displayFormatter).toContain("return ''");
+    expect(homeNormalizer).toContain("if (!home || typeof home !== 'object' || Array.isArray(home)) return null");
+    expect(homeNormalizer).toContain('nickname: sharedFieldDisplayValue(row.nickname)');
+    expect(homeNormalizer).toContain('year_built: sharedFieldDisplayValue(row.year_built)');
+    expect(homeNormalizer).toContain('square_feet: sharedFieldDisplayValue(row.square_feet)');
+    expect(connectionNormalizer).toContain('permissions: normalizeSharingPermissions(connection.permissions)');
+    expect(loadSection).toContain('.map(normalizeContractorConnectedHomeowner)');
+    expect(sharedField).toContain('value?: unknown');
+    expect(sharedField).toContain('const displayValue = sharedFieldDisplayValue(value)');
+    expect(sharedField).not.toContain('{allowed ? value ||');
+    expect(connectedHomeList).toContain('.map(home => normalizeConnectedHomeRecord(home))');
+    expect(connectedHomeList).not.toContain('return connection.home ? [connection.home] : []');
+  });
 });

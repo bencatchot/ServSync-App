@@ -6845,6 +6845,47 @@ function normalizeSharingPermissions(permissions?: Partial<SharingPermissions> |
   };
 }
 
+function sharedFieldDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
+  return '';
+}
+
+function normalizeConnectedHomeRecord(home: unknown): ContractorConnectedHomeownerHome | null {
+  if (!home || typeof home !== 'object' || Array.isArray(home)) return null;
+  const row = home as Record<string, unknown>;
+  const id = sharedFieldDisplayValue(row.id);
+  return {
+    id: id || undefined,
+    nickname: sharedFieldDisplayValue(row.nickname),
+    address_line1: sharedFieldDisplayValue(row.address_line1),
+    address_line2: sharedFieldDisplayValue(row.address_line2),
+    city: sharedFieldDisplayValue(row.city),
+    state: sharedFieldDisplayValue(row.state),
+    zip_code: sharedFieldDisplayValue(row.zip_code),
+    home_type: sharedFieldDisplayValue(row.home_type),
+    year_built: sharedFieldDisplayValue(row.year_built),
+    square_feet: sharedFieldDisplayValue(row.square_feet),
+    notes: sharedFieldDisplayValue(row.notes),
+  };
+}
+
+function normalizeContractorConnectedHomeowner(connection: ContractorConnectedHomeowner): ContractorConnectedHomeowner {
+  const rawHomes = Array.isArray(connection.homes) ? connection.homes : [];
+  const homes = rawHomes
+    .map(home => normalizeConnectedHomeRecord(home))
+    .filter((home): home is ContractorConnectedHomeownerHome => Boolean(home));
+  const fallbackHome = normalizeConnectedHomeRecord(connection.home);
+  const normalizedHomes = homes.length > 0 ? homes : fallbackHome ? [fallbackHome] : [];
+  return {
+    ...connection,
+    permissions: normalizeSharingPermissions(connection.permissions),
+    home: fallbackHome ?? normalizedHomes[0] ?? null,
+    homes: normalizedHomes,
+  };
+}
+
 function connectionSourceLabel(source?: string | null) {
   if (source === 'homeowner_request') return 'Requested by homeowner';
   if (source === 'homeowner_reconnect') return 'Originally requested by homeowner';
@@ -22629,7 +22670,8 @@ function ContractorDashboard({
         }
       }
 
-      const loadedConnections = (connectionsRes.data || []) as ContractorConnectedHomeowner[];
+      const loadedConnections = ((connectionsRes.data || []) as ContractorConnectedHomeowner[])
+        .map(normalizeContractorConnectedHomeowner);
       const connectionIds = [
         ...loadedConnections.map(connection => connection.connection_id),
         ...loadedRequests.map(request => request.connection_id),
@@ -47983,7 +48025,8 @@ function ContextualConnectionRequestModal({
   );
 }
 
-function SharedField({ label, value, allowed }: { label: string; value?: string | null; allowed: boolean }) {
+function SharedField({ label, value, allowed }: { label: string; value?: unknown; allowed: boolean }) {
+  const displayValue = sharedFieldDisplayValue(value);
   return (
     <div className={`rounded-lg border px-2.5 py-2 ${allowed ? 'border-[#E1E3E7] bg-white' : 'border-[#E1E3E7] bg-[#F7F9FC]'}`}>
       <div className="flex items-center justify-between gap-2">
@@ -47991,7 +48034,7 @@ function SharedField({ label, value, allowed }: { label: string; value?: string 
         {!allowed && <Lock size={13} className="text-slate-400" />}
       </div>
       <p className={`mt-0.5 text-sm font-semibold ${allowed ? 'text-[#02132D]' : 'text-[#223D67]/65'}`}>
-        {allowed ? value || 'Not provided' : 'Not shared'}
+        {allowed ? displayValue || 'Not provided' : 'Not shared'}
       </p>
     </div>
   );
@@ -48013,8 +48056,12 @@ function pendingSharedPropertyPermissionLabels(property: ContractorPendingConnec
 }
 
 function connectedHomeList(connection: ContractorConnectedHomeowner): ContractorConnectedHomeownerHome[] {
-  if (Array.isArray(connection.homes) && connection.homes.length > 0) return connection.homes;
-  return connection.home ? [connection.home] : [];
+  const normalizedHomes = (Array.isArray(connection.homes) ? connection.homes : [])
+    .map(home => normalizeConnectedHomeRecord(home))
+    .filter((home): home is ContractorConnectedHomeownerHome => Boolean(home));
+  if (normalizedHomes.length > 0) return normalizedHomes;
+  const fallbackHome = normalizeConnectedHomeRecord(connection.home);
+  return fallbackHome ? [fallbackHome] : [];
 }
 
 function ConnectedHomeProperties({ homes, permissions }: { homes: ContractorConnectedHomeownerHome[]; permissions: SharingPermissions }) {
