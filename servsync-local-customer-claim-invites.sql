@@ -703,7 +703,7 @@ begin
          v_invite_contractor_id,
          v_invite_local_contact_id,
          v_invite_local_home_id
-    from public.contractor_local_customer_claim_invites
+    from public.contractor_local_customer_claim_invites invite
    where invite_token = lower(trim(coalesce(p_token, '')))
    limit 1;
 

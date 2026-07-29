@@ -88,9 +88,18 @@ test.describe('local customer claim invite delivery source checks', () => {
       'select invite.contractor_id,',
       'select *',
     );
+    const acceptPreLockLookup = sourceBetween(
+      acceptRpc,
+      'select invite.id,',
+      'select *',
+    );
 
+    expect(preparePreLockLookup).toContain('from public.contractor_local_customer_claim_invites invite');
     expect(preparePreLockLookup).not.toContain('invite_token');
     expect(preparePreLockLookup.toLowerCase()).not.toContain('for update');
+    expect(acceptPreLockLookup).toContain('from public.contractor_local_customer_claim_invites invite');
+    expect(acceptPreLockLookup).not.toContain('invite.invite_token');
+    expect(acceptPreLockLookup.toLowerCase()).not.toContain('for update');
     expectInOrder(prepareRpc, [
       'from public.contractor_local_contacts',
       'for update',
