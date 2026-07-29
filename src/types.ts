@@ -1402,7 +1402,7 @@ export interface LocalCustomerClaimInvite {
   contractor_id: string;
   local_contact_id: string;
   local_home_id: string | null;
-  invite_token: string;
+  invite_token?: string | null;
   invited_email: string | null;
   invited_phone: string | null;
   status: LocalCustomerClaimInviteStatus;

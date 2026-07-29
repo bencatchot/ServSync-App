@@ -74,6 +74,20 @@ create index if not exists local_customer_claim_invites_claimed_home_idx
   on public.contractor_local_customer_claim_invites(claimed_home_id)
   where claimed_home_id is not null;
 
+update public.contractor_local_customer_claim_invites
+   set status = 'expired',
+       updated_at = now()
+ where status = 'pending'
+   and expires_at <= now();
+
+create unique index if not exists local_customer_claim_invites_one_pending_target_idx
+  on public.contractor_local_customer_claim_invites(
+    contractor_id,
+    local_contact_id,
+    coalesce(local_home_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  )
+  where status = 'pending';
+
 drop trigger if exists contractor_local_customer_claim_invites_touch_updated_at
   on public.contractor_local_customer_claim_invites;
 create trigger contractor_local_customer_claim_invites_touch_updated_at
@@ -82,11 +96,47 @@ create trigger contractor_local_customer_claim_invites_touch_updated_at
 
 alter table public.contractor_local_customer_claim_invites enable row level security;
 
+create or replace function public.servsync_private_can_prepare_local_customer_claim_invites(p_contractor_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+      from public.contractor_profiles cp
+     where cp.id = p_contractor_id
+       and cp.owner_user_id = auth.uid()
+  )
+  or exists (
+    select 1
+      from public.contractor_team_members tm
+     where tm.contractor_id = p_contractor_id
+       and tm.user_id = auth.uid()
+       and tm.status = 'active'
+       and tm.role in ('admin', 'office')
+  )
+  or public.current_user_is_platform_admin();
+$$;
+
+revoke execute on function public.servsync_private_can_prepare_local_customer_claim_invites(uuid) from public;
+revoke execute on function public.servsync_private_can_prepare_local_customer_claim_invites(uuid) from anon;
+revoke execute on function public.servsync_private_can_prepare_local_customer_claim_invites(uuid) from authenticated;
+
 drop policy if exists "Local claim invites: contractor reads own" on public.contractor_local_customer_claim_invites;
 create policy "Local claim invites: contractor reads own"
   on public.contractor_local_customer_claim_invites for select to authenticated
   using (
-    public.current_user_can_access_contractor(contractor_id)
+    public.current_user_can_manage_contractor_team(contractor_id)
+    or exists (
+      select 1
+        from public.contractor_team_members tm
+       where tm.contractor_id = contractor_local_customer_claim_invites.contractor_id
+         and tm.user_id = auth.uid()
+         and tm.status = 'active'
+         and tm.role = 'office'
+    )
     or public.current_user_is_platform_admin()
   );
 
@@ -94,7 +144,15 @@ drop policy if exists "Local claim invites: contractor creates own" on public.co
 create policy "Local claim invites: contractor creates own"
   on public.contractor_local_customer_claim_invites for insert to authenticated
   with check (
-    public.current_user_can_write_contractor_jobs(contractor_id)
+    public.current_user_can_manage_contractor_team(contractor_id)
+    or exists (
+      select 1
+        from public.contractor_team_members tm
+       where tm.contractor_id = contractor_local_customer_claim_invites.contractor_id
+         and tm.user_id = auth.uid()
+         and tm.status = 'active'
+         and tm.role = 'office'
+    )
     or public.current_user_is_platform_admin()
   );
 
@@ -102,14 +160,33 @@ drop policy if exists "Local claim invites: contractor updates own" on public.co
 create policy "Local claim invites: contractor updates own"
   on public.contractor_local_customer_claim_invites for update to authenticated
   using (
-    public.current_user_can_write_contractor_jobs(contractor_id)
+    public.current_user_can_manage_contractor_team(contractor_id)
+    or exists (
+      select 1
+        from public.contractor_team_members tm
+       where tm.contractor_id = contractor_local_customer_claim_invites.contractor_id
+         and tm.user_id = auth.uid()
+         and tm.status = 'active'
+         and tm.role = 'office'
+    )
     or public.current_user_is_platform_admin()
   )
   with check (
-    public.current_user_can_write_contractor_jobs(contractor_id)
+    public.current_user_can_manage_contractor_team(contractor_id)
+    or exists (
+      select 1
+        from public.contractor_team_members tm
+       where tm.contractor_id = contractor_local_customer_claim_invites.contractor_id
+         and tm.user_id = auth.uid()
+         and tm.status = 'active'
+         and tm.role = 'office'
+    )
     or public.current_user_is_platform_admin()
   );
 
+-- Compatibility grant for the legacy client during SQL-first rollout. The
+-- application must use servsync_list_local_customer_claim_invites(...) for
+-- token-free reads, and the final containment step must revoke this grant.
 grant select on public.contractor_local_customer_claim_invites to authenticated;
 
 create or replace function public.servsync_generate_local_customer_claim_token()
@@ -134,7 +211,73 @@ begin
 end;
 $$;
 
-grant execute on function public.servsync_generate_local_customer_claim_token() to authenticated;
+revoke execute on function public.servsync_generate_local_customer_claim_token() from public;
+revoke execute on function public.servsync_generate_local_customer_claim_token() from anon;
+revoke execute on function public.servsync_generate_local_customer_claim_token() from authenticated;
+
+create or replace function public.servsync_list_local_customer_claim_invites(p_contractor_id uuid)
+returns table (
+  id uuid,
+  contractor_id uuid,
+  local_contact_id uuid,
+  local_home_id uuid,
+  invited_email text,
+  invited_phone text,
+  status text,
+  created_by uuid,
+  claimed_by_homeowner_user_id uuid,
+  claimed_home_id uuid,
+  connection_id uuid,
+  expires_at timestamptz,
+  used_at timestamptz,
+  declined_at timestamptz,
+  revoked_at timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+stable
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.';
+  end if;
+
+  if p_contractor_id is null
+     or not public.servsync_private_can_prepare_local_customer_claim_invites(p_contractor_id) then
+    return;
+  end if;
+
+  return query
+  select
+    invite.id,
+    invite.contractor_id,
+    invite.local_contact_id,
+    invite.local_home_id,
+    invite.invited_email,
+    invite.invited_phone,
+    invite.status,
+    invite.created_by,
+    invite.claimed_by_homeowner_user_id,
+    invite.claimed_home_id,
+    invite.connection_id,
+    invite.expires_at,
+    invite.used_at,
+    invite.declined_at,
+    invite.revoked_at,
+    invite.created_at,
+    invite.updated_at
+  from public.contractor_local_customer_claim_invites invite
+  where invite.contractor_id = p_contractor_id
+  order by invite.created_at desc;
+end;
+$$;
+
+revoke execute on function public.servsync_list_local_customer_claim_invites(uuid) from public;
+revoke execute on function public.servsync_list_local_customer_claim_invites(uuid) from anon;
+grant execute on function public.servsync_list_local_customer_claim_invites(uuid) to authenticated;
 
 create or replace function public.servsync_create_local_customer_claim_invite(
   p_local_contact_id uuid,
@@ -149,8 +292,10 @@ as $$
 declare
   v_contact public.contractor_local_contacts;
   v_home public.contractor_local_homes;
+  v_existing_invite public.contractor_local_customer_claim_invites;
   v_invite public.contractor_local_customer_claim_invites;
   v_expires_days int;
+  v_has_claimed_home boolean := false;
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in.';
@@ -160,15 +305,29 @@ begin
     into v_contact
     from public.contractor_local_contacts
    where id = p_local_contact_id
-   limit 1;
+   for update;
 
   if v_contact.id is null then
     raise exception 'Local customer not found.';
   end if;
 
-  if not public.current_user_can_write_contractor_jobs(v_contact.contractor_id)
-     and not public.current_user_is_platform_admin() then
+  if not public.servsync_private_can_prepare_local_customer_claim_invites(v_contact.contractor_id) then
     raise exception 'You do not have permission to invite this customer.';
+  end if;
+
+  select exists (
+    select 1
+      from public.contractor_local_homes home
+     where home.local_contact_id = v_contact.id
+       and home.contractor_id = v_contact.contractor_id
+       and (home.home_id is not null or home.claimed_at is not null)
+  )
+    into v_has_claimed_home;
+
+  if v_contact.homeowner_user_id is not null
+     or v_contact.claimed_at is not null
+     or v_has_claimed_home then
+    raise exception 'This customer is linked to a homeowner profile and cannot receive a new claim invite.';
   end if;
 
   if p_local_home_id is not null then
@@ -178,14 +337,61 @@ begin
      where id = p_local_home_id
        and contractor_id = v_contact.contractor_id
        and local_contact_id = v_contact.id
-     limit 1;
+     for update;
 
     if v_home.id is null then
       raise exception 'Local home does not belong to this local customer.';
     end if;
+
+    if v_home.home_id is not null or v_home.claimed_at is not null then
+      raise exception 'This property is linked to a homeowner profile and cannot receive a new claim invite.';
+    end if;
   end if;
 
   v_expires_days := greatest(1, least(coalesce(p_expires_days, 14), 90));
+
+  update public.contractor_local_customer_claim_invites invite
+     set status = 'expired',
+         updated_at = now()
+   where invite.contractor_id = v_contact.contractor_id
+     and invite.local_contact_id = v_contact.id
+     and (
+       (invite.local_home_id is null and p_local_home_id is null)
+       or invite.local_home_id = p_local_home_id
+     )
+     and invite.status = 'pending'
+     and invite.expires_at <= now();
+
+  select *
+    into v_existing_invite
+    from public.contractor_local_customer_claim_invites invite
+   where invite.contractor_id = v_contact.contractor_id
+     and invite.local_contact_id = v_contact.id
+     and (
+       (invite.local_home_id is null and p_local_home_id is null)
+       or invite.local_home_id = p_local_home_id
+     )
+     and invite.status = 'pending'
+     and invite.expires_at > now()
+   order by invite.created_at desc
+   limit 1
+   for update;
+
+  if v_existing_invite.id is not null then
+    if v_existing_invite.invited_email is distinct from nullif(trim(v_contact.email), '')
+       or v_existing_invite.invited_phone is distinct from nullif(trim(v_contact.phone), '') then
+      raise exception 'The pending claim invite is stale. Revoke it before creating a new one.';
+    end if;
+
+    return jsonb_build_object(
+      'id', v_existing_invite.id,
+      'status', v_existing_invite.status,
+      'expires_at', v_existing_invite.expires_at,
+      'local_contact_id', v_existing_invite.local_contact_id,
+      'local_home_id', v_existing_invite.local_home_id,
+      'reused_existing', true
+    );
+  end if;
 
   insert into public.contractor_local_customer_claim_invites (
     contractor_id,
@@ -212,11 +418,11 @@ begin
 
   return jsonb_build_object(
     'id', v_invite.id,
-    'invite_token', v_invite.invite_token,
     'status', v_invite.status,
     'expires_at', v_invite.expires_at,
     'local_contact_id', v_invite.local_contact_id,
-    'local_home_id', v_invite.local_home_id
+    'local_home_id', v_invite.local_home_id,
+    'reused_existing', false
   );
 end;
 $$;
@@ -237,7 +443,7 @@ declare
 begin
   select *
     into v_invite
-    from public.contractor_local_customer_claim_invites
+    from public.contractor_local_customer_claim_invites invite
    where invite_token = lower(trim(coalesce(p_token, '')))
    limit 1;
 
@@ -260,6 +466,10 @@ begin
     raise exception 'Claim link not found or no longer active.';
   end if;
 
+  if v_contact.homeowner_user_id is not null or v_contact.claimed_at is not null then
+    raise exception 'Claim link not found or no longer active.';
+  end if;
+
   if v_invite.local_home_id is not null then
     select *
       into v_home
@@ -268,6 +478,20 @@ begin
        and contractor_id = v_invite.contractor_id
        and local_contact_id = v_invite.local_contact_id
      limit 1;
+
+    if v_home.id is null
+       or v_home.home_id is not null
+       or v_home.claimed_at is not null then
+      raise exception 'Claim link not found or no longer active.';
+    end if;
+  elsif exists (
+    select 1
+      from public.contractor_local_homes home
+     where home.contractor_id = v_invite.contractor_id
+       and home.local_contact_id = v_invite.local_contact_id
+       and (home.home_id is not null or home.claimed_at is not null)
+  ) then
+    raise exception 'Claim link not found or no longer active.';
   end if;
 
   select *
@@ -316,6 +540,118 @@ $$;
 
 grant execute on function public.servsync_lookup_local_customer_claim(text) to anon, authenticated;
 
+create or replace function public.servsync_prepare_local_customer_claim_invite_delivery(p_invite_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_invite public.contractor_local_customer_claim_invites;
+  v_contact public.contractor_local_contacts;
+  v_home public.contractor_local_homes;
+  v_invite_contractor_id uuid;
+  v_invite_local_contact_id uuid;
+  v_invite_local_home_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'You must be signed in.';
+  end if;
+
+  -- Read only routing identifiers first, then acquire row locks in the same
+  -- contact/home/invite order used by create and profile-edit revocation.
+  select invite.contractor_id,
+         invite.local_contact_id,
+         invite.local_home_id
+    into v_invite_contractor_id,
+         v_invite_local_contact_id,
+         v_invite_local_home_id
+    from public.contractor_local_customer_claim_invites invite
+   where id = p_invite_id
+   limit 1;
+
+  if v_invite_contractor_id is null then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  select *
+    into v_contact
+    from public.contractor_local_contacts
+   where id = v_invite_local_contact_id
+     and contractor_id = v_invite_contractor_id
+   for update;
+
+  if v_contact.id is null
+     or v_contact.homeowner_user_id is not null
+     or v_contact.claimed_at is not null then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  if v_invite_local_home_id is not null then
+    select *
+      into v_home
+      from public.contractor_local_homes
+     where id = v_invite_local_home_id
+       and contractor_id = v_invite_contractor_id
+       and local_contact_id = v_invite_local_contact_id
+     for update;
+
+    if v_home.id is null
+       or v_home.home_id is not null
+       or v_home.claimed_at is not null then
+      raise exception 'Claim invite not found or no longer available.';
+    end if;
+  elsif exists (
+    select 1
+      from public.contractor_local_homes home
+     where home.contractor_id = v_invite_contractor_id
+       and home.local_contact_id = v_invite_local_contact_id
+       and (home.home_id is not null or home.claimed_at is not null)
+  ) then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  select *
+    into v_invite
+    from public.contractor_local_customer_claim_invites
+   where id = p_invite_id
+   for update;
+
+  if v_invite.id is null
+     or v_invite.contractor_id is distinct from v_invite_contractor_id
+     or v_invite.local_contact_id is distinct from v_invite_local_contact_id
+     or v_invite.local_home_id is distinct from v_invite_local_home_id then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  if not public.servsync_private_can_prepare_local_customer_claim_invites(v_invite.contractor_id) then
+    raise exception 'You do not have permission to prepare this claim invite.';
+  end if;
+
+  if v_invite.status <> 'pending' or v_invite.expires_at <= now() then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  if v_invite.invited_email is distinct from nullif(trim(v_contact.email), '')
+     or v_invite.invited_phone is distinct from nullif(trim(v_contact.phone), '') then
+    raise exception 'Claim invite not found or no longer available.';
+  end if;
+
+  return jsonb_build_object(
+    'invite_id', v_invite.id,
+    'status', v_invite.status,
+    'expires_at', v_invite.expires_at,
+    'local_contact_id', v_invite.local_contact_id,
+    'local_home_id', v_invite.local_home_id,
+    'invite_token', v_invite.invite_token
+  );
+end;
+$$;
+
+revoke execute on function public.servsync_prepare_local_customer_claim_invite_delivery(uuid) from public;
+revoke execute on function public.servsync_prepare_local_customer_claim_invite_delivery(uuid) from anon;
+grant execute on function public.servsync_prepare_local_customer_claim_invite_delivery(uuid) to authenticated;
+
 create or replace function public.servsync_accept_local_customer_claim(
   p_token text,
   p_home_id uuid default null,
@@ -340,6 +676,10 @@ declare
   v_share_contact boolean;
   v_share_home_overview boolean;
   v_share_address boolean;
+  v_invite_id uuid;
+  v_invite_contractor_id uuid;
+  v_invite_local_contact_id uuid;
+  v_invite_local_home_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in.';
@@ -355,51 +695,71 @@ begin
     raise exception 'Only homeowner accounts can claim a local customer profile.';
   end if;
 
-  select *
-    into v_invite
-    from public.contractor_local_customer_claim_invites
+  select invite.id,
+         invite.contractor_id,
+         invite.local_contact_id,
+         invite.local_home_id
+    into v_invite_id,
+         v_invite_contractor_id,
+         v_invite_local_contact_id,
+         v_invite_local_home_id
+    from public.contractor_local_customer_claim_invites invite
    where invite_token = lower(trim(coalesce(p_token, '')))
-   for update;
+   limit 1;
 
-  if v_invite.id is null then
-    raise exception 'Claim link not found or no longer active.';
-  end if;
-
-  if v_invite.status <> 'pending' or v_invite.expires_at <= now() then
+  if v_invite_id is null then
     raise exception 'Claim link not found or no longer active.';
   end if;
 
   select *
     into v_contact
     from public.contractor_local_contacts
-   where id = v_invite.local_contact_id
-     and contractor_id = v_invite.contractor_id
+   where id = v_invite_local_contact_id
+     and contractor_id = v_invite_contractor_id
    for update;
 
   if v_contact.id is null then
     raise exception 'Local customer not found.';
   end if;
 
-  if v_contact.homeowner_user_id is not null and v_contact.homeowner_user_id <> auth.uid() then
+  if v_contact.homeowner_user_id is not null or v_contact.claimed_at is not null then
     raise exception 'This local customer profile has already been claimed.';
   end if;
 
-  if v_invite.local_home_id is not null then
+  if v_invite_local_home_id is not null then
     select *
       into v_local_home
       from public.contractor_local_homes
-     where id = v_invite.local_home_id
-       and contractor_id = v_invite.contractor_id
-       and local_contact_id = v_invite.local_contact_id
+     where id = v_invite_local_home_id
+       and contractor_id = v_invite_contractor_id
+       and local_contact_id = v_invite_local_contact_id
      for update;
 
     if v_local_home.id is null then
       raise exception 'Local home not found.';
     end if;
 
-    if v_local_home.home_id is not null and v_local_home.home_id <> p_home_id then
+    if v_local_home.home_id is not null or v_local_home.claimed_at is not null then
       raise exception 'This local home has already been claimed.';
     end if;
+  end if;
+
+  select *
+    into v_invite
+    from public.contractor_local_customer_claim_invites
+   where id = v_invite_id
+   for update;
+
+  if v_invite.id is null
+     or v_invite.contractor_id is distinct from v_invite_contractor_id
+     or v_invite.local_contact_id is distinct from v_invite_local_contact_id
+     or v_invite.local_home_id is distinct from v_invite_local_home_id
+     or v_invite.invite_token is distinct from lower(trim(coalesce(p_token, ''))) then
+    raise exception 'Claim link not found or no longer active.';
+  end if;
+
+  if v_invite.status <> 'pending' or v_invite.expires_at <= now() then
+    raise exception 'Claim link not found or no longer active.';
   end if;
 
   v_profile_updates := coalesce(p_profile_updates, '{}'::jsonb);
@@ -678,8 +1038,7 @@ begin
     raise exception 'Claim invite not found.';
   end if;
 
-  if not public.current_user_can_write_contractor_jobs(v_invite.contractor_id)
-     and not public.current_user_is_platform_admin() then
+  if not public.servsync_private_can_prepare_local_customer_claim_invites(v_invite.contractor_id) then
     raise exception 'You do not have permission to revoke this claim invite.';
   end if;
 

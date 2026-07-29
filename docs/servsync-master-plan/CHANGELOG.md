@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-28
 
+- Branch: `codex/local-claim-invite-delivery-guard`
+- Starting main SHA: `ffffa8b8523f9401f0d1c3e9ed5bdee47a8e69a2`
+- Files changed:
+  - `servsync-local-customer-claim-invites.sql`
+  - `servsync-local-customer-claim-token-fix.sql`
+  - `servsync-local-customer-claim-invite-token-containment.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/contractor-create-customer.spec.ts`
+  - `tests/e2e/local-customer-claim-invite-delivery.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a source-only hardening slice for local-customer claim-invite manual delivery. The SQL source adds an owner/admin/office-only prepare-delivery RPC, a token-free list RPC, create/lookup eligibility hardening, pending-invite duplicate prevention, private token-helper grants, and a separate final token-containment SQL step. The app no longer loads raw claim tokens through ordinary invite reads and now prepares Copy Link / QR tokens just in time through the guarded RPC.
+- Reason for change: The Task 2 audit found raw `invite_token` exposure through authenticated table reads, stale manual-delivery paths, missing claimed/homeowner-linked checks in claim invite creation/lookup, duplicate pending-invite race risk, and missing claim-invite security catalog coverage.
+- Tests/checks run:
+  - Focused local customer claim-invite delivery source/static tests were added.
+  - Security catalog coverage was expanded for local-customer claim-invite RPCs and private token helpers.
+  - Full validation and SQL application remain future approval-gated steps.
+- Known risks or follow-ups:
+  - SQL was not applied and no deployment occurred in this implementation task.
+  - Safe rollout must be SQL-first: review/preflight, apply additive SQL, validate in Sandbox, apply/validate in Production, deploy app, then apply the final direct-table-token containment step if it could not be safely applied before app deployment.
+  - Existing issued pending tokens should be reviewed during SQL preflight for duplicate/stale state before any production application.
+  - Email, SMS, provider delivery, notification sends, transactional outbox, and delivery-attempt tracking remain explicitly excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003 now records the local-customer claim-invite manual delivery token boundary, approved roles, SQL-first rollout state, and exclusions.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Contractor local customer strategy now distinguishes guarded manual link/QR preparation from future notification/email/SMS/provider delivery.
+
 - Branch: `codex/local-customer-profile-edit`
 - Starting main SHA: `846ad5dda335b1ea2893ac16741dfd2f25800e57`
 - Files changed:

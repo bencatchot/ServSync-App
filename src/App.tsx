@@ -7769,6 +7769,17 @@ function userCanSubmitContractorReferralUi(
   return activeMember?.role === 'admin' || activeMember?.role === 'office';
 }
 
+function userCanPrepareLocalCustomerClaimInvitesUi(
+  contractor: Pick<ContractorProfile, 'owner_user_id'> | null | undefined,
+  teamAccess: ContractorTeamAccess | null | undefined,
+  profileId: string,
+) {
+  if (!contractor) return false;
+  if (contractor.owner_user_id === profileId) return true;
+  const activeMember = teamAccess?.members.find(member => member.user_id === profileId && member.status === 'active');
+  return activeMember?.role === 'admin' || activeMember?.role === 'office';
+}
+
 function getContractorDisabledReason(entitlements: ContractorEntitlements | null | undefined, capability: ContractorEntitlementCapability) {
   const state = getContractorCapabilityState(entitlements, capability);
   return state.reason;
@@ -21695,7 +21706,10 @@ function ContractorDashboard({
   const [localClaimInvites, setLocalClaimInvites] = useState<LocalCustomerClaimInvite[]>([]);
   const [creatingLocalClaimInviteId, setCreatingLocalClaimInviteId] = useState<string | null>(null);
   const [revokingLocalClaimInviteId, setRevokingLocalClaimInviteId] = useState<string | null>(null);
-  const [showQrForLocalClaimInvite, setShowQrForLocalClaimInvite] = useState<string | null>(null);
+  const [copyingLocalClaimInviteId, setCopyingLocalClaimInviteId] = useState<string | null>(null);
+  const [preparingQrLocalClaimInviteId, setPreparingQrLocalClaimInviteId] = useState<string | null>(null);
+  const [preparedLocalClaimInviteQr, setPreparedLocalClaimInviteQr] = useState<{ inviteId: string; localContactId: string; token: string } | null>(null);
+  const localClaimInviteQrRequestIdRef = useRef(0);
   const [selectedHomeownerWorkspaceLocalHomeId, setSelectedHomeownerWorkspaceLocalHomeId] = useState('');
   const [addingLocalHomeContactId, setAddingLocalHomeContactId] = useState<string | null>(null);
   const [savingLocalHomeContactId, setSavingLocalHomeContactId] = useState<string | null>(null);
@@ -22531,11 +22545,9 @@ function ContractorDashboard({
             .select('*, homes:contractor_local_homes(*)')
             .eq('contractor_id', loadedContractor.id)
             .order('created_at', { ascending: false }),
-          supabase
-            .from('contractor_local_customer_claim_invites')
-            .select('*')
-            .eq('contractor_id', loadedContractor.id)
-            .order('created_at', { ascending: false }),
+          supabase.rpc('servsync_list_local_customer_claim_invites', {
+            p_contractor_id: loadedContractor.id,
+          }),
           supabase
             .from('estimates')
             .select(ESTIMATE_WITH_LINES_SELECT)
@@ -30967,6 +30979,38 @@ function ContractorDashboard({
       : 'Contractor';
   const canManageServiceAgreements = userCanManageServiceAgreementUi(contractorDraft, teamAccess, profile.id);
   const canSubmitContractorReferral = userCanSubmitContractorReferralUi(contractorDraft, teamAccess, profile.id);
+  const canPrepareLocalCustomerClaimInvites = userCanPrepareLocalCustomerClaimInvitesUi(contractorDraft, teamAccess, profile.id);
+  const clearPreparedLocalClaimInviteQr = useCallback(() => {
+    localClaimInviteQrRequestIdRef.current += 1;
+    setPreparedLocalClaimInviteQr(null);
+  }, []);
+  useEffect(() => {
+    clearPreparedLocalClaimInviteQr();
+  }, [selectedHomeownerSubjectId, homeownerDetailTab, contractorTab, clearPreparedLocalClaimInviteQr]);
+  useEffect(() => {
+    if (!preparedLocalClaimInviteQr) return;
+    const selectedLocalContactId = selectedHomeownerSubjectId?.startsWith('local:')
+      ? selectedHomeownerSubjectId.slice('local:'.length)
+      : null;
+    const preparedInvite = localClaimInvites.find(invite => invite.id === preparedLocalClaimInviteQr.inviteId) ?? null;
+    if (
+      !canPrepareLocalCustomerClaimInvites
+      || homeownerDetailTab !== 'profile'
+      || selectedLocalContactId !== preparedLocalClaimInviteQr.localContactId
+      || !preparedInvite
+      || preparedInvite.local_contact_id !== preparedLocalClaimInviteQr.localContactId
+      || effectiveLocalClaimInviteStatus(preparedInvite) !== 'pending'
+    ) {
+      clearPreparedLocalClaimInviteQr();
+    }
+  }, [
+    canPrepareLocalCustomerClaimInvites,
+    clearPreparedLocalClaimInviteQr,
+    homeownerDetailTab,
+    localClaimInvites,
+    preparedLocalClaimInviteQr,
+    selectedHomeownerSubjectId,
+  ]);
   const contractorReferralRoleDeniedReason = 'Only the contractor owner, admin, or office role can submit contractor referrals.';
   const contractorReferralActionsDisabledReason = isContractorReadOnly(contractorEntitlementState.entitlements)
     ? contractorEntitlementState.entitlements?.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
@@ -31520,7 +31564,7 @@ function ContractorDashboard({
               ? { ...invite, status: 'revoked', revoked_at: invite.revoked_at ?? nowIso, updated_at: nowIso }
               : invite
           )));
-          if (showQrForLocalClaimInvite) setShowQrForLocalClaimInvite(null);
+          clearPreparedLocalClaimInviteQr();
         }
         closeEditLocalCustomerProfileForm();
         setSelectedHomeownerSubjectId(`local:${updatedContact.id}`);
@@ -31693,19 +31737,18 @@ function ContractorDashboard({
 
       const inviteResult = data as {
         id?: string;
-        invite_token?: string;
         status?: LocalCustomerClaimInviteStatus;
         expires_at?: string;
         local_contact_id?: string;
         local_home_id?: string | null;
+        reused_existing?: boolean;
       } | null;
-      if (inviteResult?.id && inviteResult.invite_token) {
+      if (inviteResult?.id) {
         const newInvite: LocalCustomerClaimInvite = {
           id: inviteResult.id,
           contractor_id: contact.contractor_id,
           local_contact_id: inviteResult.local_contact_id ?? contact.id,
           local_home_id: inviteResult.local_home_id ?? localHome?.id ?? null,
-          invite_token: inviteResult.invite_token,
           invited_email: contact.email || null,
           invited_phone: contact.phone || null,
           status: inviteResult.status ?? 'pending',
@@ -31721,10 +31764,13 @@ function ContractorDashboard({
           updated_at: new Date().toISOString(),
         };
         setLocalClaimInvites(prev => [newInvite, ...prev.filter(invite => invite.id !== newInvite.id)]);
-        setShowQrForLocalClaimInvite(newInvite.id);
+        clearPreparedLocalClaimInviteQr();
       }
       setHomeownerDetailTab('profile');
-      setNotice('Claim invite created. Copy the link or show the QR code for the homeowner.');
+      setNotice(inviteResult?.reused_existing
+        ? 'Existing claim invite is still valid. Copy the link or show the QR code when you are ready to share it manually.'
+        : 'Claim invite created. Copy the link or show the QR code when you are ready to share it manually.'
+      );
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to create claim invite.'));
@@ -31733,13 +31779,78 @@ function ContractorDashboard({
     }
   };
 
+  const prepareLocalCustomerClaimInviteDelivery = async (invite: LocalCustomerClaimInvite) => {
+    if (!supabase) throw new Error('ServSync is still loading.');
+    const { data, error: prepareError } = await supabase.rpc('servsync_prepare_local_customer_claim_invite_delivery', {
+      p_invite_id: invite.id,
+    });
+    if (prepareError) throw prepareError;
+
+    const prepared = data as {
+      invite_token?: string;
+      status?: LocalCustomerClaimInviteStatus;
+      expires_at?: string;
+    } | null;
+    const token = prepared?.invite_token?.trim();
+    if (!token) throw new Error('Claim invite link is unavailable.');
+
+    if (prepared?.status || prepared?.expires_at) {
+      setLocalClaimInvites(prev => prev.map(item => item.id === invite.id
+        ? {
+            ...item,
+            status: prepared.status ?? item.status,
+            expires_at: prepared.expires_at ?? item.expires_at,
+          }
+        : item
+      ));
+    }
+
+    return token;
+  };
+
   const copyLocalCustomerClaimInvite = async (invite: LocalCustomerClaimInvite) => {
+    if (!canPrepareLocalCustomerClaimInvites) {
+      setError('Only the contractor owner, admin, or office role can prepare claim invite links.');
+      return;
+    }
     setError('');
+    setCopyingLocalClaimInviteId(invite.id);
     try {
-      await navigator.clipboard?.writeText(localCustomerClaimInviteUrl(invite.invite_token));
-      setNotice('Claim invite link copied.');
+      const token = await prepareLocalCustomerClaimInviteDelivery(invite);
+      await navigator.clipboard?.writeText(localCustomerClaimInviteUrl(token));
+      setNotice('Claim invite link copied. No email, SMS, or notification was sent.');
     } catch (err) {
+      await loadContractor();
       setError(readableError(err, 'Unable to copy claim invite link.'));
+    } finally {
+      setCopyingLocalClaimInviteId(null);
+    }
+  };
+
+  const toggleLocalCustomerClaimInviteQr = async (invite: LocalCustomerClaimInvite) => {
+    if (preparedLocalClaimInviteQr?.inviteId === invite.id) {
+      clearPreparedLocalClaimInviteQr();
+      return;
+    }
+    if (!canPrepareLocalCustomerClaimInvites) {
+      setError('Only the contractor owner, admin, or office role can prepare claim invite QR codes.');
+      return;
+    }
+    setError('');
+    setPreparingQrLocalClaimInviteId(invite.id);
+    const requestId = localClaimInviteQrRequestIdRef.current + 1;
+    localClaimInviteQrRequestIdRef.current = requestId;
+    try {
+      const token = await prepareLocalCustomerClaimInviteDelivery(invite);
+      if (localClaimInviteQrRequestIdRef.current !== requestId) return;
+      setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token });
+      setNotice('Claim invite QR code is ready to share manually. No email, SMS, or notification was sent.');
+    } catch (err) {
+      clearPreparedLocalClaimInviteQr();
+      await loadContractor();
+      setError(readableError(err, 'Unable to prepare claim invite QR code.'));
+    } finally {
+      setPreparingQrLocalClaimInviteId(null);
     }
   };
 
@@ -31758,7 +31869,7 @@ function ContractorDashboard({
           ? { ...item, status: 'revoked', revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() }
           : item
       )));
-      if (showQrForLocalClaimInvite === invite.id) setShowQrForLocalClaimInvite(null);
+      if (preparedLocalClaimInviteQr?.inviteId === invite.id) clearPreparedLocalClaimInviteQr();
       setNotice('Claim invite revoked.');
       await loadContractor();
     } catch (err) {
@@ -35105,8 +35216,8 @@ function ContractorDashboard({
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
-                    const localClaimInviteLink = latestLocalClaimInvite?.invite_token
-                      ? localCustomerClaimInviteUrl(latestLocalClaimInvite.invite_token)
+                    const preparedLocalClaimInviteLink = preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite?.id
+                      ? localCustomerClaimInviteUrl(preparedLocalClaimInviteQr.token)
                       : '';
                     const rawFieldWork = conn ? fieldWorkForHomeowner(conn.homeowner_user_id) : (localCustomer ? fieldWorkForLocalContact(localCustomer.id) : []);
                     const rawSubjectEstimates = conn
@@ -36348,48 +36459,70 @@ function ContractorDashboard({
                                         ) : latestLocalClaimInvite && localClaimStatus === 'pending' ? (
                                           <div className="mt-4 space-y-3">
                                             <div className="rounded-lg border border-blue-100 bg-white p-3">
-                                              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Claim link</p>
-                                              <p className="mt-1 break-all text-xs text-slate-600">{localClaimInviteLink}</p>
+                                              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Manual claim invite</p>
+                                              <p className="mt-1 text-xs text-slate-600">
+                                                Copy or show the QR code only when you are ready to share it. ServSync does not email or text this invite.
+                                              </p>
                                               <p className="mt-2 text-xs text-slate-500">Expires {formatDateTime(latestLocalClaimInvite.expires_at)}</p>
                                             </div>
-                                            <div className="flex flex-wrap gap-2">
-                                              <button type="button" onClick={() => void copyLocalCustomerClaimInvite(latestLocalClaimInvite)} className={buttonClass('primary')}>
-                                                Copy Claim Link
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => setShowQrForLocalClaimInvite(showQrForLocalClaimInvite === latestLocalClaimInvite.id ? null : latestLocalClaimInvite.id)}
-                                                className={buttonClass('secondary')}
-                                              >
-                                                {showQrForLocalClaimInvite === latestLocalClaimInvite.id ? 'Hide QR Code' : 'Show QR Code'}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                disabled={revokingLocalClaimInviteId === latestLocalClaimInvite.id}
-                                                onClick={() => void revokeLocalCustomerClaimInvite(latestLocalClaimInvite)}
-                                                className={buttonClass('secondary')}
-                                              >
-                                                {revokingLocalClaimInviteId === latestLocalClaimInvite.id ? 'Revoking...' : 'Revoke Invite'}
-                                              </button>
-                                            </div>
-                                            {showQrForLocalClaimInvite === latestLocalClaimInvite.id && (
+                                            {canPrepareLocalCustomerClaimInvites ? (
+                                              <div className="flex flex-wrap gap-2">
+                                                <button
+                                                  type="button"
+                                                  disabled={copyingLocalClaimInviteId === latestLocalClaimInvite.id}
+                                                  onClick={() => void copyLocalCustomerClaimInvite(latestLocalClaimInvite)}
+                                                  className={buttonClass('primary')}
+                                                >
+                                                  {copyingLocalClaimInviteId === latestLocalClaimInvite.id ? 'Preparing...' : 'Copy Claim Link'}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={preparingQrLocalClaimInviteId === latestLocalClaimInvite.id}
+                                                  onClick={() => void toggleLocalCustomerClaimInviteQr(latestLocalClaimInvite)}
+                                                  className={buttonClass('secondary')}
+                                                >
+                                                  {preparingQrLocalClaimInviteId === latestLocalClaimInvite.id
+                                                    ? 'Preparing...'
+                                                    : preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite.id ? 'Hide QR Code' : 'Show QR Code'}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={revokingLocalClaimInviteId === latestLocalClaimInvite.id}
+                                                  onClick={() => void revokeLocalCustomerClaimInvite(latestLocalClaimInvite)}
+                                                  className={buttonClass('secondary')}
+                                                >
+                                                  {revokingLocalClaimInviteId === latestLocalClaimInvite.id ? 'Revoking...' : 'Revoke Invite'}
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+                                                Only the contractor owner, admin, or office role can prepare claim invite links or QR codes.
+                                              </p>
+                                            )}
+                                            {preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite.id && preparedLocalClaimInviteLink && (
                                               <div className="rounded-xl border border-blue-100 bg-white p-4">
-                                                <QRDisplay value={localClaimInviteLink} fileName={`servsync-claim-${localCustomer.id}`} />
+                                                <QRDisplay value={preparedLocalClaimInviteLink} fileName={`servsync-claim-${localCustomer.id}`} />
                                               </div>
                                             )}
                                           </div>
                                         ) : (
                                           <div className="mt-4 flex flex-wrap items-center gap-2">
-                                            <button
-                                              type="button"
-                                              disabled={creatingLocalClaimInviteId === localCustomer.id}
-                                              onClick={() => void createLocalCustomerClaimInvite(localCustomer)}
-                                              className={buttonClass('primary')}
-                                            >
-                                              {creatingLocalClaimInviteId === localCustomer.id
-                                                ? 'Creating...'
-                                                : latestLocalClaimInvite ? 'Create New ServSync Invite' : 'Invite to ServSync'}
-                                            </button>
+                                            {canPrepareLocalCustomerClaimInvites ? (
+                                              <button
+                                                type="button"
+                                                disabled={creatingLocalClaimInviteId === localCustomer.id}
+                                                onClick={() => void createLocalCustomerClaimInvite(localCustomer)}
+                                                className={buttonClass('primary')}
+                                              >
+                                                {creatingLocalClaimInviteId === localCustomer.id
+                                                  ? 'Creating...'
+                                                  : latestLocalClaimInvite ? 'Create New ServSync Invite' : 'Invite to ServSync'}
+                                              </button>
+                                            ) : (
+                                              <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+                                                Only the contractor owner, admin, or office role can create or share ServSync claim invites.
+                                              </p>
+                                            )}
                                             {localClaimStatus && latestLocalClaimInvite && (
                                               <p className="text-xs text-slate-500">
                                                 Last invite: {LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus]} · Updated {formatDateTime(latestLocalClaimInvite.updated_at)}
@@ -36476,7 +36609,7 @@ function ContractorDashboard({
                                     <h3 className="font-bold text-slate-950">Jobs dashboard</h3>
                                     <p className="mt-1 text-sm text-slate-500">Quick view for this customer. Create and manage the actual workflow in Jobs.</p>
                                   </div>
-                                  {!isConn && localCustomer && (
+                                  {!isConn && localCustomer && canPrepareLocalCustomerClaimInvites && (
                                     <button
                                       type="button"
                                       disabled={creatingLocalClaimInviteId === localCustomer.id || localCustomerIsClaimed}

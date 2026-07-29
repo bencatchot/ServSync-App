@@ -34,7 +34,9 @@ begin
 end;
 $$;
 
-grant execute on function public.servsync_generate_local_customer_claim_token() to authenticated;
+revoke execute on function public.servsync_generate_local_customer_claim_token() from public;
+revoke execute on function public.servsync_generate_local_customer_claim_token() from anon;
+revoke execute on function public.servsync_generate_local_customer_claim_token() from authenticated;
 
 notify pgrst, 'reload schema';
 
