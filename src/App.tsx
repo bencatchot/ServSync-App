@@ -35378,7 +35378,7 @@ function ContractorDashboard({
                       return address && address !== primary ? `${primary} — ${address}` : primary;
                     };
                     const primaryConnectedHome = selectedWorkspaceHome ?? connectedHomes[0] ?? conn?.home ?? null;
-                    const headerName = conn ? (perm!.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer!.display_name || 'New customer');
+                    const headerName = conn ? (perm?.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer?.display_name || 'New customer');
                     const localHome = selectedWorkspaceLocalHome ?? localHomes[0] ?? null;
                     const localHeaderAddress = localHomes.length > 1 && homeownerWorkspacePropertyScope === 'all'
                       ? `${localHomes.length} properties on file`
@@ -35386,8 +35386,8 @@ function ContractorDashboard({
                     const localHeaderCity = localHomes.length > 1 && homeownerWorkspacePropertyScope === 'all'
                       ? ''
                       : `${localHome?.city ?? ''}${localHome?.state ? `, ${localHome.state}` : ''}`.trim().replace(/^,\s*/, '');
-                    const headerAddress = conn ? (perm!.share_address ? (primaryConnectedHome?.address_line1 || '') : 'Address private') : localHeaderAddress;
-                    const headerCity = conn ? (perm!.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : localHeaderCity;
+                    const headerAddress = conn ? (perm?.share_address ? (primaryConnectedHome?.address_line1 || '') : 'Address private') : localHeaderAddress;
+                    const headerCity = conn ? (perm?.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : localHeaderCity;
                     const localClaimInvitesForCustomer = localCustomer
                       ? localClaimInvites
                           .filter(invite => invite.local_contact_id === localCustomer.id)
@@ -35395,10 +35395,23 @@ function ContractorDashboard({
                       : [];
 	                    const pendingLocalClaimInvite = localClaimInvitesForCustomer.find(invite => effectiveLocalClaimInviteStatus(invite) === 'pending') ?? null;
 	                    const latestLocalClaimInvite = pendingLocalClaimInvite ?? localClaimInvitesForCustomer[0] ?? null;
-	                    const latestLocalClaimInvitePropertyCount = localClaimInvitePropertyCount(latestLocalClaimInvite);
-	                    const latestLocalClaimInvitePropertyIds = new Set(localClaimInvitePropertyIds(latestLocalClaimInvite));
-	                    const claimInviteEligibleLocalHomes = localHomes.filter(home => !home.home_id && !home.claimed_at);
-	                    const selectedClaimInviteHomeIds = localCustomer ? selectedClaimInviteHomeIdsForContact(localCustomer) : [];
+	                    const localClaimWorkspace = localCustomer
+	                      ? {
+	                          latestPropertyCount: localClaimInvitePropertyCount(latestLocalClaimInvite),
+	                          latestPropertyIds: new Set(localClaimInvitePropertyIds(latestLocalClaimInvite)),
+	                          eligibleHomes: localHomes.filter(home => !home.home_id && !home.claimed_at),
+	                          selectedHomeIds: selectedClaimInviteHomeIdsForContact(localCustomer),
+	                        }
+	                      : {
+	                          latestPropertyCount: 0,
+	                          latestPropertyIds: new Set<string>(),
+	                          eligibleHomes: [] as ContractorLocalHome[],
+	                          selectedHomeIds: [] as string[],
+	                        };
+	                    const latestLocalClaimInvitePropertyCount = localClaimWorkspace.latestPropertyCount;
+	                    const latestLocalClaimInvitePropertyIds = localClaimWorkspace.latestPropertyIds;
+	                    const claimInviteEligibleLocalHomes = localClaimWorkspace.eligibleHomes;
+	                    const selectedClaimInviteHomeIds = localClaimWorkspace.selectedHomeIds;
 	                    const localClaimStatus = localCustomerProfileIsClaimed(localCustomer)
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);

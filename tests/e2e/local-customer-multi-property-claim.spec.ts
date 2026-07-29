@@ -181,4 +181,22 @@ test.describe('local customer multi-property claim source checks', () => {
     expect(contractorInviteUi).not.toMatch(/send.*(email|sms)|edge function/i);
     expect(claimPage).not.toMatch(/send.*(email|sms)|edge function/i);
   });
+
+  test('connected-homeowner detail rendering does not execute local-claim selection logic', () => {
+    const app = source('src/App.tsx');
+    const homeownerWorkspace = sourceBetween(
+      app,
+      "const isConn = selectedSubject.kind === 'connection';",
+      'const rawFieldWork = conn ? fieldWorkForHomeowner(conn.homeowner_user_id)',
+    );
+
+    expect(homeownerWorkspace).toContain('const localClaimWorkspace = localCustomer');
+    expect(homeownerWorkspace).toContain('? {');
+    expect(homeownerWorkspace).toContain('selectedHomeIds: selectedClaimInviteHomeIdsForContact(localCustomer)');
+    expect(homeownerWorkspace).toContain('selectedHomeIds: [] as string[]');
+    expect(homeownerWorkspace).toContain('perm?.share_contact');
+    expect(homeownerWorkspace).toContain('perm?.share_address');
+    expect(homeownerWorkspace).not.toContain('perm!.');
+    expect(homeownerWorkspace).not.toContain('localCustomer!.display_name');
+  });
 });

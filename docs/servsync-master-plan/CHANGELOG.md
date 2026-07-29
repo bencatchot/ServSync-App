@@ -34,6 +34,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Production SQL, merge, and deployment remain separate owner-authorized gates.
   - Sandbox SQL and preview validation must prove runtime SQL behavior, atomic success/failure, unauthorized rejection, token boundary preservation, and cleanup with synthetic Sandbox records before Production release is considered.
   - Email, SMS, notification, provider delivery, reliable receipt, and delivery-attempt tracking remain explicitly excluded.
+  - Preview regression follow-up: hardened the selected-homeowner workspace so connected-homeowner rendering uses optional permission/profile access and does not execute local-customer-only claim-selection derivation; added focused regression coverage after a connected homeowner opened to a blank screen in the PR preview.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-003 now records the multi-property local-customer claim redesign, explicit selected-property membership, atomic homeowner mapping/acceptance, and Production-release gating.
