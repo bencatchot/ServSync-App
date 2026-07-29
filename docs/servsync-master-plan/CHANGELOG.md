@@ -4,6 +4,45 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-29
+
+- Branch: `codex/local-customer-multi-property-claim-v1`
+- Starting main SHA: `45cc8ad84721619fbd7a1533a8fdd19c16ddeca7`
+- Files changed:
+  - `servsync-local-customer-multi-property-claim.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/local-customer-claim-invite-delivery.spec.ts`
+  - `tests/e2e/local-customer-multi-property-claim.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the pre-Production multi-property local-customer claim redesign. One local-customer claim invite now has an explicit selected-property membership table, token-free v2 list/lookup metadata, guarded prepare revalidation across the selected property set, v2 atomic homeowner acceptance with per-property create-or-match mappings, and legacy create/accept wrappers that preserve single-property compatibility while rejecting unsafe multi-property partial acceptance.
+- Reason for change: Contractors need one controlled manual claim invite for the exact local properties they choose, while homeowners need to review and map every included property before ServSync links the contractor-created local customer and property set.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/local-customer-multi-property-claim.spec.ts tests/e2e/local-customer-claim-invite-delivery.spec.ts --reporter=list --trace=off`
+  - `bash -n scripts/apply-sql-dry-run.sh scripts/apply-blank-supabase-schema.sh`
+  - `git diff --check`
+- Known risks or follow-ups:
+  - Production SQL, merge, and deployment remain separate owner-authorized gates.
+  - Sandbox SQL and preview validation must prove runtime SQL behavior, atomic success/failure, unauthorized rejection, token boundary preservation, and cleanup with synthetic Sandbox records before Production release is considered.
+  - Email, SMS, notification, provider delivery, reliable receipt, and delivery-attempt tracking remain explicitly excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003 now records the multi-property local-customer claim redesign, explicit selected-property membership, atomic homeowner mapping/acceptance, and Production-release gating.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Contractor local customer strategy now includes the pre-Production multi-property claim flow and keeps delivery/provider work separate.
+- Marketing inventory impact:
+  - MARKETING INVENTORY UPDATED: YES
+  - REASON: The local customers and claim invites inventory now describes selected-property manual claim invites without promising automated delivery or public referral growth.
+
 ## 2026-07-28
 
 - Branch: `codex/local-claim-invite-delivery-guard`

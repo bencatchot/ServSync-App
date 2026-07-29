@@ -112,6 +112,8 @@ SQL_FILES=(
   "servsync-fix-contractor-logo-upload-policy-v2.sql"
   "servsync-local-customer-claim-invites.sql"
   "servsync-local-customer-claim-token-fix.sql"
+  "servsync-local-customer-claim-invite-token-containment.sql"
+  "servsync-local-customer-multi-property-claim.sql"
   "servsync-support-inquiries.sql"
   "servsync-support-attachments.sql"
   "servsync-stripe-prep.sql"

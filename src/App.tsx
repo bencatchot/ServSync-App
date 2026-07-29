@@ -372,6 +372,7 @@ import type {
   HomeownerProfile,
   InvitePreview,
   LocalCustomerClaimInvite,
+  LocalCustomerClaimInviteProperty,
   LocalCustomerClaimInviteStatus,
   PlatformOverview,
   PlatformConnectionOverview,
@@ -1239,6 +1240,7 @@ type LocalCustomerClaimPreview = {
   invite_id: string;
   status: LocalCustomerClaimInviteStatus;
   expires_at: string;
+  property_count?: number;
   contractor: {
     id: string;
     business_name: string;
@@ -1251,6 +1253,7 @@ type LocalCustomerClaimPreview = {
     phone?: string | null;
   };
   home: {
+    local_home_id?: string | null;
     nickname?: string | null;
     address_line1?: string | null;
     address_line2?: string | null;
@@ -1261,6 +1264,23 @@ type LocalCustomerClaimPreview = {
     year_built?: string | null;
     square_feet?: string | null;
   } | null;
+  homes?: LocalCustomerClaimInviteProperty[];
+};
+
+type LocalCustomerClaimHomeMappingDraft = {
+  mode: 'create' | 'existing';
+  home_id: string;
+  home_updates: {
+    nickname: string;
+    address_line1: string;
+    address_line2: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    home_type: string;
+    year_built: string;
+    square_feet: string;
+  };
 };
 
 const CONTRACTOR_TEAM_ROLE_LABELS: Record<ContractorTeamRole, string> = {
@@ -6605,6 +6625,31 @@ function effectiveLocalClaimInviteStatus(invite?: LocalCustomerClaimInvite | nul
   return invite.status;
 }
 
+function localClaimInvitePropertyIds(invite?: LocalCustomerClaimInvite | null) {
+  if (!invite) return [];
+  const ids = invite.local_home_ids?.length
+    ? invite.local_home_ids
+    : invite.properties?.map(property => property.local_home_id)
+      ?? (invite.local_home_id ? [invite.local_home_id] : []);
+  return [...new Set(ids.filter(Boolean))].sort();
+}
+
+function localClaimInvitePropertySignature(invite?: LocalCustomerClaimInvite | null) {
+  return localClaimInvitePropertyIds(invite).join('|');
+}
+
+function localClaimInvitePropertyCount(invite?: LocalCustomerClaimInvite | null) {
+  return invite?.property_count ?? localClaimInvitePropertyIds(invite).length;
+}
+
+function localCustomerClaimPreviewHomes(preview?: LocalCustomerClaimPreview | null): LocalCustomerClaimInviteProperty[] {
+  if (!preview) return [];
+  if (preview.homes?.length) return preview.homes.filter(home => Boolean(home.local_home_id));
+  if (!preview.home) return [];
+  if (!preview.home.local_home_id) return [];
+  return [{ ...preview.home, local_home_id: preview.home.local_home_id }];
+}
+
 function localCustomerClaimInviteUrl(token: string) {
   return homeownerClaimUrl(token);
 }
@@ -9400,7 +9445,7 @@ function LocalCustomerClaimPage({
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
   const [signupConfirmation, setSignupConfirmation] = useState<{ email: string; nextStepHint?: string } | null>(null);
-  const [existingHome, setExistingHome] = useState<HomeProfile | null>(null);
+  const [existingHomes, setExistingHomes] = useState<HomeProfile[]>([]);
   const [loadingHome, setLoadingHome] = useState(false);
   const [profileUpdates, setProfileUpdates] = useState({
     display_name: '',
@@ -9409,21 +9454,38 @@ function LocalCustomerClaimPage({
     state: '',
     zip_code: '',
   });
-  const [homeUpdates, setHomeUpdates] = useState({
-    nickname: '',
-    address_line1: '',
-    address_line2: '',
-    city: '',
-    state: '',
-    zip_code: '',
-    home_type: '',
-    year_built: '',
-    square_feet: '',
-  });
+  const [homeMappingDrafts, setHomeMappingDrafts] = useState<Record<string, LocalCustomerClaimHomeMappingDraft>>({});
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimMessage, setClaimMessage] = useState('');
   const [claimError, setClaimError] = useState('');
   const prefilledRef = useRef(false);
+
+  const homeDraftFromInvitedProperty = (home?: LocalCustomerClaimInviteProperty | null) => ({
+    nickname: home?.nickname || 'My Home',
+    address_line1: home?.address_line1 || '',
+    address_line2: home?.address_line2 || '',
+    city: home?.city || '',
+    state: home?.state || '',
+    zip_code: home?.zip_code || '',
+    home_type: home?.home_type || '',
+    year_built: home?.year_built || '',
+    square_feet: home?.square_feet || '',
+  });
+
+  const updateHomeMappingDraft = (
+    localHomeId: string,
+    updater: (draft: LocalCustomerClaimHomeMappingDraft) => LocalCustomerClaimHomeMappingDraft
+  ) => {
+    setHomeMappingDrafts(prev => {
+      const invitedHome = localCustomerClaimPreviewHomes(preview).find(home => home.local_home_id === localHomeId) ?? null;
+      const current = prev[localHomeId] ?? {
+        mode: 'create',
+        home_id: '',
+        home_updates: homeDraftFromInvitedProperty(invitedHome),
+      };
+      return { ...prev, [localHomeId]: updater(current) };
+    });
+  };
 
   useEffect(() => {
     if (!supabase || !token) return;
@@ -9438,6 +9500,15 @@ function LocalCustomerClaimPage({
         if (error) throw error;
         const nextPreview = data as LocalCustomerClaimPreview;
         setPreview(nextPreview);
+        const previewHomes = localCustomerClaimPreviewHomes(nextPreview);
+        setHomeMappingDrafts(previewHomes.reduce<Record<string, LocalCustomerClaimHomeMappingDraft>>((drafts, home) => {
+          drafts[home.local_home_id] = {
+            mode: 'create',
+            home_id: '',
+            home_updates: homeDraftFromInvitedProperty(home),
+          };
+          return drafts;
+        }, {}));
         if (!prefilledRef.current) {
           prefilledRef.current = true;
           const contactName = nextPreview.contact?.display_name || '';
@@ -9453,21 +9524,11 @@ function LocalCustomerClaimPage({
             state: home?.state || '',
             zip_code: home?.zip_code || '',
           });
-          setHomeUpdates({
-            nickname: home?.nickname || 'My Home',
-            address_line1: home?.address_line1 || '',
-            address_line2: home?.address_line2 || '',
-            city: home?.city || '',
-            state: home?.state || '',
-            zip_code: home?.zip_code || '',
-            home_type: home?.home_type || '',
-            year_built: home?.year_built || '',
-            square_feet: home?.square_feet || '',
-          });
         }
       } catch (err) {
         if (!mounted) return;
         setPreview(null);
+        setHomeMappingDrafts({});
         setPreviewError(readableError(err, 'This invite link is no longer available.'));
       } finally {
         if (mounted) setLoadingPreview(false);
@@ -9482,31 +9543,31 @@ function LocalCustomerClaimPage({
     const client = supabase;
     let mounted = true;
     setLoadingHome(true);
-    const loadExistingHome = async () => {
+    const loadExistingHomes = async () => {
       try {
         const { data, error } = await client
           .from('homes')
           .select('*')
           .eq('homeowner_user_id', profile.id)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
+          .order('created_at', { ascending: true });
         if (!mounted) return;
         if (error) throw error;
-        setExistingHome((data as HomeProfile | null) || null);
+        setExistingHomes((data || []) as HomeProfile[]);
       } catch (err) {
         if (mounted) setClaimError(readableError(err, 'Unable to check your existing home profile.'));
       } finally {
         if (mounted) setLoadingHome(false);
       }
     };
-    void loadExistingHome();
+    void loadExistingHomes();
     return () => { mounted = false; };
   }, [profile]);
 
   const unavailable = previewError || (!loadingPreview && !preview);
   const contractorName = preview?.contractor?.business_name || 'Your contractor';
   const contractorLocation = [preview?.contractor?.city, preview?.contractor?.state].filter(Boolean).join(', ');
+  const invitedHomes = localCustomerClaimPreviewHomes(preview);
+  const invitedPropertyCount = preview?.property_count ?? invitedHomes.length;
 
   const submitAuth = async () => {
     if (!supabase) return;
@@ -9563,10 +9624,47 @@ function LocalCustomerClaimPage({
     setClaimMessage('');
     setClaimError('');
     try {
-      const useExistingHome = Boolean(existingHome && preview.home);
-      const { error } = await supabase.rpc('servsync_accept_local_customer_claim', {
+      const invitedHomes = localCustomerClaimPreviewHomes(preview);
+      if (invitedHomes.length === 0) {
+        throw new Error('This invitation does not include any claimable properties.');
+      }
+
+      const mappings = invitedHomes.map(home => {
+        const draft = homeMappingDrafts[home.local_home_id];
+        if (!draft) {
+          throw new Error('Choose a destination for every invited property.');
+        }
+        return {
+          local_home_id: home.local_home_id,
+          mode: draft.mode,
+          home_id: draft.mode === 'existing' ? draft.home_id : null,
+          home_updates: draft.mode === 'create' ? {
+            nickname: draft.home_updates.nickname.trim(),
+            address_line1: draft.home_updates.address_line1.trim(),
+            address_line2: draft.home_updates.address_line2.trim(),
+            city: draft.home_updates.city.trim(),
+            state: draft.home_updates.state.trim(),
+            zip_code: draft.home_updates.zip_code.trim(),
+            home_type: draft.home_updates.home_type.trim(),
+            year_built: draft.home_updates.year_built.trim(),
+            square_feet: draft.home_updates.square_feet.trim(),
+          } : {},
+        };
+      });
+
+      const existingDestinationIds = mappings
+        .filter(mapping => mapping.mode === 'existing')
+        .map(mapping => mapping.home_id)
+        .filter(Boolean);
+      if (existingDestinationIds.length !== new Set(existingDestinationIds).size) {
+        throw new Error('Choose a different existing home for each invited property.');
+      }
+      if (mappings.some(mapping => mapping.mode === 'existing' && !mapping.home_id)) {
+        throw new Error('Choose an existing home for every matched property.');
+      }
+
+      const { error } = await supabase.rpc('servsync_accept_local_customer_claim_v2', {
         p_token: token,
-        p_home_id: useExistingHome ? existingHome!.id : null,
         p_profile_updates: {
           display_name: profileUpdates.display_name.trim(),
           phone: profileUpdates.phone.trim(),
@@ -9574,20 +9672,13 @@ function LocalCustomerClaimPage({
           state: profileUpdates.state.trim(),
           zip_code: profileUpdates.zip_code.trim(),
         },
-        p_home_updates: !useExistingHome && preview.home ? {
-          nickname: homeUpdates.nickname.trim(),
-          address_line1: homeUpdates.address_line1.trim(),
-          address_line2: homeUpdates.address_line2.trim(),
-          city: homeUpdates.city.trim(),
-          state: homeUpdates.state.trim(),
-          zip_code: homeUpdates.zip_code.trim(),
-          home_type: homeUpdates.home_type.trim(),
-          year_built: homeUpdates.year_built.trim(),
-          square_feet: homeUpdates.square_feet.trim(),
-        } : {},
+        p_home_mappings: mappings,
       });
       if (error) throw error;
-      setClaimMessage('Invite accepted. Your ServSync home profile and contractor connection are ready.');
+      setClaimMessage(invitedHomes.length > 1
+        ? 'Invite accepted. Your ServSync properties and contractor connection are ready.'
+        : 'Invite accepted. Your ServSync home profile and contractor connection are ready.'
+      );
       window.setTimeout(onClaimed, 700);
     } catch (err) {
       setClaimError(readableError(err, 'Unable to accept this invite.'));
@@ -9656,14 +9747,21 @@ function LocalCustomerClaimPage({
                 <InfoBox label="Customer name" value={preview?.contact?.display_name || 'Not provided'} />
                 <InfoBox label="Email" value={preview?.contact?.email || 'Not provided'} />
                 <InfoBox label="Phone" value={formatPhoneNumber(preview?.contact?.phone) || 'Not provided'} />
-                {preview?.home && (
-                  <>
-                    <InfoBox label="Home" value={preview.home.nickname || 'Home'} />
-                    <InfoBox label="Address" value={[preview.home.address_line1, preview.home.address_line2].filter(Boolean).join(', ') || 'Not provided'} />
-                    <InfoBox label="City / State / ZIP" value={[preview.home.city, preview.home.state, preview.home.zip_code].filter(Boolean).join(', ') || 'Not provided'} />
-                    <InfoBox label="Home type" value={preview.home.home_type || 'Not provided'} />
-                  </>
-                )}
+	                {invitedHomes.length > 0 && (
+	                  <div className="space-y-2">
+	                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+	                      {invitedPropertyCount === 1 ? 'Invited property' : `${invitedPropertyCount} invited properties`}
+	                    </p>
+	                    {invitedHomes.map((home, index) => (
+	                      <div key={home.local_home_id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+	                        <p className="text-sm font-bold text-slate-900">{home.nickname || `Property ${index + 1}`}</p>
+	                        <p className="mt-1 text-xs text-slate-600">{[home.address_line1, home.address_line2].filter(Boolean).join(', ') || 'Address not provided'}</p>
+	                        <p className="mt-1 text-xs text-slate-500">{[home.city, home.state, home.zip_code].filter(Boolean).join(', ') || 'City / state not provided'}</p>
+	                        {home.home_type && <p className="mt-1 text-xs text-slate-500">{home.home_type}</p>}
+	                      </div>
+	                    ))}
+	                  </div>
+	                )}
               </div>
               <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
                 Contractor private notes, unrelated records, and your private document library are not shown here.
@@ -9791,68 +9889,120 @@ function LocalCustomerClaimPage({
                 </Field>
               </div>
 
-              {preview?.home && (
-                existingHome ? (
-                  <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                    <p className="text-sm font-bold text-blue-950">You already have a home profile.</p>
-                    <p className="mt-1 text-sm leading-6 text-blue-900">
-                      For now, this invitation will link to your existing home: {existingHome.nickname || existingHome.address_line1 || 'My Home'}.
-                      Multi-property support is coming separately.
-                    </p>
-                    <p className="mt-2 text-xs text-blue-800">No existing home fields will be overwritten by this invite.</p>
-                  </div>
-                ) : (
-                  <div className="mt-5">
-                    <p className="mb-3 text-sm font-bold text-slate-950">Home details</p>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Home nickname">
-                        <input className={inputClass()} value={homeUpdates.nickname} onChange={event => setHomeUpdates(current => ({ ...current, nickname: event.target.value }))} />
-                      </Field>
-                      <Field label="Address">
-                        <input className={inputClass()} value={homeUpdates.address_line1} onChange={event => setHomeUpdates(current => ({ ...current, address_line1: event.target.value }))} />
-                      </Field>
-                      <Field label="Address line 2">
-                        <input className={inputClass()} value={homeUpdates.address_line2} onChange={event => setHomeUpdates(current => ({ ...current, address_line2: event.target.value }))} />
-                      </Field>
-                      <Field label="City">
-                        <input className={inputClass()} value={homeUpdates.city} onChange={event => setHomeUpdates(current => ({ ...current, city: event.target.value }))} />
-                      </Field>
-                      <Field label="State">
-                        <AutocompleteInput
-                          id="claim-home-state"
-                          value={homeUpdates.state}
-                          onChange={state => setHomeUpdates(current => ({ ...current, state }))}
-                          options={US_STATE_OPTIONS}
-                          placeholder="Start typing a state..."
-                        />
-                      </Field>
-                      <Field label="ZIP">
-                        <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={homeUpdates.zip_code} onChange={event => setHomeUpdates(current => ({ ...current, zip_code: event.target.value }))} />
-                      </Field>
-                      <Field label="Home type">
-                        <AutocompleteInput
-                          id="claim-home-type"
-                          value={homeUpdates.home_type}
-                          onChange={home_type => setHomeUpdates(current => ({ ...current, home_type }))}
-                          options={HOME_TYPE_OPTIONS}
-                          placeholder="Single family"
-                        />
-                      </Field>
-                      <Field label="Year built">
-                        <input className={inputClass()} value={homeUpdates.year_built} onChange={event => setHomeUpdates(current => ({ ...current, year_built: event.target.value }))} />
-                      </Field>
-                      <Field label="Square feet">
-                        <input className={inputClass()} value={homeUpdates.square_feet} onChange={event => setHomeUpdates(current => ({ ...current, square_feet: event.target.value }))} />
-                      </Field>
-                    </div>
-                  </div>
-                )
-              )}
+	              {invitedHomes.length > 0 && (
+	                <div className="mt-5 space-y-4">
+	                  <div>
+	                    <p className="text-sm font-bold text-slate-950">Property matching</p>
+	                    <p className="mt-1 text-xs leading-5 text-slate-500">
+	                      Choose one destination for each invited property. ServSync will claim the complete selected set together.
+	                    </p>
+	                  </div>
+	                  {invitedHomes.map((home, index) => {
+	                    const draft = homeMappingDrafts[home.local_home_id] ?? {
+	                      mode: 'create' as const,
+	                      home_id: '',
+	                      home_updates: homeDraftFromInvitedProperty(home),
+	                    };
+	                    return (
+	                      <div key={home.local_home_id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+	                        <div className="flex flex-wrap items-start justify-between gap-3">
+	                          <div>
+	                            <p className="text-sm font-bold text-slate-950">{home.nickname || `Property ${index + 1}`}</p>
+	                            <p className="mt-1 text-xs text-slate-600">{[home.address_line1, home.address_line2].filter(Boolean).join(', ') || 'Address not provided'}</p>
+	                            <p className="mt-1 text-xs text-slate-500">{[home.city, home.state, home.zip_code].filter(Boolean).join(', ') || 'City / state not provided'}</p>
+	                          </div>
+	                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+	                            Property {index + 1}
+	                          </span>
+	                        </div>
+	                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+	                          <button
+	                            type="button"
+	                            onClick={() => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, mode: 'create', home_id: '' }))}
+	                            className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${draft.mode === 'create' ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200'}`}
+	                          >
+	                            Create new ServSync property
+	                          </button>
+	                          <button
+	                            type="button"
+	                            disabled={existingHomes.length === 0}
+	                            onClick={() => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, mode: 'existing', home_id: current.home_id || existingHomes[0]?.id || '' }))}
+	                            className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${draft.mode === 'existing' ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200'}`}
+	                          >
+	                            Match an existing property
+	                          </button>
+	                        </div>
+	                        {draft.mode === 'existing' ? (
+	                          <div className="mt-4">
+	                            <Field label="Existing property">
+	                              <select
+	                                className={inputClass()}
+	                                value={draft.home_id}
+	                                onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_id: event.target.value }))}
+	                              >
+	                                <option value="">Choose a property...</option>
+	                                {existingHomes.map(existing => (
+	                                  <option key={existing.id} value={existing.id}>
+	                                    {existing.nickname || existing.address_line1 || 'ServSync property'}
+	                                  </option>
+	                                ))}
+	                              </select>
+	                            </Field>
+	                            <p className="mt-2 text-xs text-slate-500">Existing property details will not be overwritten by this invite.</p>
+	                          </div>
+	                        ) : (
+	                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+	                            <Field label="Property nickname">
+	                              <input className={inputClass()} value={draft.home_updates.nickname} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, nickname: event.target.value } }))} />
+	                            </Field>
+	                            <Field label="Address">
+	                              <input className={inputClass()} value={draft.home_updates.address_line1} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, address_line1: event.target.value } }))} />
+	                            </Field>
+	                            <Field label="Address line 2">
+	                              <input className={inputClass()} value={draft.home_updates.address_line2} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, address_line2: event.target.value } }))} />
+	                            </Field>
+	                            <Field label="City">
+	                              <input className={inputClass()} value={draft.home_updates.city} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, city: event.target.value } }))} />
+	                            </Field>
+	                            <Field label="State">
+	                              <AutocompleteInput
+	                                id={`claim-home-state-${home.local_home_id}`}
+	                                value={draft.home_updates.state}
+	                                onChange={state => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, state } }))}
+	                                options={US_STATE_OPTIONS}
+	                                placeholder="Start typing a state..."
+	                              />
+	                            </Field>
+	                            <Field label="ZIP">
+	                              <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={draft.home_updates.zip_code} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, zip_code: event.target.value } }))} />
+	                            </Field>
+	                            <Field label="Home type">
+	                              <AutocompleteInput
+	                                id={`claim-home-type-${home.local_home_id}`}
+	                                value={draft.home_updates.home_type}
+	                                onChange={home_type => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, home_type } }))}
+	                                options={HOME_TYPE_OPTIONS}
+	                                placeholder="Single family"
+	                              />
+	                            </Field>
+	                            <Field label="Year built">
+	                              <input className={inputClass()} value={draft.home_updates.year_built} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, year_built: event.target.value } }))} />
+	                            </Field>
+	                            <Field label="Square feet">
+	                              <input className={inputClass()} value={draft.home_updates.square_feet} onChange={event => updateHomeMappingDraft(home.local_home_id, current => ({ ...current, home_updates: { ...current.home_updates, square_feet: event.target.value } }))} />
+	                            </Field>
+	                          </div>
+	                        )}
+	                      </div>
+	                    );
+	                  })}
+	                </div>
+	              )}
 
               {loadingHome && <p className="mt-3 text-xs text-slate-500">Checking your existing home profile...</p>}
               <div className="mt-5 flex flex-wrap gap-2">
-                <button type="button" disabled={claimBusy || loadingHome} onClick={() => void acceptClaim()} className={buttonClass('primary')}>
-                  {claimBusy ? 'Working...' : existingHome && preview?.home ? 'Accept and link to my existing home' : 'Accept and create/link my profile'}
+	                <button type="button" disabled={claimBusy || loadingHome || invitedHomes.length === 0} onClick={() => void acceptClaim()} className={buttonClass('primary')}>
+	                  {claimBusy ? 'Working...' : invitedHomes.length > 1 ? 'Accept and claim selected properties' : 'Accept and create/link my profile'}
                 </button>
                 <button type="button" disabled={claimBusy} onClick={() => void declineClaim()} className={buttonClass('secondary')}>
                   Decline invite
@@ -21708,8 +21858,9 @@ function ContractorDashboard({
   const [revokingLocalClaimInviteId, setRevokingLocalClaimInviteId] = useState<string | null>(null);
   const [copyingLocalClaimInviteId, setCopyingLocalClaimInviteId] = useState<string | null>(null);
   const [preparingQrLocalClaimInviteId, setPreparingQrLocalClaimInviteId] = useState<string | null>(null);
-  const [preparedLocalClaimInviteQr, setPreparedLocalClaimInviteQr] = useState<{ inviteId: string; localContactId: string; token: string } | null>(null);
+  const [preparedLocalClaimInviteQr, setPreparedLocalClaimInviteQr] = useState<{ inviteId: string; localContactId: string; propertySignature: string; token: string } | null>(null);
   const localClaimInviteQrRequestIdRef = useRef(0);
+  const [localClaimInviteHomeSelections, setLocalClaimInviteHomeSelections] = useState<Record<string, string[]>>({});
   const [selectedHomeownerWorkspaceLocalHomeId, setSelectedHomeownerWorkspaceLocalHomeId] = useState('');
   const [addingLocalHomeContactId, setAddingLocalHomeContactId] = useState<string | null>(null);
   const [savingLocalHomeContactId, setSavingLocalHomeContactId] = useState<string | null>(null);
@@ -22545,9 +22696,9 @@ function ContractorDashboard({
             .select('*, homes:contractor_local_homes(*)')
             .eq('contractor_id', loadedContractor.id)
             .order('created_at', { ascending: false }),
-          supabase.rpc('servsync_list_local_customer_claim_invites', {
-            p_contractor_id: loadedContractor.id,
-          }),
+	          supabase.rpc('servsync_list_local_customer_claim_invites_v2', {
+	            p_contractor_id: loadedContractor.id,
+	          }),
           supabase
             .from('estimates')
             .select(ESTIMATE_WITH_LINES_SELECT)
@@ -30997,10 +31148,11 @@ function ContractorDashboard({
       !canPrepareLocalCustomerClaimInvites
       || homeownerDetailTab !== 'profile'
       || selectedLocalContactId !== preparedLocalClaimInviteQr.localContactId
-      || !preparedInvite
-      || preparedInvite.local_contact_id !== preparedLocalClaimInviteQr.localContactId
-      || effectiveLocalClaimInviteStatus(preparedInvite) !== 'pending'
-    ) {
+	      || !preparedInvite
+	      || preparedInvite.local_contact_id !== preparedLocalClaimInviteQr.localContactId
+	      || localClaimInvitePropertySignature(preparedInvite) !== preparedLocalClaimInviteQr.propertySignature
+	      || effectiveLocalClaimInviteStatus(preparedInvite) !== 'pending'
+	    ) {
       clearPreparedLocalClaimInviteQr();
     }
   }, [
@@ -31659,7 +31811,7 @@ function ContractorDashboard({
     }
   };
 
-  const createLocalHome = async (contact: ContractorLocalContact) => {
+	  const createLocalHome = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
     const draft = localHomeDrafts[contact.id] ?? EMPTY_LOCAL_HOME_DRAFT;
     if (!draft.nickname.trim() && !draft.address_line1.trim()) {
@@ -31700,9 +31852,32 @@ function ContractorDashboard({
     } finally {
       setSavingLocalHomeContactId(null);
     }
-  };
+	  };
 
-  const createLocalCustomerClaimInvite = async (contact: ContractorLocalContact) => {
+	  const selectedClaimInviteHomeIdsForContact = (contact: ContractorLocalContact) => {
+	    const eligibleHomeIds = sortedLocalHomes(contact.homes)
+	      .filter(home => !home.home_id && !home.claimed_at)
+	      .map(home => home.id);
+	    const selected = (localClaimInviteHomeSelections[contact.id] || []).filter(id => eligibleHomeIds.includes(id));
+	    return selected.length > 0 ? selected : eligibleHomeIds;
+	  };
+
+	  const toggleLocalClaimInviteHomeSelection = (contact: ContractorLocalContact, homeId: string) => {
+	    const eligibleHomeIds = sortedLocalHomes(contact.homes)
+	      .filter(home => !home.home_id && !home.claimed_at)
+	      .map(home => home.id);
+	    if (!eligibleHomeIds.includes(homeId)) return;
+	    setLocalClaimInviteHomeSelections(prev => {
+	      const current = (prev[contact.id] || eligibleHomeIds).filter(id => eligibleHomeIds.includes(id));
+	      const next = current.includes(homeId)
+	        ? current.filter(id => id !== homeId)
+	        : [...current, homeId];
+	      return { ...prev, [contact.id]: next };
+	    });
+	    clearPreparedLocalClaimInviteQr();
+	  };
+
+	  const createLocalCustomerClaimInvite = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
     const pendingInvite = localClaimInvites.find(invite =>
       invite.local_contact_id === contact.id
@@ -31714,43 +31889,43 @@ function ContractorDashboard({
       return;
     }
 
-    const localHomes = sortedLocalHomes(contact.homes);
-    const localHome = localHomes.length > 1
-      ? localHomes.find(home => home.id === selectedHomeownerWorkspaceLocalHomeId) ?? null
-      : localHomes[0] ?? null;
-    if (localHomes.length > 1 && !localHome) {
-      setError('Choose one property before creating a single-property claim invite for this local customer.');
-      setHomeownerWorkspacePropertyScope('selected');
-      setHomeownerDetailTab('home');
-      return;
+	    const selectedHomeIds = selectedClaimInviteHomeIdsForContact(contact);
+	    if (selectedHomeIds.length === 0) {
+	      setError('Add or select at least one unclaimed property before creating a ServSync claim invite for this local customer.');
+	      setHomeownerWorkspacePropertyScope('selected');
+	      setHomeownerDetailTab('home');
+	      return;
     }
     setCreatingLocalClaimInviteId(contact.id);
     setNotice('');
     setError('');
     try {
-      const { data, error: inviteError } = await supabase.rpc('servsync_create_local_customer_claim_invite', {
-        p_local_contact_id: contact.id,
-        p_local_home_id: localHome?.id ?? null,
-        p_expires_days: 14,
-      });
+	      const { data, error: inviteError } = await supabase.rpc('servsync_create_local_customer_claim_invite_v2', {
+	        p_local_contact_id: contact.id,
+	        p_local_home_ids: selectedHomeIds,
+	        p_expires_days: 14,
+	      });
       if (inviteError) throw inviteError;
 
       const inviteResult = data as {
         id?: string;
         status?: LocalCustomerClaimInviteStatus;
         expires_at?: string;
-        local_contact_id?: string;
-        local_home_id?: string | null;
-        reused_existing?: boolean;
-      } | null;
+	        local_contact_id?: string;
+	        local_home_id?: string | null;
+	        local_home_ids?: string[];
+	        property_count?: number;
+	        properties?: LocalCustomerClaimInviteProperty[];
+	        reused_existing?: boolean;
+	      } | null;
       if (inviteResult?.id) {
         const newInvite: LocalCustomerClaimInvite = {
           id: inviteResult.id,
-          contractor_id: contact.contractor_id,
-          local_contact_id: inviteResult.local_contact_id ?? contact.id,
-          local_home_id: inviteResult.local_home_id ?? localHome?.id ?? null,
-          invited_email: contact.email || null,
-          invited_phone: contact.phone || null,
+	          contractor_id: contact.contractor_id,
+	          local_contact_id: inviteResult.local_contact_id ?? contact.id,
+	          local_home_id: inviteResult.local_home_id ?? (selectedHomeIds.length === 1 ? selectedHomeIds[0] : null),
+	          invited_email: contact.email || null,
+	          invited_phone: contact.phone || null,
           status: inviteResult.status ?? 'pending',
           created_by: profile.id,
           claimed_by_homeowner_user_id: null,
@@ -31760,9 +31935,12 @@ function ContractorDashboard({
           used_at: null,
           declined_at: null,
           revoked_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+	          created_at: new Date().toISOString(),
+	          updated_at: new Date().toISOString(),
+	          local_home_ids: inviteResult.local_home_ids ?? selectedHomeIds,
+	          property_count: inviteResult.property_count ?? selectedHomeIds.length,
+	          properties: inviteResult.properties,
+	        };
         setLocalClaimInvites(prev => [newInvite, ...prev.filter(invite => invite.id !== newInvite.id)]);
         clearPreparedLocalClaimInviteQr();
       }
@@ -31840,10 +32018,15 @@ function ContractorDashboard({
     setPreparingQrLocalClaimInviteId(invite.id);
     const requestId = localClaimInviteQrRequestIdRef.current + 1;
     localClaimInviteQrRequestIdRef.current = requestId;
-    try {
-      const token = await prepareLocalCustomerClaimInviteDelivery(invite);
-      if (localClaimInviteQrRequestIdRef.current !== requestId) return;
-      setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token });
+	    try {
+	      const token = await prepareLocalCustomerClaimInviteDelivery(invite);
+	      if (localClaimInviteQrRequestIdRef.current !== requestId) return;
+	      setPreparedLocalClaimInviteQr({
+	        inviteId: invite.id,
+	        localContactId: invite.local_contact_id,
+	        propertySignature: localClaimInvitePropertySignature(invite),
+	        token,
+	      });
       setNotice('Claim invite QR code is ready to share manually. No email, SMS, or notification was sent.');
     } catch (err) {
       clearPreparedLocalClaimInviteQr();
@@ -35210,9 +35393,13 @@ function ContractorDashboard({
                           .filter(invite => invite.local_contact_id === localCustomer.id)
                           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                       : [];
-                    const pendingLocalClaimInvite = localClaimInvitesForCustomer.find(invite => effectiveLocalClaimInviteStatus(invite) === 'pending') ?? null;
-                    const latestLocalClaimInvite = pendingLocalClaimInvite ?? localClaimInvitesForCustomer[0] ?? null;
-                    const localClaimStatus = localCustomerProfileIsClaimed(localCustomer)
+	                    const pendingLocalClaimInvite = localClaimInvitesForCustomer.find(invite => effectiveLocalClaimInviteStatus(invite) === 'pending') ?? null;
+	                    const latestLocalClaimInvite = pendingLocalClaimInvite ?? localClaimInvitesForCustomer[0] ?? null;
+	                    const latestLocalClaimInvitePropertyCount = localClaimInvitePropertyCount(latestLocalClaimInvite);
+	                    const latestLocalClaimInvitePropertyIds = new Set(localClaimInvitePropertyIds(latestLocalClaimInvite));
+	                    const claimInviteEligibleLocalHomes = localHomes.filter(home => !home.home_id && !home.claimed_at);
+	                    const selectedClaimInviteHomeIds = localCustomer ? selectedClaimInviteHomeIdsForContact(localCustomer) : [];
+	                    const localClaimStatus = localCustomerProfileIsClaimed(localCustomer)
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
@@ -36438,13 +36625,13 @@ function ContractorDashboard({
                                         </div>
                                       )}
                                       <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-                                        <div className="flex flex-wrap items-start justify-between gap-3">
-                                          <div>
-                                            <p className="text-sm font-bold text-slate-950">Homeowner claim invite</p>
-                                            <p className="mt-1 text-xs text-slate-600">
-                                              Send this customer a link or QR code to create their ServSync account and review the profile/home information you entered.
-                                            </p>
-                                          </div>
+	                                        <div className="flex flex-wrap items-start justify-between gap-3">
+	                                          <div>
+	                                            <p className="text-sm font-bold text-slate-950">Homeowner claim invite</p>
+	                                            <p className="mt-1 text-xs text-slate-600">
+	                                              Select the exact properties this customer should review, then share a manual link or QR code.
+	                                            </p>
+	                                          </div>
                                           {localClaimStatus ? (
                                             <StatusBadge {...localClaimInviteStatusPresentation(localClaimStatus)} size="md" />
                                           ) : (
@@ -36452,19 +36639,29 @@ function ContractorDashboard({
                                           )}
                                         </div>
 
-                                        {localCustomerIsClaimed ? (
-                                          <p className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
-                                            This local customer has been claimed by a homeowner account.
-                                          </p>
-                                        ) : latestLocalClaimInvite && localClaimStatus === 'pending' ? (
-                                          <div className="mt-4 space-y-3">
-                                            <div className="rounded-lg border border-blue-100 bg-white p-3">
-                                              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Manual claim invite</p>
-                                              <p className="mt-1 text-xs text-slate-600">
-                                                Copy or show the QR code only when you are ready to share it. ServSync does not email or text this invite.
-                                              </p>
-                                              <p className="mt-2 text-xs text-slate-500">Expires {formatDateTime(latestLocalClaimInvite.expires_at)}</p>
-                                            </div>
+	                                        {localCustomerIsClaimed ? (
+	                                          <p className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
+	                                            This local customer has been claimed by a homeowner account.
+	                                          </p>
+	                                        ) : latestLocalClaimInvite && localClaimStatus === 'pending' ? (
+	                                          <div className="mt-4 space-y-3">
+	                                            <div className="rounded-lg border border-blue-100 bg-white p-3">
+	                                              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Manual claim invite</p>
+	                                              <p className="mt-1 text-xs text-slate-600">
+	                                                This invite covers {latestLocalClaimInvitePropertyCount || 0} selected {latestLocalClaimInvitePropertyCount === 1 ? 'property' : 'properties'}. Later property changes are not automatically included. ServSync does not email or text this invite.
+	                                              </p>
+	                                              {claimInviteEligibleLocalHomes.length > 0 && (
+	                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                                                  {claimInviteEligibleLocalHomes.map((home, index) => (
+	                                                    <div key={home.id} className={`rounded-lg border px-3 py-2 text-xs ${latestLocalClaimInvitePropertyIds.has(home.id) ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+	                                                      <p className="font-semibold">{home.nickname || `Property ${index + 1}`}</p>
+	                                                      <p className="mt-1">{home.address_line1 || 'No address on file'}</p>
+	                                                    </div>
+	                                                  ))}
+	                                                </div>
+	                                              )}
+	                                              <p className="mt-2 text-xs text-slate-500">Expires {formatDateTime(latestLocalClaimInvite.expires_at)}</p>
+	                                            </div>
                                             {canPrepareLocalCustomerClaimInvites ? (
                                               <div className="flex flex-wrap gap-2">
                                                 <button
@@ -36505,31 +36702,64 @@ function ContractorDashboard({
                                               </div>
                                             )}
                                           </div>
-                                        ) : (
-                                          <div className="mt-4 flex flex-wrap items-center gap-2">
-                                            {canPrepareLocalCustomerClaimInvites ? (
-                                              <button
-                                                type="button"
-                                                disabled={creatingLocalClaimInviteId === localCustomer.id}
-                                                onClick={() => void createLocalCustomerClaimInvite(localCustomer)}
-                                                className={buttonClass('primary')}
-                                              >
-                                                {creatingLocalClaimInviteId === localCustomer.id
-                                                  ? 'Creating...'
-                                                  : latestLocalClaimInvite ? 'Create New ServSync Invite' : 'Invite to ServSync'}
+	                                        ) : (
+	                                          <div className="mt-4 space-y-3">
+	                                            {claimInviteEligibleLocalHomes.length > 0 ? (
+	                                              <div className="rounded-lg border border-blue-100 bg-white p-3">
+	                                                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Selected properties</p>
+	                                                <p className="mt-1 text-xs text-slate-600">
+	                                                  The invite will claim only the checked properties. New properties added later need a separate invite.
+	                                                </p>
+	                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                                                  {claimInviteEligibleLocalHomes.map((home, index) => {
+	                                                    const checked = selectedClaimInviteHomeIds.includes(home.id);
+	                                                    return (
+	                                                      <label key={home.id} className={`flex gap-3 rounded-lg border px-3 py-2 text-xs transition ${checked ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+	                                                        <input
+	                                                          type="checkbox"
+	                                                          checked={checked}
+	                                                          onChange={() => toggleLocalClaimInviteHomeSelection(localCustomer!, home.id)}
+	                                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+	                                                        />
+	                                                        <span>
+	                                                          <span className="block font-semibold">{home.nickname || `Property ${index + 1}`}</span>
+	                                                          <span className="mt-1 block">{home.address_line1 || 'No address on file'}</span>
+	                                                        </span>
+	                                                      </label>
+	                                                    );
+	                                                  })}
+	                                                </div>
+	                                              </div>
+	                                            ) : (
+	                                              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+	                                                Add an unclaimed property before creating a ServSync claim invite.
+	                                              </p>
+	                                            )}
+	                                            <div className="flex flex-wrap items-center gap-2">
+	                                            {canPrepareLocalCustomerClaimInvites ? (
+	                                              <button
+	                                                type="button"
+	                                                disabled={creatingLocalClaimInviteId === localCustomer.id || selectedClaimInviteHomeIds.length === 0}
+	                                                onClick={() => void createLocalCustomerClaimInvite(localCustomer)}
+	                                                className={buttonClass('primary')}
+	                                              >
+	                                                {creatingLocalClaimInviteId === localCustomer.id
+	                                                  ? 'Creating...'
+	                                                  : latestLocalClaimInvite ? 'Create New ServSync Invite' : 'Invite to ServSync'}
                                               </button>
                                             ) : (
                                               <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
                                                 Only the contractor owner, admin, or office role can create or share ServSync claim invites.
                                               </p>
                                             )}
-                                            {localClaimStatus && latestLocalClaimInvite && (
-                                              <p className="text-xs text-slate-500">
-                                                Last invite: {LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus]} · Updated {formatDateTime(latestLocalClaimInvite.updated_at)}
-                                              </p>
-                                            )}
-                                          </div>
-                                        )}
+	                                            {localClaimStatus && latestLocalClaimInvite && (
+	                                              <p className="text-xs text-slate-500">
+	                                                Last invite: {LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus]} · Updated {formatDateTime(latestLocalClaimInvite.updated_at)}
+	                                              </p>
+	                                            )}
+	                                            </div>
+	                                          </div>
+	                                        )}
                                       </div>
                                       {localCustomer.notes && (
                                         <div className="sm:col-span-2 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
