@@ -28,12 +28,13 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Sandbox SQL application of `servsync-durable-draft-preview-rollout-mode.sql` to `zpzdkoaubyjtsomccxya` only, followed by catalog/grant/RLS validation and explicit setting of `durable_draft_preview_all_contractors_enabled=true`.
   - Sandbox rollback check toggling the private rollout setting to `cohort` and restoring `all_contractors`.
   - PR #352 Preview and PR #351 Preview rendered against Sandbox with all three Preview gates true; authenticated contractor Jobs showed Saved Drafts / Start New Draft and opened the shared Draft composer without saving or launching.
+  - Follow-up PR #352 Preview/Sandbox end-to-end validation exercised both the original cohort-enabled test contractor and the same designated test contractor with `durable_draft_beta_enabled=false` temporarily under `all_contractors`: Save Draft, navigate away/reopen, edit/resave, relaunch/reopen preservation, Create Estimate, and Create Job all passed without failed RPCs, console errors, provider delivery, or Production access. The temporary billing row was restored to its original enabled state.
   - `npm run lint` attempted; blocked before file linting by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
 - Known risks or follow-ups:
   - SQL application and rollout-mode enablement are Sandbox-only for this task; Production SQL, Production gates, Production deployment, and external beta remain separate owner approvals.
   - Preview all-contractor exposure still requires all three Vercel Preview gates plus the private Sandbox runtime setting; disabling either side returns to legacy/cohort behavior.
-  - Sandbox already had all observed billing-account rows marked `durable_draft_beta_enabled=true` at validation time, so the rollback check proves the rollout-mode switch returns `cohort` but does not prove a visually distinct non-cohort contractor in that shared Sandbox dataset.
-  - Preview validation did not save, launch, send, invoice, or create Draft output; it verified rendering, gate wiring, and back-out behavior only.
+  - The non-cohort workflow evidence used an authorized temporary false toggle on one designated Sandbox test contractor, then restored the original row. Sandbox did not contain a naturally disabled contractor billing row at validation time.
+  - Preview validation created clearly labeled Sandbox-only Draft, draft Estimate, and draft Job records for evidence. Draft Invoice launch remained unavailable for the tested account and was not exercised. No send/payment/notification/provider delivery path was invoked.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-035 now records the Preview/Sandbox all-contractor rollout-mode source, default-cohort behavior, and remaining gates without marking Draft-first Work Production-live.
