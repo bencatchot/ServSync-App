@@ -152,7 +152,8 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(financialListSource).toContain('const filteredInvoiceRecords = invoiceRecordsForView');
     expect(financialListSource).toContain('.filter(invoice => invoiceMatchesSearch(invoice) && invoiceMatchesStatus(invoice))');
     expect(financialListSource).toContain("const invoiceMatchesStatus = (invoice: Invoice) => contractorInvoiceRecordStatusFilter === 'all'");
-    expect(financialListSource).toContain('const visibleInvoiceRecords = showingEstimates ? [] : filteredInvoiceRecords;');
+    expect(financialListSource).toContain('const focusedInvoiceRecord = focusedInvoiceRecordId');
+    expect(financialListSource).toContain('const visibleInvoiceRecords = focusedInvoiceRecord ? [focusedInvoiceRecord] : showingEstimates ? [] : filteredInvoiceRecords;');
     expect(financialListSource).toContain('visibleInvoiceRecords.map(invoice => {');
     expect(financialListSource).toContain('data-testid="contractor-invoice-card"');
     expect(financialListSource).toContain('data-testid="contractor-invoice-search"');
@@ -178,6 +179,7 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(financialListSource).toContain('invoice.title');
     expect(financialListSource).toContain('invoice.invoice_number');
     expect(financialListSource).toContain('invoice.scope');
+    expect(financialListSource).toContain('Preview PDF');
     expect(financialListSource).toContain('Download PDF');
     expect(financialListSource).toContain('Send Invoice');
     expect(financialListSource).toContain('Edit draft');

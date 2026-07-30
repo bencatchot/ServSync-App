@@ -252,6 +252,36 @@ type PdfImageAsset = {
   height: number;
 };
 
+export const PDF_OBJECT_URL_REVOKE_DELAY_MS = 60_000;
+
+export function schedulePdfObjectUrlRevoke(url: string, delayMs = PDF_OBJECT_URL_REVOKE_DELAY_MS) {
+  const timer = globalThis.setTimeout(() => URL.revokeObjectURL(url), delayMs);
+  if (typeof timer === 'object' && timer && 'unref' in timer) {
+    (timer as { unref?: () => void }).unref?.();
+  }
+}
+
+export function downloadPdfBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = 'noopener';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  schedulePdfObjectUrlRevoke(url);
+}
+
+export function previewPdfBlob(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
+  schedulePdfObjectUrlRevoke(url);
+  if (!openedWindow) {
+    throw new Error('Unable to open PDF preview. Allow pop-ups for ServSync or use Download PDF.');
+  }
+}
+
 function dataUrlFromBlob(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -917,14 +947,15 @@ export async function downloadEstimatePdf(
   context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
 ) {
   const { blob, fileName } = await createEstimatePdf(estimate, context);
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  downloadPdfBlob(blob, fileName);
+}
+
+export async function previewEstimatePdf(
+  estimate: Estimate,
+  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
+) {
+  const { blob } = await createEstimatePdf(estimate, context);
+  previewPdfBlob(blob);
 }
 
 function invoiceBalanceDueCents(invoice: Pick<Invoice, 'status' | 'total_cents' | 'amount_paid_cents'>) {
@@ -1184,12 +1215,10 @@ export async function createInvoicePdf(invoice: Invoice, context: InvoicePdfCont
 
 export async function downloadInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
   const { blob, fileName } = await createInvoicePdf(invoice, context);
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  downloadPdfBlob(blob, fileName);
+}
+
+export async function previewInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
+  const { blob } = await createInvoicePdf(invoice, context);
+  previewPdfBlob(blob);
 }

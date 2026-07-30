@@ -44,6 +44,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-29
 
+- Branch: `codex/restore-estimate-invoice-pdf-v1`
+- Starting main SHA: `a71ad8551612d76ec5a5a115f0f322b16aa25510`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/pdfDocuments.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/estimate-invoice-pdf-actions.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Restored contractor estimate/invoice PDF access after Draft-first saves by focusing saved invoice drafts into the invoice record list, adding contractor Preview PDF actions beside existing Download PDF actions, and routing estimate/invoice preview/download through shared PDF blob helpers with delayed object URL cleanup.
+- Reason for change: The Draft-first invoice save path left contractors without the same immediate saved-record PDF surface estimates had, and the PDF download helpers revoked object URLs synchronously after click, making browser handoff brittle. Local PDF preview/download must remain independent from portal-send or homeowner-connection eligibility.
+- Tests/checks run:
+  - Focused PDF action coverage verifies real estimate and invoice PDF output starts with `%PDF-`, the shared preview/download URL lifecycle delays revocation until after browser handoff, saved invoice focus returns to a PDF-capable invoice record, local-customer send gating does not block local PDF actions, and estimate records keep preview/download actions for connected and local customers.
+  - Full command results are recorded in the implementation report.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel setting, auth/permission, invoice send, homeowner portal delivery, payment, Production data, or deployment change is included.
+  - Authenticated browser save/download coverage still depends on configured test accounts and approved non-production fixtures; this branch adds source and direct PDF-output regression coverage without sending records.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NO
+  - REASON: Backlog reviewed; no update needed. This repairs an existing PDF access workflow without changing active feature status, public-launch readiness scope, or roadmap priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: No product-direction or rollout-gate language changed.
+
 - Branch: `codex/backlog-structure-cleanup-v1`
 - Starting main SHA: `74498d90466af4f134c170fd747fc2f8130624bd`
 - Files changed:
