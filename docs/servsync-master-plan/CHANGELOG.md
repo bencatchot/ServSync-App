@@ -20,11 +20,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Summary of change: Added a backend-enforced Draft-first Work Preview/Sandbox rollout mode. The new SQL uses the private `servsync_runtime_settings` table to default `durable_draft_preview_all_contractors_enabled` to `false`/`cohort`, then replaces the private durable Draft entitlement helper and browser entitlement RPC so an approved Sandbox operator can switch valid contractor contexts to `all_contractors` without setting `durable_draft_beta_enabled=true` or bulk-enrolling billing rows. Existing Draft persistence, Estimate/Job/Invoice output permissions, RLS, and UI capability checks remain authoritative.
 - Reason for change: Preview/Sandbox validation for broad Draft-first contractor readiness should not require manual account-by-account cohort toggles, but the rollout must remain server-enforced, default-off for Production, and separate from action authority.
 - Tests/checks run:
-  - Pending in this branch report.
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/durable-draft-cohort-gating.spec.ts tests/e2e/durable-draft-invoice-launch-foundation.spec.ts --project=chromium`
+  - `git diff --check`
+  - Changed-file secret/guard scan confirming no bulk `durable_draft_beta_enabled=true` update, provider-delivery path, raw-token path, or Production-targeting source was added.
+  - Sandbox SQL application of `servsync-durable-draft-preview-rollout-mode.sql` to `zpzdkoaubyjtsomccxya` only, followed by catalog/grant/RLS validation and explicit setting of `durable_draft_preview_all_contractors_enabled=true`.
+  - Sandbox rollback check toggling the private rollout setting to `cohort` and restoring `all_contractors`.
+  - PR #352 Preview and PR #351 Preview rendered against Sandbox with all three Preview gates true; authenticated contractor Jobs showed Saved Drafts / Start New Draft and opened the shared Draft composer without saving or launching.
+  - `npm run lint` attempted; blocked before file linting by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
 - Known risks or follow-ups:
-  - SQL application is Sandbox-only for this task; Production SQL, Production gates, Production deployment, and external beta remain separate owner approvals.
-  - Preview all-contractor exposure still requires all three Vercel Preview gates plus the private Sandbox runtime setting.
-  - Runtime validation must confirm PR preview and PR #351 preview are Sandbox-backed before any rendered workflow checks.
+  - SQL application and rollout-mode enablement are Sandbox-only for this task; Production SQL, Production gates, Production deployment, and external beta remain separate owner approvals.
+  - Preview all-contractor exposure still requires all three Vercel Preview gates plus the private Sandbox runtime setting; disabling either side returns to legacy/cohort behavior.
+  - Sandbox already had all observed billing-account rows marked `durable_draft_beta_enabled=true` at validation time, so the rollback check proves the rollout-mode switch returns `cohort` but does not prove a visually distinct non-cohort contractor in that shared Sandbox dataset.
+  - Preview validation did not save, launch, send, invoice, or create Draft output; it verified rendering, gate wiring, and back-out behavior only.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-035 now records the Preview/Sandbox all-contractor rollout-mode source, default-cohort behavior, and remaining gates without marking Draft-first Work Production-live.
