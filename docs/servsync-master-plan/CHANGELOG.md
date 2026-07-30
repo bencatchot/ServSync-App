@@ -13,8 +13,9 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `tests/e2e/contractor-create-invoice.spec.ts`
   - `tests/e2e/durable-draft-composer-integration-2c-b.spec.ts`
   - `tests/e2e/estimate-invoice-pdf-actions.spec.ts`
+  - `tests/e2e/local-customer-claim-invite-delivery.spec.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Focuses newly saved or newly created draft invoices into the canonical saved-invoice detail/action state so contractors immediately see the existing `Preview PDF` and `Download PDF` actions after save, schedule-row invoice creation, completed-job invoice creation, partial-invoice creation, or supported Draft-first invoice adoption. The saved invoice resolver now falls back to the canonical invoice collection when a just-focused invoice is not yet present in the filtered view.
+- Summary of change: Focuses newly saved or newly created draft invoices into the canonical saved-invoice detail/action state so contractors immediately see the existing `Preview PDF` and `Download PDF` actions after save, schedule-row invoice creation, completed-job invoice creation, partial-invoice creation, or supported Draft-first invoice adoption. The saved invoice resolver now falls back to the canonical invoice collection when a just-focused invoice is not yet present in the filtered view. Preview validation also found and fixed a narrow local-customer detail null guard so customers with no current claim invite do not try to render a prepared QR token from null state.
 - Reason for change: PR #351 restored the PDF handlers and invoice-list PDF actions, but some post-save and creation paths still reopened draft invoices in the editor or depended on a stale filtered list, forcing contractors to navigate back through Jobs -> Invoices before accessing the working PDF actions.
 - Tests/checks run:
   - Focused source and browser coverage verifies saved invoice focus, immediate `Preview PDF` and `Download PDF` visibility after invoice save, schedule/job/partial/Draft-first invoice focus paths, and the canonical invoice fallback for focused saved invoices.
