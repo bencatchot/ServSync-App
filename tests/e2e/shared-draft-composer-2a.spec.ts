@@ -210,7 +210,9 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     const lineRow = sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
 
     expect(guidance).toContain('Saved Work Templates');
-    expect(guidance).toContain('Estimate or draft Invoice starts');
+    expect(guidance).toContain('Choose template');
+    expect(guidance).toContain('contractor-owned template');
+    expect(guidance).toContain('Switch to Standard work scope to use saved work templates.');
     expect(guidance).toContain('Inspection Checklists');
     expect(guidance).toContain('Home-specific Checklists');
     expect(guidance).not.toContain('Generic templates');

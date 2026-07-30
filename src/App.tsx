@@ -37825,6 +37825,7 @@ function ContractorDashboard({
                           connectedOptions={draftJobConnectedOptionsForComposer}
                           localOptions={draftJobLocalOptionsForComposer}
                           checklistOptions={draftChecklistSourceOptions}
+                          savedWorkTemplates={estimateTemplates}
                           customerLabel={fieldWorkSubjectLabel}
                           propertyLabel={fieldWorkSubjectAddress}
                           onStartNew={startCleanDraftJobComposer}
@@ -41266,6 +41267,7 @@ function ContractorDashboard({
                   connectedOptions={draftJobConnectedOptionsForComposer}
                   localOptions={draftJobLocalOptionsForComposer}
                   checklistOptions={draftChecklistSourceOptions}
+                  savedWorkTemplates={estimateTemplates}
                   customerLabel={fieldWorkSubjectLabel}
                   propertyLabel={fieldWorkSubjectAddress}
                   onStartNew={startCleanDraftJobComposer}

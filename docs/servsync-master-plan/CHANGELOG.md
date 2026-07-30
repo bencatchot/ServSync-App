@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-30
 
+- Branch: `codex/draft-saved-work-template-integration-v1`
+- Starting main SHA: `a23b28a7f74a8ccc79f6488e016aa0b4aca4bcd2`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/drafts/DurableDraftWorkspace.tsx`
+  - `src/features/drafts/savedWorkTemplateDraftIntegration.ts`
+  - `tests/e2e/draft-saved-work-template-integration.spec.ts`
+  - `tests/e2e/shared-draft-composer-2a.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds a functional `Choose template` action to the standard Draft Composer so contractors can apply already loaded saved estimate templates as reusable Draft work content. Blank Drafts apply the selected template immediately; non-empty Drafts require explicit Replace, Add, or Cancel; customer, property, title, intended output, and Draft identity stay unchanged; Inspection Checklist Drafts remain separate.
+- Reason for change: The Draft Composer previously showed Saved Work Templates as guidance only, even though contractor-owned estimate templates were already available in the app. Contractors need a narrow reuse path inside Draft-first planning without adding backend schema, template CRUD, provider delivery, or launch side effects.
+- Tests/checks run:
+  - `npm ci`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-saved-work-template-integration.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/shared-draft-composer-2a.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/durable-draft-composer-integration-2c-b.spec.ts --project=chromium`
+  - Final diff, whitespace, lint, and scope scans are recorded in the implementation report.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, Supabase/Vercel setting, Production data, Sandbox data, estimate/job/invoice launch, invitation, email, SMS, notification, payment, provider delivery, or deployment change is included.
+  - Template terms plus estimate-only structured fields without durable Draft persistence are intentionally not copied into Drafts. Future work can add explicit Draft fields only through a separately approved backend/product slice.
+  - Runtime browser validation in a Sandbox preview remains recommended before Production rollout of the broader Draft-first workflow.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 now records the active Draft-first saved work template integration slice while preserving remaining Price Book / reusable estimate content maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the Draft-first saved work template integration and its frontend-only/no-rollout-boundary limits.
+
 - Branch: `codex/post-save-invoice-pdf-actions-v1`
 - Starting main SHA: `23e76bf3d39d97d06770c152ead3a9724f70944b`
 - Files changed:
