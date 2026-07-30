@@ -24304,7 +24304,7 @@ function ContractorDashboard({
       const savedInvoice = await loadInvoiceById(invoiceId);
       setNotice(actionFeedbackMessage(
         editingInvoiceId ? 'Draft invoice updated' : 'Draft invoice saved',
-        'It remains private until you send it to the homeowner. Open the saved invoice actions to preview or download the PDF.',
+        'It remains private until you send it to the homeowner. Preview or download the PDF from the saved invoice actions now.',
         'contractor-invoice-save-feedback',
       ));
       if (options?.closeComposer === false) {
@@ -24558,7 +24558,8 @@ function ContractorDashboard({
       const result = (data || {}) as { invoice_id?: string; created?: boolean; schedule_item_id?: string };
       if (!result.invoice_id) throw new Error('Schedule invoice was created, but no invoice id was returned.');
       const invoice = await loadInvoiceById(result.invoice_id);
-      openInvoiceRecord(invoice);
+      if (result.created === false) openInvoiceRecord(invoice);
+      else focusSavedInvoiceRecord(invoice);
       setNotice('Draft invoice created from the approved payment schedule row.');
       await loadContractor();
     } catch (err) {
@@ -24717,7 +24718,8 @@ function ContractorDashboard({
       const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
       if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
       const invoice = await loadInvoiceById(result.invoice_id);
-      openInvoiceRecord(invoice);
+      if (result.created === false) openInvoiceRecord(invoice);
+      else focusSavedInvoiceRecord(invoice);
       setNotice(requestWillClose
         ? result.created
           ? 'Invoice draft created from job and linked service request moved to closed.'
@@ -24778,7 +24780,7 @@ function ContractorDashboard({
       const invoice = await loadInvoiceById(result.invoice_id);
       setPartialInvoiceJob(null);
       setPartialInvoiceSelectedIds(new Set());
-      openInvoiceRecord(invoice);
+      focusSavedInvoiceRecord(invoice);
       setNotice('Draft invoice created from completed work items. Open backlog items were captured separately and are not included in the total.');
       await loadContractor();
     } catch (err) {
@@ -29645,7 +29647,7 @@ function ContractorDashboard({
     }
     if (output.type === 'invoice') {
       setInvoices(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
-      openInvoiceRecord(output.record);
+      focusSavedInvoiceRecord(output.record);
       focusDurableDraftOutputHeading(output, focusToken);
       return;
     }
@@ -38742,7 +38744,9 @@ function ContractorDashboard({
                       ? estimateRecordsForView.find(estimate => estimate.id === focusedEstimateRecordId) ?? null
                       : null;
                     const focusedInvoiceRecord = focusedInvoiceRecordId
-                      ? invoiceRecordsForView.find(invoice => invoice.id === focusedInvoiceRecordId) ?? null
+                      ? invoiceRecordsForView.find(invoice => invoice.id === focusedInvoiceRecordId)
+                        ?? invoices.find(invoice => invoice.id === focusedInvoiceRecordId)
+                        ?? null
                       : null;
                     const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);
                     const estimateCustomerSearchText = (estimate: Estimate) => {

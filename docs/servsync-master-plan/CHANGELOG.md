@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-30
 
+- Branch: `codex/post-save-invoice-pdf-actions-v1`
+- Starting main SHA: `23e76bf3d39d97d06770c152ead3a9724f70944b`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/durable-draft-composer-integration-2c-b.spec.ts`
+  - `tests/e2e/estimate-invoice-pdf-actions.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Focuses newly saved or newly created draft invoices into the canonical saved-invoice detail/action state so contractors immediately see the existing `Preview PDF` and `Download PDF` actions after save, schedule-row invoice creation, completed-job invoice creation, partial-invoice creation, or supported Draft-first invoice adoption. The saved invoice resolver now falls back to the canonical invoice collection when a just-focused invoice is not yet present in the filtered view.
+- Reason for change: PR #351 restored the PDF handlers and invoice-list PDF actions, but some post-save and creation paths still reopened draft invoices in the editor or depended on a stale filtered list, forcing contractors to navigate back through Jobs -> Invoices before accessing the working PDF actions.
+- Tests/checks run:
+  - Focused source and browser coverage verifies saved invoice focus, immediate `Preview PDF` and `Download PDF` visibility after invoice save, schedule/job/partial/Draft-first invoice focus paths, and the canonical invoice fallback for focused saved invoices.
+  - Full command results are recorded in the implementation report.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel setting, Production data, invoice delivery, payment request, provider delivery, or deployment change is included.
+  - Safari-specific browser validation remains a manual follow-up unless explicitly performed; this change preserves the PR #351 delayed object URL cleanup implementation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NO
+  - REASON: Backlog reviewed; no update needed. This is a narrow repair to an already restored invoice PDF access workflow and does not change active feature status, roadmap priority, or Draft-first rollout gate state.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: No product-direction, beta strategy, or rollout-gate language changed.
+
 - Branch: `codex/preview-all-contractor-draft-first-v1`
 - Starting main SHA: `a71ad8551612d76ec5a5a115f0f322b16aa25510`
 - Files changed:
