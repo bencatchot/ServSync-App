@@ -187,6 +187,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'current_user_can_send_contractor_workflow_messages',
   'servsync_contractor_pending_connection_requests',
   'servsync_current_contractor_entitlements',
+  'servsync_current_contractor_durable_draft_entitlement',
   'servsync_accept_service_request_appointment_window',
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
@@ -257,6 +258,8 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
 const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_append_workflow_activity_event',
   'servsync_generate_local_customer_claim_token',
+  'servsync_private_contractor_has_durable_draft_entitlement',
+  'servsync_private_durable_draft_rollout_mode',
   'servsync_private_can_prepare_local_customer_claim_invites',
   'servsync_record_home_access_invite_delivery_result',
 ];
