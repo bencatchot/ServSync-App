@@ -237,8 +237,12 @@ test.describe('contractor mutating invoice creation', () => {
     await waitForInvoiceDraftSave(main, saveInvoiceButton);
 
     await expect(main.getByRole('heading', { name: /^Open Invoices$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Saved invoice draft$/i })).toBeVisible();
     await expect(main.getByText(invoiceTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(new RegExp(`${escapeRegExp(customerName)}.*Updated`, 'i'))).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Preview PDF$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Download PDF$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Invoice draft$/i })).toHaveCount(0);
 
     await consoleErrors.assertClean(testInfo);
   });

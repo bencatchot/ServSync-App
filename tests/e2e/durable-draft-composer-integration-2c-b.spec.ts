@@ -720,7 +720,8 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(loader).toContain("return { type: 'invoice', id, record: validated.record }");
     expect(loader).not.toMatch(/setEstimates|setInspections|openEstimateRecord|openInspection|openInvoiceRecord/);
     expect(adopter).toMatch(/setEstimates[\s\S]*focusSavedEstimateRecord/);
-    expect(adopter).toMatch(/setInvoices[\s\S]*openInvoiceRecord/);
+    expect(adopter).toMatch(/setInvoices[\s\S]*focusSavedInvoiceRecord/);
+    expect(adopter).not.toContain('openInvoiceRecord(output.record)');
     expect(adopter).toMatch(/setInspections[\s\S]*openInspection/);
     expect(workspace).toContain('openingOutputOperation.current === operation');
     expect(workspace).toMatch(/await onLoadOutput[\s\S]*if \(!isCurrent\(\)\) return;[\s\S]*onAdoptOutput/);

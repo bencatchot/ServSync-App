@@ -249,6 +249,10 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     const source = appSource();
     const saveSource = sourceBetween(source, 'const saveInvoiceDraft = async', 'const sendInvoiceToHomeowner = async');
     const focusSource = sourceBetween(source, 'const focusSavedInvoiceRecord = (invoice: Invoice) => {', 'const saveEstimateDraft = async');
+    const scheduleInvoiceSource = sourceBetween(source, 'const createInvoiceFromEstimateScheduleItem = async', 'const renderContractorEstimatePaymentScheduleSection');
+    const jobInvoiceSource = sourceBetween(source, 'const createInvoiceFromJob = async', 'const openPartialInvoiceReview =');
+    const partialInvoiceSource = sourceBetween(source, 'const createPartialInvoiceFromSelectedItems = async', 'const manualWorkItemCanEdit =');
+    const durableAdoptionSource = sourceBetween(source, 'const adoptDurableDraftOutput =', 'const saveDraftJobComposer =');
     const financialListSource = sourceBetween(
       source,
       "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
@@ -258,9 +262,17 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     expect(focusSource).toContain("setContractorFinancialRecordKind('invoices');");
     expect(focusSource).toContain('setFocusedInvoiceRecordId(invoice.id);');
     expect(focusSource).toContain("setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');");
+    expect(saveSource).toContain('const savedInvoice = await loadInvoiceById(invoiceId);');
     expect(saveSource).toContain('focusSavedInvoiceRecord(savedInvoice);');
+    expect(saveSource).toContain('Preview or download the PDF from the saved invoice actions now.');
     expect(saveSource).not.toContain('openInspection(linkedJob');
+    expect(scheduleInvoiceSource).toContain('else focusSavedInvoiceRecord(invoice);');
+    expect(jobInvoiceSource).toContain('else focusSavedInvoiceRecord(invoice);');
+    expect(partialInvoiceSource).toContain('focusSavedInvoiceRecord(invoice);');
+    expect(durableAdoptionSource).toMatch(/if \(output\.type === 'invoice'\)[\s\S]*setInvoices[\s\S]*focusSavedInvoiceRecord\(output\.record\)/);
+    expect(durableAdoptionSource).not.toContain('openInvoiceRecord(output.record)');
     expect(financialListSource).toContain("const focusedInvoiceRecord = focusedInvoiceRecordId");
+    expect(financialListSource).toContain('?? invoices.find(invoice => invoice.id === focusedInvoiceRecordId)');
     expect(financialListSource).toContain('const visibleInvoiceRecords = focusedInvoiceRecord ? [focusedInvoiceRecord]');
     expect(financialListSource).toContain('Saved invoice draft');
     expect(financialListSource).toContain('Preview PDF');
