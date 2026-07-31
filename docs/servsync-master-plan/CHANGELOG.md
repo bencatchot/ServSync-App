@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-30
 
+- Branch: `codex/draft-composer-ui-cleanup-v1`
+- Starting main SHA: `ab5b75d8819facaf0f0b14bc45ac0d087bfd0818`
+- Files changed:
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `tests/e2e/draft-saved-work-template-integration.spec.ts`
+  - `tests/e2e/shared-draft-composer-2a.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Simplifies the standard Draft Composer template area to one compact Saved Work Templates action and count, removes the three explanatory category cards, and leaves Inspection Checklist selection in its existing work-format-specific `Start from` control. The Add estimate/invoice/work line action now renders after the empty state or final line item and remains full-width on narrow screens.
+- Reason for change: The category guidance repeated behavior already expressed by Work format and made the Draft Composer feel visually busy. Keeping Add line at the end of the line-item list also avoids scrolling back to the section header during longer Drafts.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:4173 ./node_modules/.bin/playwright test tests/e2e/draft-saved-work-template-integration.spec.ts tests/e2e/shared-draft-composer-2a.spec.ts --project=chromium --reporter=list`
+  - `git diff --check`
+  - `npm run lint` was attempted and remains blocked before changed files are linted by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, Supabase/Vercel setting, Production or Sandbox data, Draft persistence, template mapping, checklist behavior, launch behavior, provider delivery, or manual deployment change is included.
+  - Preview review should confirm the compact template row and bottom Add line action at desktop and mobile widths.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: The backlog is reconciled through merged PR #354 and now records Saved Work Template integration as merged source while preserving the remaining FB-024 maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is a presentation and action-placement refinement to the existing Draft-first workflow, not a change to product direction, lifecycle behavior, roles, permissions, or rollout boundaries.
+
 - Branch: `codex/draft-saved-work-template-integration-v1`
 - Starting main SHA: `a23b28a7f74a8ccc79f6488e016aa0b4aca4bcd2`
 - Files changed:

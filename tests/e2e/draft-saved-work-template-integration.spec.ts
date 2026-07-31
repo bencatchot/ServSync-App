@@ -175,9 +175,11 @@ test.describe('Draft saved work template integration', () => {
     expect(templateGuidance).toContain('data-testid="durable-draft-template-replace"');
     expect(templateGuidance).toContain('data-testid="durable-draft-template-add"');
     expect(templateGuidance).toContain('data-testid="durable-draft-template-cancel"');
-    expect(templateGuidance).toContain('Switch to Standard work scope to use saved work templates.');
-    expect(templateGuidance).toContain('Inspection Checklists');
-    expect(templateGuidance).toContain('Home-specific Checklists');
+    expect(templateGuidance).toContain('saved template');
+    expect(templateGuidance).not.toContain('Template starting points');
+    expect(templateGuidance).not.toContain('Inspection Checklists');
+    expect(templateGuidance).not.toContain('Home-specific Checklists');
+    expect(composerSource).toContain('{!isChecklistDraft ? (');
     expect(composerSource).toContain('draftHasMeaningfulSavedWorkTemplateContent(draft)');
     expect(composerSource).toContain("applyTemplate(template, 'replace')");
     expect(composerSource).toContain("applyTemplate(pendingTemplate, 'add')");

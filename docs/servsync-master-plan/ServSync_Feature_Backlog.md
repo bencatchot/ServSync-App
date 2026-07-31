@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-30
 
-Last reconciled against `origin/main` at `a23b28a7f74a8ccc79f6488e016aa0b4aca4bcd2` (merged PR #353).
+Last reconciled against `origin/main` at `ab5b75d8819facaf0f0b14bc45ac0d087bfd0818` (merged PR #354).
 
 ## Purpose
 
@@ -18,13 +18,14 @@ ServSync remains in controlled private beta. The current beta loop is:
 
 Homeowner request -> contractor estimate -> homeowner approval -> job/report -> invoice -> Home History -> manual reminder.
 
-Current repository evidence through PR #353 shows these relevant states:
+Current repository evidence through PR #354 shows these relevant states:
 
 - Local-customer profile editing, property management, single-property claim invitations, guarded manual Copy Link / QR preparation, token-free ordinary claim-invite reads, and final Production token containment are complete from PR #346 and PR #347.
 - PR #348 remains an open draft for local-customer multi-property claim invitations. It is active work and is not complete until source, SQL, preview/Sandbox validation, Production release gates, and final review are separately completed.
 - PR #349 replaced the Codex workflow instructions and does not change product capability.
 - PR #351 and PR #353 restored contractor invoice PDF access from Jobs -> Invoices and immediate post-save invoice detail actions. They do not add payment processing or provider delivery.
 - PR #352 added the private Preview/Sandbox all-contractor Draft-first rollout mode source and Sandbox validation evidence; Production rollout still requires separate owner-approved gates.
+- PR #354 added contractor-owned Saved Work Template selection inside the standard Draft-first composer. Inspection Checklists remain in their separate work-format path.
 - Draft-first Work remains gated/cohort-bound. Hidden foundations, source wiring, Sandbox validation, or internal cohort evidence must not be described as general Production-live capability unless the relevant Production gates and cohorts are enabled and validated.
 - Provider-neutral foundations for accounting, payments, communication, delivery, Demo Mode, Project Collaboration, and operations readiness are foundations only unless a later entry explicitly says the user-facing capability is live.
 
@@ -70,7 +71,7 @@ Important guardrails:
 | FB-015 | Native Mobile Apps | iOS/Android, field workflow | Later / Future | Medium | Responsive web and PWA metadata are not native apps. Decide Capacitor vs React Native/Expo only after mobile web QA, auth redirects, file/photo behavior, and deep links are audited. |
 | FB-016 | Public-Launch Operational Readiness, Records, PDF, Storage, Restore, Retention, Recovery | Security, records, storage, restore, operations, scale | Backlog | High | Consolidates FB-016 and remaining FB-020 work. Controlled-beta baseline is archived; remaining work includes full data/auth restore, storage restore, backup/PITR verification, retention/export/deletion policy, public smoke/monitoring strategy, scale readiness, security follow-ups, and recovery drills. |
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Backlog | High | Entitlement readiness exists, but billing enforcement, checkout, paid subscription activation, plan limits, and packaging decisions remain future product and rollout work. |
-| FB-024 | Price Book / Reusable Estimate Content Maturity | Estimates, saved charges, trade libraries, Draft-first reusable work | Backlog | High | Estimate defaults/templates v1 is archived. Current active slice wires existing contractor-owned saved estimate templates into the standard Draft-first composer as reusable work content without backend changes. Remaining maturity includes reusable assemblies, default quantity/tax/category behavior, margin reminders, invoice quick-pick decisions, dedupe/overwrite policy, XLSX/PDF/import cleanup, and broader trade-library decisions. |
+| FB-024 | Price Book / Reusable Estimate Content Maturity | Estimates, saved charges, trade libraries, Draft-first reusable work | Backlog | High | Estimate defaults/templates v1 is archived. Existing contractor-owned saved estimate templates now feed the standard Draft-first composer as reusable work content; Inspection Checklists remain separate. Remaining maturity includes reusable assemblies, default quantity/tax/category behavior, margin reminders, invoice quick-pick decisions, dedupe/overwrite policy, XLSX/PDF/import cleanup, and broader trade-library decisions. |
 | FB-026 | Review Moderation and Public Display | Reviews, referrals, Discover trust | Backlog | High | Contractor referral v1 is archived. Remaining work is approved-only public ServSync review/rating display, moderation policy, snippets/kudos visibility, external-review handoff, and no-fake-rating/no-paid-ranking boundaries. |
 | FB-029 | Recurring Service Automation | Service agreements, reminders, renewals, recurring billing | Later / Future | Medium | Service Agreements foundation v1 is archived. Retain recurring automation only as future selected visits, renewals, reminders, or recurring billing after explicit workflow/payment/notification approvals. |
 | FB-030 | Home Access Invite Email Enablement and Shared-Record Expansion | Shared homes, Home Access, permissions | Backlog | High | Shared Home/Home Access foundation v1 is archived. Remaining work is guarded invite-email enablement and one-surface-at-a-time expansion of shared records such as requests, estimates, invoices, jobs, documents, reminders, notifications, and storage. |
