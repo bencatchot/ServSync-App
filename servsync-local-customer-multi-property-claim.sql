@@ -1173,6 +1173,24 @@ revoke execute on function public.servsync_accept_local_customer_claim(text, uui
 revoke execute on function public.servsync_accept_local_customer_claim(text, uuid, jsonb, jsonb) from anon;
 grant execute on function public.servsync_accept_local_customer_claim(text, uuid, jsonb, jsonb) to authenticated;
 
+-- Reassert least-privilege grants for legacy claim lifecycle RPCs created by
+-- the single-property foundation so rerunning this slice closes inherited
+-- default EXECUTE exposure without changing function behavior.
+revoke execute on function public.servsync_decline_local_customer_claim(text) from public;
+revoke execute on function public.servsync_decline_local_customer_claim(text) from anon;
+grant execute on function public.servsync_decline_local_customer_claim(text) to authenticated;
+
+revoke execute on function public.servsync_revoke_local_customer_claim_invite(uuid) from public;
+revoke execute on function public.servsync_revoke_local_customer_claim_invite(uuid) from anon;
+grant execute on function public.servsync_revoke_local_customer_claim_invite(uuid) to authenticated;
+
+-- Preserve the completed token-containment boundary for the token-bearing
+-- legacy invite table when this feature slice is rerun in an environment that
+-- previously used SQL-first compatibility grants.
+revoke select on public.contractor_local_customer_claim_invites from public;
+revoke select on public.contractor_local_customer_claim_invites from anon;
+revoke select on public.contractor_local_customer_claim_invites from authenticated;
+
 notify pgrst, 'reload schema';
 
 commit;

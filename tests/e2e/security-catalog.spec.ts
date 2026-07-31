@@ -26,6 +26,16 @@ type RpcRow = {
   authenticated_execute: boolean | null;
 };
 
+type RpcSignatureRow = {
+  signature: string;
+  exists: boolean;
+  security_definer: boolean | null;
+  search_path_public: boolean | null;
+  public_execute: boolean | null;
+  anon_execute: boolean | null;
+  authenticated_execute: boolean | null;
+};
+
 type BucketRow = {
   bucket_id: string;
   exists: boolean;
@@ -259,6 +269,11 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_void_invoice',
 ];
 
+const CLAIM_LIFECYCLE_RPC_SIGNATURES = [
+  'servsync_decline_local_customer_claim(text)',
+  'servsync_revoke_local_customer_claim_invite(uuid)',
+];
+
 const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_append_workflow_activity_event',
   'servsync_generate_local_customer_claim_token',
@@ -344,6 +359,31 @@ order by e.proname;
   `;
 }
 
+function securityDefinerRpcSignatureCatalogQuery(values: string[]) {
+  return `
+with expected(signature) as (
+  values ${sqlValues(values)}
+)
+select
+  e.signature,
+  p.oid is not null as exists,
+  p.prosecdef as security_definer,
+  'search_path=public' = any(p.proconfig) as search_path_public,
+  exists (
+    select 1
+    from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+    where acl.grantee = 0
+      and acl.privilege_type = 'EXECUTE'
+  ) as public_execute,
+  has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
+  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute
+from expected e
+left join pg_proc p
+  on p.oid = e.signature::regprocedure
+order by e.signature;
+  `;
+}
+
 function runCatalogQuery<T>(sql: string): T[] {
   requireLinkedSandbox();
 
@@ -405,6 +445,54 @@ order by e.table_name;
       expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
       expect(row.authenticated_execute, `${row.proname} should grant EXECUTE to authenticated`).toBe(true);
     }
+  });
+
+  test('local customer claim lifecycle RPC grants are hardened by exact signature', () => {
+    const rows = runCatalogQuery<RpcSignatureRow>(
+      securityDefinerRpcSignatureCatalogQuery(CLAIM_LIFECYCLE_RPC_SIGNATURES),
+    );
+
+    expect(rows, 'Claim lifecycle RPC signature rows should match expected count').toHaveLength(
+      CLAIM_LIFECYCLE_RPC_SIGNATURES.length,
+    );
+    for (const row of rows) {
+      expect(row.exists, `${row.signature} should exist`).toBe(true);
+      expect(row.security_definer, `${row.signature} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.signature} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.signature} should not grant EXECUTE to PUBLIC`).toBe(false);
+      expect(row.anon_execute, `${row.signature} should not grant EXECUTE to anon`).toBe(false);
+      expect(row.authenticated_execute, `${row.signature} should grant EXECUTE to authenticated`).toBe(true);
+    }
+  });
+
+  test('local customer claim invite token table has no direct browser SELECT grants', () => {
+    const rows = runCatalogQuery<TablePrivilegeRow>(`
+select
+  c.relname as table_name,
+  c.oid is not null as exists,
+  has_table_privilege('public', c.oid, 'SELECT') as public_select,
+  has_table_privilege('public', c.oid, 'INSERT') as public_insert,
+  has_table_privilege('public', c.oid, 'UPDATE') as public_update,
+  has_table_privilege('public', c.oid, 'DELETE') as public_delete,
+  has_table_privilege('anon', c.oid, 'SELECT') as anon_select,
+  has_table_privilege('anon', c.oid, 'INSERT') as anon_insert,
+  has_table_privilege('anon', c.oid, 'UPDATE') as anon_update,
+  has_table_privilege('anon', c.oid, 'DELETE') as anon_delete,
+  has_table_privilege('authenticated', c.oid, 'SELECT') as authenticated_select,
+  has_table_privilege('authenticated', c.oid, 'INSERT') as authenticated_insert,
+  has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
+  has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete
+from pg_class c
+where c.relnamespace = 'public'::regnamespace
+  and c.relname = 'contractor_local_customer_claim_invites'
+  and c.relkind in ('r', 'p');
+    `);
+
+    expect(rows, 'Claim invite table catalog row should exist').toHaveLength(1);
+    expect(rows[0].exists, 'claim invite table should exist').toBe(true);
+    expect(rows[0].public_select, 'PUBLIC should not directly SELECT claim invites').toBe(false);
+    expect(rows[0].anon_select, 'anon should not directly SELECT claim invites').toBe(false);
+    expect(rows[0].authenticated_select, 'authenticated should use token-free list RPCs, not direct table SELECT').toBe(false);
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {

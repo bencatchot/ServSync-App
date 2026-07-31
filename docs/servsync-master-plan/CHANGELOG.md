@@ -9,7 +9,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Branch: `codex/local-customer-multi-property-claim-v1`
 - Original starting main SHA: `45cc8ad84721619fbd7a1533a8fdd19c16ddeca7`
 - Reconciled main SHA: `23429f0a1d297d7c07bdd26021a2732531cdc2e2`
-- SQL SHA-256: `0eb3df557b7d746c4630f91815601040c20e03934043a59c5e7ec8a6b2ceea52`
+- SQL SHA-256: `f7a8eddc606ae42e163ec838308af551a356b570181f45f35d75ea8eab5ad180`
 - Files changed:
   - `servsync-local-customer-multi-property-claim.sql`
   - `scripts/apply-blank-supabase-schema.sh`
@@ -24,6 +24,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Adds the pre-Production multi-property local-customer claim redesign and reconciles its open draft PR with PR #355-era `main`. One invite carries an explicit contractor-selected local-property set; token-free preview returns every property; homeowner acceptance requires a complete create-or-match mapping and claims the set atomically; legacy single-property compatibility remains while older clients reject multi-property partial acceptance. The reconciliation preserves the later null-safe QR guard and current Draft-first/PDF source.
+- Follow-up grant remediation: The multi-property SQL now reasserts least-privilege `EXECUTE` grants for `servsync_decline_local_customer_claim(text)` and `servsync_revoke_local_customer_claim_invite(uuid)`, and reasserts final token-containment `SELECT` revocations on `contractor_local_customer_claim_invites` so rerunning this slice closes inherited SQL-first compatibility exposure without changing claim RPC behavior.
 - Tests/checks run:
   - `npm ci`
   - `npm run typecheck`
@@ -32,12 +33,12 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `bash -n scripts/apply-sql-dry-run.sh scripts/apply-blank-supabase-schema.sh`
   - `git diff --check`
   - Sandbox SQL and rolled-back synthetic validation were previously completed against `zpzdkoaubyjtsomccxya` with zero synthetic residue and no raw-token exposure.
+  - Corrected SQL reapplied to Sandbox `zpzdkoaubyjtsomccxya`; live catalog verification confirmed the decline/revoke exact signatures no longer grant `PUBLIC` or `anon` execute, authenticated execute remains, and the token-bearing claim invite table no longer grants direct browser `SELECT`.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
   - `npm run lint` was attempted and remains blocked before changed files are linted by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
-  - Live `tests/e2e/security-catalog.spec.ts` execution was correctly refused because the reconciliation worktree was not linked to the Sandbox Supabase project; the earlier Sandbox-linked catalog evidence remains the release evidence for this unchanged SQL hash.
 - Known risks or follow-ups:
   - Production SQL, final Preview review, merge/automatic deployment, Production runtime validation, and completion closeout remain release steps.
   - Email, SMS, notifications, provider delivery, reliable receipt, and delivery-attempt tracking remain excluded.
-  - The broader Sandbox security catalog still has the previously documented PR #347 parity drift and requires an explicitly linked Sandbox CLI session for live catalog execution.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-003A now records branch reconciliation and completed Sandbox validation while preserving the remaining Production release gates.
