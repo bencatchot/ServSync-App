@@ -1,3 +1,9 @@
+import {
+  credentialEnvNamesForTarget,
+  requireValidationTarget,
+  type ValidationCredentialKey,
+} from './validationTarget';
+
 export type TestRole = 'contractor' | 'homeowner';
 export type TestCredentialKey = TestRole | 'contractorB' | 'homeownerB';
 
@@ -6,9 +12,11 @@ export type TestCredentials = {
   password: string;
 };
 
-const PRODUCTION_HOSTS = new Set(['servsync.app', 'www.servsync.app']);
 const REQUIRED_TEST_ENV_NAMES = [
+  'SERVSYNC_VALIDATION_TARGET',
   'TEST_APP_URL',
+  'TEST_SUPABASE_URL',
+  'TEST_SUPABASE_PROJECT_REF',
   'TEST_HOMEOWNER_EMAIL',
   'TEST_HOMEOWNER_PASSWORD',
   'TEST_CONTRACTOR_EMAIL',
@@ -17,10 +25,18 @@ const REQUIRED_TEST_ENV_NAMES = [
   'TEST_HOMEOWNER_B_PASSWORD',
   'TEST_CONTRACTOR_B_EMAIL',
   'TEST_CONTRACTOR_B_PASSWORD',
+  'DEMO_HOMEOWNER_EMAIL',
+  'DEMO_HOMEOWNER_PASSWORD',
+  'DEMO_CONTRACTOR_EMAIL',
+  'DEMO_CONTRACTOR_PASSWORD',
+  'DEMO_HOMEOWNER_B_EMAIL',
+  'DEMO_HOMEOWNER_B_PASSWORD',
+  'DEMO_CONTRACTOR_B_EMAIL',
+  'DEMO_CONTRACTOR_B_PASSWORD',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
 ];
 
-export const testAppUrl = requireSandboxTestAppUrl();
+export const testAppUrl = requireSafeTestAppUrl();
 
 export function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -34,47 +50,20 @@ export function requiredEnv(name: string): string {
   return value;
 }
 
-function requireSandboxTestAppUrl(): string {
-  const value = requiredEnv('TEST_APP_URL');
-  let parsed: URL;
-
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new Error(`Invalid TEST_APP_URL "${value}". Set it to a Vercel Preview / sandbox URL before running Playwright.`);
-  }
-
-  if (PRODUCTION_HOSTS.has(parsed.hostname.toLowerCase())) {
-    throw new Error(
-      'Refusing to run authenticated Playwright tests against production servsync.app. Set TEST_APP_URL to the Vercel Preview / sandbox URL.',
-    );
-  }
-
-  return value;
+function requireSafeTestAppUrl(): string {
+  return requireValidationTarget({ requireAppUrl: true }).appUrl ?? requiredEnv('TEST_APP_URL');
 }
 
 export function credentialsFor(key: TestCredentialKey): TestCredentials {
-  switch (key) {
-    case 'contractor':
-      return {
-        email: requiredEnv('TEST_CONTRACTOR_EMAIL'),
-        password: requiredEnv('TEST_CONTRACTOR_PASSWORD'),
-      };
-    case 'contractorB':
-      return {
-        email: requiredEnv('TEST_CONTRACTOR_B_EMAIL'),
-        password: requiredEnv('TEST_CONTRACTOR_B_PASSWORD'),
-      };
-    case 'homeownerB':
-      return {
-        email: requiredEnv('TEST_HOMEOWNER_B_EMAIL'),
-        password: requiredEnv('TEST_HOMEOWNER_B_PASSWORD'),
-      };
-    case 'homeowner':
-    default:
-      return {
-        email: requiredEnv('TEST_HOMEOWNER_EMAIL'),
-        password: requiredEnv('TEST_HOMEOWNER_PASSWORD'),
-      };
-  }
+  const { targetName } = requireValidationTarget({
+    requireAppUrl: true,
+    requireSupabaseEnv: true,
+    requireCredentials: [key as ValidationCredentialKey],
+  });
+  const names = credentialEnvNamesForTarget(targetName, key as ValidationCredentialKey);
+
+  return {
+    email: requiredEnv(names.email),
+    password: requiredEnv(names.password),
+  };
 }

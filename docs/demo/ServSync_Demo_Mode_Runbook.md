@@ -46,6 +46,8 @@ Presentation mode fails closed for missing, malformed, mismatched, production, o
 
 Values are intentionally omitted from this runbook.
 
+Demo seed/reset/verify runner:
+
 - `DEMO_MODE_ENABLED`
 - `DEMO_SUPABASE_URL`
 - `DEMO_SUPABASE_PROJECT_REF`
@@ -57,6 +59,25 @@ Values are intentionally omitted from this runbook.
 - `DEMO_CONTRACTOR_PASSWORD`
 - `DEMO_RESET_ACKNOWLEDGE` for reset only
 - `DEMO_ANCHOR_TIMESTAMP` optional
+
+Authenticated Demo Playwright validation:
+
+- `SERVSYNC_VALIDATION_TARGET=demo`
+- `TEST_APP_URL`
+- `TEST_SUPABASE_URL`
+- `TEST_SUPABASE_PROJECT_REF`
+- `DEMO_HOMEOWNER_EMAIL`
+- `DEMO_HOMEOWNER_PASSWORD`
+- `DEMO_CONTRACTOR_EMAIL`
+- `DEMO_CONTRACTOR_PASSWORD`
+- `DEMO_HOMEOWNER_B_EMAIL`
+- `DEMO_HOMEOWNER_B_PASSWORD`
+- `DEMO_CONTRACTOR_B_EMAIL`
+- `DEMO_CONTRACTOR_B_PASSWORD`
+
+The Demo Playwright target guard requires the selected environment, Supabase URL, Supabase project ref, and linked Supabase CLI project to agree on the dedicated Demo ref `bdytwgejqnlblhrnqxkp` when catalog checks use `supabase db query --linked`. It fails closed for missing values, unknown refs, mismatches, the known Production ref `uqgtheclhxqlnjpfmheq`, the shared Sandbox ref when Demo is selected, and public Production app hosts.
+
+Store secret values only in an ignored local environment file or approved secret store. Do not commit credentials or paste them into chat, terminal reports, PR descriptions, screenshots, traces, videos, or logs. The Playwright helpers report missing variable names only and must not print values.
 
 The runner also refuses to proceed if these external-effect flags are set to enabled-looking values in the process environment. Rejected values are case-insensitive and include `true`, `1`, `yes`, `on`, and `enabled`. Unrecognized non-empty boolean values also fail closed; unset the flag or use a clear disabled value such as `false`.
 
@@ -99,6 +120,18 @@ npm run demo:verify -- --checkpoint=request_ready
 The canonical documented form is `--checkpoint=<key>`. The runner also accepts `--checkpoint <key>` for operator convenience. Unknown, empty, malformed, or deferred checkpoint keys fail before remote target validation or mutation.
 
 The command output reports safe identifiers, run reconciliation summaries, verification categories, and record counts. It must not print passwords, tokens, access keys, or full sensitive environment values.
+
+Run Demo catalog checks after loading the dedicated Demo environment and linking the Supabase CLI to `bdytwgejqnlblhrnqxkp`:
+
+```bash
+SERVSYNC_VALIDATION_TARGET=demo \
+TEST_APP_URL="https://servsync-demo-4v0cil6iy-bencatchots-projects.vercel.app" \
+TEST_SUPABASE_URL="https://bdytwgejqnlblhrnqxkp.supabase.co" \
+TEST_SUPABASE_PROJECT_REF="bdytwgejqnlblhrnqxkp" \
+npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium
+```
+
+Run authenticated FB-003A Demo validation only after the Demo fixture credentials are present through the approved secret location. Keep external-effect flags unset or explicitly disabled, and use only the internal/non-delivery claim-invitation path.
 
 ## Supported Checkpoints
 

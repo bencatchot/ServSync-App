@@ -4,6 +4,39 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-31
+
+- Branch: `codex/demo-validation-target-config`
+- Starting main SHA: `a20cee5ef184709ca462f6546f54a61e655aa058`
+- Files changed:
+  - `tests/e2e/helpers/validationTarget.ts`
+  - `tests/e2e/helpers/env.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `tests/e2e/validation-target-config.spec.ts`
+  - `docs/QA_PLAYWRIGHT_GUIDE.md`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds an explicit non-Production validation-target guard for authenticated Playwright and security-catalog runs. Sandbox remains allowed through `SERVSYNC_VALIDATION_TARGET=sandbox`; the dedicated Demo environment is allowed through `SERVSYNC_VALIDATION_TARGET=demo`; both paths require matching Supabase URL/ref evidence, and Production hosts/refs remain rejected. The security catalog now uses the shared target guard instead of a Sandbox-only hardcode, and docs identify the required Demo credential variable names without committing values.
+- Reason for change: FB-003A Demo validation was blocked after Demo SQL remediation because the authenticated Demo credentials were not configured and the security-catalog suite refused the positively identified Demo ref.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - focused validation-target and security-catalog source tests
+  - existing Sandbox-target and new Demo-target configuration guard tests
+  - `git diff --check`
+  - changed-file secret/token scans
+  - `npm run lint` attempted; inherited ESLint startup issue is recorded in the implementation report if unchanged.
+- Known risks or follow-ups:
+  - No SQL, Demo fixtures, Production, Sandbox, deployment, merge, or provider delivery change is included.
+  - Authenticated FB-003A Demo Tests A-H still require owner-provided Demo secret configuration before they can run.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003A now distinguishes completed database remediation from validation-tooling remediation and still-pending authenticated Demo validation.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This changes validation tooling and runbook instructions, not product direction, workflow definitions, permissions, or rollout policy.
+
 ## 2026-07-30
 
 - Branch: `codex/local-customer-multi-property-claim-v1`
