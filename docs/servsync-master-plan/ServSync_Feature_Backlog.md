@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-30
 
-Last reconciled against `origin/main` at `ab5b75d8819facaf0f0b14bc45ac0d087bfd0818` (merged PR #354).
+Last reconciled against `origin/main` at `23429f0a1d297d7c07bdd26021a2732531cdc2e2` (merged PR #355).
 
 ## Purpose
 
@@ -18,14 +18,15 @@ ServSync remains in controlled private beta. The current beta loop is:
 
 Homeowner request -> contractor estimate -> homeowner approval -> job/report -> invoice -> Home History -> manual reminder.
 
-Current repository evidence through PR #354 shows these relevant states:
+Current repository evidence through PR #355 shows these relevant states:
 
 - Local-customer profile editing, property management, single-property claim invitations, guarded manual Copy Link / QR preparation, token-free ordinary claim-invite reads, and final Production token containment are complete from PR #346 and PR #347.
-- PR #348 remains an open draft for local-customer multi-property claim invitations. It is active work and is not complete until source, SQL, preview/Sandbox validation, Production release gates, and final review are separately completed.
+- PR #348 remains an open draft for local-customer multi-property claim invitations. Its source has been reconciled onto PR #355-era `main`, and Sandbox SQL plus synthetic validation are complete. Production SQL, final Preview review, merge, Production runtime validation, and completion closeout remain separate release steps.
 - PR #349 replaced the Codex workflow instructions and does not change product capability.
 - PR #351 and PR #353 restored contractor invoice PDF access from Jobs -> Invoices and immediate post-save invoice detail actions. They do not add payment processing or provider delivery.
 - PR #352 added the private Preview/Sandbox all-contractor Draft-first rollout mode source and Sandbox validation evidence; Production rollout still requires separate owner-approved gates.
 - PR #354 added contractor-owned Saved Work Template selection inside the standard Draft-first composer. Inspection Checklists remain in their separate work-format path.
+- PR #355 simplified the Draft Composer template area and moved Add work line beneath the final line item.
 - Draft-first Work remains gated/cohort-bound. Hidden foundations, source wiring, Sandbox validation, or internal cohort evidence must not be described as general Production-live capability unless the relevant Production gates and cohorts are enabled and validated.
 - Provider-neutral foundations for accounting, payments, communication, delivery, Demo Mode, Project Collaboration, and operations readiness are foundations only unless a later entry explicitly says the user-facing capability is live.
 
@@ -55,7 +56,7 @@ Important guardrails:
 
 | ID | Active unfinished outcome | Product area | Status | Priority | Current state / next step |
 | --- | --- | --- | --- | --- | --- |
-| FB-003A | Local-Customer Multi-Property Claim | Local customers, claim invitations, connected homeowner conversion | Implementation In Progress | High | PR #348 is open/draft. Finish review, SQL rollout, Sandbox/preview validation, Production release gating, and completion audit before marking complete. |
+| FB-003A | Local-Customer Multi-Property Claim | Local customers, claim invitations, connected homeowner conversion | Gated Rollout | High | PR #348 is open/draft and reconciled with current `main`. Source validation and Sandbox SQL/synthetic validation are complete. Remaining steps are refreshed Preview review, owner-approved Production SQL, merge/automatic deployment, Production runtime validation, and completion closeout. |
 | FB-003B | Request-Free Operational Document Delivery Authorization | Local customers, estimates, invoices, operational delivery | Backlog | High | Keep separate from claim-link/QR delivery. Future work must define safe authorization for request-free operational document send paths without weakening token containment or homeowner-controlled claimed profiles. |
 | FB-004 | Contractor Reporting Beyond Attention Queues | Contractor operations, reporting | Backlog | Medium | Follow-Up Lite is archived. Retain only reporting not already handled by dashboard workflow summaries or attention queues, such as filtered operational reports, exports, or owner/admin management views. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profiles, recognition, marketplace trust | Later / Future | Low | Preserve as future trust work after real platform activity and moderation/public-display rules exist. |
@@ -137,7 +138,7 @@ This section is factual repo state, not a product-priority decision.
 
 | Work | Current evidence | Backlog relationship |
 | --- | --- | --- |
-| PR #348 Add multi-property local customer claim flow | Open draft, branch `codex/local-customer-multi-property-claim-v1`, head `d964e411c1f1397141ae0e82f876f15cfd58637a` when checked on 2026-07-29. | FB-003A active. |
+| PR #348 Add multi-property local customer claim flow | Open draft on branch `codex/local-customer-multi-property-claim-v1`; reconciled with `origin/main` at `23429f0a1d297d7c07bdd26021a2732531cdc2e2` on 2026-07-30. Sandbox SQL and synthetic validation are complete; Production release steps remain gated. | FB-003A active. |
 | PR #73 marketing demo screenshot tooling | Open draft and conflicting against current main. | Potentially useful marketing/demo support; do not close without owner approval. |
 | PR #183 shared-home boundary tests | Open draft and mergeable. | Partially superseded by later FB-030 closeout evidence, but may contain reusable test coverage. |
 | PR #187 Discover trust-layer backlog additions | Open draft and mergeable. | Still potentially valid planning input for FB-005/FB-008/FB-009/FB-026. |

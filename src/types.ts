@@ -1397,6 +1397,21 @@ export interface ContractorLocalContact {
 
 export type LocalCustomerClaimInviteStatus = 'pending' | 'claimed' | 'declined' | 'expired' | 'revoked';
 
+export interface LocalCustomerClaimInviteProperty {
+  local_home_id: string;
+  claimed_home_id?: string | null;
+  nickname?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  home_type?: string | null;
+  year_built?: string | null;
+  square_feet?: string | null;
+  sort_order?: number | null;
+}
+
 export interface LocalCustomerClaimInvite {
   id: string;
   contractor_id: string;
@@ -1416,6 +1431,9 @@ export interface LocalCustomerClaimInvite {
   revoked_at: string | null;
   created_at: string;
   updated_at: string;
+  local_home_ids?: string[];
+  property_count?: number;
+  properties?: LocalCustomerClaimInviteProperty[];
 }
 
 export interface Inspection {

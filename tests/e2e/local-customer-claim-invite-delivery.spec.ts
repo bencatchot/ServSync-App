@@ -186,12 +186,14 @@ test.describe('local customer claim invite delivery source checks', () => {
       'const rawFieldWork = conn ? fieldWorkForHomeowner',
     );
 
-    expect(loadSection).toContain("supabase.rpc('servsync_list_local_customer_claim_invites'");
+    expect(loadSection).toContain("supabase.rpc('servsync_list_local_customer_claim_invites_v2'");
     expect(loadSection).not.toContain(".from('contractor_local_customer_claim_invites')");
     expect(createSection).not.toContain('invite_token');
     expect(prepareSection).toContain("supabase.rpc('servsync_prepare_local_customer_claim_invite_delivery'");
     expect(prepareSection).toContain('navigator.clipboard?.writeText(localCustomerClaimInviteUrl(token))');
-    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token })');
+    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({');
+    expect(prepareSection).toContain('localContactId: invite.local_contact_id');
+    expect(prepareSection).toContain('propertySignature: localClaimInvitePropertySignature(invite)');
     expect(localCustomerDetailSection).toContain('preparedLocalClaimInviteQr && latestLocalClaimInvite && preparedLocalClaimInviteQr.inviteId === latestLocalClaimInvite.id');
     expect(localCustomerDetailSection).toContain('localCustomerClaimInviteUrl(preparedLocalClaimInviteQr.token)');
     expect(localCustomerDetailSection).not.toContain('preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite?.id');
@@ -218,16 +220,17 @@ test.describe('local customer claim invite delivery source checks', () => {
       'const revokeLocalCustomerClaimInvite = async',
     );
 
-    expect(qrStateSection).toContain('localContactId: string; token: string');
+    expect(qrStateSection).toContain('propertySignature: string; token: string');
     expect(qrStateSection).toContain('localClaimInviteQrRequestIdRef');
     expect(qrCleanupSection).toContain('clearPreparedLocalClaimInviteQr');
     expect(qrCleanupSection).toContain('setPreparedLocalClaimInviteQr(null)');
     expect(qrCleanupSection).toContain('[selectedHomeownerSubjectId, homeownerDetailTab, contractorTab, clearPreparedLocalClaimInviteQr]');
     expect(qrCleanupSection).toContain('selectedLocalContactId !== preparedLocalClaimInviteQr.localContactId');
+    expect(qrCleanupSection).toContain('localClaimInvitePropertySignature(preparedInvite) !== preparedLocalClaimInviteQr.propertySignature');
     expect(qrCleanupSection).toContain("effectiveLocalClaimInviteStatus(preparedInvite) !== 'pending'");
     expect(prepareSection).toContain('const requestId = localClaimInviteQrRequestIdRef.current + 1');
     expect(prepareSection).toContain('if (localClaimInviteQrRequestIdRef.current !== requestId) return;');
-    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({ inviteId: invite.id, localContactId: invite.local_contact_id, token })');
+    expect(prepareSection).toContain('propertySignature: localClaimInvitePropertySignature(invite)');
   });
 
   test('final containment SQL removes broad direct claim-invite table reads', () => {
