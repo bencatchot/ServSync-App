@@ -21,7 +21,7 @@ Homeowner request -> contractor estimate -> homeowner approval -> job/report -> 
 Current repository evidence through PR #355 shows these relevant states:
 
 - Local-customer profile editing, property management, single-property claim invitations, guarded manual Copy Link / QR preparation, token-free ordinary claim-invite reads, and final Production token containment are complete from PR #346 and PR #347.
-- PR #348 remains an open draft for local-customer multi-property claim invitations. Its source has been reconciled onto PR #355-era `main`, and Sandbox SQL plus synthetic validation are complete. Production SQL, final Preview review, merge, Production runtime validation, and completion closeout remain separate release steps.
+- PR #348 merged the local-customer multi-property claim invitation source. SQL/security remediation has been validated outside Production and Production release gates remain separate; authenticated Demo workflow validation remains unfinished until the dedicated Demo validation credentials/tooling gate is complete.
 - PR #349 replaced the Codex workflow instructions and does not change product capability.
 - PR #351 and PR #353 restored contractor invoice PDF access from Jobs -> Invoices and immediate post-save invoice detail actions. They do not add payment processing or provider delivery.
 - PR #352 added the private Preview/Sandbox all-contractor Draft-first rollout mode source and Sandbox validation evidence; Production rollout still requires separate owner-approved gates.
@@ -56,7 +56,7 @@ Important guardrails:
 
 | ID | Active unfinished outcome | Product area | Status | Priority | Current state / next step |
 | --- | --- | --- | --- | --- | --- |
-| FB-003A | Local-Customer Multi-Property Claim | Local customers, claim invitations, connected homeowner conversion | Gated Rollout | High | PR #348 is open/draft and reconciled with current `main`. Source validation and Sandbox SQL/synthetic validation are complete. Remaining steps are refreshed Preview review, owner-approved Production SQL, merge/automatic deployment, Production runtime validation, and completion closeout. |
+| FB-003A | Local-Customer Multi-Property Claim | Local customers, claim invitations, connected homeowner conversion | Gated Rollout | High | PR #348 source is merged and the Demo database has been remediated with the reviewed claim-invitation baseline plus FB-003A SQL. This validation-tooling slice adds explicit Demo/Sandbox target guards so the final authenticated Demo Tests A-H can run once owner-provided Demo secrets are configured. Keep FB-003A open until authenticated Demo validation and the minimum Production confirmation complete. |
 | FB-003B | Request-Free Operational Document Delivery Authorization | Local customers, estimates, invoices, operational delivery | Backlog | High | Keep separate from claim-link/QR delivery. Future work must define safe authorization for request-free operational document send paths without weakening token containment or homeowner-controlled claimed profiles. |
 | FB-004 | Contractor Reporting Beyond Attention Queues | Contractor operations, reporting | Backlog | Medium | Follow-Up Lite is archived. Retain only reporting not already handled by dashboard workflow summaries or attention queues, such as filtered operational reports, exports, or owner/admin management views. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profiles, recognition, marketplace trust | Later / Future | Low | Preserve as future trust work after real platform activity and moderation/public-display rules exist. |
@@ -138,7 +138,7 @@ This section is factual repo state, not a product-priority decision.
 
 | Work | Current evidence | Backlog relationship |
 | --- | --- | --- |
-| PR #348 Add multi-property local customer claim flow | Open draft on branch `codex/local-customer-multi-property-claim-v1`; reconciled with `origin/main` at `23429f0a1d297d7c07bdd26021a2732531cdc2e2` on 2026-07-30. Sandbox SQL and synthetic validation are complete; Production release steps remain gated. | FB-003A active. |
+| PR #348 Add multi-property local customer claim flow | Merged through `origin/main` at `a20cee5ef184709ca462f6546f54a61e655aa058`. Demo database remediation has installed the reviewed claim-invitation baseline and FB-003A SQL; authenticated Demo Tests A-H remain pending dedicated Demo credential configuration and validation-tooling merge. | FB-003A active. |
 | PR #73 marketing demo screenshot tooling | Open draft and conflicting against current main. | Potentially useful marketing/demo support; do not close without owner approval. |
 | PR #183 shared-home boundary tests | Open draft and mergeable. | Partially superseded by later FB-030 closeout evidence, but may contain reusable test coverage. |
 | PR #187 Discover trust-layer backlog additions | Open draft and mergeable. | Still potentially valid planning input for FB-005/FB-008/FB-009/FB-026. |

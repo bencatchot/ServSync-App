@@ -1,9 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
+import { requireValidationTarget } from './helpers/validationTarget';
 
 type CatalogResponse<T> = {
   rows?: T[];
@@ -316,15 +313,8 @@ const STORAGE_OBJECT_POLICIES = [
   'discover_media_upload_contractor',
 ];
 
-function requireLinkedSandbox() {
-  const projectRefPath = resolve(process.cwd(), 'supabase/.temp/project-ref');
-  const linkedProjectRef = existsSync(projectRefPath) ? readFileSync(projectRefPath, 'utf8').trim() : '';
-
-  if (linkedProjectRef !== SANDBOX_SUPABASE_REF) {
-    throw new Error(
-      `Refusing catalog checks because Supabase CLI is linked to "${linkedProjectRef || 'unknown'}", not sandbox ${SANDBOX_SUPABASE_REF}.`,
-    );
-  }
+function requireLinkedValidationTarget() {
+  requireValidationTarget({ requireLinkedProjectRef: true, requireSupabaseEnv: true });
 }
 
 function sqlValues(values: string[]) {
@@ -385,7 +375,7 @@ order by e.signature;
 }
 
 function runCatalogQuery<T>(sql: string): T[] {
-  requireLinkedSandbox();
+  requireLinkedValidationTarget();
 
   const output = execFileSync('supabase', ['db', 'query', '--linked', '--output', 'json', sql], {
     cwd: process.cwd(),
@@ -403,8 +393,8 @@ function runCatalogQuery<T>(sql: string): T[] {
   return parsed.rows ?? [];
 }
 
-test.describe('sandbox security catalog checks', () => {
-  test('core private tables have RLS enabled in the linked sandbox', () => {
+test.describe('security catalog checks', () => {
+  test('core private tables have RLS enabled in the linked validation target', () => {
     const rows = runCatalogQuery<RlsRow>(`
 with expected(table_name) as (
   values ${sqlValues(CORE_PRIVATE_TABLES)}
@@ -428,7 +418,7 @@ order by e.table_name;
     }
   });
 
-  test('selected browser-callable RPCs are hardened for sandbox browser access', () => {
+  test('selected browser-callable RPCs are hardened for browser access', () => {
     const rows = runCatalogQuery<RpcRow>(
       securityDefinerRpcCatalogQuery(BROWSER_CALLABLE_SECURITY_DEFINER_RPCS),
     );
@@ -1194,7 +1184,7 @@ order by e.proname;
     }
   });
 
-  test('core storage buckets exist with expected public/private flags in the linked sandbox', () => {
+  test('core storage buckets exist with expected public/private flags in the linked validation target', () => {
     const bucketValues = STORAGE_BUCKETS.map(
       bucket => `('${bucket.bucket_id.replace(/'/g, "''")}', ${bucket.expected_public ? 'true' : 'false'})`,
     ).join(',');
@@ -1221,7 +1211,7 @@ order by e.bucket_id;
     }
   });
 
-  test('selected storage object policies exist in the linked sandbox', () => {
+  test('selected storage object policies exist in the linked validation target', () => {
     const rows = runCatalogQuery<StoragePolicyRow>(`
 with expected(policy_name) as (
   values ${sqlValues(STORAGE_OBJECT_POLICIES)}

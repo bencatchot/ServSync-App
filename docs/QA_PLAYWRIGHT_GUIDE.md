@@ -42,12 +42,17 @@ Mobile coverage starts with one read-only smoke spec that uses test-local mobile
 
 Set these in your local shell or `.env.test.local` before running Playwright:
 
+- `SERVSYNC_VALIDATION_TARGET`
 - `TEST_APP_URL`
+- `TEST_SUPABASE_URL`
+- `TEST_SUPABASE_PROJECT_REF`
 - `TEST_CONTRACTOR_EMAIL`
 - `TEST_CONTRACTOR_PASSWORD`
 - `TEST_HOMEOWNER_EMAIL`
 - `TEST_HOMEOWNER_PASSWORD`
 - `VERCEL_AUTOMATION_BYPASS_SECRET` when testing a protected Vercel Preview
+
+Use `SERVSYNC_VALIDATION_TARGET=sandbox` for the shared Sandbox and `SERVSYNC_VALIDATION_TARGET=demo` for the dedicated Demo environment. The Playwright helper fails closed when the selected target, configured Supabase URL, configured Supabase project ref, or linked Supabase CLI project disagree. It always rejects the known Production project ref and the public Production hosts.
 
 Never commit credentials. Do not paste passwords, tokens, bypass secrets, or service keys into chat, GitHub, docs, screenshots, traces, or test logs.
 
@@ -68,6 +73,36 @@ Do not use production:
 - `https://www.servsync.app`
 
 The test helper intentionally refuses production hosts for authenticated Playwright. Production should be checked with public/read-only smoke steps unless production smoke accounts are separately approved.
+
+## Dedicated Demo Validation
+
+Dedicated Demo validation must be selected explicitly:
+
+```bash
+set -a
+source .env.test.local
+set +a
+SERVSYNC_VALIDATION_TARGET=demo \
+TEST_APP_URL="https://servsync-demo-4v0cil6iy-bencatchots-projects.vercel.app" \
+TEST_SUPABASE_URL="https://bdytwgejqnlblhrnqxkp.supabase.co" \
+TEST_SUPABASE_PROJECT_REF="bdytwgejqnlblhrnqxkp" \
+npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium
+```
+
+For authenticated Demo browser validation, configure these secret names in the approved local ignored environment file or approved secret store. Values must not be committed, printed, pasted into chat, written into PR descriptions, or included in screenshots/traces:
+
+- `DEMO_CONTRACTOR_EMAIL`
+- `DEMO_CONTRACTOR_PASSWORD`
+- `DEMO_HOMEOWNER_EMAIL`
+- `DEMO_HOMEOWNER_PASSWORD`
+- `DEMO_CONTRACTOR_B_EMAIL`
+- `DEMO_CONTRACTOR_B_PASSWORD`
+- `DEMO_HOMEOWNER_B_EMAIL`
+- `DEMO_HOMEOWNER_B_PASSWORD`
+
+The primary Demo account names align with the Demo seed/reset runner. Secondary Demo identities are required only for isolation or cross-tenant tests that call `credentialsFor('contractorB')` or `credentialsFor('homeownerB')`. Do not create or rotate Demo auth identities from Playwright; use the approved Demo seed/reset procedure when identity setup is required.
+
+Sandbox validation continues to use `SERVSYNC_VALIDATION_TARGET=sandbox`, the Sandbox ref `zpzdkoaubyjtsomccxya`, and the existing `TEST_*` credential names.
 
 ## Read-Only Smoke Tests
 
