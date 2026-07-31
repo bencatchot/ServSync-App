@@ -180,13 +180,23 @@ test.describe('local customer claim invite delivery source checks', () => {
       '<p className="text-sm font-bold text-slate-950">Homeowner claim invite</p>',
       '{localCustomer.notes && (',
     );
+    const localCustomerDetailSection = sourceBetween(
+      app,
+      "const latestLocalClaimInvite = pendingLocalClaimInvite ?? localClaimInvitesForCustomer[0] ?? null;",
+      'const rawFieldWork = conn ? fieldWorkForHomeowner',
+    );
 
     expect(loadSection).toContain("supabase.rpc('servsync_list_local_customer_claim_invites_v2'");
     expect(loadSection).not.toContain(".from('contractor_local_customer_claim_invites')");
     expect(createSection).not.toContain('invite_token');
     expect(prepareSection).toContain("supabase.rpc('servsync_prepare_local_customer_claim_invite_delivery'");
     expect(prepareSection).toContain('navigator.clipboard?.writeText(localCustomerClaimInviteUrl(token))');
+    expect(prepareSection).toContain('setPreparedLocalClaimInviteQr({');
+    expect(prepareSection).toContain('localContactId: invite.local_contact_id');
     expect(prepareSection).toContain('propertySignature: localClaimInvitePropertySignature(invite)');
+    expect(localCustomerDetailSection).toContain('preparedLocalClaimInviteQr && latestLocalClaimInvite && preparedLocalClaimInviteQr.inviteId === latestLocalClaimInvite.id');
+    expect(localCustomerDetailSection).toContain('localCustomerClaimInviteUrl(preparedLocalClaimInviteQr.token)');
+    expect(localCustomerDetailSection).not.toContain('preparedLocalClaimInviteQr?.inviteId === latestLocalClaimInvite?.id');
     expect(claimInviteUi).not.toContain('localClaimInviteLink');
     expect(claimInviteUi).toContain('ServSync does not email or text this invite');
     expect(claimInviteUi).toContain('Only the contractor owner, admin, or office role');

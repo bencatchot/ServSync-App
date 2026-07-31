@@ -124,6 +124,37 @@ test.describe('Durable Draft-to-Invoice launch foundation source checks', () => 
       .toBeLessThan(launchRpc.indexOf('servsync_private_launch_work_draft_as_invoice'));
   });
 
+  test('Preview rollout-mode SQL overrides the private entitlement helper without broadening action authority', () => {
+    const rollout = read('servsync-durable-draft-preview-rollout-mode.sql');
+    const helper = sourceBetween(
+      rollout,
+      'create or replace function public.servsync_private_contractor_has_durable_draft_entitlement',
+      'create or replace function public.servsync_current_contractor_durable_draft_entitlement',
+    );
+    const browserRpc = sourceBetween(
+      rollout,
+      'create or replace function public.servsync_current_contractor_durable_draft_entitlement',
+      'revoke all on function public.servsync_private_durable_draft_rollout_mode',
+    );
+
+    expect(rollout).toContain('servsync-durable-draft-preview-rollout-mode');
+    expect(helper).toContain('security definer');
+    expect(helper).toContain('set search_path = public');
+    expect(helper).toContain("public.servsync_private_durable_draft_rollout_mode() = 'all_contractors'");
+    expect(helper).toContain('from public.contractor_billing_accounts account');
+    expect(helper).toContain('account.durable_draft_beta_enabled is true');
+    expect(helper).not.toMatch(/current_user_can_(?:write|manage)|current_user_is_platform_admin/i);
+    expect(rollout).not.toMatch(/set\s+durable_draft_beta_enabled\s*=\s*true/i);
+    expect(rollout).not.toMatch(/grant\s+execute\s+on\s+function\s+public\.servsync_private_contractor_has_durable_draft_entitlement/i);
+
+    expect(browserRpc).toContain('auth.uid()');
+    expect(browserRpc).toContain('cp.owner_user_id = v_user_id');
+    expect(browserRpc).toContain('tm.user_id = v_user_id');
+    expect(browserRpc).toContain("tm.status = 'active'");
+    expect(browserRpc).toContain('servsync_private_contractor_has_durable_draft_entitlement(v_contractor_id)');
+    expect(rollout).toMatch(/grant execute on function public\.servsync_current_contractor_durable_draft_entitlement\(uuid\) to authenticated/i);
+  });
+
   test('predecessor line-item column check covers invoice line insert requirements', () => {
     const sql = sqlSource();
     const columnCheck = sourceBetween(

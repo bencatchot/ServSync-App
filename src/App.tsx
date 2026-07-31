@@ -5075,6 +5075,11 @@ async function downloadEstimatePdf(estimate: Estimate, context: EstimatePdfConte
   return downloadEstimatePdf(estimate, context);
 }
 
+async function previewEstimatePdf(estimate: Estimate, context: EstimatePdfContext) {
+  const { previewEstimatePdf } = await loadPdfDocuments();
+  return previewEstimatePdf(estimate, context);
+}
+
 async function generateInspectionPdf(
   inspection: Inspection,
   contractorName: string,
@@ -5094,6 +5099,11 @@ async function generateInspectionPdf(
 async function downloadInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
   const { downloadInvoicePdf } = await loadPdfDocuments();
   return downloadInvoicePdf(invoice, context);
+}
+
+async function previewInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
+  const { previewInvoicePdf } = await loadPdfDocuments();
+  return previewInvoicePdf(invoice, context);
 }
 
 function normalizeText(value: string) {
@@ -21771,6 +21781,7 @@ function ContractorDashboard({
   const [savingEstimate, setSavingEstimate] = useState(false);
   const [invoiceComposerOpen, setInvoiceComposerOpen] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [focusedInvoiceRecordId, setFocusedInvoiceRecordId] = useState<string | null>(null);
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
@@ -23973,6 +23984,7 @@ function ContractorDashboard({
       return;
     }
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     setEditingInvoiceId(null);
     setContractorFinancialRecordKind('invoices');
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
@@ -24032,6 +24044,7 @@ function ContractorDashboard({
     setEstimateDraftSessionId(crypto.randomUUID());
     setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
       title: `Estimate — ${subjectName || 'Customer'} — ${formatShortMonthDay()}`,
@@ -24188,6 +24201,7 @@ function ContractorDashboard({
 
   const focusSavedEstimateRecord = (estimate: Estimate) => {
     setContractorFinancialRecordKind('estimates');
+    setFocusedInvoiceRecordId(null);
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
     const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -24209,6 +24223,25 @@ function ContractorDashboard({
     setEstimateLineSourcePanel(null);
     setFocusedEstimateRecordId(estimate.id);
     setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+  };
+
+  const focusSavedInvoiceRecord = (invoice: Invoice) => {
+    setContractorFinancialRecordKind('invoices');
+    setFocusedEstimateRecordId(null);
+    const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
+    const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
+    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+    setContractorTab('inspections');
+    setInspectionView('list');
+    setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
+    setEstimateComposerOpen(false);
+    setInvoiceComposerOpen(false);
+    setEditingEstimateId(null);
+    setEditingInvoiceId(null);
+    setEstimateLineSourcePanel(null);
+    setInvoiceTemplateStartNotice('');
+    setFocusedInvoiceRecordId(invoice.id);
+    setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');
   };
 
   const saveEstimateDraft = async (subject: {
@@ -24486,7 +24519,7 @@ function ContractorDashboard({
       const savedInvoice = await loadInvoiceById(invoiceId);
       setNotice(actionFeedbackMessage(
         editingInvoiceId ? 'Draft invoice updated' : 'Draft invoice saved',
-        'It remains private until you send it to the homeowner.',
+        'It remains private until you send it to the homeowner. Preview or download the PDF from the saved invoice actions now.',
         'contractor-invoice-save-feedback',
       ));
       if (options?.closeComposer === false) {
@@ -24498,17 +24531,12 @@ function ContractorDashboard({
         setInvoiceDraft(createBlankInvoiceDraft());
         setInvoiceTemplateStartNotice('');
         setEstimateGuidedBuilderActive(false);
-        const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
-        if (linkedJob) {
-          openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
-        } else {
-          setInspectionView('list');
-          setContractorFinancialRecordKind('invoices');
-          setContractorJobsView('open_financial');
-          setContractorTab('inspections');
-        }
+        focusSavedInvoiceRecord(savedInvoice);
       }
       await loadContractor();
+      if (options?.closeComposer !== false) {
+        focusSavedInvoiceRecord(savedInvoice);
+      }
       return savedInvoice;
     } catch (err) {
       setError(actionFeedbackMessage(
@@ -24613,6 +24641,7 @@ function ContractorDashboard({
   const openInvoiceRecord = (invoice: Invoice) => {
     setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
@@ -24638,6 +24667,7 @@ function ContractorDashboard({
   const openEstimateRecord = (estimate: Estimate) => {
     setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
     const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
@@ -24743,7 +24773,8 @@ function ContractorDashboard({
       const result = (data || {}) as { invoice_id?: string; created?: boolean; schedule_item_id?: string };
       if (!result.invoice_id) throw new Error('Schedule invoice was created, but no invoice id was returned.');
       const invoice = await loadInvoiceById(result.invoice_id);
-      openInvoiceRecord(invoice);
+      if (result.created === false) openInvoiceRecord(invoice);
+      else focusSavedInvoiceRecord(invoice);
       setNotice('Draft invoice created from the approved payment schedule row.');
       await loadContractor();
     } catch (err) {
@@ -24902,7 +24933,8 @@ function ContractorDashboard({
       const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
       if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
       const invoice = await loadInvoiceById(result.invoice_id);
-      openInvoiceRecord(invoice);
+      if (result.created === false) openInvoiceRecord(invoice);
+      else focusSavedInvoiceRecord(invoice);
       setNotice(requestWillClose
         ? result.created
           ? 'Invoice draft created from job and linked service request moved to closed.'
@@ -24963,7 +24995,7 @@ function ContractorDashboard({
       const invoice = await loadInvoiceById(result.invoice_id);
       setPartialInvoiceJob(null);
       setPartialInvoiceSelectedIds(new Set());
-      openInvoiceRecord(invoice);
+      focusSavedInvoiceRecord(invoice);
       setNotice('Draft invoice created from completed work items. Open backlog items were captured separately and are not included in the total.');
       await loadContractor();
     } catch (err) {
@@ -28790,6 +28822,7 @@ function ContractorDashboard({
     setContractorJobsViewAndScroll('open_financial');
     setInspectionView('list');
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     setJobsCustomerFilterSubjectId(null);
     setContractorEstimateRecordSearch('');
     setContractorEstimateRecordStatusFilter('approved');
@@ -28814,6 +28847,7 @@ function ContractorDashboard({
   };
   const openContractorJobsHeaderTab = (tab: ContractorJobsHeaderTab) => {
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
     setInvoiceComposerOpen(false);
@@ -29640,6 +29674,7 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
       setContractorJobsViewAndScroll('overview');
       setInspectionView('list');
@@ -29660,6 +29695,7 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
       setContractorJobsViewAndScroll('overview');
       setInspectionView('list');
@@ -29680,6 +29716,7 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
       setContractorJobsViewAndScroll('overview');
       setInspectionView('list');
@@ -29700,6 +29737,7 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
       setContractorJobsViewAndScroll('overview');
       setInspectionView('list');
@@ -29824,7 +29862,7 @@ function ContractorDashboard({
     }
     if (output.type === 'invoice') {
       setInvoices(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
-      openInvoiceRecord(output.record);
+      focusSavedInvoiceRecord(output.record);
       focusDurableDraftOutputHeading(output, focusToken);
       return;
     }
@@ -37636,6 +37674,19 @@ function ContractorDashboard({
                                               <>
                                                 <button
                                                   type="button"
+                                                  onClick={() => void previewEstimatePdf(estimate, {
+                                                    contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                                    customerName: headerName,
+                                                    customerAddress: headerAddress || headerCity,
+                                                    contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                                  }).catch(err => setError(readableError(err, 'Unable to preview estimate PDF.')))}
+                                                  className={buttonClass('secondary')}
+                                                >
+                                                  <FileText size={15} />
+                                                  Preview PDF
+                                                </button>
+                                                <button
+                                                  type="button"
                                                   onClick={() => void downloadEstimatePdf(estimate, {
                                                     contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                                     customerName: headerName,
@@ -38081,6 +38132,7 @@ function ContractorDashboard({
                           connectedOptions={draftJobConnectedOptionsForComposer}
                           localOptions={draftJobLocalOptionsForComposer}
                           checklistOptions={draftChecklistSourceOptions}
+                          savedWorkTemplates={estimateTemplates}
                           customerLabel={fieldWorkSubjectLabel}
                           propertyLabel={fieldWorkSubjectAddress}
                           onStartNew={startCleanDraftJobComposer}
@@ -38486,6 +38538,7 @@ function ContractorDashboard({
                                   setContractorJobsViewAndScroll('open_financial');
                                   setInspectionView('list');
                                   setFocusedEstimateRecordId(null);
+                                  setFocusedInvoiceRecordId(null);
                                 }}
                                 className={buttonClass('secondary')}
                               >
@@ -38998,6 +39051,11 @@ function ContractorDashboard({
                     const focusedEstimateRecord = focusedEstimateRecordId
                       ? estimateRecordsForView.find(estimate => estimate.id === focusedEstimateRecordId) ?? null
                       : null;
+                    const focusedInvoiceRecord = focusedInvoiceRecordId
+                      ? invoiceRecordsForView.find(invoice => invoice.id === focusedInvoiceRecordId)
+                        ?? invoices.find(invoice => invoice.id === focusedInvoiceRecordId)
+                        ?? null
+                      : null;
                     const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);
                     const estimateCustomerSearchText = (estimate: Estimate) => {
                       const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
@@ -39083,15 +39141,19 @@ function ContractorDashboard({
                       .filter(invoice => invoiceMatchesSearch(invoice) && invoiceMatchesStatus(invoice))
                       .sort(sortInvoiceRecords);
                     const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : showingEstimates ? filteredEstimateRecords : [];
-                    const visibleInvoiceRecords = showingEstimates ? [] : filteredInvoiceRecords;
+                    const visibleInvoiceRecords = focusedInvoiceRecord ? [focusedInvoiceRecord] : showingEstimates ? [] : filteredInvoiceRecords;
                     const listTitle = focusedEstimateRecord
                       ? 'Saved estimate draft'
-                      : showingEstimates ? 'Estimate records' : 'Invoice records';
+                      : focusedInvoiceRecord
+                        ? 'Saved invoice draft'
+                        : showingEstimates ? 'Estimate records' : 'Invoice records';
                     const listDescription = focusedEstimateRecord
                       ? 'This is the estimate you just saved. Send it, download the PDF, save it as a template, or continue editing.'
-                      : showingEstimates
-                        ? 'Search, filter, and sort estimate records without mixing in invoice cards.'
-                        : 'Search, filter, and sort invoice records without mixing in estimate cards.';
+                      : focusedInvoiceRecord
+                        ? 'This is the invoice you just saved. Preview or download the PDF now, keep editing, or send it when the customer is connected.'
+                        : showingEstimates
+                          ? 'Search, filter, and sort estimate records without mixing in invoice cards.'
+                          : 'Search, filter, and sort invoice records without mixing in estimate cards.';
 	                    const estimateFilterActive = Boolean(contractorEstimateRecordSearch.trim())
 	                      || contractorEstimateRecordStatusFilter !== 'all'
 	                      || contractorEstimateRecordSort !== 'updated_newest'
@@ -39158,7 +39220,7 @@ function ContractorDashboard({
                               <p className="mt-1 text-sm leading-6 text-slate-500">{listDescription}</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {!focusedEstimateRecord && showingEstimates && (
+                              {!focusedEstimateRecord && !focusedInvoiceRecord && showingEstimates && (
                                 <button
                                   type="button"
                                   disabled={durableDraftCohortSafeHold}
@@ -39175,7 +39237,7 @@ function ContractorDashboard({
                                   New estimate
                                 </button>
                               )}
-                              {!focusedEstimateRecord && !showingEstimates && (
+                              {!focusedEstimateRecord && !focusedInvoiceRecord && !showingEstimates && (
                                 <button
                                   type="button"
                                   onClick={durableDraftCohortSafeHold ? () => {
@@ -39194,10 +39256,16 @@ function ContractorDashboard({
                                   View all open estimates
                                 </button>
                               )}
+                              {focusedInvoiceRecord && (
+                                <button type="button" onClick={() => setFocusedInvoiceRecordId(null)} className={buttonClass('secondary')}>
+                                  View all open invoices
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => {
                                   setFocusedEstimateRecordId(null);
+                                  setFocusedInvoiceRecordId(null);
                                   setContractorJobsViewAndScroll('overview');
                                 }}
                                 className={buttonClass('secondary')}
@@ -39206,7 +39274,7 @@ function ContractorDashboard({
                               </button>
                             </div>
                           </div>
-                          {!focusedEstimateRecord && (
+                          {!focusedEstimateRecord && !focusedInvoiceRecord && (
                           <div
                             className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(11rem,14rem)_minmax(11rem,14rem)_auto] xl:items-end"
                             data-testid={showingEstimates ? 'contractor-estimate-list-controls' : 'contractor-invoice-list-controls'}
@@ -39214,11 +39282,12 @@ function ContractorDashboard({
                             <Field label="Customer">
                               <select
                                 className={inputClass()}
-                                value={jobsCustomerFilterSubjectId ?? ''}
-                                onChange={event => {
-                                  setFocusedEstimateRecordId(null);
-                                  setJobsCustomerFilterSubjectId(event.target.value || null);
-                                }}
+                                  value={jobsCustomerFilterSubjectId ?? ''}
+                                  onChange={event => {
+                                    setFocusedEstimateRecordId(null);
+                                    setFocusedInvoiceRecordId(null);
+                                    setJobsCustomerFilterSubjectId(event.target.value || null);
+                                  }}
                               >
                                 <option value="">All customers</option>
                                 {connections.filter(c => c.status === 'active').map(c => (
@@ -39437,6 +39506,23 @@ function ContractorDashboard({
                                     <div className={`mt-3 ${mobileActionRowClass()}`}>
                                       <button
                                         type="button"
+                                        onClick={() => void previewInvoicePdf(invoice, {
+                                          contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                          contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                          contractorEmail: contractor?.email || contractorDraft.email || '',
+                                          contractorPhone: formatPhoneNumber(contractor?.phone || contractorDraft.phone || ''),
+                                          contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
+                                          customerName,
+                                          customerAddress,
+                                          serviceLabel: customerServiceLabel,
+                                        }).catch(err => setError(readableError(err, 'Unable to preview invoice PDF.')))}
+                                        className={mobileButtonClass('secondary')}
+                                      >
+                                        <FileText size={15} />
+                                        Preview PDF
+                                      </button>
+                                      <button
+                                        type="button"
                                         onClick={() => void downloadInvoicePdf(invoice, {
                                           contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                           contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
@@ -39621,6 +39707,19 @@ function ContractorDashboard({
                                 )}
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                                   <>
+                                    <button
+                                      type="button"
+                                      onClick={() => void previewEstimatePdf(estimate, {
+                                        contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                        customerName,
+                                        customerAddress,
+                                        contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                      }).catch(err => setError(readableError(err, 'Unable to preview estimate PDF.')))}
+                                      className={mobileButtonClass('secondary')}
+                                    >
+                                      <FileText size={15} />
+                                      Preview PDF
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => void downloadEstimatePdf(estimate, {
@@ -41475,6 +41574,7 @@ function ContractorDashboard({
                   connectedOptions={draftJobConnectedOptionsForComposer}
                   localOptions={draftJobLocalOptionsForComposer}
                   checklistOptions={draftChecklistSourceOptions}
+                  savedWorkTemplates={estimateTemplates}
                   customerLabel={fieldWorkSubjectLabel}
                   propertyLabel={fieldWorkSubjectAddress}
                   onStartNew={startCleanDraftJobComposer}

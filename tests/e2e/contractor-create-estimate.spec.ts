@@ -199,7 +199,8 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(financialListSource).toContain('const filteredEstimateRecords = estimateRecordsForView');
     expect(financialListSource).toContain('.filter(estimate => estimateMatchesSearch(estimate) && estimateMatchesStatus(estimate))');
     expect(financialListSource).toContain('const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : showingEstimates ? filteredEstimateRecords : [];');
-    expect(financialListSource).toContain('const visibleInvoiceRecords = showingEstimates ? [] : filteredInvoiceRecords;');
+    expect(financialListSource).toContain('const focusedInvoiceRecord = focusedInvoiceRecordId');
+    expect(financialListSource).toContain('const visibleInvoiceRecords = focusedInvoiceRecord ? [focusedInvoiceRecord] : showingEstimates ? [] : filteredInvoiceRecords;');
     expect(financialListSource).toContain('visibleInvoiceRecords.map(invoice => {');
     expect(financialListSource).toContain('visibleEstimateRecords.map(estimate => {');
     expect(financialListSource).toContain('New estimate');

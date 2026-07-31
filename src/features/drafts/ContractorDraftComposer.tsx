@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
@@ -13,13 +13,19 @@ import {
 } from './checklistDraftScope';
 import { DraftOutcomeSelector } from './DraftOutcomeSelector';
 import type { DraftIntendedOutput, SharedDraftComposerDraft } from './draftComposerTypes';
-import type { EstimateLaborMode } from '../../types';
+import {
+  applyEstimateTemplateToSharedDraft,
+  draftHasMeaningfulSavedWorkTemplateContent,
+  type SavedWorkTemplateApplyMode,
+} from './savedWorkTemplateDraftIntegration';
+import type { EstimateLaborMode, EstimateTemplate } from '../../types';
 
 type ContractorDraftComposerProps = {
   draft: SharedDraftComposerDraft;
   connectedOptions: DraftJobCustomerOption[];
   localOptions: DraftJobCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
+  savedWorkTemplates?: EstimateTemplate[];
   currentDraftId?: string | null;
   canSave: boolean;
   saving: boolean;
@@ -62,6 +68,7 @@ export function ContractorDraftComposer({
   connectedOptions,
   localOptions,
   checklistOptions = [],
+  savedWorkTemplates = [],
   currentDraftId,
   canSave,
   saving,
@@ -82,6 +89,11 @@ export function ContractorDraftComposer({
   onRemovePersistedLine,
 }: ContractorDraftComposerProps) {
   const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(() => new Set());
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<EstimateTemplate | null>(null);
+  const [templateFeedback, setTemplateFeedback] = useState<{ tone: ActionFeedbackTone; title: string; body: string } | null>(null);
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
+  const templateApplyResetTimer = useRef<number | null>(null);
   const customerOptions = draft.subject_type === 'connected' ? connectedOptions : localOptions;
   const selectedCustomerId = draft.subject_type === 'connected' ? draft.homeowner_user_id : draft.local_contact_id;
   const selectedCustomer = customerOptions.find(option => option.id === selectedCustomerId) ?? null;
@@ -109,6 +121,8 @@ export function ContractorDraftComposer({
       ? 'No draft Invoice line items yet. Add labor, materials, or fees before creating the draft Invoice.'
       : 'No work scope yet. Add labor, materials, or fees before saving detailed scope.';
   const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : isInvoiceIntent ? 'Draft Invoice total' : 'Draft Job total';
+  const savedTemplateCount = savedWorkTemplates.length;
+  const templateSelectionDisabled = interactionDisabled || isChecklistDraft;
 
   useEffect(() => {
     setExpandedLineIds(prev => {
@@ -124,6 +138,27 @@ export function ContractorDraftComposer({
     });
   }, [draft.line_items]);
 
+  useEffect(() => {
+    return () => {
+      if (templateApplyResetTimer.current !== null) {
+        window.clearTimeout(templateApplyResetTimer.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isChecklistDraft) return;
+    setTemplatePickerOpen(false);
+    setPendingTemplate(null);
+  }, [isChecklistDraft]);
+
+  useEffect(() => {
+    if (!pendingTemplate) return;
+    if (!savedWorkTemplates.some(template => template.id === pendingTemplate.id)) {
+      setPendingTemplate(null);
+    }
+  }, [pendingTemplate, savedWorkTemplates]);
+
   const updateLine = (index: number, updates: Partial<WorkComposerLineDraft>) => {
     onChange({
       ...draft,
@@ -136,6 +171,43 @@ export function ContractorDraftComposer({
       ...draft,
       line_items: [...draft.line_items, createWorkComposerLineDraft()],
     });
+  };
+
+  const resetTemplateApplyGuard = () => {
+    if (templateApplyResetTimer.current !== null) {
+      window.clearTimeout(templateApplyResetTimer.current);
+    }
+    templateApplyResetTimer.current = window.setTimeout(() => {
+      setApplyingTemplateId(null);
+      templateApplyResetTimer.current = null;
+    }, 250);
+  };
+
+  const applyTemplate = (template: EstimateTemplate, mode: SavedWorkTemplateApplyMode) => {
+    if (applyingTemplateId || templateSelectionDisabled) return;
+    setApplyingTemplateId(template.id);
+    const nextDraft = applyEstimateTemplateToSharedDraft(draft, template, mode);
+    onChange(nextDraft);
+    setTemplatePickerOpen(false);
+    setPendingTemplate(null);
+    setTemplateFeedback({
+      tone: 'success',
+      title: mode === 'replace' ? 'Template applied' : 'Template added',
+      body: mode === 'replace'
+        ? `${template.name} replaced the reusable work content. Customer, property, and output stay unchanged.`
+        : `${template.name} was added to the current Draft content.`,
+    });
+    resetTemplateApplyGuard();
+  };
+
+  const chooseTemplate = (template: EstimateTemplate) => {
+    setTemplateFeedback(null);
+    if (templateSelectionDisabled) return;
+    if (draftHasMeaningfulSavedWorkTemplateContent(draft)) {
+      setPendingTemplate(template);
+      return;
+    }
+    applyTemplate(template, 'replace');
   };
 
   const removeLine = (index: number) => {
@@ -298,28 +370,108 @@ export function ContractorDraftComposer({
         </p>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-950">Template starting points</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Keep each source type separate so pricing templates and checklist templates do not get mixed.</p>
+      {!isChecklistDraft ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">Saved Work Templates</h3>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                {savedTemplateCount === 0
+                  ? 'No saved templates yet.'
+                  : `${savedTemplateCount} saved template${savedTemplateCount === 1 ? '' : 's'} available.`}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              data-testid="durable-draft-template-picker-toggle"
+              disabled={templateSelectionDisabled}
+              onClick={() => {
+                setTemplatePickerOpen(open => !open);
+                setPendingTemplate(null);
+                setTemplateFeedback(null);
+              }}
+            >
+              <FileText size={15} />
+              Choose template
+            </button>
           </div>
+          {templateFeedback ? (
+            <ActionFeedback
+              tone={templateFeedback.tone}
+              title={templateFeedback.title}
+              body={templateFeedback.body}
+              testId="durable-draft-template-feedback"
+            />
+          ) : null}
+          {templatePickerOpen ? (
+            <div className="mt-3 rounded-xl border border-blue-100 bg-white p-3" data-testid="durable-draft-template-picker">
+              {savedWorkTemplates.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500" data-testid="durable-draft-template-empty">
+                  Saved estimate templates from Templates will appear here when available.
+                </div>
+              ) : (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {savedWorkTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="durable-draft-template-option"
+                      disabled={Boolean(applyingTemplateId)}
+                      onClick={() => chooseTemplate(template)}
+                    >
+                      <span className="block text-sm font-bold text-slate-950">{template.name}</span>
+                      <span className="mt-1 block text-xs font-medium text-slate-500">
+                        {template.trade || 'Saved work'} / {template.line_items.length} line{template.line_items.length === 1 ? '' : 's'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {pendingTemplate ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="durable-draft-template-confirmation">
+                  <p className="text-sm font-bold text-amber-950">Apply {pendingTemplate.name}?</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-900">
+                    This Draft already has reusable scope, notes, or line items. Replace that work content or add the template below it.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="durable-draft-template-replace"
+                      disabled={Boolean(applyingTemplateId)}
+                      onClick={() => applyTemplate(pendingTemplate, 'replace')}
+                    >
+                      <FileText size={15} />
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="durable-draft-template-add"
+                      disabled={Boolean(applyingTemplateId)}
+                      onClick={() => applyTemplate(pendingTemplate, 'add')}
+                    >
+                      <Plus size={15} />
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                      data-testid="durable-draft-template-cancel"
+                      onClick={() => setPendingTemplate(null)}
+                    >
+                      <X size={15} />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          <div className="rounded-xl border border-white bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved Work Templates</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Use from Templates for Estimate or draft Invoice starts.</p>
-          </div>
-          <div className="rounded-xl border border-white bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Inspection Checklists</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Choose Inspection Checklist as the work format.</p>
-          </div>
-          <div className="rounded-xl border border-white bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Home-specific Checklists</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Available after the customer and property are selected.</p>
-          </div>
-        </div>
-      </div>
+      ) : null}
 
       <div className="grid gap-3">
         {composerField('Draft title', (
@@ -487,16 +639,12 @@ export function ContractorDraftComposer({
         </div>
       ) : (
       <>
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-work-items">
+        <div className="mb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-950">{workItemsHeading}</h3>
             <p className="mt-1 text-xs leading-5 text-slate-500">{workItemsDescription}</p>
           </div>
-          <button type="button" onClick={addLine} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50">
-            <Plus size={15} />
-            {addLineLabel}
-          </button>
         </div>
         {draft.line_items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
@@ -525,6 +673,17 @@ export function ContractorDraftComposer({
             ))}
           </div>
         )}
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={addLine}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:w-auto"
+            data-testid="durable-draft-add-line"
+          >
+            <Plus size={15} />
+            {addLineLabel}
+          </button>
+        </div>
       </div>
 
       <WorkComposerTotalsPanel

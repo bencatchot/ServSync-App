@@ -4,10 +4,11 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
-## 2026-07-29
+## 2026-07-30
 
 - Branch: `codex/local-customer-multi-property-claim-v1`
-- Starting main SHA: `45cc8ad84721619fbd7a1533a8fdd19c16ddeca7`
+- Original starting main SHA: `45cc8ad84721619fbd7a1533a8fdd19c16ddeca7`
+- Reconciled main SHA: `23429f0a1d297d7c07bdd26021a2732531cdc2e2`
 - SQL SHA-256: `0eb3df557b7d746c4630f91815601040c20e03934043a59c5e7ec8a6b2ceea52`
 - Files changed:
   - `servsync-local-customer-multi-property-claim.sql`
@@ -22,30 +23,201 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the pre-Production multi-property local-customer claim redesign. One local-customer claim invite now has an explicit selected-property membership table, token-free v2 list/lookup metadata, guarded prepare revalidation across the selected property set, v2 atomic homeowner acceptance with per-property create-or-match mappings, and legacy create/accept wrappers that preserve single-property compatibility while rejecting unsafe multi-property partial acceptance.
-- Reason for change: Contractors need one controlled manual claim invite for the exact local properties they choose, while homeowners need to review and map every included property before ServSync links the contractor-created local customer and property set.
+- Summary of change: Adds the pre-Production multi-property local-customer claim redesign and reconciles its open draft PR with PR #355-era `main`. One invite carries an explicit contractor-selected local-property set; token-free preview returns every property; homeowner acceptance requires a complete create-or-match mapping and claims the set atomically; legacy single-property compatibility remains while older clients reject multi-property partial acceptance. The reconciliation preserves the later null-safe QR guard and current Draft-first/PDF source.
+- Tests/checks run:
+  - `npm ci`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/local-customer-multi-property-claim.spec.ts tests/e2e/local-customer-claim-invite-delivery.spec.ts --project=chromium --reporter=list --trace=off`
+  - `bash -n scripts/apply-sql-dry-run.sh scripts/apply-blank-supabase-schema.sh`
+  - `git diff --check`
+  - Sandbox SQL and rolled-back synthetic validation were previously completed against `zpzdkoaubyjtsomccxya` with zero synthetic residue and no raw-token exposure.
+  - `npm run lint` was attempted and remains blocked before changed files are linted by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
+  - Live `tests/e2e/security-catalog.spec.ts` execution was correctly refused because the reconciliation worktree was not linked to the Sandbox Supabase project; the earlier Sandbox-linked catalog evidence remains the release evidence for this unchanged SQL hash.
+- Known risks or follow-ups:
+  - Production SQL, final Preview review, merge/automatic deployment, Production runtime validation, and completion closeout remain release steps.
+  - Email, SMS, notifications, provider delivery, reliable receipt, and delivery-attempt tracking remain excluded.
+  - The broader Sandbox security catalog still has the previously documented PR #347 parity drift and requires an explicitly linked Sandbox CLI session for live catalog execution.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003A now records branch reconciliation and completed Sandbox validation while preserving the remaining Production release gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor local-customer strategy records selected-property claim behavior without broadening provider delivery.
+- Marketing inventory impact:
+  - MARKETING INVENTORY UPDATED: YES
+  - REASON: The local-customer inventory describes selected-property manual claim invitations without promising automated delivery.
+
+- Branch: `codex/draft-composer-ui-cleanup-v1`
+- Starting main SHA: `ab5b75d8819facaf0f0b14bc45ac0d087bfd0818`
+- Files changed:
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `tests/e2e/draft-saved-work-template-integration.spec.ts`
+  - `tests/e2e/shared-draft-composer-2a.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Simplifies the standard Draft Composer template area to one compact Saved Work Templates action and count, removes the three explanatory category cards, and leaves Inspection Checklist selection in its existing work-format-specific `Start from` control. The Add estimate/invoice/work line action now renders after the empty state or final line item and remains full-width on narrow screens.
+- Reason for change: The category guidance repeated behavior already expressed by Work format and made the Draft Composer feel visually busy. Keeping Add line at the end of the line-item list also avoids scrolling back to the section header during longer Drafts.
 - Tests/checks run:
   - `npm run typecheck`
   - `npm run build`
-  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/local-customer-multi-property-claim.spec.ts tests/e2e/local-customer-claim-invite-delivery.spec.ts --reporter=list --trace=off`
-  - `bash -n scripts/apply-sql-dry-run.sh scripts/apply-blank-supabase-schema.sh`
+  - `TEST_APP_URL=http://127.0.0.1:4173 ./node_modules/.bin/playwright test tests/e2e/draft-saved-work-template-integration.spec.ts tests/e2e/shared-draft-composer-2a.spec.ts --project=chromium --reporter=list`
   - `git diff --check`
+  - `npm run lint` was attempted and remains blocked before changed files are linted by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
 - Known risks or follow-ups:
-  - Production SQL, merge, and deployment remain separate owner-authorized gates.
-  - Sandbox SQL and preview validation must prove runtime SQL behavior, atomic success/failure, unauthorized rejection, token boundary preservation, and cleanup with synthetic Sandbox records before Production release is considered.
-  - Email, SMS, notification, provider delivery, reliable receipt, and delivery-attempt tracking remain explicitly excluded.
-  - Preview regression follow-up: hardened the selected-homeowner workspace so connected-homeowner rendering uses optional permission/profile access and does not execute local-customer-only claim-selection derivation; added focused regression coverage after a connected homeowner opened to a blank screen in the PR preview.
-  - Preview regression follow-up: connected-homeowner shared fields now coerce unexpected RPC object/JSON values to safe display text and normalize shared `homes/home` records before property-card rendering.
-  - Preview regression follow-up: connected-homeowner RPC rows now normalize all top-level display/status/permission fields before the contractor Homeowners detail workspace renders, protecting the header, sidebar, property scope, and detail tabs from older or wider Sandbox response shapes.
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, Supabase/Vercel setting, Production or Sandbox data, Draft persistence, template mapping, checklist behavior, launch behavior, provider delivery, or manual deployment change is included.
+  - Preview review should confirm the compact template row and bottom Add line action at desktop and mobile widths.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-003 now records the multi-property local-customer claim redesign, explicit selected-property membership, atomic homeowner mapping/acceptance, and Production-release gating.
+  - REASON: The backlog is reconciled through merged PR #354 and now records Saved Work Template integration as merged source while preserving the remaining FB-024 maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is a presentation and action-placement refinement to the existing Draft-first workflow, not a change to product direction, lifecycle behavior, roles, permissions, or rollout boundaries.
+
+- Branch: `codex/draft-saved-work-template-integration-v1`
+- Starting main SHA: `a23b28a7f74a8ccc79f6488e016aa0b4aca4bcd2`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/drafts/DurableDraftWorkspace.tsx`
+  - `src/features/drafts/savedWorkTemplateDraftIntegration.ts`
+  - `tests/e2e/draft-saved-work-template-integration.spec.ts`
+  - `tests/e2e/shared-draft-composer-2a.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds a functional `Choose template` action to the standard Draft Composer so contractors can apply already loaded saved estimate templates as reusable Draft work content. Blank Drafts apply the selected template immediately; non-empty Drafts require explicit Replace, Add, or Cancel; customer, property, title, intended output, and Draft identity stay unchanged; Inspection Checklist Drafts remain separate.
+- Reason for change: The Draft Composer previously showed Saved Work Templates as guidance only, even though contractor-owned estimate templates were already available in the app. Contractors need a narrow reuse path inside Draft-first planning without adding backend schema, template CRUD, provider delivery, or launch side effects.
+- Tests/checks run:
+  - `npm ci`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-saved-work-template-integration.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/shared-draft-composer-2a.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/durable-draft-composer-integration-2c-b.spec.ts --project=chromium`
+  - Final diff, whitespace, lint, and scope scans are recorded in the implementation report.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, Supabase/Vercel setting, Production data, Sandbox data, estimate/job/invoice launch, invitation, email, SMS, notification, payment, provider delivery, or deployment change is included.
+  - Template terms plus estimate-only structured fields without durable Draft persistence are intentionally not copied into Drafts. Future work can add explicit Draft fields only through a separately approved backend/product slice.
+  - Runtime browser validation in a Sandbox preview remains recommended before Production rollout of the broader Draft-first workflow.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 now records the active Draft-first saved work template integration slice while preserving remaining Price Book / reusable estimate content maturity work.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
-  - REASON: Contractor local customer strategy now includes the pre-Production multi-property claim flow and keeps delivery/provider work separate.
-- Marketing inventory impact:
-  - MARKETING INVENTORY UPDATED: YES
-  - REASON: The local customers and claim invites inventory now describes selected-property manual claim invites without promising automated delivery or public referral growth.
+  - REASON: The master plan now records the Draft-first saved work template integration and its frontend-only/no-rollout-boundary limits.
+
+- Branch: `codex/post-save-invoice-pdf-actions-v1`
+- Starting main SHA: `23e76bf3d39d97d06770c152ead3a9724f70944b`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/durable-draft-composer-integration-2c-b.spec.ts`
+  - `tests/e2e/estimate-invoice-pdf-actions.spec.ts`
+  - `tests/e2e/local-customer-claim-invite-delivery.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Focuses newly saved or newly created draft invoices into the canonical saved-invoice detail/action state so contractors immediately see the existing `Preview PDF` and `Download PDF` actions after save, schedule-row invoice creation, completed-job invoice creation, partial-invoice creation, or supported Draft-first invoice adoption. The saved invoice resolver now falls back to the canonical invoice collection when a just-focused invoice is not yet present in the filtered view. Preview validation also found and fixed a narrow local-customer detail null guard so customers with no current claim invite do not try to render a prepared QR token from null state.
+- Reason for change: PR #351 restored the PDF handlers and invoice-list PDF actions, but some post-save and creation paths still reopened draft invoices in the editor or depended on a stale filtered list, forcing contractors to navigate back through Jobs -> Invoices before accessing the working PDF actions.
+- Tests/checks run:
+  - Focused source and browser coverage verifies saved invoice focus, immediate `Preview PDF` and `Download PDF` visibility after invoice save, schedule/job/partial/Draft-first invoice focus paths, and the canonical invoice fallback for focused saved invoices.
+  - Full command results are recorded in the implementation report.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel setting, Production data, invoice delivery, payment request, provider delivery, or deployment change is included.
+  - Safari-specific browser validation remains a manual follow-up unless explicitly performed; this change preserves the PR #351 delayed object URL cleanup implementation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NO
+  - REASON: Backlog reviewed; no update needed. This is a narrow repair to an already restored invoice PDF access workflow and does not change active feature status, roadmap priority, or Draft-first rollout gate state.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: No product-direction, beta strategy, or rollout-gate language changed.
+
+- Branch: `codex/preview-all-contractor-draft-first-v1`
+- Starting main SHA: `a71ad8551612d76ec5a5a115f0f322b16aa25510`
+- Files changed:
+  - `servsync-durable-draft-preview-rollout-mode.sql`
+  - `tests/e2e/durable-draft-cohort-gating.spec.ts`
+  - `tests/e2e/durable-draft-invoice-launch-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a backend-enforced Draft-first Work Preview/Sandbox rollout mode. The new SQL uses the private `servsync_runtime_settings` table to default `durable_draft_preview_all_contractors_enabled` to `false`/`cohort`, then replaces the private durable Draft entitlement helper and browser entitlement RPC so an approved Sandbox operator can switch valid contractor contexts to `all_contractors` without setting `durable_draft_beta_enabled=true` or bulk-enrolling billing rows. Existing Draft persistence, Estimate/Job/Invoice output permissions, RLS, and UI capability checks remain authoritative.
+- Reason for change: Preview/Sandbox validation for broad Draft-first contractor readiness should not require manual account-by-account cohort toggles, but the rollout must remain server-enforced, default-off for Production, and separate from action authority.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/durable-draft-cohort-gating.spec.ts tests/e2e/durable-draft-invoice-launch-foundation.spec.ts --project=chromium`
+  - `git diff --check`
+  - Changed-file secret/guard scan confirming no bulk `durable_draft_beta_enabled=true` update, provider-delivery path, raw-token path, or Production-targeting source was added.
+  - Sandbox SQL application of `servsync-durable-draft-preview-rollout-mode.sql` to `zpzdkoaubyjtsomccxya` only, followed by catalog/grant/RLS validation and explicit setting of `durable_draft_preview_all_contractors_enabled=true`.
+  - Sandbox rollback check toggling the private rollout setting to `cohort` and restoring `all_contractors`.
+  - PR #352 Preview and PR #351 Preview rendered against Sandbox with all three Preview gates true; authenticated contractor Jobs showed Saved Drafts / Start New Draft and opened the shared Draft composer without saving or launching.
+  - Follow-up PR #352 Preview/Sandbox end-to-end validation exercised both the original cohort-enabled test contractor and the same designated test contractor with `durable_draft_beta_enabled=false` temporarily under `all_contractors`: Save Draft, navigate away/reopen, edit/resave, relaunch/reopen preservation, Create Estimate, and Create Job all passed without failed RPCs, console errors, provider delivery, or Production access. The temporary billing row was restored to its original enabled state.
+  - `npm run lint` attempted; blocked before file linting by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup failure.
+- Known risks or follow-ups:
+  - SQL application and rollout-mode enablement are Sandbox-only for this task; Production SQL, Production gates, Production deployment, and external beta remain separate owner approvals.
+  - Preview all-contractor exposure still requires all three Vercel Preview gates plus the private Sandbox runtime setting; disabling either side returns to legacy/cohort behavior.
+  - The non-cohort workflow evidence used an authorized temporary false toggle on one designated Sandbox test contractor, then restored the original row. Sandbox did not contain a naturally disabled contractor billing row at validation time.
+  - Preview validation created clearly labeled Sandbox-only Draft, draft Estimate, and draft Job records for evidence. Draft Invoice launch remained unavailable for the tested account and was not exercised. No send/payment/notification/provider delivery path was invoked.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the Preview/Sandbox all-contractor rollout-mode source, default-cohort behavior, and remaining gates without marking Draft-first Work Production-live.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first rollout section now distinguishes cohort enrollment from the new private Preview/Sandbox all-contractors rollout switch and preserves Production approval gates.
+
+## 2026-07-29
+
+- Branch: `codex/restore-estimate-invoice-pdf-v1`
+- Starting main SHA: `a71ad8551612d76ec5a5a115f0f322b16aa25510`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/pdfDocuments.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/estimate-invoice-pdf-actions.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Restored contractor estimate/invoice PDF access after Draft-first saves by focusing saved invoice drafts into the invoice record list, adding contractor Preview PDF actions beside existing Download PDF actions, and routing estimate/invoice preview/download through shared PDF blob helpers with delayed object URL cleanup.
+- Reason for change: The Draft-first invoice save path left contractors without the same immediate saved-record PDF surface estimates had, and the PDF download helpers revoked object URLs synchronously after click, making browser handoff brittle. Local PDF preview/download must remain independent from portal-send or homeowner-connection eligibility.
+- Tests/checks run:
+  - Focused PDF action coverage verifies real estimate and invoice PDF output starts with `%PDF-`, the shared preview/download URL lifecycle delays revocation until after browser handoff, saved invoice focus returns to a PDF-capable invoice record, local-customer send gating does not block local PDF actions, and estimate records keep preview/download actions for connected and local customers.
+  - Full command results are recorded in the implementation report.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel setting, auth/permission, invoice send, homeowner portal delivery, payment, Production data, or deployment change is included.
+  - Authenticated browser save/download coverage still depends on configured test accounts and approved non-production fixtures; this branch adds source and direct PDF-output regression coverage without sending records.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NO
+  - REASON: Backlog reviewed; no update needed. This repairs an existing PDF access workflow without changing active feature status, public-launch readiness scope, or roadmap priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: No product-direction or rollout-gate language changed.
+
+- Branch: `codex/backlog-structure-cleanup-v1`
+- Starting main SHA: `74498d90466af4f134c170fd747fc2f8130624bd`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reconciled the feature backlog through the current main branch, moved completed v1 milestones into a completed-feature archive, consolidated overlapping backlog IDs, split mixed completed/unfinished entries, and replaced long active-entry implementation diaries with concise unfinished-outcome summaries and a readable ID crosswalk.
+- Reason for change: The active backlog was still reconciled only through PR #198 while main had advanced through PR #349, leaving completed milestones and stale rollout language mixed into the active backlog.
+- Tests/checks run:
+  - Repository/GitHub state inspection for current main, PR #349, PR #348, and open PRs #73, #150, #183, #187, and #256.
+  - Markdown/internal-link validation for the updated planning docs.
+  - `git diff --check`
+  - Changed-file scope and docs-only guard scan.
+  - Credential-shaped secret scan of changed files.
+- Known risks or follow-ups:
+  - Documentation-only cleanup. No app code, SQL, Supabase/Vercel setting, Production data, gate, cohort, or deployment behavior changed.
+  - PR #348 remains active draft work for local-customer multi-property claim and is not marked complete.
+  - Open PRs #73, #183, #187, and #256 still require separate owner disposition.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: This task directly restructures the active backlog and completed-feature archive.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan reconciliation sentence now points at the current backlog/archive/changelog structure instead of the stale PR #145/FB-033 state.
 
 ## 2026-07-28
 

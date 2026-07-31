@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
-import type { Estimate, Inspection, Invoice } from '../../types';
+import type { Estimate, EstimateTemplate, Inspection, Invoice } from '../../types';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
 import { draftJobOptionsWithSavedSelection } from '../jobs/draftJobMappings';
 import { isComposerDraftJob } from '../jobs/jobRecordSelectors';
@@ -85,6 +85,7 @@ type DurableDraftWorkspaceProps = {
   connectedOptions: DraftJobCustomerOption[];
   localOptions: DraftJobCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
+  savedWorkTemplates?: EstimateTemplate[];
   customerLabel: (draft: Inspection) => string;
   propertyLabel: (draft: Inspection) => string;
   onStartNew: () => void;
@@ -276,6 +277,7 @@ export function DurableDraftWorkspace({
   connectedOptions,
   localOptions,
   checklistOptions = [],
+  savedWorkTemplates = [],
   customerLabel,
   propertyLabel,
   onStartNew,
@@ -1703,6 +1705,7 @@ export function DurableDraftWorkspace({
         connectedOptions={connectedOptionsWithSavedSelection}
         localOptions={localOptionsWithSavedSelection}
         checklistOptions={checklistOptions}
+        savedWorkTemplates={savedWorkTemplates}
         currentDraftId={canonical?.draft.draftId ?? null}
         canSave={capabilities.canPersistDraft && saveState !== 'saving'}
         saving={saveState === 'saving'}

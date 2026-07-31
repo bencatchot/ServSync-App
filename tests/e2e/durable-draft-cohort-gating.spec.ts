@@ -165,9 +165,68 @@ test.describe('durable Draft cohort SQL source contract', () => {
     expect(sql).toContain("notify pgrst, 'reload schema'");
   });
 
-  test('leaves both approved durable Draft SQL sources unchanged', () => {
+  test('adds a fail-closed Preview/Sandbox all-contractor rollout mode without billing-row enrollment', () => {
+    const sql = sourceFile('servsync-durable-draft-preview-rollout-mode.sql');
+    expect(sql).toMatch(/^--[\s\S]*\nbegin;/i);
+    expect(sql).toMatch(/commit;\s*$/i);
+    expect(sql).toContain('create table if not exists public.servsync_runtime_settings');
+    expect(sql).toContain("'durable_draft_preview_all_contractors_enabled'");
+    expect(sql).toMatch(/'durable_draft_preview_all_contractors_enabled',\s*false,/i);
+    expect(sql).toContain('on conflict (setting_key) do nothing');
+    expect(sql).toContain('create or replace function public.servsync_private_durable_draft_rollout_mode()');
+    expect(sql).toContain("then 'all_contractors'");
+    expect(sql).toContain("else 'cohort'");
+    expect(sql).not.toMatch(/set\s+durable_draft_beta_enabled\s*=\s*true/i);
+    expect(sql).not.toMatch(/update\s+public\.contractor_billing_accounts/i);
+    expect(sql).not.toMatch(/insert\s+into\s+public\.contractor_billing_accounts/i);
+    expect(sql).not.toMatch(/grant\s+(?:select|insert|update|delete|all)\s+on\s+(?:table\s+)?public\.servsync_runtime_settings/i);
+  });
+
+  test('rollout entitlement still requires authenticated contractor context and preserves action authority', () => {
+    const sql = sourceFile('servsync-durable-draft-preview-rollout-mode.sql');
+    const modeHelper = sql.slice(
+      sql.indexOf('create or replace function public.servsync_private_durable_draft_rollout_mode()'),
+      sql.indexOf('create or replace function public.servsync_private_contractor_has_durable_draft_entitlement'),
+    );
+    const helper = sql.slice(
+      sql.indexOf('create or replace function public.servsync_private_contractor_has_durable_draft_entitlement'),
+      sql.indexOf('create or replace function public.servsync_current_contractor_durable_draft_entitlement'),
+    );
+    const browserRpc = sql.slice(
+      sql.indexOf('create or replace function public.servsync_current_contractor_durable_draft_entitlement'),
+      sql.indexOf('revoke all on function public.servsync_private_durable_draft_rollout_mode'),
+    );
+
+    expect(modeHelper).toContain('security definer');
+    expect(modeHelper).toContain('set search_path = public');
+    expect(modeHelper).toContain('from public.servsync_runtime_settings rs');
+    expect(helper).toContain('from public.contractor_profiles cp');
+    expect(helper).toContain('cp.id = p_contractor_id');
+    expect(helper).toContain("public.servsync_private_durable_draft_rollout_mode() = 'all_contractors'");
+    expect(helper).toContain('from public.contractor_billing_accounts account');
+    expect(helper).toContain('account.contractor_id = p_contractor_id');
+    expect(helper).toContain('account.durable_draft_beta_enabled is true');
+    expect(helper).not.toMatch(/current_user_can_(?:write|manage)|current_user_is_platform_admin/i);
+
+    expect(browserRpc).toContain('v_user_id uuid := auth.uid()');
+    expect(browserRpc).toContain('from public.servsync_current_contractor_profile() cp');
+    expect(browserRpc).toContain('cp.owner_user_id = v_user_id');
+    expect(browserRpc).toContain('tm.user_id = v_user_id');
+    expect(browserRpc).toContain("tm.status = 'active'");
+    expect(browserRpc).toContain("errcode = '42501'");
+    expect(browserRpc).toContain('public.servsync_private_contractor_has_durable_draft_entitlement(v_contractor_id)');
+    expect(browserRpc).not.toContain('durable_draft_beta_enabled');
+
+    expect(sql).toMatch(/revoke all on function public\.servsync_private_durable_draft_rollout_mode\(\) from authenticated/i);
+    expect(sql).toMatch(/revoke all on function public\.servsync_private_contractor_has_durable_draft_entitlement\(uuid\) from authenticated/i);
+    expect(sql).toMatch(/grant execute on function public\.servsync_current_contractor_durable_draft_entitlement\(uuid\) to authenticated/i);
+    expect(sql).toContain("notify pgrst, 'reload schema'");
+  });
+
+  test('keeps prior durable Draft SQL sources available and applies rollout as a narrow follow-up source', () => {
     expect(sourceFile('servsync-durable-draft-launch-foundation.sql')).toContain('servsync_launch_work_draft');
     expect(sourceFile('servsync-durable-draft-launch-permission-parity-correction.sql')).toContain('DRAFT_PERMISSION_DENIED');
+    expect(sourceFile('servsync-durable-draft-preview-rollout-mode.sql')).toContain('servsync_private_durable_draft_rollout_mode');
   });
 });
 
