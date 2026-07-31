@@ -199,7 +199,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(appSource).toContain('beginInvoiceDraftFromEstimate');
   });
 
-  test('Draft template guidance stays source-specific and line detail UI matches persisted durable fields', () => {
+  test('Draft template action stays compact and line detail UI matches persisted durable fields', () => {
     const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const guidance = sourceBetween(
       composerSource,
@@ -211,17 +211,34 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
 
     expect(guidance).toContain('Saved Work Templates');
     expect(guidance).toContain('Choose template');
-    expect(guidance).toContain('contractor-owned template');
-    expect(guidance).toContain('Switch to Standard work scope to use saved work templates.');
-    expect(guidance).toContain('Inspection Checklists');
-    expect(guidance).toContain('Home-specific Checklists');
-    expect(guidance).not.toContain('Generic templates');
+    expect(guidance).toContain('saved template');
+    expect(guidance).not.toContain('Template starting points');
+    expect(guidance).not.toContain('Inspection Checklists');
+    expect(guidance).not.toContain('Home-specific Checklists');
     expect(launchTypes).toContain('room_label: string | null;');
     expect(launchTypes).toContain('location_label: string | null;');
     expect(launchTypes).toContain('internal_notes: string;');
     expect(launchTypes).not.toContain('model_spec');
     expect(launchTypes).not.toContain('supply_status');
     expect(lineRow).toContain("itemLabel !== 'draft estimate'");
+  });
+
+  test('Add line action follows the empty state or final line item', () => {
+    const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
+    const workItems = sourceBetween(
+      composerSource,
+      'data-testid="durable-draft-work-items"',
+      '<WorkComposerTotalsPanel',
+    );
+    const lineItemsIndex = workItems.indexOf('draft.line_items.map');
+    const emptyStateIndex = workItems.indexOf('{emptyLinesLabel}');
+    const addLineIndex = workItems.indexOf('data-testid="durable-draft-add-line"');
+
+    expect(lineItemsIndex).toBeGreaterThanOrEqual(0);
+    expect(emptyStateIndex).toBeGreaterThanOrEqual(0);
+    expect(addLineIndex).toBeGreaterThan(lineItemsIndex);
+    expect(addLineIndex).toBeGreaterThan(emptyStateIndex);
+    expect(workItems.slice(0, lineItemsIndex)).not.toContain('data-testid="durable-draft-add-line"');
   });
 
   test('Save Draft maps only currently supported shared fields into existing Draft Job persistence', () => {

@@ -370,118 +370,108 @@ export function ContractorDraftComposer({
         </p>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-950">Template starting points</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Keep each source type separate so pricing templates and checklist templates do not get mixed.</p>
+      {!isChecklistDraft ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">Saved Work Templates</h3>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                {savedTemplateCount === 0
+                  ? 'No saved templates yet.'
+                  : `${savedTemplateCount} saved template${savedTemplateCount === 1 ? '' : 's'} available.`}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              data-testid="durable-draft-template-picker-toggle"
+              disabled={templateSelectionDisabled}
+              onClick={() => {
+                setTemplatePickerOpen(open => !open);
+                setPendingTemplate(null);
+                setTemplateFeedback(null);
+              }}
+            >
+              <FileText size={15} />
+              Choose template
+            </button>
           </div>
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-            data-testid="durable-draft-template-picker-toggle"
-            disabled={templateSelectionDisabled}
-            onClick={() => {
-              setTemplatePickerOpen(open => !open);
-              setPendingTemplate(null);
-              setTemplateFeedback(null);
-            }}
-          >
-            <FileText size={15} />
-            Choose template
-          </button>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          <div className="rounded-xl border border-white bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved Work Templates</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              {isChecklistDraft ? 'Switch to Standard work scope to use saved work templates.' : `${savedTemplateCount} contractor-owned template${savedTemplateCount === 1 ? '' : 's'} available.`}
-            </p>
-          </div>
-          <div className="rounded-xl border border-white bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Inspection Checklists</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Choose Inspection Checklist as the work format.</p>
-          </div>
-          <div className="rounded-xl border border-white bg-white px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Home-specific Checklists</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">Available after the customer and property are selected.</p>
-          </div>
-        </div>
-        {templateFeedback ? (
-          <ActionFeedback
-            tone={templateFeedback.tone}
-            title={templateFeedback.title}
-            body={templateFeedback.body}
-            testId="durable-draft-template-feedback"
-          />
-        ) : null}
-        {templatePickerOpen && !isChecklistDraft ? (
-          <div className="mt-3 rounded-xl border border-blue-100 bg-white p-3" data-testid="durable-draft-template-picker">
-            {savedWorkTemplates.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500" data-testid="durable-draft-template-empty">
-                Saved estimate templates from Templates will appear here when available.
-              </div>
-            ) : (
-              <div className="grid gap-2 md:grid-cols-2">
-                {savedWorkTemplates.map(template => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="durable-draft-template-option"
-                    disabled={Boolean(applyingTemplateId)}
-                    onClick={() => chooseTemplate(template)}
-                  >
-                    <span className="block text-sm font-bold text-slate-950">{template.name}</span>
-                    <span className="mt-1 block text-xs font-medium text-slate-500">
-                      {template.trade || 'Saved work'} / {template.line_items.length} line{template.line_items.length === 1 ? '' : 's'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {pendingTemplate ? (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="durable-draft-template-confirmation">
-                <p className="text-sm font-bold text-amber-950">Apply {pendingTemplate.name}?</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900">
-                  This Draft already has reusable scope, notes, or line items. Replace that work content or add the template below it.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="durable-draft-template-replace"
-                    disabled={Boolean(applyingTemplateId)}
-                    onClick={() => applyTemplate(pendingTemplate, 'replace')}
-                  >
-                    <FileText size={15} />
-                    Replace
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="durable-draft-template-add"
-                    disabled={Boolean(applyingTemplateId)}
-                    onClick={() => applyTemplate(pendingTemplate, 'add')}
-                  >
-                    <Plus size={15} />
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                    data-testid="durable-draft-template-cancel"
-                    onClick={() => setPendingTemplate(null)}
-                  >
-                    <X size={15} />
-                    Cancel
-                  </button>
+          {templateFeedback ? (
+            <ActionFeedback
+              tone={templateFeedback.tone}
+              title={templateFeedback.title}
+              body={templateFeedback.body}
+              testId="durable-draft-template-feedback"
+            />
+          ) : null}
+          {templatePickerOpen ? (
+            <div className="mt-3 rounded-xl border border-blue-100 bg-white p-3" data-testid="durable-draft-template-picker">
+              {savedWorkTemplates.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500" data-testid="durable-draft-template-empty">
+                  Saved estimate templates from Templates will appear here when available.
                 </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+              ) : (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {savedWorkTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="durable-draft-template-option"
+                      disabled={Boolean(applyingTemplateId)}
+                      onClick={() => chooseTemplate(template)}
+                    >
+                      <span className="block text-sm font-bold text-slate-950">{template.name}</span>
+                      <span className="mt-1 block text-xs font-medium text-slate-500">
+                        {template.trade || 'Saved work'} / {template.line_items.length} line{template.line_items.length === 1 ? '' : 's'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {pendingTemplate ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="durable-draft-template-confirmation">
+                  <p className="text-sm font-bold text-amber-950">Apply {pendingTemplate.name}?</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-900">
+                    This Draft already has reusable scope, notes, or line items. Replace that work content or add the template below it.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="durable-draft-template-replace"
+                      disabled={Boolean(applyingTemplateId)}
+                      onClick={() => applyTemplate(pendingTemplate, 'replace')}
+                    >
+                      <FileText size={15} />
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="durable-draft-template-add"
+                      disabled={Boolean(applyingTemplateId)}
+                      onClick={() => applyTemplate(pendingTemplate, 'add')}
+                    >
+                      <Plus size={15} />
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                      data-testid="durable-draft-template-cancel"
+                      onClick={() => setPendingTemplate(null)}
+                    >
+                      <X size={15} />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         {composerField('Draft title', (
@@ -649,16 +639,12 @@ export function ContractorDraftComposer({
         </div>
       ) : (
       <>
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-work-items">
+        <div className="mb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-950">{workItemsHeading}</h3>
             <p className="mt-1 text-xs leading-5 text-slate-500">{workItemsDescription}</p>
           </div>
-          <button type="button" onClick={addLine} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50">
-            <Plus size={15} />
-            {addLineLabel}
-          </button>
         </div>
         {draft.line_items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
@@ -687,6 +673,17 @@ export function ContractorDraftComposer({
             ))}
           </div>
         )}
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={addLine}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:w-auto"
+            data-testid="durable-draft-add-line"
+          >
+            <Plus size={15} />
+            {addLineLabel}
+          </button>
+        </div>
       </div>
 
       <WorkComposerTotalsPanel
