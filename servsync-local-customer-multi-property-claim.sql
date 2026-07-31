@@ -1186,10 +1186,11 @@ grant execute on function public.servsync_revoke_local_customer_claim_invite(uui
 
 -- Preserve the completed token-containment boundary for the token-bearing
 -- legacy invite table when this feature slice is rerun in an environment that
--- previously used SQL-first compatibility grants.
-revoke select on public.contractor_local_customer_claim_invites from public;
-revoke select on public.contractor_local_customer_claim_invites from anon;
-revoke select on public.contractor_local_customer_claim_invites from authenticated;
+-- previously used SQL-first compatibility grants. Claim invite access is
+-- mediated through guarded RPCs, not direct browser table privileges.
+revoke all on public.contractor_local_customer_claim_invites from public;
+revoke all on public.contractor_local_customer_claim_invites from anon;
+revoke all on public.contractor_local_customer_claim_invites from authenticated;
 
 notify pgrst, 'reload schema';
 

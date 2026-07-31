@@ -465,7 +465,7 @@ order by e.table_name;
     }
   });
 
-  test('local customer claim invite token table has no direct browser SELECT grants', () => {
+  test('local customer claim invite token table has no direct browser grants', () => {
     const rows = runCatalogQuery<TablePrivilegeRow>(`
 select
   c.relname as table_name,
@@ -491,8 +491,17 @@ where c.relnamespace = 'public'::regnamespace
     expect(rows, 'Claim invite table catalog row should exist').toHaveLength(1);
     expect(rows[0].exists, 'claim invite table should exist').toBe(true);
     expect(rows[0].public_select, 'PUBLIC should not directly SELECT claim invites').toBe(false);
+    expect(rows[0].public_insert, 'PUBLIC should not directly INSERT claim invites').toBe(false);
+    expect(rows[0].public_update, 'PUBLIC should not directly UPDATE claim invites').toBe(false);
+    expect(rows[0].public_delete, 'PUBLIC should not directly DELETE claim invites').toBe(false);
     expect(rows[0].anon_select, 'anon should not directly SELECT claim invites').toBe(false);
+    expect(rows[0].anon_insert, 'anon should not directly INSERT claim invites').toBe(false);
+    expect(rows[0].anon_update, 'anon should not directly UPDATE claim invites').toBe(false);
+    expect(rows[0].anon_delete, 'anon should not directly DELETE claim invites').toBe(false);
     expect(rows[0].authenticated_select, 'authenticated should use token-free list RPCs, not direct table SELECT').toBe(false);
+    expect(rows[0].authenticated_insert, 'authenticated should use guarded create RPCs, not direct table INSERT').toBe(false);
+    expect(rows[0].authenticated_update, 'authenticated should use guarded lifecycle RPCs, not direct table UPDATE').toBe(false);
+    expect(rows[0].authenticated_delete, 'authenticated should not directly DELETE claim invites').toBe(false);
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {
