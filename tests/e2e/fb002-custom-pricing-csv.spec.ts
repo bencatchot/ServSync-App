@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const workspaceSource = () => sourceFile('src/features/price-book/ContractorPriceBookWorkspace.tsx');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -13,19 +14,17 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test.describe('FB-002 Custom Pricing CSV preview regression', () => {
+test.describe('FB-002 Price Book CSV preview regression', () => {
   test('CSV import surface is private, preview-first, and mobile-tolerant', () => {
     const source = appSource();
     const customPricingSource = sourceBetween(
       source,
       "{contractorJobsView === 'custom_pricing' && (",
-      "{contractorJobsView === 'templates' && (",
+      "{contractorJobsView === 'service_agreements' && (",
     );
 
-    expect(customPricingSource).toContain('<Card title="Custom Pricing"');
-    expect(customPricingSource).toContain('Private pricing library');
-    expect(customPricingSource).toContain('These records stay private to your contractor account');
-    expect(customPricingSource).toContain('do not automatically load into estimates, invoices, homeowner-facing screens, or suggestions');
+    expect(customPricingSource).not.toContain('<Card title="Price Book"');
+    expect(customPricingSource).toContain('<ContractorPriceBookWorkspace');
     expect(customPricingSource).toContain('Upload CSV');
     expect(customPricingSource).toContain('Sample CSV');
     expect(customPricingSource).toContain('Choose CSV');
@@ -33,10 +32,10 @@ test.describe('FB-002 Custom Pricing CSV preview regression', () => {
     expect(customPricingSource).toContain('Review column mapping');
     expect(customPricingSource).toContain('Preview before import');
     expect(customPricingSource).toContain('Only valid rows will be imported');
-    expect(customPricingSource).toContain('Invalid rows stay out of your pricing library');
+    expect(customPricingSource).toContain('Invalid rows stay out of your Price Book');
     expect(customPricingSource).toContain('Review warnings before importing');
     expect(customPricingSource).toContain('Duplicate matches are warning-only');
-    expect(customPricingSource).toContain('CSV import adds valid rows and does not overwrite existing pricing');
+    expect(customPricingSource).toContain('import adds valid rows and does not overwrite existing pricing');
     expect(customPricingSource).toContain('overflow-x-auto');
     expect(customPricingSource).toContain('min-w-[720px]');
     expect(customPricingSource).toContain('Showing the first 20 parsed rows for preview.');
@@ -82,7 +81,7 @@ test.describe('FB-002 Custom Pricing CSV preview regression', () => {
 
     expect(previewSource).toContain('const existingKeys = new Set');
     expect(previewSource).toContain('const seenImportKeys = new Set<string>();');
-    expect(previewSource).toContain('Possible duplicate of an existing Custom Pricing item.');
+    expect(previewSource).toContain('Possible duplicate of an existing Price Book item.');
     expect(previewSource).toContain('Possible duplicate within this CSV import.');
     expect(previewSource).toContain('warnings.push');
     expect(previewSource).toContain('source: CONTRACTOR_PRICE_BOOK_CSV_SOURCE');
@@ -142,17 +141,13 @@ test.describe('FB-002 Custom Pricing CSV preview regression', () => {
     }
   });
 
-  test('Custom Pricing stays contractor-private and out of homeowner surfaces', () => {
+  test('Price Book stays contractor-private and out of homeowner surfaces', () => {
     const source = appSource();
     const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
-    const customPricingSource = sourceBetween(
-      source,
-      "{contractorJobsView === 'custom_pricing' && (",
-      "{contractorJobsView === 'templates' && (",
-    );
+    const workspace = workspaceSource();
 
-    expect(customPricingSource).toContain('private to your contractor account');
-    expect(customPricingSource).toContain('do not automatically load into estimates, invoices, homeowner-facing screens, or suggestions');
+    expect(workspace).toContain('Private contractor library');
+    expect(workspace).toContain('this library never changes an existing document');
     expect(homeownerSource).not.toContain('contractor_price_book_items');
     expect(homeownerSource).not.toContain('contractorPriceBookItems');
     expect(homeownerSource).not.toContain('renderEstimateSavedItemPicker');

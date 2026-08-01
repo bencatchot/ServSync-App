@@ -274,7 +274,7 @@ Current Production state:
 
 Current implementation state:
 
-- The legacy Jobs area mixes operational Jobs, Estimates, Invoices, Reports, Templates, Custom Pricing, Service Plans (internally `service_agreement` records), and legacy creation flows.
+- The legacy Jobs area mixes operational Jobs, Estimates, Invoices, Reports, Templates, Price Book, Service Plans (internally `service_agreement` records), and legacy creation flows.
 - Current Draft composer foundations are reusable.
 - `Create Job` from Draft exists in code but is gated with the Draft UI.
 - `Create Estimate` and `Create Invoice` from Draft are not implemented.
@@ -324,7 +324,7 @@ Destination types:
 | Templates | Secondary tool | Prefill Drafts after Draft and Work landing are stable |
 | Scheduling | Dashboard summary plus Work-owned internal view | Operational commitments |
 | Service Plans | Secondary Work-adjacent destination | Existing reusable plan-template and homeowner-offer workflow; separate from one-time Draft outputs and future recurring automation |
-| Custom Pricing | Company/Work reference tool | Pricing source, not core Work navigation |
+| Price Book | Company/Work reference tool | Reusable pricing source, not core Work navigation; internal `custom_pricing` route identifiers remain stable |
 
 The Work module should prioritize attention and next actions. The first Jobs Overview uses one consistent At a Glance tile system rather than competing tile groups or embedded full lists.
 
@@ -342,8 +342,8 @@ The first redesigned landing contains:
 - A prominent Needs Attention tile whose total equals the rows in its destination.
 - A dedicated Drafts destination containing the current full Draft list.
 - A dedicated Needs Attention destination containing only accepted estimates without a Job, completed invoiceable Jobs without an Invoice, and draft/overdue/partially-paid Invoices.
-- Actions & Tools for Start New Draft, Templates, Service Plans, and Custom Pricing, shown only when existing capability and role checks permit them.
-- Existing Estimates, Jobs, Invoices, Templates, Service Plans, and Custom Pricing destinations without new backend authority.
+- Actions & Tools for Start New Draft, Templates, Service Plans, and Price Book, shown only when existing capability and role checks permit them.
+- Existing Estimates, Jobs, Invoices, Templates, Service Plans, and Price Book destinations without new backend authority.
 
 No complete Draft, Estimate, Job, or Invoice list belongs on the overview. Empty, loading, and error states must not misrepresent live counts. Broader future attention categories such as upcoming work, waiting on customer, or recent activity require separately approved definitions before they appear in this bounded first release.
 

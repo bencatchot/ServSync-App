@@ -225,6 +225,8 @@ import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
 import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
 import { contractorJobsNeedsAttentionCount } from './features/work/contractorWorkSelectors';
+import { ContractorPriceBookWorkspace, type PriceBookLoadState } from './features/price-book/ContractorPriceBookWorkspace';
+import { contractorPriceBookAccess } from './features/price-book/priceBookAccess';
 import {
   applyDraftJobScopeResult,
   createBlankDraftJobComposerDraft,
@@ -2028,7 +2030,7 @@ function buildContractorPriceBookCsvPreviewRows(
 
     const sku = contractorPriceBookCsvValue(row, mapping, 'sku');
     const duplicateKey = normalizeText(`${title} ${sku}`);
-    if (duplicateKey && existingKeys.has(duplicateKey)) warnings.push('Possible duplicate of an existing Custom Pricing item.');
+    if (duplicateKey && existingKeys.has(duplicateKey)) warnings.push('Possible duplicate of an existing Price Book item.');
     if (duplicateKey && seenImportKeys.has(duplicateKey)) warnings.push('Possible duplicate within this CSV import.');
     if (duplicateKey) seenImportKeys.add(duplicateKey);
 
@@ -21801,8 +21803,9 @@ function ContractorDashboard({
   const [editingContractorPriceBookItemId, setEditingContractorPriceBookItemId] = useState<string | null>(null);
   const [savingContractorPriceBookItem, setSavingContractorPriceBookItem] = useState(false);
   const [togglingContractorPriceBookItemId, setTogglingContractorPriceBookItemId] = useState<string | null>(null);
-  const [showArchivedContractorPriceBookItems, setShowArchivedContractorPriceBookItems] = useState(false);
-  const [contractorPriceBookSearch, setContractorPriceBookSearch] = useState('');
+  const [contractorPriceBookFormOpen, setContractorPriceBookFormOpen] = useState(false);
+  const [contractorPriceBookLoadState, setContractorPriceBookLoadState] = useState<PriceBookLoadState>('idle');
+  const [contractorPriceBookLoadError, setContractorPriceBookLoadError] = useState('');
   const [contractorPriceBookCsvFileName, setContractorPriceBookCsvFileName] = useState('');
   const [contractorPriceBookCsvHeaders, setContractorPriceBookCsvHeaders] = useState<string[]>([]);
   const [contractorPriceBookCsvRows, setContractorPriceBookCsvRows] = useState<ContractorPriceBookCsvRow[]>([]);
@@ -22647,6 +22650,8 @@ function ContractorDashboard({
     if (!supabase) return;
     setLoading(true);
     setError('');
+    setContractorPriceBookLoadState('loading');
+    setContractorPriceBookLoadError('');
     try {
       const profileRes = await supabase.from('contractor_profiles').select('*').eq('owner_user_id', profile.id).maybeSingle();
       if (profileRes.error) throw profileRes.error;
@@ -22830,7 +22835,15 @@ function ContractorDashboard({
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
         if (!savedEstimateChargesRes.error) setSavedEstimateCharges((savedEstimateChargesRes.data || []) as ContractorSavedEstimateCharge[]);
-        if (!priceBookItemsRes.error) setContractorPriceBookItems((priceBookItemsRes.data || []) as ContractorPriceBookItem[]);
+        if (!priceBookItemsRes.error) {
+          setContractorPriceBookItems((priceBookItemsRes.data || []) as ContractorPriceBookItem[]);
+          setContractorPriceBookLoadState('ready');
+          setContractorPriceBookLoadError('');
+        } else {
+          setContractorPriceBookItems([]);
+          setContractorPriceBookLoadState('error');
+          setContractorPriceBookLoadError(readableError(priceBookItemsRes.error, 'Try loading the contractor workspace again.'));
+        }
         if (userCanManageServiceAgreementUi(loadedContractor, loadedTeamAccess, profile.id)) {
           const [serviceAgreementTemplatesRes, serviceAgreementOffersRes] = await Promise.all([
             supabase
@@ -22860,12 +22873,16 @@ function ContractorDashboard({
         setLocalClaimInvites([]);
         setSavedEstimateCharges([]);
         setContractorPriceBookItems([]);
+        setContractorPriceBookLoadState('ready');
+        setContractorPriceBookLoadError('');
         setServiceAgreementTemplates([]);
         setServiceAgreementOffers([]);
         setJobWorkItemsByJobId({});
       }
     } catch (err) {
       setError(readableError(err, 'Unable to load contractor workspace.'));
+      setContractorPriceBookLoadState('error');
+      setContractorPriceBookLoadError('The contractor workspace did not finish loading. Try again.');
     } finally {
       setLoading(false);
     }
@@ -25584,24 +25601,34 @@ function ContractorDashboard({
   const resetContractorPriceBookDraft = () => {
     setEditingContractorPriceBookItemId(null);
     setContractorPriceBookDraft(createBlankContractorPriceBookItemDraft());
+    setContractorPriceBookFormOpen(false);
+  };
+
+  const openContractorPriceBookAddForm = () => {
+    if (contractorPriceBookLoadState !== 'ready') return;
+    setEditingContractorPriceBookItemId(null);
+    setContractorPriceBookDraft(createBlankContractorPriceBookItemDraft());
+    setContractorPriceBookFormOpen(true);
   };
 
   const editContractorPriceBookItem = (item: ContractorPriceBookItem) => {
+    if (contractorPriceBookLoadState !== 'ready') return;
     setEditingContractorPriceBookItemId(item.id);
     setContractorPriceBookDraft(contractorPriceBookItemDraftFromRecord(item));
+    setContractorPriceBookFormOpen(true);
     setContractorJobsView('custom_pricing');
     setInspectionView('list');
   };
 
   const saveContractorPriceBookItem = async () => {
-    if (!supabase || !contractor?.id) return;
+    if (!supabase || !contractor?.id || !canManageEstimateSettings || contractorPriceBookLoadState !== 'ready') return;
     const title = contractorPriceBookDraft.title.trim();
     const priceInput = contractorPriceBookDraft.default_unit_price.replace(/[$,]/g, '').trim();
     const priceValue = priceInput === '' ? null : Number(priceInput);
     const laborHoursInput = contractorPriceBookDraft.labor_hours.trim();
     const laborHoursValue = laborHoursInput === '' ? null : Number(laborHoursInput);
     if (!title) {
-      setError('Add a Custom Pricing title before saving.');
+      setError('Add a Price Book item name before saving.');
       return;
     }
     if (priceValue !== null && (!Number.isFinite(priceValue) || priceValue < 0)) {
@@ -25659,18 +25686,18 @@ function ContractorDashboard({
             .insert(payload);
       const { error: saveError } = await mutation;
       if (saveError) throw saveError;
-      setNotice(editingContractorPriceBookItemId ? 'Custom Pricing item updated.' : 'Custom Pricing item created.');
+      setNotice(editingContractorPriceBookItemId ? 'Price Book item updated.' : 'Price Book item created.');
       resetContractorPriceBookDraft();
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to save this Custom Pricing item. Make sure you have estimate settings access.'));
+      setError(readableError(err, 'Unable to save this Price Book item. Make sure you have estimate settings access.'));
     } finally {
       setSavingContractorPriceBookItem(false);
     }
   };
 
   const toggleContractorPriceBookItemActive = async (item: ContractorPriceBookItem) => {
-    if (!supabase) return;
+    if (!supabase || !canManageEstimateSettings || contractorPriceBookLoadState !== 'ready') return;
     const nextActive = !(item.active && !item.archived_at);
     setNotice('');
     setError('');
@@ -25684,10 +25711,10 @@ function ContractorDashboard({
         })
         .eq('id', item.id);
       if (updateError) throw updateError;
-      setNotice(nextActive ? 'Custom Pricing item restored.' : 'Custom Pricing item archived.');
+      setNotice(nextActive ? 'Price Book item restored.' : 'Price Book item archived.');
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to update this Custom Pricing item.'));
+      setError(readableError(err, 'Unable to update this Price Book item.'));
     } finally {
       setTogglingContractorPriceBookItemId(null);
     }
@@ -26008,18 +26035,18 @@ function ContractorDashboard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'servsync-custom-pricing-sample.csv';
+    link.download = 'servsync-price-book-sample.csv';
     link.click();
     URL.revokeObjectURL(url);
   };
 
   const importContractorPriceBookCsvRows = async () => {
-    if (!supabase || !contractor?.id || !canManageEstimateSettings) return;
+    if (!supabase || !contractor?.id || !canManageEstimateSettings || contractorPriceBookLoadState !== 'ready') return;
     if (validContractorPriceBookCsvRows.length === 0) {
       setContractorPriceBookCsvError('There are no valid rows to import.');
       return;
     }
-    const confirmed = window.confirm(`Import ${validContractorPriceBookCsvRows.length} valid Custom Pricing item${validContractorPriceBookCsvRows.length === 1 ? '' : 's'}? Invalid rows will be skipped.`);
+    const confirmed = window.confirm(`Import ${validContractorPriceBookCsvRows.length} valid Price Book item${validContractorPriceBookCsvRows.length === 1 ? '' : 's'}? Invalid rows will be skipped.`);
     if (!confirmed) return;
     setNotice('');
     setError('');
@@ -26032,11 +26059,11 @@ function ContractorDashboard({
       }));
       const { error: insertError } = await supabase.from('contractor_price_book_items').insert(payloads);
       if (insertError) throw insertError;
-      setNotice(`Imported ${payloads.length} Custom Pricing item${payloads.length === 1 ? '' : 's'} from CSV.`);
+      setNotice(`Imported ${payloads.length} Price Book item${payloads.length === 1 ? '' : 's'} from CSV.`);
       resetContractorPriceBookCsvImport();
       await loadContractor();
     } catch (err) {
-      setContractorPriceBookCsvError(readableError(err, 'Unable to import these Custom Pricing rows.'));
+      setContractorPriceBookCsvError(readableError(err, 'Unable to import these Price Book rows.'));
     } finally {
       setImportingContractorPriceBookCsv(false);
     }
@@ -28722,15 +28749,6 @@ function ContractorDashboard({
         item.unit || '',
       ].join(' ')).includes(estimateSavedItemSearchText);
     });
-  const archivedContractorPriceBookItems = contractorPriceBookItems
-    .filter(item => !item.active || Boolean(item.archived_at))
-    .sort((a, b) => a.title.localeCompare(b.title) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  const contractorPriceBookSearchText = normalizeText(contractorPriceBookSearch);
-  const visibleContractorPriceBookItems = (showArchivedContractorPriceBookItems ? archivedContractorPriceBookItems : activeContractorPriceBookItems)
-    .filter(item => {
-      if (!contractorPriceBookSearchText) return true;
-      return normalizeText(`${item.title} ${item.customer_description} ${item.internal_notes} ${item.trade} ${item.category} ${item.sku || ''}`).includes(contractorPriceBookSearchText);
-    });
   const serviceAgreementMoneyLabel = (cents?: number | null) =>
     cents === null || cents === undefined ? 'Price not set' : formatMoney(cents);
   const serviceAgreementDurationLabel = (months?: number | null) =>
@@ -29224,8 +29242,8 @@ function ContractorDashboard({
     {
       id: 'tool-custom-pricing',
       icon: <Receipt size={16} />,
-      title: 'Custom Pricing',
-      helper: 'Private price book items for your contractor account.',
+      title: 'Price Book',
+      helper: 'Reusable pricing items for your contractor account.',
       meta: `${activeContractorPriceBookItems.length} active`,
       onAction: () => {
         setContractorTab('inspections');
@@ -31237,7 +31255,8 @@ function ContractorDashboard({
   };
 
   const canManageInspectionTemplates = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
-  const canManageEstimateSettings = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
+  const priceBookAccess = contractorPriceBookAccess(contractor, teamAccess, profile.id);
+  const canManageEstimateSettings = priceBookAccess.canManage;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
   const contractorAccountName = profile.full_name.trim() || profile.email;
@@ -38140,7 +38159,7 @@ function ContractorDashboard({
                     canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canPersistDraft}
                     canUseTemplates={canManageInspectionTemplates || canManageEstimateSettings}
                     canUseServicePlans={canManageServiceAgreements}
-                    canUseCustomPricing={canManageEstimateSettings}
+                    canViewPriceBook={priceBookAccess.canView}
                     estimateCount={openFinancialRecords.length}
                     activeJobCount={openJobs.length}
                     invoiceCount={openInvoiceRecords.length}
@@ -38375,9 +38394,9 @@ function ContractorDashboard({
                         },
                         {
                           id: 'custom_pricing',
-                          label: 'Custom Pricing',
+                          label: 'Price Book',
                           value: String(activeContractorPriceBookItems.length),
-                          helper: 'Private pricing library',
+                          helper: 'Reusable pricing library',
                           icon: <Receipt size={15} />,
                           onClick: () => {
                             setContractorFinancialRecordKind('estimates');
@@ -40214,382 +40233,152 @@ function ContractorDashboard({
               )}
 
               {contractorJobsView === 'custom_pricing' && (
-                <Card title="Custom Pricing" icon={<Receipt size={18} />}>
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Private pricing library</p>
-                        <h3 className="mt-1 text-lg font-bold text-slate-950">Build a reusable price book for your contractor account.</h3>
-                        <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-	                          Phase 1 stores manually managed Custom Pricing items only. These records stay private to your contractor account and do not automatically load into estimates, invoices, homeowner-facing screens, or suggestions.
-                        </p>
-                      </div>
-                      <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className={buttonClass('secondary')}>
-                        Back to Jobs
-                      </button>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <InfoBox label="Active" value={String(activeContractorPriceBookItems.length)} />
-                      <InfoBox label="Archived" value={String(archivedContractorPriceBookItems.length)} />
-                      <InfoBox
-                        label="Price Required"
-                        value={String(activeContractorPriceBookItems.filter(item => item.default_unit_price_cents === null || item.default_unit_price_cents === undefined).length)}
-                      />
-                    </div>
-
-                    {!contractor?.id ? (
-                      <Notice tone="info" text="Save the business profile once before adding Custom Pricing items." />
-                    ) : canManageEstimateSettings ? (
-                      <>
-                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <p className="text-sm font-bold text-slate-950">Upload CSV</p>
-                              <p className="mt-1 max-w-3xl text-xs leading-5 text-emerald-900">
-                                Upload a CSV price list to add multiple pricing items at once. You'll review everything before it's saved. Duplicate matches are warning-only; CSV import adds valid rows and does not overwrite existing pricing. Blank price means Price Required; $0 means intentional no-charge. Excel support is planned later; export Excel as CSV for now.
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button type="button" onClick={downloadContractorPriceBookSampleCsv} className={buttonClass('secondary')}>
-                                <Download size={16} />
-                                Sample CSV
-                              </button>
-                              <label className={`${buttonClass('primary')} cursor-pointer`}>
-                                <Upload size={16} />
-                                Choose CSV
-                                <input
-                                  type="file"
-                                  accept=".csv,text/csv"
-                                  className="sr-only"
-                                  onChange={event => void loadContractorPriceBookCsvFile(event.target.files?.[0] || null)}
-                                />
-                              </label>
-                            </div>
+                <ContractorPriceBookWorkspace
+                    items={contractorPriceBookItems}
+                    contractorSaved={Boolean(contractor?.id)}
+                    canManage={canManageEstimateSettings}
+                    loadState={contractorPriceBookLoadState}
+                    loadError={contractorPriceBookLoadError}
+                    draft={contractorPriceBookDraft}
+                    setDraft={setContractorPriceBookDraft}
+                    formOpen={contractorPriceBookFormOpen}
+                    editingItemId={editingContractorPriceBookItemId}
+                    savingItem={savingContractorPriceBookItem}
+                    togglingItemId={togglingContractorPriceBookItemId}
+                    onBack={() => setContractorJobsViewAndScroll('overview')}
+                    onRetry={() => void loadContractor()}
+                    onOpenAddForm={openContractorPriceBookAddForm}
+                    onCancelForm={resetContractorPriceBookDraft}
+                    onSave={() => void saveContractorPriceBookItem()}
+                    onEdit={editContractorPriceBookItem}
+                    onToggleActive={item => void toggleContractorPriceBookItemActive(item)}
+                    csvTools={(
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-slate-950">Upload CSV</p>
+                            <p className="mt-1 max-w-3xl text-xs leading-5 text-emerald-900">
+                              Upload a CSV price list to add multiple Price Book items at once. You will review everything before it is saved. Duplicate matches are warning-only; import adds valid rows and does not overwrite existing pricing. Blank price means Price Required; $0 means intentional no-charge.
+                            </p>
                           </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" onClick={downloadContractorPriceBookSampleCsv} className={buttonClass('secondary')}>
+                              <Download size={16} />
+                              Sample CSV
+                            </button>
+                            <label className={`${buttonClass('primary')} cursor-pointer`}>
+                              <Upload size={16} />
+                              Choose CSV
+                              <input
+                                type="file"
+                                accept=".csv,text/csv"
+                                className="sr-only"
+                                onChange={event => void loadContractorPriceBookCsvFile(event.target.files?.[0] || null)}
+                              />
+                            </label>
+                          </div>
+                        </div>
 
-	                          {contractorPriceBookCsvError && <div className="mt-3"><Notice tone="error" text={contractorPriceBookCsvError} /></div>}
+                        {contractorPriceBookCsvError && <div className="mt-3"><Notice tone="error" text={contractorPriceBookCsvError} /></div>}
 
-                          {contractorPriceBookCsvRows.length > 0 && (
-                            <div className="mt-4 space-y-4">
-                              <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-xs leading-5 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                        {contractorPriceBookCsvRows.length > 0 && (
+                          <div className="mt-4 space-y-4">
+                            <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-xs leading-5 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="font-bold text-slate-950">{contractorPriceBookCsvFileName}</p>
+                                <p>
+                                  Parsed {contractorPriceBookCsvRows.length} rows: {validContractorPriceBookCsvRows.length} valid, {warningContractorPriceBookCsvRows.length} with warnings, {blockedContractorPriceBookCsvRows.length} blocked.
+                                </p>
+                              </div>
+                              <button type="button" onClick={resetContractorPriceBookCsvImport} className={buttonClass('secondary')}>
+                                Clear CSV
+                              </button>
+                            </div>
+
+                            <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                              <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Review column mapping</p>
+                              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {CONTRACTOR_PRICE_BOOK_CSV_FIELDS.map(field => (
+                                  <Field key={field.key} label={`${field.label}${field.required ? ' *' : ''}`}>
+                                    <select
+                                      className={inputClass()}
+                                      value={contractorPriceBookCsvMapping[field.key] || ''}
+                                      onChange={event => updateContractorPriceBookCsvMapping(field.key, event.target.value)}
+                                    >
+                                      <option value="">Do not import</option>
+                                      {contractorPriceBookCsvHeaders.map(header => (
+                                        <option key={`${field.key}-${header}`} value={header}>{header}</option>
+                                      ))}
+                                    </select>
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">{field.helper}</p>
+                                  </Field>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                  <p className="font-bold text-slate-950">{contractorPriceBookCsvFileName}</p>
-                                  <p>
-                                    Parsed {contractorPriceBookCsvRows.length} rows: {validContractorPriceBookCsvRows.length} valid, {warningContractorPriceBookCsvRows.length} with warnings, {blockedContractorPriceBookCsvRows.length} blocked.
-                                  </p>
+                                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Preview before import</p>
+                                  <p className="mt-1 text-xs leading-5 text-slate-500">Only valid rows will be imported. Invalid rows stay out of your Price Book. Review warnings before importing.</p>
                                 </div>
-                                <button type="button" onClick={resetContractorPriceBookCsvImport} className={buttonClass('secondary')}>
-                                  Clear CSV
+                                <button
+                                  type="button"
+                                  disabled={importingContractorPriceBookCsv || validContractorPriceBookCsvRows.length === 0}
+                                  onClick={() => void importContractorPriceBookCsvRows()}
+                                  className={buttonClass('primary')}
+                                >
+                                  <Upload size={16} />
+                                  {importingContractorPriceBookCsv ? 'Importing...' : 'Import ' + validContractorPriceBookCsvRows.length + ' valid'}
                                 </button>
                               </div>
-
-                              <div className="rounded-xl border border-emerald-200 bg-white p-3">
-                                <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Review column mapping</p>
-                                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                  {CONTRACTOR_PRICE_BOOK_CSV_FIELDS.map(field => (
-                                    <Field key={field.key} label={`${field.label}${field.required ? ' *' : ''}`}>
-                                      <select
-                                        className={inputClass()}
-                                        value={contractorPriceBookCsvMapping[field.key] || ''}
-                                        onChange={event => updateContractorPriceBookCsvMapping(field.key, event.target.value)}
-                                      >
-                                        <option value="">Do not import</option>
-                                        {contractorPriceBookCsvHeaders.map(header => (
-                                          <option key={`${field.key}-${header}`} value={header}>{header}</option>
-                                        ))}
-                                      </select>
-                                      <p className="mt-1 text-xs leading-5 text-slate-500">{field.helper}</p>
-                                    </Field>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="rounded-xl border border-emerald-200 bg-white p-3">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                  <div>
-                                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Preview before import</p>
-                                    <p className="mt-1 text-xs leading-5 text-slate-500">Only valid rows will be imported. Invalid rows stay out of your pricing library. Review warnings before importing.</p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    disabled={importingContractorPriceBookCsv || validContractorPriceBookCsvRows.length === 0}
-                                    onClick={() => void importContractorPriceBookCsvRows()}
-                                    className={buttonClass('primary')}
-                                  >
-                                    <Upload size={16} />
-                                    {importingContractorPriceBookCsv ? 'Importing...' : `Import ${validContractorPriceBookCsvRows.length} valid`}
-                                  </button>
-                                </div>
-                                <div className="mt-3 overflow-x-auto">
-                                  <table className="min-w-[720px] text-left text-xs">
-                                    <thead className="text-slate-500">
-                                      <tr>
-                                        <th className="border-b border-slate-200 py-2 pr-3">Row</th>
-                                        <th className="border-b border-slate-200 py-2 pr-3">Title</th>
-                                        <th className="border-b border-slate-200 py-2 pr-3">Type</th>
-                                        <th className="border-b border-slate-200 py-2 pr-3">Price</th>
-                                        <th className="border-b border-slate-200 py-2 pr-3">Status</th>
+                              <div className="mt-3 overflow-x-auto">
+                                <table className="min-w-[720px] text-left text-xs">
+                                  <thead className="text-slate-500">
+                                    <tr>
+                                      <th className="border-b border-slate-200 py-2 pr-3">Row</th>
+                                      <th className="border-b border-slate-200 py-2 pr-3">Title</th>
+                                      <th className="border-b border-slate-200 py-2 pr-3">Type</th>
+                                      <th className="border-b border-slate-200 py-2 pr-3">Price</th>
+                                      <th className="border-b border-slate-200 py-2 pr-3">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {contractorPriceBookCsvPreviewRows.slice(0, 20).map(row => (
+                                      <tr key={row.rowNumber} className="align-top">
+                                        <td className="border-b border-slate-100 py-2 pr-3 font-semibold text-slate-500">{row.rowNumber}</td>
+                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-950">{row.payload.title || 'Missing title'}</td>
+                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{estimateLineTypeLabel(row.payload.line_type)}</td>
+                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{contractorPriceBookPriceLabel(row.payload)}</td>
+                                        <td className="border-b border-slate-100 py-2 pr-3">
+                                          {row.errors.length > 0 ? (
+                                            <div className="space-y-1 text-red-700">
+                                              <p className="font-bold">Blocked</p>
+                                              {row.errors.map(error => <p key={error}>{error}</p>)}
+                                            </div>
+                                          ) : row.warnings.length > 0 ? (
+                                            <div className="space-y-1 text-amber-700">
+                                              <p className="font-bold">Valid with warning</p>
+                                              {row.warnings.map(warning => <p key={warning}>{warning}</p>)}
+                                            </div>
+                                          ) : (
+                                            <span className="font-semibold text-emerald-700">Valid</span>
+                                          )}
+                                        </td>
                                       </tr>
-                                    </thead>
-                                    <tbody>
-                                      {contractorPriceBookCsvPreviewRows.slice(0, 20).map(row => (
-                                        <tr key={row.rowNumber} className="align-top">
-                                          <td className="border-b border-slate-100 py-2 pr-3 font-semibold text-slate-500">{row.rowNumber}</td>
-                                          <td className="border-b border-slate-100 py-2 pr-3 text-slate-950">{row.payload.title || 'Missing title'}</td>
-                                          <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{estimateLineTypeLabel(row.payload.line_type)}</td>
-                                          <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{contractorPriceBookPriceLabel(row.payload)}</td>
-                                          <td className="border-b border-slate-100 py-2 pr-3">
-                                            {row.errors.length > 0 ? (
-                                              <div className="space-y-1 text-red-700">
-                                                <p className="font-bold">Blocked</p>
-                                                {row.errors.map(error => <p key={error}>{error}</p>)}
-                                              </div>
-                                            ) : row.warnings.length > 0 ? (
-                                              <div className="space-y-1 text-amber-700">
-                                                <p className="font-bold">Valid with warning</p>
-                                                {row.warnings.map(warning => <p key={warning}>{warning}</p>)}
-                                              </div>
-                                            ) : (
-                                              <span className="font-semibold text-emerald-700">Valid</span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                                {contractorPriceBookCsvPreviewRows.length > 20 && (
-                                  <p className="mt-2 text-xs text-slate-500">Showing the first 20 parsed rows for preview.</p>
-                                )}
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
-	                            </div>
-	                          )}
-	                        </div>
-
-	                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm font-bold text-slate-950">{editingContractorPriceBookItemId ? 'Edit Custom Pricing item' : 'Add Custom Pricing item'}</p>
-                              <p className="mt-1 text-xs leading-5 text-slate-500">Leave default price blank when the contractor must price the item manually before use.</p>
-                            </div>
-                            {editingContractorPriceBookItemId && (
-                              <button type="button" onClick={resetContractorPriceBookDraft} className={buttonClass('secondary')}>
-                                Cancel edit
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="mt-4 grid gap-3 lg:grid-cols-4">
-                            <Field label="Item title">
-                              <input
-                                className={inputClass()}
-                                value={contractorPriceBookDraft.title}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, title: event.target.value }))}
-                                placeholder="Service call"
-                              />
-                            </Field>
-                            <Field label="Line type">
-                              <select
-                                className={inputClass()}
-                                value={contractorPriceBookDraft.line_type}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, line_type: event.target.value as EstimateLineType }))}
-                              >
-                                {ESTIMATE_LINE_TYPE_OPTIONS.map(lineType => (
-                                  <option key={lineType} value={lineType}>{ESTIMATE_LINE_TYPE_LABELS[lineType]}</option>
-                                ))}
-                              </select>
-                            </Field>
-                            <Field label="Default price">
-                              <input
-                                className={inputClass()}
-                                inputMode="decimal"
-                                value={contractorPriceBookDraft.default_unit_price}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, default_unit_price: event.target.value }))}
-                                placeholder="Blank = Price Required"
-                              />
-                            </Field>
-                            <Field label="Unit">
-                              <input
-                                className={inputClass()}
-                                value={contractorPriceBookDraft.unit}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, unit: event.target.value }))}
-                                placeholder="each"
-                              />
-                            </Field>
-                            <Field label="Trade">
-                              <input
-                                className={inputClass()}
-                                value={contractorPriceBookDraft.trade}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, trade: event.target.value }))}
-                                placeholder="HVAC, plumbing..."
-                              />
-                            </Field>
-                            <Field label="Category">
-                              <input
-                                className={inputClass()}
-                                value={contractorPriceBookDraft.category}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, category: event.target.value }))}
-                                placeholder="Service, repair..."
-                              />
-                            </Field>
-                            <Field label="Labor hours">
-                              <input
-                                className={inputClass()}
-                                inputMode="decimal"
-                                value={contractorPriceBookDraft.labor_hours}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, labor_hours: event.target.value }))}
-                                placeholder="Optional"
-                              />
-                            </Field>
-                            <Field label="SKU / code">
-                              <input
-                                className={inputClass()}
-                                value={contractorPriceBookDraft.sku}
-                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, sku: event.target.value }))}
-                                placeholder="Optional"
-                              />
-                            </Field>
-                            <div className="flex items-end">
-                              <label className="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm font-semibold text-[#223D67]">
-                                <input
-                                  type="checkbox"
-                                  checked={contractorPriceBookDraft.taxable}
-                                  onChange={event => setContractorPriceBookDraft(current => ({ ...current, taxable: event.target.checked }))}
-                                  className="h-4 w-4 rounded border-slate-300 text-[#0078FF]"
-                                />
-                                Taxable
-                              </label>
-                            </div>
-                            <div className="flex items-end">
-                              <label className="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm font-semibold text-[#223D67]">
-                                <input
-                                  type="checkbox"
-                                  checked={contractorPriceBookDraft.active}
-                                  onChange={event => setContractorPriceBookDraft(current => ({ ...current, active: event.target.checked }))}
-                                  className="h-4 w-4 rounded border-slate-300 text-[#0078FF]"
-                                />
-                                Active
-                              </label>
-                            </div>
-                            <div className="lg:col-span-2">
-                              <Field label="Customer description">
-                                <textarea
-                                  className={inputClass()}
-                                  rows={3}
-                                  value={contractorPriceBookDraft.customer_description}
-                                  onChange={event => setContractorPriceBookDraft(current => ({ ...current, customer_description: event.target.value }))}
-                                  placeholder="Optional customer-safe description for future estimate use"
-                                />
-                              </Field>
-                            </div>
-                            <div className="lg:col-span-2">
-                              <Field label="Internal notes">
-                                <textarea
-                                  className={inputClass()}
-                                  rows={3}
-                                  value={contractorPriceBookDraft.internal_notes}
-                                  onChange={event => setContractorPriceBookDraft(current => ({ ...current, internal_notes: event.target.value }))}
-                                  placeholder="Private contractor note"
-                                />
-                              </Field>
+                              {contractorPriceBookCsvPreviewRows.length > 20 && (
+                                <p className="mt-2 text-xs text-slate-500">Showing the first 20 parsed rows for preview.</p>
+                              )}
                             </div>
                           </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              disabled={savingContractorPriceBookItem}
-                              onClick={() => void saveContractorPriceBookItem()}
-                              className={buttonClass('primary')}
-                            >
-                              <Plus size={16} />
-                              {savingContractorPriceBookItem ? 'Saving...' : editingContractorPriceBookItemId ? 'Save item' : 'Add item'}
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <Notice tone="info" text="You can view Custom Pricing items, but only the contractor owner, admin, or office role can change pricing library settings." />
+                        )}
+                      </div>
                     )}
-
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search Custom Pricing</label>
-                          <input
-                            className={inputClass()}
-                            value={contractorPriceBookSearch}
-                            onChange={event => setContractorPriceBookSearch(event.target.value)}
-                            placeholder="Search title, trade, category, SKU, or notes..."
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowArchivedContractorPriceBookItems(value => !value)}
-                          className={buttonClass('secondary')}
-                        >
-                          {showArchivedContractorPriceBookItems ? 'Show active' : 'Show archived'}
-                        </button>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        {visibleContractorPriceBookItems.length === 0 ? (
-                          <EmptyState text={showArchivedContractorPriceBookItems ? 'No archived Custom Pricing items match this view.' : 'No active Custom Pricing items match this view.'} />
-                        ) : visibleContractorPriceBookItems.map(item => {
-                          const archived = !item.active || Boolean(item.archived_at);
-                          return (
-                            <div key={item.id} className={`rounded-xl border p-3 ${archived ? 'border-slate-200 bg-slate-50' : 'border-blue-100 bg-blue-50/40'}`}>
-                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-bold text-slate-950">{item.title}</p>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${archived ? 'bg-slate-200 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
-                                      {archived ? 'Archived' : 'Active'}
-                                    </span>
-                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#223D67]">
-                                      {estimateLineTypeLabel(item.line_type)}
-                                    </span>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.default_unit_price_cents === null || item.default_unit_price_cents === undefined ? 'bg-amber-50 text-amber-700' : 'bg-white text-[#223D67]'}`}>
-                                      {contractorPriceBookPriceLabel(item)}
-                                    </span>
-                                  </div>
-                                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                                    {[item.trade, item.category, item.unit ? `Unit: ${item.unit}` : '', item.sku ? `SKU: ${item.sku}` : ''].filter(Boolean).join(' · ') || 'No trade/category metadata yet.'}
-                                  </p>
-                                  {item.customer_description && <p className="mt-2 text-sm leading-5 text-slate-700">{item.customer_description}</p>}
-                                  {item.internal_notes && (
-                                    <p className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
-                                      Internal note: {item.internal_notes}
-                                    </p>
-                                  )}
-                                  <p className="mt-2 text-xs text-slate-400">
-                                    Updated {formatShortDate(item.updated_at)}
-                                  </p>
-                                </div>
-                                {canManageEstimateSettings && (
-                                  <div className="flex flex-wrap gap-2 lg:justify-end">
-                                    <button type="button" onClick={() => editContractorPriceBookItem(item)} className={buttonClass('secondary')}>
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={togglingContractorPriceBookItemId === item.id}
-                                      onClick={() => void toggleContractorPriceBookItemActive(item)}
-                                      className={buttonClass('secondary')}
-                                    >
-                                      {togglingContractorPriceBookItemId === item.id ? 'Updating...' : archived ? 'Restore' : 'Archive'}
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
+                />
               )}
 
               {contractorJobsView === 'service_agreements' && (

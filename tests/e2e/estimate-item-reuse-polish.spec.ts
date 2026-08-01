@@ -40,7 +40,7 @@ test.describe('Estimate item reuse polish', () => {
     const derivedSource = sourceBetween(
       source,
       'const activeSavedEstimateCharges = savedEstimateCharges',
-      'const archivedContractorPriceBookItems = contractorPriceBookItems',
+      'const serviceAgreementMoneyLabel =',
     );
 
     expect(derivedSource).toContain('.filter(charge => charge.active)');
