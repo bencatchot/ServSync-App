@@ -1,8 +1,8 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-07-30
+Last updated: 2026-08-01
 
-Last reconciled against `origin/main` at `23429f0a1d297d7c07bdd26021a2732531cdc2e2` (merged PR #355).
+Last reconciled against `origin/main` at `6e5226e869e64bfed3102acfa09779b846cbbb88` (merged PR #357).
 
 ## Purpose
 
@@ -18,10 +18,10 @@ ServSync remains in controlled private beta. The current beta loop is:
 
 Homeowner request -> contractor estimate -> homeowner approval -> job/report -> invoice -> Home History -> manual reminder.
 
-Current repository evidence through PR #355 shows these relevant states:
+Current repository evidence through PR #357 shows these relevant states:
 
 - Local-customer profile editing, property management, single-property claim invitations, guarded manual Copy Link / QR preparation, token-free ordinary claim-invite reads, and final Production token containment are complete from PR #346 and PR #347.
-- PR #348 merged the local-customer multi-property claim invitation source. SQL/security remediation has been validated outside Production and Production release gates remain separate; authenticated Demo workflow validation remains unfinished until the dedicated Demo validation credentials/tooling gate is complete.
+- PR #348 merged the local-customer multi-property claim invitation source. The reviewed SQL was applied to Production with catalog/security validation, public Production smoke passed 7/7, and the full authenticated Tests A-H passed only in the dedicated Demo environment. FB-003A is archived; automated delivery remains excluded and request-free operational delivery remains FB-003B.
 - PR #349 replaced the Codex workflow instructions and does not change product capability.
 - PR #351 and PR #353 restored contractor invoice PDF access from Jobs -> Invoices and immediate post-save invoice detail actions. They do not add payment processing or provider delivery.
 - PR #352 added the private Preview/Sandbox all-contractor Draft-first rollout mode source and Sandbox validation evidence; Production rollout still requires separate owner-approved gates.
@@ -56,7 +56,6 @@ Important guardrails:
 
 | ID | Active unfinished outcome | Product area | Status | Priority | Current state / next step |
 | --- | --- | --- | --- | --- | --- |
-| FB-003A | Local-Customer Multi-Property Claim | Local customers, claim invitations, connected homeowner conversion | Gated Rollout | High | PR #348 source is merged and the Demo database has been remediated with the reviewed claim-invitation baseline plus FB-003A SQL. The owner-approved canonical authenticated Demo procedure is documented in [FB-003A Authenticated Demo Validation](../demo/validation/FB-003A_Authenticated_Demo_Validation.md), but Tests A-H remain pending and unexecuted. Keep FB-003A open until authenticated Demo validation and the minimum Production confirmation complete. |
 | FB-003B | Request-Free Operational Document Delivery Authorization | Local customers, estimates, invoices, operational delivery | Backlog | High | Keep separate from claim-link/QR delivery. Future work must define safe authorization for request-free operational document send paths without weakening token containment or homeowner-controlled claimed profiles. |
 | FB-004 | Contractor Reporting Beyond Attention Queues | Contractor operations, reporting | Backlog | Medium | Follow-Up Lite is archived. Retain only reporting not already handled by dashboard workflow summaries or attention queues, such as filtered operational reports, exports, or owner/admin management views. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profiles, recognition, marketplace trust | Later / Future | Low | Preserve as future trust work after real platform activity and moderation/public-display rules exist. |
@@ -79,6 +78,7 @@ Important guardrails:
 | FB-033 | Project Collaboration Rollout | Projects, multi-contractor coordination | Gated Rollout | Later / Future | PR #273 merged the hidden Slice 1 foundation. Project Collaboration is not live: no ordinary-user UI, Project Board, assignments, invitations, project billing, production allowlist activation, or broad financial sharing is enabled. Next work requires rollout and surface-specific authorization. |
 | FB-034A | Demo Mode Extended Scenario Coverage | Demo data, marketing capture, QA support | Later / Future | Medium | The request-to-job capture milestone is archived. Future demo work may cover invoices, Home History, report finalization, reminders, media, role switching, or browser controls only in approved demo environments. |
 | FB-035 | Draft-First Work Rollout | Contractor Work, Drafts, estimates, jobs, invoices | Gated Rollout | High | Keep active. Source and SQL foundations exist in stages, but Production gates/cohorts and full rollout remain controlled. See the rollout matrix below. |
+| FB-036 | Claim-Link Expected-Error Presentation Polish | Local-customer claim invitations, error UX | Backlog | Low | P3 polish only. Keep the clear handled unavailable-invite message, but suppress raw RPC/JSON detail from the user-facing page for expected stale, invalid, expired, or already-used claim links. Preserve useful internal/runtime diagnostics and do not change replay protection, lookup rejection, token containment, or acceptance behavior. |
 
 ## FB-035 Rollout Status Matrix
 
@@ -97,7 +97,8 @@ Important guardrails:
 | --- | --- | --- |
 | FB-001 | Archived: Invite a Contractor to ServSync v1. | Future outreach or claim-flow work should use a new focused entry or FB-003/FB-026 only when the scope matches. |
 | FB-002 | Archived: Contractor Estimate Defaults & Templates v1. | FB-024 Price Book / Reusable Estimate Content Maturity. |
-| FB-003 | Split. Core connection and multi-property permission milestone archived. | FB-003A local-customer multi-property claim; FB-003B request-free operational document delivery authorization. |
+| FB-003 | Split. Core connection and multi-property permission milestone archived. | FB-003A local-customer multi-property claim is archived; FB-003B retains request-free operational document delivery authorization. |
+| FB-003A | Archived: Local-Customer Multi-Property Claim. | FB-003B retains request-free operational document delivery; replay error-presentation polish is FB-036. |
 | FB-004 | Retained but narrowed. | FB-004 contractor reporting beyond existing attention queues. |
 | FB-005 | Retained. | FB-005 awards/badges. |
 | FB-006 | Retained and consolidated with FB-021/FB-022 booking follow-ups. | FB-006 contractor-controlled online booking. |
@@ -131,6 +132,7 @@ Important guardrails:
 | FB-033 | Retained. | FB-033 Project Collaboration rollout. |
 | FB-034 | Archived: Demo Mode request-to-job capture milestone. | FB-034A demo extended scenario coverage if later prioritized. |
 | FB-035 | Retained. | FB-035 Draft-first Work rollout. |
+| FB-036 | New focused follow-up. | FB-036 claim-link expected-error presentation polish. |
 
 ## Current Work Snapshot
 
@@ -138,7 +140,7 @@ This section is factual repo state, not a product-priority decision.
 
 | Work | Current evidence | Backlog relationship |
 | --- | --- | --- |
-| PR #348 Add multi-property local customer claim flow | Merged through `origin/main` at `a20cee5ef184709ca462f6546f54a61e655aa058`. Demo database remediation has installed the reviewed claim-invitation baseline and FB-003A SQL; authenticated Demo Tests A-H remain pending dedicated Demo credential configuration and validation-tooling merge. | FB-003A active. |
+| PR #348 Add multi-property local customer claim flow | Merged through `origin/main` at `a20cee5ef184709ca462f6546f54a61e655aa058`. Reviewed Production SQL/catalog security and public smoke confirmation remain distinct from the authenticated Demo Tests A-H pass recorded in [FB-003A Authenticated Demo Validation](../demo/validation/FB-003A_Authenticated_Demo_Validation.md). | FB-003A archived; nonblocking replay error presentation is FB-036. |
 | PR #73 marketing demo screenshot tooling | Open draft and conflicting against current main. | Potentially useful marketing/demo support; do not close without owner approval. |
 | PR #183 shared-home boundary tests | Open draft and mergeable. | Partially superseded by later FB-030 closeout evidence, but may contain reusable test coverage. |
 | PR #187 Discover trust-layer backlog additions | Open draft and mergeable. | Still potentially valid planning input for FB-005/FB-008/FB-009/FB-026. |

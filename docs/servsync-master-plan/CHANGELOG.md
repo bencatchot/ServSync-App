@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-01
 
+- Branch: `codex/fb003a-documentation-closeout`
+- Starting main SHA: `6e5226e869e64bfed3102acfa09779b846cbbb88`
+- Files changed:
+  - `docs/demo/validation/FB-003A_Authenticated_Demo_Validation.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Closes FB-003A documentation after the authenticated Demo Tests A-H pass and combined evidence review. The supplemental Test D packet closed the only original gap by proving one handled replay and exact protected database equality before and after it. FB-003A moves from the active backlog to completed features, while raw replay RPC/JSON detail is tracked separately as nonblocking P3 polish under FB-036.
+- Reason for change: Repository planning documents still described authenticated Demo validation and Production release confirmation as pending even though PR #348 source, controlled Production SQL/catalog security and public smoke evidence, and the dedicated Demo authenticated workflow validation are complete.
+- Tests/checks run:
+  - Authorized five-file diff and docs-only scope review
+  - Markdown internal-link validation
+  - FB-003A pending/active contradiction scan
+  - FB-036 uniqueness check
+  - `git diff --check`
+  - changed-file credential/token and token-bearing URL scans
+- Known risks or follow-ups:
+  - The authenticated A-H workflow was validated in Demo, not Production; Production evidence remains limited to the previously controlled SQL/catalog security confirmation and public smoke.
+  - The handled stale/invalid/expired/already-used claim-link page still exposes raw RPC/JSON detail. FB-036 tracks suppressing that user-facing detail without changing replay rejection or acceptance behavior.
+  - The original A-H packet's missing standalone manifest remains a bounded evidence-packaging weakness and is not an FB-003A product defect.
+  - Documentation-only closeout: no source, tests, SQL, environment, deployment, application data, evidence packet, or provider state changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003A is archived as completed and FB-036 preserves the separate P3 replay-error presentation follow-up.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The local-customer rollout state now records completed Production confirmation and authenticated Demo acceptance without conflating the two environments.
+
 - Branch: `codex/fb003a-authenticated-demo-validation-docs`
 - Starting main SHA: `d00369cc1e468e307e4aaa284db8a5e884315de1`
 - Files changed:
