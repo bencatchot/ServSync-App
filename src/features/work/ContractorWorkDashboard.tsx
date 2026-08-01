@@ -4,6 +4,7 @@ import {
   Calendar,
   CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
   FileText,
   FolderOpen,
   Plus,
@@ -35,6 +36,7 @@ export type ContractorWorkDashboardProps = {
   onReviewBilling: () => void;
   onViewUpcomingWork: () => void;
   onViewJobHistory: () => void;
+  onOpenServicePlans: () => void;
 };
 
 function formatWorkDashboardDate(value?: string | null) {
@@ -151,6 +153,7 @@ export function ContractorWorkDashboard({
   onReviewBilling,
   onViewUpcomingWork,
   onViewJobHistory,
+  onOpenServicePlans,
 }: ContractorWorkDashboardProps) {
   const empty = contractorWorkDashboardIsEmpty({
     draftsToContinueCount: draftsToContinue.length,
@@ -321,6 +324,34 @@ export function ContractorWorkDashboard({
           </section>
         </div>
       )}
+
+      <section
+        data-testid="contractor-work-service-plans-entry"
+        className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+      >
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="rounded-lg bg-white p-1.5 text-slate-600">
+                <ClipboardList size={16} />
+              </span>
+              <h3 className="min-w-0 break-words text-sm font-bold text-slate-950">Service Plans</h3>
+            </div>
+            <p className="mt-2 break-words text-sm leading-5 text-slate-500">
+              Create maintenance plan templates and homeowner offers.
+            </p>
+          </div>
+          <button
+            type="button"
+            data-testid="contractor-work-open-service-plans"
+            onClick={onOpenServicePlans}
+            className="inline-flex min-h-[2.5rem] max-w-full shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
+          >
+            <span className="min-w-0 break-words">Open Service Plans</span>
+            <ArrowRight size={15} className="shrink-0" />
+          </button>
+        </div>
+      </section>
     </section>
   );
 }

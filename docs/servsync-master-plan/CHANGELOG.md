@@ -6,6 +6,41 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-01
 
+- Branch: `codex/fb035-service-plans-draft-first-restoration-v1`
+- Starting main SHA: `b8a483a6126ed1796f26c664fc0fc63bfdf07f9c`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/work/ContractorWorkDashboard.tsx`
+  - focused contractor Work, Service Plans, homeowner response, mobile shell, notice, feedback, and smoke tests under `tests/e2e/`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Restores Service Plans discoverability in the gated Draft-first contractor experience. A secondary Work overview action remains available in empty and populated dashboard states, and Templates now includes a Service Plans entry. Both use one list-reset navigation callback to open the existing internal `service_agreements` management view. Contractor and homeowner copy now consistently uses Service Plans, Plan Offers, Active Plans, Review Plan, Accept plan, and Decline plan while stable database, RPC, state, type, and test identifiers remain unchanged.
+- Reason for change: Draft-first preserved the Service Agreements backend and dedicated template/offer workflow but removed the contractor's ordinary navigation path. The restoration makes the existing workflow discoverable without treating a Service Plan as an Estimate, Job, or Invoice Draft output.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - focused Service Plans contractor/homeowner, SQL foundation, Work dashboard, and mobile shell Playwright source guardrails: 35 passed
+  - focused homeowner/contractor feedback, Draft notice, and Service Plan visibility copy guardrails: 4 passed
+  - representative rendered Draft-first cohort/loading/fail-closed checks with a local Vite server: 3 passed
+  - `git diff --check`
+  - changed-file secret/credential/token scan
+  - Markdown link, heading, table, and backlog consistency checks
+  - `npm run lint` attempted; inherited ESLint 9 `@typescript-eslint/no-unused-expressions` / `allowShortCircuit` startup failure remains unchanged and prevented rule execution
+- Known risks or follow-ups:
+  - Service Plans remain a manual template, offer, homeowner response, and accepted-snapshot foundation. This change adds no recurring visits, scheduling, reminders, renewals, invoices, payments, notifications, e-signatures, external delivery, or automation.
+  - Draft-first rollout remains gated/cohort-controlled under FB-035; this source change does not alter SQL, rollout settings, entitlements, role authority, or Production configuration.
+  - Automatic draft-PR Preview validation remains required before owner review.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records Service Plans discoverability as a Draft-first rollout requirement while keeping recurring automation under FB-029.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Planning and completed-feature records now use the public Service Plans label while explicitly preserving internal `service_agreement` contracts and future automation boundaries.
+
 - Branch: `codex/fb003a-documentation-closeout`
 - Starting main SHA: `6e5226e869e64bfed3102acfa09779b846cbbb88`
 - Files changed:
