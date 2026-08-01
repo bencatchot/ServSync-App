@@ -1165,7 +1165,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
 
     page.once('dialog', dialog => dialog.accept());
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await harnessValue(page, `h.setTarget({ kind: 'durable', draftId: '${DRAFT_ID}' })`);
     await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
     await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.activeEnvelope('estimate'))");
@@ -1357,7 +1357,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     await completeInitialDraft(page, 'estimate');
     await confirmLaunch(page, 'estimate');
     await completeLaunchAndConsume(page, 'estimate', 'succeeded', false);
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await expect(page.getByTestId('durable-draft-row-consumed')).toHaveCount(0);
     await expect(page.getByTestId('durable-draft-row-active')).toHaveCount(0);
     await harnessValue(page, "h.completeList([h.listRow('active', 'estimate')])");
@@ -1473,7 +1473,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     await confirmLaunch(page, 'estimate');
     await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
     page.once('dialog', dialog => dialog.accept());
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await harnessValue(page, "h.completeRpc('servsync_save_work_draft', h.activeEnvelope('estimate'))");
     expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
     expect(await harnessValue<null>(page, 'h.storageRecord()')).toBeNull();

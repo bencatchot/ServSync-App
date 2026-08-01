@@ -20,14 +20,9 @@ function sourceDiff(path: string) {
 
 test.describe('Jobs template taxonomy', () => {
   test('Jobs overview uses clarified template helper copy', () => {
-    const source = appSource();
-    const jobsOverviewSource = sourceBetween(
-      source,
-      'data-testid="contractor-jobs-overview-tools-list"',
-      "{contractorJobsView === 'new_financial' && (",
-    );
+    const jobsOverviewSource = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
 
-    expect(jobsOverviewSource).toContain('Saved work templates and inspection checklists');
+    expect(jobsOverviewSource).toContain('Saved Work Templates and Inspection Checklists');
     expect(jobsOverviewSource).not.toContain('Workflow and estimate starters');
   });
 

@@ -289,11 +289,13 @@ This specification does not make the Work redesign live.
 
 Work should initially remain one global navigation destination.
 
-Work Dashboard manages and surfaces existing Work. Creation enters Work through controlled actions.
+The contractor-facing landing uses the existing global `Jobs` identity. Internally, this specification may still refer to the broader Work architecture, but the first landing redesign must not add a second visible `Work` umbrella.
+
+Jobs Overview manages and surfaces existing Work. Creation enters Work through controlled actions.
 
 Primary internal destinations:
 
-- Work Dashboard.
+- Jobs Overview.
 - Drafts.
 - Open Jobs.
 - Job History.
@@ -312,7 +314,7 @@ Destination types:
 
 | Destination | Type | Initial role |
 | --- | --- | --- |
-| Work Dashboard | Primary landing | Attention, next action, and orientation |
+| Jobs Overview | Primary landing | Attention, next action, and orientation |
 | Drafts | Primary internal destination | Contractor-only planning records |
 | Open Jobs | Primary internal destination | Active operational work |
 | Job History | Primary internal destination | Completed, closed, cancelled, and archived work |
@@ -324,33 +326,31 @@ Destination types:
 | Service Plans | Secondary Work-adjacent destination | Existing reusable plan-template and homeowner-offer workflow; separate from one-time Draft outputs and future recurring automation |
 | Custom Pricing | Company/Work reference tool | Pricing source, not core Work navigation |
 
-The Work module should prioritize attention and next actions, not six equal folders.
+The Work module should prioritize attention and next actions. The first Jobs Overview uses one consistent At a Glance tile system rather than competing tile groups or embedded full lists.
 
-Starting a Draft should not require first navigating through the Work Dashboard when a trusted contextual action is available. The Work Dashboard may still retain a secondary header shortcut for convenience.
+Starting a Draft should not require first navigating through Jobs Overview when a trusted contextual action is available. Jobs Overview retains Start New Draft as a role-safe tool action.
 
-## 7. Work Dashboard
+## 7. Jobs Overview
 
-The Work Dashboard is not a folder menu. It answers:
+Jobs Overview answers:
 
 `What existing work needs my attention, and what should happen next?`
 
-The dashboard should prioritize:
+The first redesigned landing contains:
 
-- Drafts needing continuation.
-- Active Jobs.
-- Upcoming work.
-- Waiting on customer.
-- Ready-to-invoice work.
-- Overdue or action-required records.
-- Recent activity.
-- Job History access.
+- One At a Glance tile system for Needs Attention, Drafts, Estimates, Active Jobs, and Invoices.
+- A prominent Needs Attention tile whose total equals the rows in its destination.
+- A dedicated Drafts destination containing the current full Draft list.
+- A dedicated Needs Attention destination containing only accepted estimates without a Job, completed invoiceable Jobs without an Invoice, and draft/overdue/partially-paid Invoices.
+- Actions & Tools for Start New Draft, Templates, Service Plans, and Custom Pricing, shown only when existing capability and role checks permit them.
+- Existing Estimates, Jobs, Invoices, Templates, Service Plans, and Custom Pricing destinations without new backend authority.
 
-When ongoing Work exists, the largest visual priority should be existing Work needing attention, not creation.
+No complete Draft, Estimate, Job, or Invoice list belongs on the overview. Empty, loading, and error states must not misrepresent live counts. Broader future attention categories such as upcoming work, waiting on customer, or recent activity require separately approved definitions before they appear in this bounded first release.
 
 ### Creation Shortcut
 
 Purpose:
-Provide a deliberate shortcut into Start New Draft without making creation the dashboard's primary content.
+Provide a deliberate Start New Draft action in Actions & Tools without making creation the landing's primary content.
 
 Inclusion:
 Available to authorized Work users when Draft-first Work is enabled, role permissions allow Draft creation, and duplicate-prevention rules are satisfied.
@@ -362,10 +362,10 @@ Empty state:
 If there is no Work yet, Start New Draft may become the primary empty-state action.
 
 Mobile:
-Compact Work-header action or future approved Work-scoped control. It should not crowd every Work subview.
+Compact action row within Actions & Tools. It should not crowd every Jobs subview.
 
 Desktop:
-Secondary Work-header action when existing Work is present.
+Secondary Jobs Overview tool action when existing Work is present.
 
 Initial Work redesign:
 Required.

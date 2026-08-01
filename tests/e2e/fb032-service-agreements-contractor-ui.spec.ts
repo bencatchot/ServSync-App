@@ -41,7 +41,7 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     expect(serviceAgreementSource).not.toContain('Homeowner review and response is planned for a later slice.');
   });
 
-  test('restores Draft-first Work and Templates entries through one list-reset navigation callback', () => {
+  test('keeps the Draft-first Jobs overview and Templates entries on one list-reset navigation callback', () => {
     const source = appSource();
     const dashboardSource = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
     const openServicePlansSource = sourceBetween(
@@ -53,12 +53,12 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     expect(openServicePlansSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
     expect(openServicePlansSource).toContain("setInspectionView('list')");
     expect(source).toContain('onOpenServicePlans={openContractorServicePlans}');
-    expect(dashboardSource).toContain('data-testid="contractor-work-service-plans-entry"');
-    expect(dashboardSource).toContain('data-testid="contractor-work-open-service-plans"');
+    expect(dashboardSource).toContain('testId="contractor-work-open-service-plans"');
+    expect(dashboardSource).toContain('{canUseServicePlans ? (');
     expect(source).toContain('data-testid="contractor-templates-service-plans-entry"');
     expect(source).toContain('onClick={openContractorServicePlans}');
     expect(source).toContain('Manage reusable plan templates, pricing, visits, duration, and offer terms.');
-    expect(source).toContain("{sharedDraftComposerEnabled ? 'Back to Work' : 'Back to Jobs'}");
+    expect(source).toContain('Back to Jobs');
   });
 
   test('loads manager-visible lists with direct RLS-scoped reads only after manager checks', () => {

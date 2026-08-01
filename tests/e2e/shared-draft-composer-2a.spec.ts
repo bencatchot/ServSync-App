@@ -136,12 +136,17 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx')).toContain("'draft estimate'");
   });
 
-  test('shared Work overview owns active durable Draft visibility and Open Jobs stays operational', () => {
+  test('Jobs overview routes to the dedicated durable Draft list while Open Jobs stays operational', () => {
     const appSource = sourceFile('src/App.tsx');
     const sharedOverview = sourceBetween(
       appSource,
-      "sharedDraftComposerEnabled ? (\n                  <div className=\"space-y-4\">",
-      "{contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled",
+      "{contractorJobsView === 'overview' && (",
+      "{contractorJobsView === 'drafts'",
+    );
+    const draftsDestination = sourceBetween(
+      appSource,
+      "{contractorJobsView === 'drafts'",
+      "{contractorJobsView === 'needs_attention'",
     );
     const openJobsSource = sourceBetween(
       appSource,
@@ -154,11 +159,13 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
       "{/* ── NEW VIEW ── */}",
     );
 
-    expect(sharedOverview).toContain('data-testid="contractor-work-durable-drafts-overview"');
-    expect(sharedOverview).toContain('Drafts needing attention');
-    expect(sharedOverview).toContain('mode="list"');
-    expect(sharedOverview).toContain('onOpenTarget={target => {');
-    expect(sharedOverview).toContain("setContractorJobsView('new_jobs');");
+    expect(sharedOverview).toContain('<ContractorWorkDashboard');
+    expect(sharedOverview).not.toContain('<DurableDraftWorkspace');
+    expect(draftsDestination).toContain('data-testid="contractor-jobs-drafts-destination"');
+    expect(draftsDestination).toContain('<DurableDraftWorkspace');
+    expect(draftsDestination).toContain('mode="list"');
+    expect(draftsDestination).toContain('onOpenTarget={target => {');
+    expect(draftsDestination).toContain("setContractorJobsView('new_jobs');");
     expect(openJobsSource).toContain("DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && !sharedDraftComposerEnabled");
     expect(openJobsSource).toContain('<DraftJobList');
     expect(openJobsSource).not.toContain('sharedDraftComposerEnabled && supabase ? (');
@@ -292,7 +299,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(selectorSource).toContain('It will not be sent.');
     expect(composerSource).toContain('data-testid="shared-draft-composer"');
     expect(composerSource).toContain('Save Draft');
-    expect(composerSource).toContain('Back to Work');
+    expect(composerSource).toContain('Back to Jobs');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Job');
     expect(composerSource).not.toContain('launchContractorWorkDraft');

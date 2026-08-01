@@ -421,7 +421,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await expect(page.getByLabel('Draft title')).toHaveValue('Imported');
 
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('list', 'contractor_work_drafts', [window.__durableHarness.row(draftA, contractorA, 'Stale A Draft')], 'A'), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await page.evaluate(({ draftB, contractorB, legacyId }) => window.__durableHarness.complete('list', 'contractor_work_drafts', [window.__durableHarness.row(draftB, contractorB, 'Imported', { legacy_inspection_id: legacyId })], 'B'), { draftB: DRAFT_B, contractorB: CONTRACTOR_B, legacyId: LEGACY_ID });
     await expect(page.getByText('Earlier plan')).toHaveCount(0);
     await expect(page.getByText('Unrelated plan')).toBeVisible();
@@ -435,7 +435,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.getByRole('button', { name: 'Continue Draft' }).click();
     await page.evaluate(() => window.__durableHarness.fail('rpc', 'servsync_import_legacy_draft_job'));
     await expect(page.getByTestId('durable-draft-open-error')).toBeVisible();
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await page.evaluate(() => window.__durableHarness.complete('list', 'contractor_work_drafts', [], 'A'));
     await expect(page.getByText('Earlier plan')).toBeVisible();
     await page.getByRole('button', { name: 'Continue Draft' }).click();
@@ -456,10 +456,10 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Saved Draft')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
     await page.getByLabel('Draft title').fill('Local edit');
     page.once('dialog', dialog => void dialog.dismiss());
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await expect(page.getByLabel('Draft title')).toHaveValue('Local edit');
     page.once('dialog', dialog => void dialog.accept());
-    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.getByRole('button', { name: 'Back to Jobs' }).click();
     await expect(page.getByTestId('durable-draft-list')).toBeVisible();
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_save_work_draft'))).toBe(0);
   });
@@ -477,7 +477,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
         launched_at: '2026-07-19T11:00:00.000Z',
       })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
       await page.getByRole('button', { name: `Open ${output.label}` }).click();
-      await page.getByRole('button', { name: 'Back to Work' }).click();
+      await page.getByRole('button', { name: 'Back to Jobs' }).click();
       await page.evaluate(({ output, contractorId }) => window.__durableHarness.complete('output', output.type, window.__durableHarness.output(output.type, output.id, contractorId)), { output, contractorId: CONTRACTOR_A });
       await expect(page.getByTestId('durable-draft-list')).toBeVisible();
       expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
