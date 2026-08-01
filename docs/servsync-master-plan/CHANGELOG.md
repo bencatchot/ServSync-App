@@ -4,6 +4,33 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-01
+
+- Branch: `codex/fb003a-authenticated-demo-validation-docs`
+- Starting main SHA: `d00369cc1e468e307e4aaa284db8a5e884315de1`
+- Files changed:
+  - `docs/demo/validation/FB-003A_Authenticated_Demo_Validation.md`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds the canonical owner-approved authenticated Demo browser procedure for FB-003A Tests A-H, including Demo-only targeting, persona slots, safe guarded Copy Link handoff rules, execution order, evidence requirements, stop conditions, and expected mutation ledger.
+- Reason for change: The authenticated FB-003A Demo validation was blocked because current repository documentation said Tests A-H were pending but did not define the individual browser tests or the safe token handoff needed to execute them without exposing raw claim tokens.
+- Tests/checks run:
+  - Documentation diff review
+  - Markdown internal-link validation
+  - `git diff --check`
+  - changed-file credential/token scan
+- Known risks or follow-ups:
+  - Tests A-H were not executed by this documentation-only change.
+  - No Demo, Sandbox, Production, SQL, deployment, environment, fixture, authentication, provider delivery, or app-code change is included.
+  - Next step is controlled review/merge of this documentation, then a separately authorized authenticated Demo execution.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003A now links to the canonical owner-approved procedure while preserving authenticated validation as pending.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This documents the validation procedure for an existing approved workflow; it does not change product direction, permissions, lifecycle behavior, or rollout policy.
+
 ## 2026-07-31
 
 - Branch: `codex/demo-validation-target-config`
