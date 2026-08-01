@@ -69,15 +69,15 @@ test.describe('Bundle 3B-2 service agreement, report, and Home Map notices', () 
 
     expect(app).toContain("import { VisibilityNotice } from './features/drafts/VisibilityNotice';");
     expect(contractorSource).toContain('<DraftNotice');
-    expect(contractorSource).toContain('title="Draft service agreement"');
+    expect(contractorSource).toContain('title="Draft service plan"');
     expect(contractorSource).toContain('Not visible to the homeowner yet. Save the draft, then send when ready.');
     expect(contractorSource).toContain('testId="service-agreement-draft-offer-notice"');
-    expect(contractorSource).not.toMatch(/Create agreement template[\s\S]{0,500}<DraftNotice/);
+    expect(contractorSource).not.toMatch(/Create plan template[\s\S]{0,500}<DraftNotice/);
 
     expect(homeownerSource).toContain('testId="homeowner-service-agreement-sent-notice"');
     expect(homeownerSource).toContain('title="Sent to homeowner"');
     expect(homeownerSource).toContain('testId="homeowner-service-agreement-active-notice"');
-    expect(homeownerSource).toContain('title="Active agreement"');
+    expect(homeownerSource).toContain('title="Active plan"');
     expect(homeownerSource).toContain("respondToServiceAgreementOffer(offer, 'accepted')");
     expect(homeownerSource).toContain("respondToServiceAgreementOffer(offer, 'declined')");
     expect(homeownerSource).toContain(".neq('status', 'draft')");

@@ -229,9 +229,10 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(toolsOverviewSource).toContain("id: 'templates'");
     expect(toolsOverviewSource).toContain("id: 'custom_pricing'");
     expect(toolsOverviewSource).toContain("id: 'service_agreements'");
+    expect(toolsOverviewSource).toContain("label: 'Service Plans'");
     expect(toolsOverviewSource).toContain("setContractorJobsViewAndScroll('templates')");
     expect(toolsOverviewSource).toContain("setContractorJobsViewAndScroll('custom_pricing')");
-    expect(toolsOverviewSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
+    expect(toolsOverviewSource).toContain('onClick: openContractorServicePlans');
     expect(toolsOverviewSource).not.toContain('col-span-2');
     expect(toolsOverviewSource).not.toContain('order-1');
   });

@@ -13189,14 +13189,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       });
       if (responseError) throw responseError;
       setNotice(response === 'accepted'
-        ? actionFeedbackMessage('Service agreement accepted', 'The agreement is active. Scheduling and billing still happen separately with the contractor.', 'homeowner-service-agreement-response-feedback')
-        : actionFeedbackMessage('Service agreement declined', 'The contractor can follow up or send a different offer if needed.', 'homeowner-service-agreement-response-feedback')
+        ? actionFeedbackMessage('Service plan accepted', 'The plan is active. Scheduling and billing still happen separately with the contractor.', 'homeowner-service-agreement-response-feedback')
+        : actionFeedbackMessage('Service plan declined', 'The contractor can follow up or send a different offer if needed.', 'homeowner-service-agreement-response-feedback')
       );
       setViewingServiceAgreementOfferId(null);
       await loadHomeowner();
     } catch (err) {
       setError(actionFeedbackMessage(
-        'Service agreement response could not be saved',
+        'Service plan response could not be saved',
         readableError(err, 'Your response was not recorded. Review the offer and try again.'),
         'homeowner-service-agreement-response-error',
       ));
@@ -14299,9 +14299,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
     {
       id: 'agreement_offers',
-      title: 'Agreement Offers',
+      title: 'Plan Offers',
       helper: 'Review maintenance offers',
-      emptyText: 'No service agreement offers are waiting here.',
+      emptyText: 'No service plan offers are waiting here.',
       count: propertyScopedServiceAgreementOffers.length,
       totalCents: sumServiceAgreementOfferCents(propertyScopedServiceAgreementOffers),
       tone: 'attention',
@@ -14326,9 +14326,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
     {
       id: 'agreements',
-      title: 'Agreements',
-      helper: 'Accepted agreement snapshots',
-      emptyText: 'No accepted service agreements yet.',
+      title: 'Active Plans',
+      helper: 'Accepted plan snapshots',
+      emptyText: 'No accepted service plans yet.',
       count: visibleAgreementRecords.length,
       totalCents: sumServiceAgreementCents(visibleAgreementRecords),
       tone: 'accepted',
@@ -14345,7 +14345,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ];
   const selectedHomeownerRecordTile = homeownerRecordSectionTiles.find(tile => tile.id === selectedHomeownerRecordSection) ?? homeownerRecordSectionTiles[0];
   const selectedHomeownerRecordEmptyText = homeownerRecordPropertyScope === 'selected' && selectedHomeId && !homeownerHasAnyPropertyScopedRecords
-    ? 'Estimates, invoices, agreements, and completed records for this property will appear here after contractors send or update them.'
+    ? 'Estimates, invoices, service plans, and completed records for this property will appear here after contractors send or update them.'
     : homeownerRecordPropertyScope === 'unassigned' && !homeownerHasAnyPropertyScopedRecords
       ? 'Unassigned records will appear here when older estimates or invoices are not tied to a property.'
       : selectedHomeownerRecordTile.emptyText;
@@ -14395,10 +14395,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const renderServiceAgreementGuardrailCopy = () => (
     <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm leading-6 text-blue-900">
-      <p className="font-semibold">Service agreement guardrails</p>
+      <p className="font-semibold">Service plan guardrails</p>
       <ul className="mt-1 list-disc space-y-1 pl-4">
-        <li>Accepting this agreement does not set up autopay.</li>
-        <li>Accepting does not create an invoice, schedule a visit, or create a job.</li>
+        <li>Accepting this plan does not set up autopay.</li>
+        <li>Accepting this plan does not create an invoice, schedule a visit, or create a job.</li>
         <li>This is not a legal e-signature flow.</li>
         <li>Your contractor will still coordinate scheduling and billing separately.</li>
       </ul>
@@ -14447,7 +14447,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             className={buttonClass(canRespond && !isOpen ? 'primary' : 'secondary')}
           >
             <ClipboardCheck size={16} />
-            {isOpen ? 'Hide Details' : canRespond ? 'Review Agreement' : 'View Details'}
+            {isOpen ? 'Hide Details' : canRespond ? 'Review Plan' : 'View Details'}
           </button>
         </div>
         {isOpen && (
@@ -14455,7 +14455,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             {canRespond && (
               <VisibilityNotice
                 title="Sent to homeowner"
-                body="Review this service agreement offer, then accept or decline when you are ready."
+                body="Review this service plan offer, then accept or decline when you are ready."
                 tone="info"
                 variant="compact"
                 testId="homeowner-service-agreement-sent-notice"
@@ -14481,35 +14481,35 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onClick={() => void respondToServiceAgreementOffer(offer, 'accepted')}
                   disabled={busy}
                   data-testid="homeowner-accept-service-agreement-offer"
-                  aria-label={`Accept service agreement offer ${offer.title}`}
+                  aria-label={`Accept service plan offer ${offer.title}`}
                   className={buttonClass('primary')}
                 >
                   <CheckCircle2 size={16} />
-                  {busy ? 'Updating...' : 'Accept agreement'}
+                  {busy ? 'Updating...' : 'Accept plan'}
                 </button>
                 <button
                   type="button"
                   onClick={() => void respondToServiceAgreementOffer(offer, 'declined')}
                   disabled={busy}
                   data-testid="homeowner-decline-service-agreement-offer"
-                  aria-label={`Decline service agreement offer ${offer.title}`}
+                  aria-label={`Decline service plan offer ${offer.title}`}
                   className={buttonClass('secondary')}
                 >
-                  Decline
+                  Decline plan
                 </button>
               </div>
             )}
             {offer.status === 'accepted' && (
               <VisibilityNotice
                 title="Accepted"
-                body="You accepted this agreement. Active agreement details appear in the Agreements section."
+                body="You accepted this plan. Active plan details appear in the Active Plans section."
                 tone="success"
                 variant="compact"
               />
             )}
-            {offer.status === 'declined' && <VisibilityNotice title="Declined" body="You declined this agreement offer." tone="info" variant="compact" />}
-            {offer.status === 'expired' && <VisibilityNotice title="Expired" body="This agreement offer has expired." tone="info" variant="compact" />}
-            {offer.status === 'withdrawn' && <VisibilityNotice title="Withdrawn" body="This agreement offer was withdrawn by the contractor." tone="info" variant="compact" />}
+            {offer.status === 'declined' && <VisibilityNotice title="Declined" body="You declined this plan offer." tone="info" variant="compact" />}
+            {offer.status === 'expired' && <VisibilityNotice title="Expired" body="This plan offer has expired." tone="info" variant="compact" />}
+            {offer.status === 'withdrawn' && <VisibilityNotice title="Withdrawn" body="This plan offer was withdrawn by the contractor." tone="info" variant="compact" />}
           </div>
         )}
       </div>
@@ -14553,14 +14553,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             className={buttonClass(isOpen ? 'secondary' : 'primary')}
           >
             <ClipboardCheck size={16} />
-            {isOpen ? 'Hide Details' : 'View Agreement'}
+            {isOpen ? 'Hide Details' : 'View Plan'}
           </button>
         </div>
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
             <VisibilityNotice
-              title="Active agreement"
-              body="This agreement was accepted and is now read-only. Your contractor still coordinates scheduling and billing separately."
+              title="Active plan"
+              body="This plan was accepted and is now read-only. Your contractor still coordinates scheduling and billing separately."
               tone="success"
               variant="compact"
               testId="homeowner-service-agreement-active-notice"
@@ -15021,14 +15021,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }[tone];
     const emptyTitle = title === 'Needs Review'
       ? 'No estimates to review'
-      : title === 'Agreement Offers'
-        ? 'No agreement offers yet'
+      : title === 'Plan Offers'
+        ? 'No plan offers yet'
         : title === 'Open Invoices'
           ? 'No invoices yet'
           : title === 'Accepted Estimates'
             ? 'No accepted estimates yet'
-            : title === 'Agreements'
-              ? 'No service agreements yet'
+            : title === 'Active Plans'
+              ? 'No service plans yet'
               : 'No paid or closed records yet';
 
     return (
@@ -15083,9 +15083,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
       <div className="space-y-5">
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-900">Review estimates, invoices, and service agreement offers from connected contractors</p>
+          <p className="text-sm font-semibold text-blue-900">Review estimates, invoices, and service plan offers from connected contractors</p>
           <p className="mt-1 text-sm text-blue-800">
-            Drafts stay private to the contractor. Sent estimates and agreement offers need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
+            Drafts stay private to the contractor. Sent estimates and plan offers need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
           </p>
         </div>
 
@@ -15224,13 +15224,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             selectedHomeownerRecordSection === 'needs_review'
               ? 'Estimates waiting for your approval or decline.'
               : selectedHomeownerRecordSection === 'agreement_offers'
-                ? 'Service agreement offers sent by connected contractors. Draft offers stay hidden until sent.'
+                ? 'Service plan offers sent by connected contractors. Draft offers stay hidden until sent.'
               : selectedHomeownerRecordSection === 'open_invoices'
                 ? 'Invoices that have been sent and are not marked paid or void.'
                 : selectedHomeownerRecordSection === 'accepted'
                   ? 'Approved estimates and any linked job or invoice status ServSync can show.'
                   : selectedHomeownerRecordSection === 'agreements'
-                    ? 'Accepted service agreement snapshots. Scheduling and billing remain separate.'
+                    ? 'Accepted service plan snapshots. Scheduling and billing remain separate.'
                     : 'Paid invoices, void invoices, and estimates that are no longer active.',
             selectedHomeownerRecordEmptyText,
             selectedHomeownerRecordChildren,
@@ -25704,7 +25704,7 @@ function ContractorDashboard({
 
   const serviceAgreementTemplatePayload = () => {
     const name = cleanHumanLabelText(serviceAgreementTemplateDraft.name);
-    if (!name) return { error: 'Enter a service agreement template name.' };
+    if (!name) return { error: 'Enter a service plan template name.' };
     const duration = parseOptionalWholeNumber(serviceAgreementTemplateDraft.default_duration_months, 'Default duration months', { positive: true });
     if (duration.error) return { error: duration.error };
     const price = parseOptionalDollarCents(serviceAgreementTemplateDraft.default_price, 'Default price');
@@ -25716,13 +25716,13 @@ function ContractorDashboard({
       ? serviceAgreementTemplates.find(template => template.id === editingServiceAgreementTemplateId)
       : null;
     if (editingTemplate?.default_duration_months !== null && editingTemplate?.default_duration_months !== undefined && duration.value === null) {
-      return { error: 'Enter a duration greater than zero before saving this existing template. Clearing a saved duration requires a later agreement RPC update.' };
+      return { error: 'Enter a duration greater than zero before saving this existing template. Clearing a saved duration requires a later plan RPC update.' };
     }
     if (editingTemplate?.default_price_cents !== null && editingTemplate?.default_price_cents !== undefined && price.value === null) {
-      return { error: 'Enter a default price of zero or more before saving this existing template. Clearing a saved price requires a later agreement RPC update.' };
+      return { error: 'Enter a default price of zero or more before saving this existing template. Clearing a saved price requires a later plan RPC update.' };
     }
     if (editingTemplate?.included_visit_count !== null && editingTemplate?.included_visit_count !== undefined && visitCount.value === null) {
-      return { error: 'Enter an included visit count of zero or more before saving this existing template. Clearing a saved visit count requires a later agreement RPC update.' };
+      return { error: 'Enter an included visit count of zero or more before saving this existing template. Clearing a saved visit count requires a later plan RPC update.' };
     }
 
     return {
@@ -25750,7 +25750,7 @@ function ContractorDashboard({
     }
     const parsed = serviceAgreementTemplatePayload();
     if ('error' in parsed) {
-      setError(parsed.error || 'Check the service agreement template fields and try again.');
+      setError(parsed.error || 'Check the service plan template fields and try again.');
       return;
     }
     setSavingServiceAgreementTemplate(true);
@@ -25765,11 +25765,11 @@ function ContractorDashboard({
         : { p_contractor_id: contractor.id, ...parsed.payload };
       const { error: saveError } = await supabase.rpc(rpcName, rpcPayload);
       if (saveError) throw saveError;
-      setNotice(editingServiceAgreementTemplateId ? 'Service agreement template updated.' : 'Service agreement template created.');
+      setNotice(editingServiceAgreementTemplateId ? 'Service plan template updated.' : 'Service plan template created.');
       resetServiceAgreementTemplateDraft();
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to save this service agreement template.'));
+      setError(readableError(err, 'Unable to save this service plan template.'));
     } finally {
       setSavingServiceAgreementTemplate(false);
     }
@@ -25796,10 +25796,10 @@ function ContractorDashboard({
       });
       if (updateError) throw updateError;
       if (editingServiceAgreementTemplateId === template.id && nextStatus === 'archived') resetServiceAgreementTemplateDraft();
-      setNotice(nextStatus === 'active' ? 'Service agreement template reactivated.' : 'Service agreement template archived.');
+      setNotice(nextStatus === 'active' ? 'Service plan template reactivated.' : 'Service plan template archived.');
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to update this service agreement template.'));
+      setError(readableError(err, 'Unable to update this service plan template.'));
     } finally {
       setTogglingServiceAgreementTemplateId(null);
     }
@@ -25864,7 +25864,7 @@ function ContractorDashboard({
     }
     const parsed = serviceAgreementOfferPayload();
     if ('error' in parsed) {
-      setError(parsed.error || 'Check the service agreement offer fields and try again.');
+      setError(parsed.error || 'Check the service plan offer fields and try again.');
       return;
     }
     setSavingServiceAgreementOffer(true);
@@ -25874,7 +25874,7 @@ function ContractorDashboard({
       const { error: createError } = await supabase.rpc('servsync_create_service_agreement_offer', parsed.payload);
       if (createError) throw createError;
       setNotice(actionFeedbackMessage(
-        'Draft service agreement saved',
+        'Draft service plan saved',
         'It remains private until you send it to the homeowner for review.',
         'contractor-service-agreement-save-feedback',
       ));
@@ -25882,7 +25882,7 @@ function ContractorDashboard({
       await loadContractor();
     } catch (err) {
       setError(actionFeedbackMessage(
-        'Service agreement offer could not be saved',
+        'Service plan offer could not be saved',
         readableError(err, 'Your draft details are still in the form. Check the offer and try saving again.'),
         'contractor-service-agreement-save-error',
       ));
@@ -25910,14 +25910,14 @@ function ContractorDashboard({
       });
       if (sendError) throw sendError;
       setNotice(actionFeedbackMessage(
-        'Service agreement offer sent',
+        'Service plan offer sent',
         'The homeowner can now review and respond to the offer.',
         'contractor-service-agreement-send-feedback',
       ));
       await loadContractor();
     } catch (err) {
       setError(actionFeedbackMessage(
-        'Service agreement offer could not be sent',
+        'Service plan offer could not be sent',
         readableError(err, 'The offer was not sent. Review the homeowner, property, and offer details, then try again.'),
         'contractor-service-agreement-send-error',
       ));
@@ -28828,6 +28828,11 @@ function ContractorDashboard({
     setContractorEstimateRecordStatusFilter('approved');
     setContractorEstimateRecordSort('updated_newest');
   };
+  const openContractorServicePlans = () => {
+    setContractorFinancialRecordKind('estimates');
+    setContractorJobsViewAndScroll('service_agreements');
+    setInspectionView('list');
+  };
   const openJobs = operationalInspections.filter(inspectionIsOpenJob);
   const closedJobs = operationalInspections.filter(inspectionIsClosedJob);
   const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);
@@ -31273,12 +31278,12 @@ function ContractorDashboard({
     ? 'Save the business profile once before referring another contractor.'
     : contractorReferralActionsDisabledReason || (!canSubmitContractorReferral ? contractorReferralRoleDeniedReason : '');
   const contractorReferralControlsDisabled = Boolean(contractorReferralDisabledReason);
-  const serviceAgreementRoleDeniedReason = 'Only the contractor owner, admin, or office role can manage service agreement templates and offers.';
+  const serviceAgreementRoleDeniedReason = 'Only the contractor owner, admin, or office role can manage service plan templates and offers.';
   const serviceAgreementActionsDisabledReason = isContractorReadOnly(contractorEntitlementState.entitlements)
     ? contractorEntitlementState.entitlements?.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
     : '';
   const serviceAgreementDisabledReason = !contractor?.id
-    ? 'Save the business profile once before adding service agreement templates.'
+    ? 'Save the business profile once before adding service plan templates.'
     : serviceAgreementActionsDisabledReason || (!canManageServiceAgreements ? serviceAgreementRoleDeniedReason : '');
   const serviceAgreementControlsDisabled = Boolean(serviceAgreementDisabledReason);
   const contractorCanSendWorkflowMessages = currentContractorTeamRole === 'owner'
@@ -38185,6 +38190,7 @@ function ContractorDashboard({
                         setContractorJobsViewAndScroll('closed_jobs');
                         setInspectionView('list');
                       }}
+                      onOpenServicePlans={openContractorServicePlans}
                     />
                   </div>
                 ) : null
@@ -38357,15 +38363,11 @@ function ContractorDashboard({
                         },
                         {
                           id: 'service_agreements',
-                          label: 'Service Agreements',
+                          label: 'Service Plans',
                           value: String(activeServiceAgreementTemplates.length),
-                          helper: 'Templates and offers',
+                          helper: 'Plan templates and homeowner offers',
                           icon: <ClipboardList size={15} />,
-                          onClick: () => {
-                            setContractorFinancialRecordKind('estimates');
-                            setContractorJobsViewAndScroll('service_agreements');
-                            setInspectionView('list');
-                          },
+                          onClick: openContractorServicePlans,
                         },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; onClick: () => void }>).map(item => (
                         <button
@@ -40567,18 +40569,18 @@ function ContractorDashboard({
               )}
 
               {contractorJobsView === 'service_agreements' && (
-                <Card title="Service Agreements" icon={<ClipboardList size={18} />}>
+                <Card title="Service Plans" icon={<ClipboardList size={18} />}>
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Contractor-side foundation</p>
                         <h3 className="mt-1 text-lg font-bold text-slate-950">Create maintenance plan templates and draft offers.</h3>
                         <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                          Choose one explicitly shared property for each offer. Homeowners can review and respond after an offer is sent, and accepted agreements stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
+                          Choose one explicitly shared property for each offer. Homeowners can review and respond after an offer is sent, and accepted plans stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
                         </p>
                       </div>
                       <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className={buttonClass('secondary')}>
-                        Back to Jobs
+                        {sharedDraftComposerEnabled ? 'Back to Work' : 'Back to Jobs'}
                       </button>
                     </div>
 
@@ -40599,7 +40601,7 @@ function ContractorDashboard({
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <p className="text-sm font-bold text-slate-950">{editingServiceAgreementTemplateId ? 'Edit agreement template' : 'Create agreement template'}</p>
+                              <p className="text-sm font-bold text-slate-950">{editingServiceAgreementTemplateId ? 'Edit plan template' : 'Create plan template'}</p>
                               <p className="mt-1 text-xs leading-5 text-slate-500">Templates are private to your contractor account until you create and send an offer.</p>
                             </div>
                             {editingServiceAgreementTemplateId && (
@@ -40692,7 +40694,7 @@ function ContractorDashboard({
                             <p className="mt-1 text-xs leading-5 text-slate-500">Start from an active template, then choose one connected homeowner and one explicitly shared property.</p>
                           </div>
                           <DraftNotice
-                            title="Draft service agreement"
+                            title="Draft service plan"
                             body="Not visible to the homeowner yet. Save the draft, then send when ready."
                             className="mt-3"
                             testId="service-agreement-draft-offer-notice"
@@ -40766,7 +40768,7 @@ function ContractorDashboard({
                                 className={inputClass()}
                                 value={serviceAgreementOfferDraft.title}
                                 onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, title: event.target.value }))}
-                                placeholder={selectedServiceAgreementOfferTemplate?.name || 'Maintenance agreement'}
+                                placeholder={selectedServiceAgreementOfferTemplate?.name || 'Maintenance plan'}
                               />
                             </Field>
                             <Field label="Price">
@@ -40833,7 +40835,7 @@ function ContractorDashboard({
                           </div>
                           {serviceAgreementEligibleConnections.length === 0 && (
                             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-                              Connect with a homeowner and share a property before creating agreement offers.
+                              Connect with a homeowner and share a property before creating plan offers.
                             </p>
                           )}
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -40862,7 +40864,7 @@ function ContractorDashboard({
                         </div>
                         <div className="mt-4 space-y-3">
                           {serviceAgreementTemplates.length === 0 ? (
-                            <EmptyState text={canManageServiceAgreements ? 'No service agreement templates yet.' : 'Service agreement templates are available to contractor owner, admin, and office roles.'} />
+                            <EmptyState text={canManageServiceAgreements ? 'No service plan templates yet.' : 'Service plan templates are available to contractor owner, admin, and office roles.'} />
                           ) : serviceAgreementTemplates.map(template => {
                             const archived = template.status === 'archived';
                             return (
@@ -40930,7 +40932,7 @@ function ContractorDashboard({
                         </div>
                         <div className="mt-4 space-y-3">
                           {serviceAgreementOffers.length === 0 ? (
-                            <EmptyState text="No service agreement offers yet." />
+                            <EmptyState text="No service plan offers yet." />
                           ) : serviceAgreementOffers.map(offer => (
                             <div key={offer.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -41005,7 +41007,7 @@ function ContractorDashboard({
                   </button>
                 </div>
 
-                <div className="mb-4 grid gap-3 md:grid-cols-3">
+                <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -41060,6 +41062,20 @@ function ContractorDashboard({
 	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{estimateTemplates.length}</span>
 	                    </div>
 	                  </button>
+                  <button
+                    type="button"
+                    data-testid="contractor-templates-service-plans-entry"
+                    onClick={openContractorServicePlans}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 sm:p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-bold text-slate-950">Service Plans</p>
+                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Manage reusable plan templates, pricing, visits, duration, and offer terms.</p>
+                      </div>
+                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{activeServiceAgreementTemplates.length}</span>
+                    </div>
+                  </button>
                 </div>
 
                 {showTemplateForm && (

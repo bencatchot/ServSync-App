@@ -82,7 +82,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(requestSource).toContain('No response time is guaranteed.');
     expect(estimateSource).toContain("'Estimate accepted'");
     expect(estimateSource).toContain("'Estimate response could not be saved'");
-    expect(agreementSource).toContain("'Service agreement accepted'");
+    expect(agreementSource).toContain("'Service plan accepted'");
     expect(agreementSource).toContain('Scheduling and billing still happen separately with the contractor.');
     expect(appointmentSource).toContain("'New time suggested'");
     expect(appointmentSource).toContain('The contractor still needs to confirm before the appointment changes.');
@@ -120,8 +120,8 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(homeMapSource).toContain("'Home Map update submitted'");
     expect(homeMapSource).toContain('The permanent Home Map is unchanged until they approve it.');
     expect(homeMapSource).toContain("'Home Map update revoked'");
-    expect(agreementSource).toContain("'Draft service agreement saved'");
-    expect(agreementSource).toContain("'Service agreement offer sent'");
+    expect(agreementSource).toContain("'Draft service plan saved'");
+    expect(agreementSource).toContain("'Service plan offer sent'");
     expect(reportSource).toContain("'Report finalized'");
     expect(reportSource).toContain("'Report sent'");
     expect(reportSource).toContain("'Job completed'");

@@ -200,9 +200,27 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     expect(overviewSource).toContain('readyToInvoiceJobs={completedJobsReadyToInvoice}');
     expect(overviewSource).toContain('invoicesNeedingAttention={invoiceAttentionRecords}');
     expect(overviewSource).toContain('upcomingWorkCount={scheduleSnapshotCount}');
+    expect(overviewSource).toContain('onOpenServicePlans={openContractorServicePlans}');
     expect(overviewSource).toContain('data-testid="contractor-jobs-overview"');
     expect(recentJobsSource).toContain('operationalInspections.slice(0, 5).map');
     expect(recentJobsSource).not.toContain('inspections.slice(0, 5)');
+  });
+
+  test('keeps Service Plans available in empty and populated Work states without making it a Draft output', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const dashboardSource = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
+    const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
+    const servicePlansEntryIndex = dashboardSource.indexOf('data-testid="contractor-work-service-plans-entry"');
+
+    expect(dashboardSource).toContain('onOpenServicePlans: () => void;');
+    expect(dashboardSource).toContain('data-testid="contractor-work-open-service-plans"');
+    expect(dashboardSource).toContain('Create maintenance plan templates and homeowner offers.');
+    expect(servicePlansEntryIndex).toBeGreaterThan(dashboardSource.indexOf('data-testid="contractor-work-dashboard-empty"'));
+    expect(servicePlansEntryIndex).toBeGreaterThan(dashboardSource.indexOf('data-testid="contractor-work-job-history-link"'));
+    expect(appSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
+    expect(appSource).toContain('onOpenServicePlans={openContractorServicePlans}');
+    expect(composerSource).not.toContain('Service Plans');
+    expect(composerSource).not.toContain('service_agreement');
   });
 
   test('keeps Start New Draft an action, not a new route or mobile destination', () => {

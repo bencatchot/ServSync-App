@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-01
 
-Last reconciled against `origin/main` at `6e5226e869e64bfed3102acfa09779b846cbbb88` (merged PR #357).
+Last reconciled against `origin/main` at `b8a483a6126ed1796f26c664fc0fc63bfdf07f9c` (merged PR #358).
 
 ## Purpose
 
@@ -34,7 +34,7 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 | FB-027 | Contractor Pipeline / Follow-Up Lite | Contractor Workflow overview / Needs review summary, navigation-only attention CTAs, accepted-estimate job handoff focus, invoice attention, and related UI cleanup are merged and documented. | Deeper contractor reporting remains active under FB-004. |
 | FB-030 | Shared Home / Home Access foundation v1 | Home membership foundation, invite/accept/decline/revoke RPCs, pending email invite UI, shared-home shells, shared reminder shells, disabled delivery function scaffold, DB delivery-enable contract, and boundary tests are merged/applied where required. | Invite-email enablement and additional shared-record surfaces remain active under FB-030. |
 | FB-031 | Contractor Beta Billing / Entitlement Readiness v1 | Billing-account/entitlement SQL, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied while beta remains free and no Stripe/paywall is live. | Pricing, packaging, checkout, enforcement, and paid subscription rollout remain active/future under FB-017. |
-| FB-032 | Service Agreements foundation v1 | Service agreement SQL/RLS/RPC foundation, contractor template/offer UI, homeowner offer review/accept/decline, and read-only active agreement display are merged/applied where required. | Recurring visits, renewals, reminders, notifications, recurring billing, and automation remain active/future under FB-029. |
+| FB-032 | Service Plans foundation v1 | Service plan SQL/RLS/RPC foundation (with stable internal `service_agreement` identifiers), contractor template/offer UI, homeowner offer review/accept/decline, and read-only active plan display are merged/applied where required. | Recurring visits, renewals, reminders, notifications, recurring billing, and automation remain active/future under FB-029. |
 | FB-034 | Demo Mode request-to-job capture milestone | Dedicated demo environment foundation, private runner checkpoints through request-to-job and job lifecycle states, and frontend-only presentation controls are merged and documented. | Extended demo coverage remains future under FB-034A if later prioritized. |
 
 ## Consolidated Completion Notes
@@ -46,4 +46,4 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 - FB-013 and FB-028: provider-neutral integration foundations exist; accounting export and QuickBooks readiness remains active.
 - FB-014 and FB-023: payment schedules and invoice generation foundations exist; actual payment collection remains active.
 - FB-016 and FB-020: controlled-beta operational baseline is complete; public-launch operational readiness remains active.
-- FB-029 and FB-032: Service Agreements foundation v1 is complete; recurring service automation remains future.
+- FB-029 and FB-032: Service Plans foundation v1 is complete; recurring service automation remains future.

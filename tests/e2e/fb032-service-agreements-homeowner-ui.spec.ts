@@ -13,8 +13,8 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test.describe('FB-032 homeowner Service Agreements UI source guardrails', () => {
-  test('adds Service Agreements to the homeowner Estimates / Invoices area', () => {
+test.describe('FB-032 homeowner Service Plans UI source guardrails', () => {
+  test('adds Service Plans to the homeowner Estimates / Invoices area', () => {
     const source = appSource();
     const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
     const recordsPageSource = sourceBetween(
@@ -23,9 +23,9 @@ test.describe('FB-032 homeowner Service Agreements UI source guardrails', () => 
       'const homeownerClosedRequestStatuses',
     );
 
-    expect(recordsPageSource).toContain('Review estimates, invoices, and service agreement offers from connected contractors');
-    expect(homeownerSource).toContain("title: 'Agreement Offers'");
-    expect(homeownerSource).toContain("title: 'Agreements'");
+    expect(recordsPageSource).toContain('Review estimates, invoices, and service plan offers from connected contractors');
+    expect(homeownerSource).toContain("title: 'Plan Offers'");
+    expect(homeownerSource).toContain("title: 'Active Plans'");
     expect(homeownerSource).toContain('visibleServiceAgreementOffers.map(renderHomeownerServiceAgreementOfferCard)');
     expect(homeownerSource).toContain('visibleServiceAgreements.map(renderHomeownerServiceAgreementCard)');
     expect(source).toContain("type HomeownerTab = 'overview'");
@@ -86,12 +86,12 @@ test.describe('FB-032 homeowner Service Agreements UI source guardrails', () => 
       expect(homeownerSource).not.toContain(`.from('${table}').delete`);
     }
 
-    expect(homeownerSource).not.toContain('Create service agreement template');
+    expect(homeownerSource).not.toContain('Create service plan template');
     expect(homeownerSource).not.toContain('Save draft offer');
     expect(homeownerSource).not.toContain('Send offer');
   });
 
-  test('renders homeowner guardrail copy and read-only agreement cards', () => {
+  test('renders homeowner guardrail copy and read-only plan cards', () => {
     const source = appSource();
     const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
     const agreementCardSource = sourceBetween(
@@ -100,13 +100,27 @@ test.describe('FB-032 homeowner Service Agreements UI source guardrails', () => 
       'const renderHomeownerInvoiceCard = (invoice: Invoice',
     );
 
-    expect(homeownerSource).toContain('Accepting this agreement does not set up autopay.');
-    expect(homeownerSource).toContain('Accepting does not create an invoice, schedule a visit, or create a job.');
+    expect(homeownerSource).toContain('Accepting this plan does not set up autopay.');
+    expect(homeownerSource).toContain('Accepting this plan does not create an invoice, schedule a visit, or create a job.');
     expect(homeownerSource).toContain('This is not a legal e-signature flow.');
     expect(homeownerSource).toContain('Your contractor will still coordinate scheduling and billing separately.');
     expect(agreementCardSource).toContain('data-testid="homeowner-service-agreement-card"');
-    expect(agreementCardSource).toContain('This agreement was accepted and is now read-only.');
+    expect(agreementCardSource).toContain('This plan was accepted and is now read-only.');
     expect(agreementCardSource).not.toContain('respondToServiceAgreementOffer');
+  });
+
+  test('uses Service Plan terminology while preserving internal response identifiers', () => {
+    const source = appSource();
+    const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
+
+    expect(homeownerSource).toContain("canRespond ? 'Review Plan'");
+    expect(homeownerSource).toContain("'Accept plan'");
+    expect(homeownerSource).toContain('Decline plan');
+    expect(homeownerSource).toContain('aria-label={`Accept service plan offer ${offer.title}`}');
+    expect(homeownerSource).toContain('aria-label={`Decline service plan offer ${offer.title}`}');
+    expect(homeownerSource).toContain("supabase.rpc('servsync_homeowner_respond_to_service_agreement_offer'");
+    expect(homeownerSource).toContain('data-testid="homeowner-service-agreement-card"');
+    expect(homeownerSource).toContain('data-testid="homeowner-service-agreement-offer-card"');
   });
 
   test('does not add visits, automation, payments, notification delivery, or scheduling hooks', () => {

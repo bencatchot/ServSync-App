@@ -13,8 +13,8 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test.describe('FB-032 contractor Service Agreements UI source guardrails', () => {
-  test('adds Service Agreements as a Jobs workspace subview with conservative copy', () => {
+test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
+  test('keeps Service Plans on the existing internal management subview with conservative copy', () => {
     const source = appSource();
     const overviewSource = sourceBetween(
       source,
@@ -29,16 +29,36 @@ test.describe('FB-032 contractor Service Agreements UI source guardrails', () =>
 
     expect(source).toContain("type ContractorJobsView = 'overview'");
     expect(source).toContain("'service_agreements'");
-    expect(overviewSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
-    expect(overviewSource).toContain('Service Agreements');
-    expect(serviceAgreementSource).toContain('<Card title="Service Agreements"');
-    expect(serviceAgreementSource).toContain('title="Draft service agreement"');
+    expect(overviewSource).toContain('onOpenServicePlans={openContractorServicePlans}');
+    expect(overviewSource).toContain('Service Plans');
+    expect(serviceAgreementSource).toContain('<Card title="Service Plans"');
+    expect(serviceAgreementSource).toContain('title="Draft service plan"');
     expect(serviceAgreementSource).toContain('Not visible to the homeowner yet. Save the draft, then send when ready.');
     expect(serviceAgreementSource).toContain('Choose one explicitly shared property for each offer.');
-    expect(serviceAgreementSource).toContain('Homeowners can review and respond after an offer is sent, and accepted agreements stay read-only.');
+    expect(serviceAgreementSource).toContain('Homeowners can review and respond after an offer is sent, and accepted plans stay read-only.');
     expect(serviceAgreementSource).toContain('Scheduling and billing are coordinated separately.');
     expect(serviceAgreementSource).toContain('This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.');
     expect(serviceAgreementSource).not.toContain('Homeowner review and response is planned for a later slice.');
+  });
+
+  test('restores Draft-first Work and Templates entries through one list-reset navigation callback', () => {
+    const source = appSource();
+    const dashboardSource = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
+    const openServicePlansSource = sourceBetween(
+      source,
+      'const openContractorServicePlans = () => {',
+      'const openJobs = operationalInspections.filter',
+    );
+
+    expect(openServicePlansSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
+    expect(openServicePlansSource).toContain("setInspectionView('list')");
+    expect(source).toContain('onOpenServicePlans={openContractorServicePlans}');
+    expect(dashboardSource).toContain('data-testid="contractor-work-service-plans-entry"');
+    expect(dashboardSource).toContain('data-testid="contractor-work-open-service-plans"');
+    expect(source).toContain('data-testid="contractor-templates-service-plans-entry"');
+    expect(source).toContain('onClick={openContractorServicePlans}');
+    expect(source).toContain('Manage reusable plan templates, pricing, visits, duration, and offer terms.');
+    expect(source).toContain("{sharedDraftComposerEnabled ? 'Back to Work' : 'Back to Jobs'}");
   });
 
   test('loads manager-visible lists with direct RLS-scoped reads only after manager checks', () => {

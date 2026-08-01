@@ -274,7 +274,7 @@ Current Production state:
 
 Current implementation state:
 
-- The current Jobs area mixes operational Jobs, Estimates, Invoices, Reports, Templates, Custom Pricing, Service Agreements, and legacy creation flows.
+- The legacy Jobs area mixes operational Jobs, Estimates, Invoices, Reports, Templates, Custom Pricing, Service Plans (internally `service_agreement` records), and legacy creation flows.
 - Current Draft composer foundations are reusable.
 - `Create Job` from Draft exists in code but is gated with the Draft UI.
 - `Create Estimate` and `Create Invoice` from Draft are not implemented.
@@ -305,7 +305,7 @@ Secondary or internal tools:
 - Reports.
 - Templates.
 - Scheduling.
-- Service agreements where appropriate.
+- Service Plans where appropriate, using the existing dedicated plan-template and homeowner-offer workflow.
 - Custom pricing where appropriate.
 
 Destination types:
@@ -321,7 +321,7 @@ Destination types:
 | Reports | Job area plus internal Work access | Checklist/report output tied to Jobs |
 | Templates | Secondary tool | Prefill Drafts after Draft and Work landing are stable |
 | Scheduling | Dashboard summary plus Work-owned internal view | Operational commitments |
-| Service Agreements | Secondary/future Work-adjacent area | Recurring work offering, not core initial redesign |
+| Service Plans | Secondary Work-adjacent destination | Existing reusable plan-template and homeowner-offer workflow; separate from one-time Draft outputs and future recurring automation |
 | Custom Pricing | Company/Work reference tool | Pricing source, not core Work navigation |
 
 The Work module should prioritize attention and next actions, not six equal folders.

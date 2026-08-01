@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-01
 
-Last reconciled against `origin/main` at `6e5226e869e64bfed3102acfa09779b846cbbb88` (merged PR #357).
+Last reconciled against `origin/main` at `b8a483a6126ed1796f26c664fc0fc63bfdf07f9c` (merged PR #358).
 
 ## Purpose
 
@@ -18,7 +18,7 @@ ServSync remains in controlled private beta. The current beta loop is:
 
 Homeowner request -> contractor estimate -> homeowner approval -> job/report -> invoice -> Home History -> manual reminder.
 
-Current repository evidence through PR #357 shows these relevant states:
+Current repository evidence through PR #358 shows these relevant states:
 
 - Local-customer profile editing, property management, single-property claim invitations, guarded manual Copy Link / QR preparation, token-free ordinary claim-invite reads, and final Production token containment are complete from PR #346 and PR #347.
 - PR #348 merged the local-customer multi-property claim invitation source. The reviewed SQL was applied to Production with catalog/security validation, public Production smoke passed 7/7, and the full authenticated Tests A-H passed only in the dedicated Demo environment. FB-003A is archived; automated delivery remains excluded and request-free operational delivery remains FB-003B.
@@ -73,22 +73,22 @@ Important guardrails:
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Backlog | High | Entitlement readiness exists, but billing enforcement, checkout, paid subscription activation, plan limits, and packaging decisions remain future product and rollout work. |
 | FB-024 | Price Book / Reusable Estimate Content Maturity | Estimates, saved charges, trade libraries, Draft-first reusable work | Backlog | High | Estimate defaults/templates v1 is archived. Existing contractor-owned saved estimate templates now feed the standard Draft-first composer as reusable work content; Inspection Checklists remain separate. Remaining maturity includes reusable assemblies, default quantity/tax/category behavior, margin reminders, invoice quick-pick decisions, dedupe/overwrite policy, XLSX/PDF/import cleanup, and broader trade-library decisions. |
 | FB-026 | Review Moderation and Public Display | Reviews, referrals, Discover trust | Backlog | High | Contractor referral v1 is archived. Remaining work is approved-only public ServSync review/rating display, moderation policy, snippets/kudos visibility, external-review handoff, and no-fake-rating/no-paid-ranking boundaries. |
-| FB-029 | Recurring Service Automation | Service agreements, reminders, renewals, recurring billing | Later / Future | Medium | Service Agreements foundation v1 is archived. Retain recurring automation only as future selected visits, renewals, reminders, or recurring billing after explicit workflow/payment/notification approvals. |
+| FB-029 | Recurring Service Automation | Service Plans, reminders, renewals, recurring billing | Later / Future | Medium | Service Plans foundation v1 is archived. Retain recurring automation only as future selected visits, renewals, reminders, or recurring billing after explicit workflow/payment/notification approvals. |
 | FB-030 | Home Access Invite Email Enablement and Shared-Record Expansion | Shared homes, Home Access, permissions | Backlog | High | Shared Home/Home Access foundation v1 is archived. Remaining work is guarded invite-email enablement and one-surface-at-a-time expansion of shared records such as requests, estimates, invoices, jobs, documents, reminders, notifications, and storage. |
 | FB-033 | Project Collaboration Rollout | Projects, multi-contractor coordination | Gated Rollout | Later / Future | PR #273 merged the hidden Slice 1 foundation. Project Collaboration is not live: no ordinary-user UI, Project Board, assignments, invitations, project billing, production allowlist activation, or broad financial sharing is enabled. Next work requires rollout and surface-specific authorization. |
 | FB-034A | Demo Mode Extended Scenario Coverage | Demo data, marketing capture, QA support | Later / Future | Medium | The request-to-job capture milestone is archived. Future demo work may cover invoices, Home History, report finalization, reminders, media, role switching, or browser controls only in approved demo environments. |
-| FB-035 | Draft-First Work Rollout | Contractor Work, Drafts, estimates, jobs, invoices | Gated Rollout | High | Keep active. Source and SQL foundations exist in stages, but Production gates/cohorts and full rollout remain controlled. See the rollout matrix below. |
+| FB-035 | Draft-First Work Rollout | Contractor Work, Drafts, estimates, jobs, invoices | Gated Rollout | High | Keep active. Source and SQL foundations exist in stages, but Production gates/cohorts and full rollout remain controlled. This branch restores Service Plans discoverability from the Draft-first Work overview and Templates while keeping plans separate from one-time Draft outputs. See the rollout matrix below. |
 | FB-036 | Claim-Link Expected-Error Presentation Polish | Local-customer claim invitations, error UX | Backlog | Low | P3 polish only. Keep the clear handled unavailable-invite message, but suppress raw RPC/JSON detail from the user-facing page for expected stale, invalid, expired, or already-used claim links. Preserve useful internal/runtime diagnostics and do not change replay protection, lookup rejection, token containment, or acceptance behavior. |
 
 ## FB-035 Rollout Status Matrix
 
 | Dimension | Current status | Remaining blockers / next gate |
 | --- | --- | --- |
-| Source status | Multiple Draft-first Work foundations and follow-up fixes are merged through current `origin/main`; direct Draft-to-Invoice app wiring and entitlement-hardening source are included on main. This branch adds a private Preview/Sandbox all-contractor rollout-mode SQL source without changing app action authority. | Verify the currently deployed Production source and gate behavior before any Production expansion. |
+| Source status | Multiple Draft-first Work foundations, direct Draft-to-Invoice wiring, entitlement hardening, and the private Preview/Sandbox all-contractor rollout mode are merged through current `origin/main`. This branch restores the existing Service Plans management destination to the Draft-first Work overview and Templates without changing app action authority, SQL, or internal `service_agreement` contracts. | Validate the branch Preview, then verify the currently deployed Production source and gate behavior before any Production expansion. |
 | SQL application status | Durable Draft foundations and selected follow-up SQL have been reviewed/applied in prior controlled gates where noted in the changelog. The Preview/Sandbox rollout-mode SQL defaults to `cohort`; in approved Sandbox validation it was applied to `zpzdkoaubyjtsomccxya` and explicitly set to `all_contractors`. | Do not assume a source file is live SQL. Re-prove installed functions, grants, RLS, runtime setting, and hashes before any Production rollout. |
 | Gate state | Draft-first Work remains controlled by explicit global gates plus a server-side entitlement decision. Preview can expose all valid contractor contexts only when the private DB rollout mode is `all_contractors` and the three Vercel Preview gates are true. | No Production gate expansion without separate owner approval, deployment/source verification, and rollback plan. |
 | Cohort state | Internal/cohort-bound validation has occurred for selected paths; broad contractor Production beta is not enabled by this backlog entry. Preview/Sandbox all-contractor rendering was validated on PR #352 and PR #351 previews against Sandbox data after the private mode was set to `all_contractors`. | Owner must approve any Production cohort enablement or expansion. |
-| Validated outputs | Draft-to-Estimate, Draft-to-Job, inspection checklist, and Draft-to-Invoice paths have source/Sandbox/internal evidence recorded in the changelog. This branch validated read-only Preview rendering of Saved Drafts, Start New Draft, and shared Draft composer open/back-out behavior without saving or launching. | Runtime evidence remains bounded. Do not claim universal concurrency, saved-output validation, or real-user rollout completion. |
+| Validated outputs | Draft-to-Estimate, Draft-to-Job, inspection checklist, and Draft-to-Invoice paths have source/Sandbox/internal evidence recorded in the changelog. Prior Preview evidence covers Saved Drafts, Start New Draft, and shared Draft composer open/back-out behavior. Service Plans remain a separate template/offer workflow and are not a Draft outcome. | Validate Service Plans discoverability and responsive behavior in this branch Preview. Runtime evidence remains bounded; do not claim universal concurrency, saved-output validation, or real-user rollout completion. |
 | Remaining blockers | Production rollout planning, Production SQL/setting decision, Production gate decision, role-matrix follow-up with a non-cohort contractor fixture, telemetry, Production smoke, mobile review, and owner release decisions. | Complete controlled gates before describing Draft-first Work as live. |
 
 ## Consolidation And Retirement Crosswalk
@@ -128,7 +128,7 @@ Important guardrails:
 | FB-029 | Retained and narrowed. | FB-029 recurring service automation. |
 | FB-030 | Split. Shared Home/Home Access foundation v1 archived. | FB-030 invite-email enablement and shared-record expansion. |
 | FB-031 | Archived: Contractor Beta Billing/Entitlement Readiness v1. | FB-017 for pricing/packaging; implementation-specific entitlement follow-ups should be new scoped work. |
-| FB-032 | Archived: Service Agreements foundation v1. | FB-029 recurring service automation. |
+| FB-032 | Archived: Service Plans foundation v1 (internal `service_agreement` identifiers retained). | FB-029 recurring service automation. |
 | FB-033 | Retained. | FB-033 Project Collaboration rollout. |
 | FB-034 | Archived: Demo Mode request-to-job capture milestone. | FB-034A demo extended scenario coverage if later prioritized. |
 | FB-035 | Retained. | FB-035 Draft-first Work rollout. |

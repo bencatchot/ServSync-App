@@ -52,7 +52,7 @@ test.describe('homeowner read-only smoke', () => {
 
     await openSidebarTab(page, /Estimates \/ Invoices/i);
     await expectActiveTabHeading(page, /^Estimates \/ Invoices$/i);
-    await expect(main.getByText(/^Review estimates, invoices, and service agreement offers from connected contractors$/i)).toBeVisible();
+    await expect(main.getByText(/^Review estimates, invoices, and service plan offers from connected contractors$/i)).toBeVisible();
 
     await openSidebarTab(page, /Home History/i);
     await expectActiveTabHeading(page, /^Home History$/i);

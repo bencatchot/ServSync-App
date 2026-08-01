@@ -71,7 +71,7 @@ test.describe('mobile read-only smoke', () => {
     await expect(main.getByRole('heading', { level: 2, name: /^Start a new service request$/i })).toBeVisible();
 
     await openMobileTab(page, /Estimates \/ Invoices/i, 'Estimates / Invoices');
-    await expect(main.getByText(/^Review estimates, invoices, and service agreement offers from connected contractors$/i)).toBeVisible();
+    await expect(main.getByText(/^Review estimates, invoices, and service plan offers from connected contractors$/i)).toBeVisible();
 
     await openMobileTab(page, /Home History/i, 'Home History');
     await expect(main.getByRole('heading', { level: 2, name: /^Home History$/i })).toBeVisible();
