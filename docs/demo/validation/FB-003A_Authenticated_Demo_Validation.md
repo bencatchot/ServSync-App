@@ -2,7 +2,7 @@
 
 This is the canonical authenticated Demo browser procedure for FB-003A, Local-Customer Multi-Property Claim.
 
-The procedure is approved and durable, but it has not yet been executed. A later controlled Demo validation task must run it and record the result. Do not treat this document as evidence that FB-003A passed authenticated Demo validation.
+The procedure remains the reusable validation standard. Its 2026-08-01 authenticated Demo execution and combined evidence review passed; the recorded result appears in [Recorded Completion Result](#recorded-completion-result---2026-08-01). Do not treat the procedure steps alone as evidence of a future run.
 
 ## Purpose And Scope
 
@@ -497,7 +497,7 @@ After the tests:
 - Confirm no token-bearing evidence was captured.
 - Confirm no incomplete transaction or waiting lock remains.
 - Confirm disposable fixture cleanup or retention follows the Demo runbook.
-- Confirm FB-003A remains open until the run result and the minimum Production confirmation are reviewed.
+- Confirm the run result and the separately controlled minimum Production confirmation are reviewed before closing the applicable milestone.
 
 ## Stop Conditions
 
@@ -536,10 +536,44 @@ Any additional mutation must be explained, tied to a normal browser action, and 
 
 ## Completion Meaning
 
-This document makes Tests A-H canonical for later execution. It does not mark FB-003A complete and does not record authenticated validation success.
+This document keeps Tests A-H canonical for any future execution. A procedure by itself is not evidence of success; each run still requires target proof, sanitized evidence, mutation accounting, and a reviewed result.
 
-FB-003A remains pending until:
+The recorded 2026-08-01 execution satisfied the completion conditions below. Future runs must independently satisfy the same standard.
 
-1. A separately authorized Demo run executes this procedure successfully.
-2. The run report confirms no token exposure, provider delivery, tenant-isolation defect, or atomicity failure.
-3. The owner separately authorizes and reviews the minimum Production confirmation.
+## Recorded Completion Result - 2026-08-01
+
+**Final classification:** FB-003A AUTHENTICATED DEMO VALIDATION PASSED — READY FOR DOCUMENTATION CLOSEOUT
+
+Reviewed identity:
+
+- Repository/source SHA: `6e5226e869e64bfed3102acfa09779b846cbbb88`.
+- Preview host: `servsync-demo-5e7r1phvh-bencatchots-projects.vercel.app`.
+- Vercel deployment: `dpl_5ftAsDN7kV2qVAvGw67uzKWEBLAs`.
+- Dedicated Demo Supabase project: `bdytwgejqnlblhrnqxkp`.
+
+| Test | Reviewed disposition |
+| --- | --- |
+| A | Passed: one manual pending invitation represented exactly two contractor-selected properties and created exactly two membership rows without claim, connection, homeowner-home, or provider-delivery mutation. |
+| B | Passed: Homeowner A received a mobile-readable, token-free preview of only the intended customer and two properties; preview caused no mutation. |
+| C | Passed: one v2 acceptance atomically claimed the customer and both local properties, created two distinct homeowner properties, mapped both memberships, reused the valid Contractor A/Homeowner A connection, and recorded the expected profile/audit changes without duplicates or partial state. |
+| D | Passed through the supplemental packet: the same transient claim URL was replayed exactly once after successful acceptance; the expected lookup `400` produced a handled unavailable-invite state and protected database state was exactly equal before and after replay. |
+| E | Passed: a supported local-customer profile edit revoked only its fresh pending invitation, and stale preview was rejected without claim, property-link, connection, or partial mutation. |
+| F | Passed: the legacy-compatible single-property preview and create-new acceptance claimed exactly one intended property without duplicates. |
+| G | Passed: connected-homeowner detail remained readable and crash-free with no Copy Link, QR, prepare-token, or misleading claim controls. |
+| H | Passed before and after acceptance: Contractor B and the unrelated homeowner could not enumerate or manage Contractor A claim data; browser-role direct reads were denied and no cross-tenant mutation occurred. |
+
+The original run completed A, B, C, E, F, G, and H. Its first Test D replay runner timed out before capturing the handled UI, although no duplicate or regressive mutation occurred. A supplemental Test D run closed only that evidence gap by proving authenticated session continuity, scoped two-property preview, one atomic acceptance, one immediate replay, the handled unavailable state, and exact before/after equality for the contact, local homes, invite, memberships, homeowner homes, connection, permissions, audits, and aggregate counts. Safely stopped locator and execution-order attempts were validation-runner defects, not product failures.
+
+Evidence identity:
+
+- Original A-H packet `servsync-fb003a-demo-validation-20260731T225359`: 31 files, run ID `1785556691`, aggregate review fingerprint `94bd4acaff8b433009b5f89d9455d11d519eec90bbc76d82a88d12b569793f18`.
+- Supplemental Test D packet `servsync-fb003a-testd-existing-invite-final.XTdrA3`: 10 files, aggregate review fingerprint `38d769c800661e2f39c301e1bd5f39de751a84c3600d1910771fa514a5e2debe`.
+
+The packet names are runtime evidence identities, not durable repository links. Combined review found no credentials, JWTs, cookies, authorization headers, bypass values, raw claim tokens, token-bearing URLs, or QR payloads in retained evidence. Validation targeted Demo only; no Production or Sandbox validation access, SQL application, deployment/configuration change, external provider delivery, or unrelated data mutation occurred during the authenticated Demo run or combined read-only review.
+
+No FB-003A product defect remained. Two nonblocking observations are separate from milestone completion:
+
+- The handled replay page exposes raw RPC/JSON detail below its clear user-facing message. This is tracked as P3 polish under `FB-036` and does not weaken replay protection or acceptance behavior.
+- The original packet lacks a standalone manifest. Its exact report path, run ID, complete test set, and aggregate fingerprint identified it unambiguously; this remains a bounded evidence-packaging weakness rather than product work.
+
+No further authenticated FB-003A validation run is required.
