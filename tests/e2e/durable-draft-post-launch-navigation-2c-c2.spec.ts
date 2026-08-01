@@ -710,7 +710,7 @@ test.describe('Slice 2C-C2 rendered post-launch navigation', () => {
       await confirm(page, outputType);
       await consume(page, outputType);
       await waitForOutputLoad(page, outputType);
-      await page.getByRole('button', { name: 'Back to Work' }).click();
+      await page.getByRole('button', { name: 'Back to Jobs' }).click();
       await h(page, `h.completeOutput('${outputType}')`);
       expect((await h<{ adopted: string[]; focusCount: number }>(page, 'h.snapshot()')).adopted).toEqual([]);
       expect((await h<{ focusCount: number }>(page, 'h.snapshot()')).focusCount).toBe(0);
@@ -744,7 +744,7 @@ test.describe('Slice 2C-C2 rendered post-launch navigation', () => {
       await confirm(page, outputType);
       await consume(page, outputType);
       await waitForOutputLoad(page, outputType);
-      await page.getByRole('button', { name: 'Back to Work' }).click();
+      await page.getByRole('button', { name: 'Back to Jobs' }).click();
       await h(page, `h.failOutput('${outputType}')`);
       await expect(page.getByTestId('durable-draft-list')).toBeVisible();
       await expect(page.getByText(/could not be opened/)).toHaveCount(0);
@@ -876,7 +876,7 @@ test.describe('Slice 2C-C2 rendered post-launch navigation', () => {
       await confirm(page, 'estimate');
       await consume(page, 'estimate');
       await waitForOutputLoad(page, 'estimate');
-      await page.getByRole('button', { name: 'Back to Work' }).click();
+      await page.getByRole('button', { name: 'Back to Jobs' }).click();
       await h(page, `h.showTarget('${IDS.draft}')`);
       await expect.poll(() => h<number>(page, `h.count('rpc', 'servsync_get_work_draft')`)).toBeGreaterThan(2);
       await h(page, `h.completeRpc('servsync_get_work_draft', h.envelope('consumed', 'estimate', true))`);

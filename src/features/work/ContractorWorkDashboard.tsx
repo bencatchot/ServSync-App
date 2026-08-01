@@ -1,357 +1,345 @@
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
-  Calendar,
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
   FileText,
-  FolderOpen,
+  Layers3,
   Plus,
   Receipt,
+  Settings2,
+  Sparkles,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Estimate, Inspection, Invoice } from '../../types';
-import { inspectionIsClosedJob } from '../jobs/status';
-import { contractorWorkDashboardIsEmpty } from './contractorWorkSelectors';
+import type { DurableDraftSummaryState } from '../drafts/useDurableDraftSummary';
+import { contractorJobsNeedsAttentionCount } from './contractorWorkSelectors';
 
-type DashboardRecord = Inspection | Estimate | Invoice;
+type TileState = {
+  status: 'loading' | 'ready' | 'error';
+  count: number;
+};
+
+type SummaryTileProps = {
+  testId: string;
+  label: string;
+  helper: string;
+  emptyHelper: string;
+  state: TileState;
+  icon: ReactNode;
+  onClick: () => void;
+  prominent?: boolean;
+};
+
+function SummaryTile({
+  testId,
+  label,
+  helper,
+  emptyHelper,
+  state,
+  icon,
+  onClick,
+  prominent = false,
+}: SummaryTileProps) {
+  const value = state.status === 'loading' ? '...' : state.status === 'error' ? '—' : String(state.count);
+  const statusHelper = state.status === 'loading'
+    ? 'Loading current records'
+    : state.status === 'error'
+      ? 'Count unavailable'
+      : state.count === 0
+        ? emptyHelper
+        : helper;
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      aria-label={`${label}: ${state.status === 'ready' ? `${state.count}. ${statusHelper}` : statusHelper}`}
+      className={`${prominent ? 'col-span-2 border-amber-200 bg-amber-50 md:col-span-1' : 'border-slate-200 bg-white'} min-h-[7.25rem] min-w-0 rounded-lg border p-3 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2`}
+    >
+      <span className="flex items-start justify-between gap-3">
+        <span className={`${prominent ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'} rounded-lg p-2`}>{icon}</span>
+        <span className="min-w-[2ch] text-right text-xl font-bold text-slate-950" aria-hidden="true">{value}</span>
+      </span>
+      <span className="mt-2 block text-sm font-bold text-slate-950">{label}</span>
+      <span className="mt-1 block text-xs leading-4 text-slate-600">{statusHelper}</span>
+    </button>
+  );
+}
+
+function ToolAction({
+  testId,
+  label,
+  helper,
+  icon,
+  onClick,
+}: {
+  testId: string;
+  label: string;
+  helper: string;
+  icon: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      className="flex min-h-[5.5rem] min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+    >
+      <span className="shrink-0 rounded-lg bg-slate-100 p-2 text-slate-700">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-slate-950">{label}</span>
+        <span className="mt-1 block text-xs leading-4 text-slate-600">{helper}</span>
+      </span>
+      <ArrowRight size={16} className="shrink-0 text-slate-400" />
+    </button>
+  );
+}
 
 export type ContractorWorkDashboardProps = {
   loading: boolean;
   loadError?: string;
+  draftSummary: DurableDraftSummaryState;
+  canReadDrafts: boolean;
   canStartDraft: boolean;
-  draftsToContinue: Inspection[];
-  activeJobs: Inspection[];
-  workReadyToStart: Estimate[];
-  readyToInvoiceJobs: Inspection[];
-  invoicesNeedingAttention: Invoice[];
-  upcomingWorkCount: number;
-  onStartNewDraft: () => void;
+  canUseTemplates: boolean;
+  canUseServicePlans: boolean;
+  canUseCustomPricing: boolean;
+  estimateCount: number;
+  activeJobCount: number;
+  invoiceCount: number;
+  needsAttentionCount: number;
+  onViewNeedsAttention: () => void;
   onViewDrafts: () => void;
-  onContinueDraft: (draft: Inspection) => void;
-  onViewOpenJobs: () => void;
-  onOpenJob: (job: Inspection) => void;
-  onReviewAcceptedEstimates: () => void;
-  onReviewBilling: () => void;
-  onViewUpcomingWork: () => void;
-  onViewJobHistory: () => void;
+  onViewEstimates: () => void;
+  onViewActiveJobs: () => void;
+  onViewInvoices: () => void;
+  onStartNewDraft: () => void;
+  onOpenTemplates: () => void;
   onOpenServicePlans: () => void;
+  onOpenCustomPricing: () => void;
 };
-
-function formatWorkDashboardDate(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
-}
-
-function recordTitle(record: DashboardRecord) {
-  if ('invoice_number' in record) return record.title || `Invoice ${record.invoice_number}`;
-  if ('name' in record) return record.name || 'Untitled work';
-  return record.title || 'Untitled estimate';
-}
-
-function recordMeta(record: DashboardRecord) {
-  if ('invoice_number' in record) return `Invoice ${record.invoice_number}`;
-  if ('status' in record && 'total_cents' in record) return `Estimate status: ${record.status}`;
-  if ('job_status' in record) return inspectionIsClosedJob(record) ? 'Job history' : 'Operational job';
-  return '';
-}
-
-function PreviewList<T extends DashboardRecord>({
-  items,
-  onOpen,
-}: {
-  items: T[];
-  onOpen?: (item: T) => void;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <div className="mt-3 space-y-2">
-      {items.slice(0, 3).map(item => {
-        const updatedLabel = formatWorkDashboardDate(item.updated_at || item.created_at);
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onOpen?.(item)}
-            className="flex min-h-[3.25rem] w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
-          >
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-950">{recordTitle(item)}</span>
-              <span className="mt-0.5 block truncate text-xs text-slate-500">{[recordMeta(item), updatedLabel].filter(Boolean).join(' · ')}</span>
-            </span>
-            <ArrowRight size={15} className="shrink-0 text-slate-400" />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function AttentionSection({
-  testId,
-  icon,
-  title,
-  count,
-  helper,
-  actionLabel,
-  onAction,
-  children,
-}: {
-  testId: string;
-  icon: ReactNode;
-  title: string;
-  count: number | string;
-  helper: string;
-  actionLabel: string;
-  onAction: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <section data-testid={testId} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="rounded-lg bg-blue-50 p-1.5 text-blue-700">{icon}</span>
-            <h3 className="min-w-0 break-words text-sm font-bold text-slate-950">{title}</h3>
-          </div>
-          <p className="mt-2 break-words text-sm leading-5 text-slate-500">{helper}</p>
-        </div>
-        <span className="w-fit max-w-full shrink-0 break-words rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">{count}</span>
-      </div>
-      {children}
-      <button
-        type="button"
-        onClick={onAction}
-        className="mt-3 inline-flex min-h-[2.5rem] max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
-      >
-        <span className="min-w-0 break-words">{actionLabel}</span>
-        <ArrowRight size={15} className="shrink-0" />
-      </button>
-    </section>
-  );
-}
 
 export function ContractorWorkDashboard({
   loading,
   loadError,
+  draftSummary,
+  canReadDrafts,
   canStartDraft,
-  draftsToContinue,
-  activeJobs,
-  workReadyToStart,
-  readyToInvoiceJobs,
-  invoicesNeedingAttention,
-  upcomingWorkCount,
-  onStartNewDraft,
+  canUseTemplates,
+  canUseServicePlans,
+  canUseCustomPricing,
+  estimateCount,
+  activeJobCount,
+  invoiceCount,
+  needsAttentionCount,
+  onViewNeedsAttention,
   onViewDrafts,
-  onContinueDraft,
-  onViewOpenJobs,
-  onOpenJob,
-  onReviewAcceptedEstimates,
-  onReviewBilling,
-  onViewUpcomingWork,
-  onViewJobHistory,
+  onViewEstimates,
+  onViewActiveJobs,
+  onViewInvoices,
+  onStartNewDraft,
+  onOpenTemplates,
   onOpenServicePlans,
+  onOpenCustomPricing,
 }: ContractorWorkDashboardProps) {
-  const empty = contractorWorkDashboardIsEmpty({
-    draftsToContinueCount: draftsToContinue.length,
-    activeJobsCount: activeJobs.length,
-    workReadyToStartCount: workReadyToStart.length,
-    readyToInvoiceJobCount: readyToInvoiceJobs.length,
-    invoiceAttentionCount: invoicesNeedingAttention.length,
-    upcomingWorkCount,
+  const loadedState = (count: number): TileState => ({
+    status: loading ? 'loading' : loadError ? 'error' : 'ready',
+    count,
   });
-
-  if (loading) {
-    return (
-      <section data-testid="contractor-work-dashboard-loading" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-sm font-semibold text-slate-950">Loading Work dashboard...</p>
-        <p className="mt-1 text-sm text-slate-500">Checking existing work, Drafts, billing items, and upcoming schedule items.</p>
-      </section>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <section data-testid="contractor-work-dashboard-error" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" />
-          <div>
-            <h2 className="text-base font-bold text-amber-950">Work dashboard could not load</h2>
-            <p className="mt-1 text-sm leading-5 text-amber-900">{loadError}</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  const actionsAvailable = canStartDraft || canUseTemplates || canUseServicePlans || canUseCustomPricing;
 
   return (
-    <section data-testid="contractor-work-dashboard" className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Jobs workspace preview</p>
-            <h2 className="mt-1 text-2xl font-bold text-slate-950">Work</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-              What existing work needs my attention, and what should happen next?
-            </p>
-          </div>
-          {canStartDraft && !empty && (
-            <button
-              type="button"
-              data-testid="contractor-work-start-draft-header"
-              onClick={onStartNewDraft}
-              className="inline-flex min-h-[2.75rem] max-w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50"
-            >
-              <Plus size={16} />
-              Start New Draft
-            </button>
-          )}
+    <section data-testid="contractor-work-dashboard" className="space-y-5">
+      {loadError ? (
+        <div data-testid="contractor-work-dashboard-error" role="alert" className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <span>Some Jobs information is unavailable. Counts stay hidden until access is restored.</span>
         </div>
-      </div>
+      ) : null}
 
-      {empty ? (
-        <section data-testid="contractor-work-dashboard-empty" className="min-w-0 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-            <ClipboardCheck size={20} />
-          </div>
-          <h3 className="mt-3 text-lg font-bold text-slate-950">Nothing needs your attention yet</h3>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
-            Existing work, Drafts, approvals, and billing items will appear here as they move through the workflow.
-          </p>
-          {canStartDraft && (
-            <button
-              type="button"
-              data-testid="contractor-work-start-draft-empty"
-              onClick={onStartNewDraft}
-              className="mt-4 inline-flex min-h-[2.75rem] max-w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-            >
-              <Plus size={16} />
-              Start New Draft
-            </button>
-          )}
-        </section>
-      ) : (
-        <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-          {draftsToContinue.length > 0 && (
-            <AttentionSection
-              testId="contractor-work-drafts-section"
-              icon={<FileText size={16} />}
-              title="Drafts to Continue"
-              count={draftsToContinue.length}
-              helper="Contractor-only Drafts that can be continued without entering operational Job lists."
-              actionLabel="View all Drafts"
-              onAction={onViewDrafts}
-            >
-              <PreviewList items={draftsToContinue} onOpen={onContinueDraft} />
-            </AttentionSection>
-          )}
-
-          {activeJobs.length > 0 && (
-            <AttentionSection
-              testId="contractor-work-active-jobs-section"
-              icon={<ClipboardCheck size={16} />}
-              title="Active Jobs"
-              count={activeJobs.length}
-              helper="Open operational Jobs only. Composer Drafts are excluded before this section is derived."
-              actionLabel="View open Jobs"
-              onAction={onViewOpenJobs}
-            >
-              <PreviewList items={activeJobs} onOpen={onOpenJob} />
-            </AttentionSection>
-          )}
-
-          {workReadyToStart.length > 0 && (
-            <AttentionSection
-              testId="contractor-work-ready-to-start-section"
-              icon={<CheckCircle2 size={16} />}
-              title="Work Ready to Start"
-              count={workReadyToStart.length}
-              helper="Accepted estimates that do not already have an associated operational Job."
-              actionLabel="Review accepted estimates"
-              onAction={onReviewAcceptedEstimates}
-            >
-              <PreviewList items={workReadyToStart} onOpen={() => onReviewAcceptedEstimates()} />
-            </AttentionSection>
-          )}
-
-          {(readyToInvoiceJobs.length > 0 || invoicesNeedingAttention.length > 0) && (
-            <AttentionSection
-              testId="contractor-work-billing-attention-section"
-              icon={<Receipt size={16} />}
-              title="Billing Attention"
-              count={`${readyToInvoiceJobs.length} jobs / ${invoicesNeedingAttention.length} invoices`}
-              helper={`${readyToInvoiceJobs.length} completed job${readyToInvoiceJobs.length === 1 ? '' : 's'} ready to invoice; ${invoicesNeedingAttention.length} invoice${invoicesNeedingAttention.length === 1 ? '' : 's'} need review.`}
-              actionLabel="Review billing"
-              onAction={onReviewBilling}
-            />
-          )}
-
-          {upcomingWorkCount > 0 && (
-            <AttentionSection
-              testId="contractor-work-upcoming-section"
-              icon={<Calendar size={16} />}
-              title="Upcoming Work"
-              count={upcomingWorkCount}
-              helper="Upcoming scheduled visits, appointment requests, and contractor calendar items from the current schedule snapshot."
-              actionLabel="View Calendar"
-              onAction={onViewUpcomingWork}
-            />
-          )}
-
-          <section data-testid="contractor-work-job-history-link" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="rounded-lg bg-white p-1.5 text-slate-600">
-                    <FolderOpen size={16} />
-                  </span>
-                  <h3 className="min-w-0 break-words text-sm font-bold text-slate-950">Job History</h3>
-                </div>
-                <p className="mt-2 break-words text-sm leading-5 text-slate-500">Review completed and closed Jobs without treating history as attention work.</p>
-              </div>
-              <button
-                type="button"
-                onClick={onViewJobHistory}
-                className="inline-flex min-h-[2.5rem] max-w-full shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
-              >
-                <span className="min-w-0 break-words">View Job History</span>
-                <ArrowRight size={15} className="shrink-0" />
-              </button>
-            </div>
-          </section>
+      <section aria-labelledby="jobs-at-a-glance-heading">
+        <div className="mb-3">
+          <h2 id="jobs-at-a-glance-heading" className="text-lg font-bold text-slate-950">At a Glance</h2>
+          <p className="mt-1 text-sm text-slate-600">Open an existing workflow or review the items that need a next step.</p>
         </div>
-      )}
-
-      <section
-        data-testid="contractor-work-service-plans-entry"
-        className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4"
-      >
-        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="rounded-lg bg-white p-1.5 text-slate-600">
-                <ClipboardList size={16} />
-              </span>
-              <h3 className="min-w-0 break-words text-sm font-bold text-slate-950">Service Plans</h3>
-            </div>
-            <p className="mt-2 break-words text-sm leading-5 text-slate-500">
-              Create maintenance plan templates and homeowner offers.
-            </p>
-          </div>
-          <button
-            type="button"
-            data-testid="contractor-work-open-service-plans"
-            onClick={onOpenServicePlans}
-            className="inline-flex min-h-[2.5rem] max-w-full shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900"
-          >
-            <span className="min-w-0 break-words">Open Service Plans</span>
-            <ArrowRight size={15} className="shrink-0" />
-          </button>
+        <div data-testid="contractor-jobs-at-a-glance" className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-5 md:gap-3">
+          <SummaryTile
+            testId="contractor-jobs-summary-needs-attention"
+            label="Needs Attention"
+            helper="Records ready for a contractor next step"
+            emptyHelper="Nothing needs attention"
+            state={loadedState(needsAttentionCount)}
+            icon={<AlertTriangle size={18} />}
+            onClick={onViewNeedsAttention}
+            prominent
+          />
+          {canReadDrafts ? (
+            <SummaryTile
+              testId="contractor-jobs-summary-drafts"
+              label="Drafts"
+              helper="Planning to continue"
+              emptyHelper="No saved Drafts"
+              state={draftSummary}
+              icon={<FileText size={18} />}
+              onClick={onViewDrafts}
+            />
+          ) : null}
+          <SummaryTile
+            testId="contractor-jobs-summary-estimates"
+            label="Estimates"
+            helper="Open estimate records"
+            emptyHelper="No open estimates"
+            state={loadedState(estimateCount)}
+            icon={<ClipboardList size={18} />}
+            onClick={onViewEstimates}
+          />
+          <SummaryTile
+            testId="contractor-jobs-summary-active-jobs"
+            label="Active Jobs"
+            helper="Scheduled and active work"
+            emptyHelper="No active Jobs"
+            state={loadedState(activeJobCount)}
+            icon={<ClipboardCheck size={18} />}
+            onClick={onViewActiveJobs}
+          />
+          <SummaryTile
+            testId="contractor-jobs-summary-invoices"
+            label="Invoices"
+            helper="Open invoice records"
+            emptyHelper="No open invoices"
+            state={loadedState(invoiceCount)}
+            icon={<Receipt size={18} />}
+            onClick={onViewInvoices}
+          />
         </div>
       </section>
+
+      {actionsAvailable ? (
+        <section aria-labelledby="jobs-actions-heading">
+          <div className="mb-3">
+            <h2 id="jobs-actions-heading" className="text-lg font-bold text-slate-950">Actions &amp; Tools</h2>
+            <p className="mt-1 text-sm text-slate-600">Start planning or open the reusable tools your role can manage.</p>
+          </div>
+          <div data-testid="contractor-jobs-actions-tools" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {canStartDraft ? (
+              <ToolAction testId="contractor-work-start-draft" label="Start New Draft" helper="Plan customer work before choosing an output" icon={<Plus size={18} />} onClick={onStartNewDraft} />
+            ) : null}
+            {canUseTemplates ? (
+              <ToolAction testId="contractor-work-open-templates" label="Templates" helper="Saved Work Templates and Inspection Checklists" icon={<Sparkles size={18} />} onClick={onOpenTemplates} />
+            ) : null}
+            {canUseServicePlans ? (
+              <ToolAction testId="contractor-work-open-service-plans" label="Service Plans" helper="Plan templates and homeowner offers" icon={<Layers3 size={18} />} onClick={onOpenServicePlans} />
+            ) : null}
+            {canUseCustomPricing ? (
+              <ToolAction testId="contractor-work-open-custom-pricing" label="Custom Pricing" helper="Manage the private pricing library" icon={<Settings2 size={18} />} onClick={onOpenCustomPricing} />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
+type AttentionRecordProps = {
+  title: string;
+  reason: string;
+  meta: string;
+  onOpen: () => void;
+};
+
+function AttentionRecord({ title, reason, meta, onOpen }: AttentionRecordProps) {
+  return (
+    <button type="button" onClick={onOpen} className="flex min-h-[4.5rem] w-full min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-slate-950">{title}</span>
+        <span className="mt-1 block text-xs font-semibold text-amber-800">{reason}</span>
+        <span className="mt-1 block truncate text-xs text-slate-500">{meta}</span>
+      </span>
+      <ArrowRight size={16} className="shrink-0 text-slate-400" />
+    </button>
+  );
+}
+
+function formatRecordDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+}
+
+export function ContractorNeedsAttention({
+  estimates,
+  jobs,
+  invoices,
+  onBack,
+  onOpenEstimate,
+  onOpenJob,
+  onOpenInvoice,
+}: {
+  estimates: Estimate[];
+  jobs: Inspection[];
+  invoices: Invoice[];
+  onBack: () => void;
+  onOpenEstimate: (estimate: Estimate) => void;
+  onOpenJob: (job: Inspection) => void;
+  onOpenInvoice: (invoice: Invoice) => void;
+}) {
+  const total = contractorJobsNeedsAttentionCount({
+    acceptedEstimateCount: estimates.length,
+    readyToInvoiceJobCount: jobs.length,
+    invoiceAttentionCount: invoices.length,
+  });
+  return (
+    <section data-testid="contractor-needs-attention" className="space-y-5">
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-950">Needs Attention</h2>
+          <p className="mt-1 text-sm text-slate-600">Only records with a clear contractor next step appear here.</p>
+        </div>
+        <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50">
+          <ArrowLeft size={16} /> Jobs overview
+        </button>
+      </div>
+
+      {total === 0 ? (
+        <div data-testid="contractor-needs-attention-empty" className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+          <CheckCircle2 size={22} className="mx-auto text-emerald-700" />
+          <h3 className="mt-3 text-base font-bold text-slate-950">Nothing needs attention</h3>
+          <p className="mt-1 text-sm text-slate-600">Accepted estimates, completed invoiceable Jobs, and invoices requiring action will appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {estimates.length > 0 ? (
+            <section aria-labelledby="attention-estimates-heading">
+              <h3 id="attention-estimates-heading" className="text-sm font-bold text-slate-950">Accepted Estimates <span className="ml-1 text-slate-500">{estimates.length}</span></h3>
+              <p className="mt-1 text-xs text-slate-600">Accepted pricing ready to become a Job.</p>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {estimates.map(estimate => <AttentionRecord key={estimate.id} title={estimate.title || 'Untitled estimate'} reason="Ready to create Job" meta={`Updated ${formatRecordDate(estimate.updated_at)}`} onOpen={() => onOpenEstimate(estimate)} />)}
+              </div>
+            </section>
+          ) : null}
+          {jobs.length > 0 ? (
+            <section aria-labelledby="attention-jobs-heading">
+              <h3 id="attention-jobs-heading" className="text-sm font-bold text-slate-950">Completed Jobs <span className="ml-1 text-slate-500">{jobs.length}</span></h3>
+              <p className="mt-1 text-xs text-slate-600">Completed work with no current Invoice.</p>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {jobs.map(job => <AttentionRecord key={job.id} title={job.name || 'Untitled Job'} reason="Ready to invoice" meta={`Updated ${formatRecordDate(job.updated_at)}`} onOpen={() => onOpenJob(job)} />)}
+              </div>
+            </section>
+          ) : null}
+          {invoices.length > 0 ? (
+            <section aria-labelledby="attention-invoices-heading">
+              <h3 id="attention-invoices-heading" className="text-sm font-bold text-slate-950">Invoices <span className="ml-1 text-slate-500">{invoices.length}</span></h3>
+              <p className="mt-1 text-xs text-slate-600">Draft, overdue, or partially paid invoices requiring review.</p>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {invoices.map(invoice => <AttentionRecord key={invoice.id} title={invoice.title || `Invoice ${invoice.invoice_number}`} reason={invoice.status === 'partially_paid' ? 'Partially paid' : invoice.status === 'overdue' ? 'Overdue' : 'Draft requires review'} meta={`Invoice ${invoice.invoice_number} · Updated ${formatRecordDate(invoice.updated_at)}`} onOpen={() => onOpenInvoice(invoice)} />)}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }

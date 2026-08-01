@@ -6,6 +6,47 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-01
 
+- Branch: `codex/jobs-overview-redesign-v1`
+- Starting main SHA: `c1f06fdf971b4b0218c81b823408473b932b1fa4`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/work/ContractorWorkDashboard.tsx`
+  - `src/features/work/contractorWorkSelectors.ts`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/drafts/DurableDraftWorkspace.tsx`
+  - `src/features/drafts/durableDraftListSelectors.ts`
+  - `src/features/drafts/useDurableDraftSummary.ts`
+  - focused Jobs overview, durable Draft, navigation, templates, and Service Plans tests under `tests/e2e/`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements the first gated contractor Jobs landing redesign. The visible page identity is Jobs, one At a Glance tile system routes to exact live-count destinations, Needs Attention is bounded to approved next-step records, Drafts owns the existing full durable list, and Actions & Tools reuses existing Start New Draft, Templates, Service Plans, and Custom Pricing paths. The existing Draft-first gate, capabilities, role checks, record workflows, and legacy fallback remain unchanged.
+- Reason for change: The prior enabled overview mixed a visible Work umbrella, several tile/list systems, and complete record previews. Contractors need a compact mobile-first starting point that answers what needs attention and routes each workflow into a focused destination without inventing new authority or lifecycle behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - focused Jobs overview, mobile navigation, template taxonomy, and contractor Service Plans guardrails
+  - focused durable Draft list, composer, cohort, launch-navigation, estimate/job/invoice, PDF, and homeowner Service Plans regression coverage
+  - responsive rendered review at mobile and desktop widths
+  - `git diff --check`
+  - changed-file secret/credential/token scan
+  - focused skipped-test scan
+  - Markdown link and planning-language checks
+  - `npm run lint` attempted; inherited ESLint startup status recorded in the PR evidence
+- Known risks or follow-ups:
+  - The redesign remains behind the existing Draft-first/contractor Work gates and does not enable any Production cohort or configuration.
+  - Needs Attention deliberately excludes broader future categories until they have separately approved definitions and lifecycle semantics.
+  - Counts use existing frontend-loaded, tenant-scoped datasets; no new server aggregate or authorization surface is introduced.
+  - Draft PR Preview and owner review remain required before merge or any separately authorized rollout gate.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records this first Jobs landing implementation slice and its remaining Preview, merge, and controlled-rollout gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The plan and Work-module specification now distinguish the internal Work architecture from the visible Jobs identity and define the bounded first overview destinations.
+
 - Branch: `codex/fb035-service-plans-draft-first-restoration-v1`
 - Starting main SHA: `b8a483a6126ed1796f26c664fc0fc63bfdf07f9c`
 - Files changed:

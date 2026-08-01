@@ -27,25 +27,14 @@ export function contractorWorkInvoicesNeedingAttentionFrom(invoices: Invoice[]) 
   return invoices.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));
 }
 
-export function contractorWorkDashboardIsEmpty({
-  draftsToContinueCount,
-  activeJobsCount,
-  workReadyToStartCount,
+export function contractorJobsNeedsAttentionCount({
+  acceptedEstimateCount,
   readyToInvoiceJobCount,
   invoiceAttentionCount,
-  upcomingWorkCount,
 }: {
-  draftsToContinueCount: number;
-  activeJobsCount: number;
-  workReadyToStartCount: number;
+  acceptedEstimateCount: number;
   readyToInvoiceJobCount: number;
   invoiceAttentionCount: number;
-  upcomingWorkCount: number;
 }) {
-  return draftsToContinueCount === 0
-    && activeJobsCount === 0
-    && workReadyToStartCount === 0
-    && readyToInvoiceJobCount === 0
-    && invoiceAttentionCount === 0
-    && upcomingWorkCount === 0;
+  return acceptedEstimateCount + readyToInvoiceJobCount + invoiceAttentionCount;
 }
