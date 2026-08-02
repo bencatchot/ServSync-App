@@ -6,6 +6,40 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-01
 
+- Branch: `agent/fb024-draft-first-price-book-picker-v1`
+- Starting main SHA: `e67ef9ceaa0f3bd948bdb0de33bbde6f11d8dd38`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/drafts/DurableDraftWorkspace.tsx`
+  - `src/features/price-book/DraftPriceBookPicker.tsx`
+  - `src/features/price-book/priceBookEstimateLineSnapshot.ts`
+  - `src/features/price-book/ContractorPriceBookWorkspace.tsx`
+  - `src/features/price-book/priceBookView.ts`
+  - focused FB-024 mapping, rendered UI, mobile, state, authorization, duplicate-action, persistence, launch-snapshot, and legacy regression coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements FB-024 Draft-first Price Book Picker v1 without reusing the older “FB-024 Slice 1” label. Standard Estimate-intent Drafts now show a compact collapsed picker for authorized Price Book viewers. Contractors can search and filter active/non-archived items and append one item at a time as a fresh editable Draft line. The legacy estimate picker and Draft-first picker now share one safe snapshot mapper, preserving blank Price Required versus explicit zero while copying only title, customer-safe description, line type, unit, optional unit price, and optional labor hours with quantity `1`.
+- Reason for change: The gated Draft-first Estimate workflow already persists the supported line fields and already loads contractor-scoped Price Book data, but it lacked the legacy estimate editor's safe reusable-item insertion. Sharing the mapper closes that parity gap without new backend authority, live linkage, or competing snapshot semantics.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - focused FB-024, Price Book management, saved-template, shared-composer, and durable Draft regression coverage: 59 passed
+  - focused interactive browser coverage is present for collapsed/mobile UI, search/filter, idle/loading/error/empty/no-results, authorization, duplicate action, save/reopen, and no-autosave/no-launch behavior; local execution awaits an available Chromium binary
+  - `npm run lint` attempted; the inherited ESLint / `@typescript-eslint/no-unused-expressions` startup incompatibility still blocks lint before changed source is evaluated
+- Known risks or follow-ups:
+  - Interactive local browser execution is environment-blocked until Chromium is available; exact Preview verification remains required after the draft PR is opened.
+  - Price Book filtering remains client-side over the existing loaded query. Backend pagination/query-cap design remains separate.
+  - Multi-select, quantity staging, assemblies, default quantity/tax/category propagation, management changes, Saved Charges, templates, Inspection Checklists, Job/Invoice selection, and invoice quick-pick remain excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records the Draft-first picker as the active implementation while remaining open for later reusable-content maturity work; stale PR #360/#361 reconciliation wording is corrected.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The execution summary now records the Draft-first Price Book snapshot boundary and its separation from other reusable-work sources and output types.
+
 - Branch: `codex/fb024-price-book-management-v1`
 - Starting main SHA: `b08073214ffeebb01d55ba22af3e290b954423e1`
 - Files changed:

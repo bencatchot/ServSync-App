@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
-import type { Estimate, EstimateTemplate, Inspection, Invoice } from '../../types';
+import type { ContractorPriceBookItem, Estimate, EstimateTemplate, Inspection, Invoice } from '../../types';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
 import { draftJobOptionsWithSavedSelection } from '../jobs/draftJobMappings';
 import { isComposerDraftJob } from '../jobs/jobRecordSelectors';
@@ -74,6 +74,7 @@ import {
 } from './durableDraftPostLaunchNavigation';
 import { validateDurableDraftLoadedOutput } from './durableDraftOutputValidation';
 import type { DraftChecklistSourceOption } from './checklistDraftScope';
+import type { PriceBookLoadState } from '../price-book/priceBookView';
 
 type DurableDraftWorkspaceProps = {
   client: DurableDraftSupabaseClient;
@@ -87,6 +88,10 @@ type DurableDraftWorkspaceProps = {
   localOptions: DraftJobCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
   savedWorkTemplates?: EstimateTemplate[];
+  priceBookItems?: ContractorPriceBookItem[];
+  priceBookLoadState?: PriceBookLoadState;
+  priceBookLoadError?: string;
+  canViewPriceBook?: boolean;
   customerLabel: (draft: Inspection) => string;
   propertyLabel: (draft: Inspection) => string;
   onStartNew: () => void;
@@ -269,6 +274,10 @@ export function DurableDraftWorkspace({
   localOptions,
   checklistOptions = [],
   savedWorkTemplates = [],
+  priceBookItems = [],
+  priceBookLoadState = 'idle',
+  priceBookLoadError = '',
+  canViewPriceBook = false,
   customerLabel,
   propertyLabel,
   onStartNew,
@@ -1697,6 +1706,10 @@ export function DurableDraftWorkspace({
         localOptions={localOptionsWithSavedSelection}
         checklistOptions={checklistOptions}
         savedWorkTemplates={savedWorkTemplates}
+        priceBookItems={priceBookItems}
+        priceBookLoadState={priceBookLoadState}
+        priceBookLoadError={priceBookLoadError}
+        canViewPriceBook={canViewPriceBook}
         currentDraftId={canonical?.draft.draftId ?? null}
         canSave={capabilities.canPersistDraft && saveState !== 'saving'}
         saving={saveState === 'saving'}

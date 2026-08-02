@@ -227,6 +227,7 @@ import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/wo
 import { contractorJobsNeedsAttentionCount } from './features/work/contractorWorkSelectors';
 import { ContractorPriceBookWorkspace, type PriceBookLoadState } from './features/price-book/ContractorPriceBookWorkspace';
 import { contractorPriceBookAccess } from './features/price-book/priceBookAccess';
+import { priceBookItemToEstimateLineDraft } from './features/price-book/priceBookEstimateLineSnapshot';
 import {
   applyDraftJobScopeResult,
   createBlankDraftJobComposerDraft,
@@ -2087,24 +2088,6 @@ function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge)
     unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each'),
     unit_price: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
     editor_source_note: savedEstimateChargeEditorNote(charge),
-  });
-}
-
-function estimateLineDraftFromPriceBookItem(item: ContractorPriceBookItem): EstimateLineDraft {
-  return createEstimateLineDraft({
-    line_type: normalizeEstimateLineType(item.line_type),
-    description: item.title,
-    line_title: item.title,
-    customer_description: item.customer_description || '',
-    quantity: '1',
-    unit: item.unit || 'each',
-    unit_price: item.default_unit_price_cents === null || item.default_unit_price_cents === undefined
-      ? ''
-      : item.default_unit_price_cents === 0
-        ? '0.00'
-        : centsToDollars(item.default_unit_price_cents),
-    labor_hours: item.labor_hours === null || item.labor_hours === undefined ? '' : String(Number(item.labor_hours)),
-    editor_source_note: `Added from Price Book: ${item.title}. Review quantity, price, and scope before sending.`,
   });
 }
 
@@ -26123,7 +26106,7 @@ function ContractorDashboard({
   };
 
   const addPriceBookItemToEstimateDraft = (item: ContractorPriceBookItem) => {
-    const nextLine = estimateLineDraftFromPriceBookItem(item);
+    const nextLine = priceBookItemToEstimateLineDraft(item);
     expandEstimateLineGroup(estimateLineVisualGroup(nextLine));
     setEstimateDraft(draft => {
       const usableLines = draft.line_items.filter(draftLineHasContent);
@@ -38210,6 +38193,10 @@ function ContractorDashboard({
                     localOptions={draftJobLocalOptionsForComposer}
                     checklistOptions={draftChecklistSourceOptions}
                     savedWorkTemplates={estimateTemplates}
+                    priceBookItems={contractorPriceBookItems}
+                    priceBookLoadState={contractorPriceBookLoadState}
+                    priceBookLoadError={contractorPriceBookLoadError}
+                    canViewPriceBook={priceBookAccess.canView}
                     customerLabel={fieldWorkSubjectLabel}
                     propertyLabel={fieldWorkSubjectAddress}
                     onStartNew={startCleanDraftJobComposer}
@@ -41404,6 +41391,10 @@ function ContractorDashboard({
                   localOptions={draftJobLocalOptionsForComposer}
                   checklistOptions={draftChecklistSourceOptions}
                   savedWorkTemplates={estimateTemplates}
+                  priceBookItems={contractorPriceBookItems}
+                  priceBookLoadState={contractorPriceBookLoadState}
+                  priceBookLoadError={contractorPriceBookLoadError}
+                  canViewPriceBook={priceBookAccess.canView}
                   customerLabel={fieldWorkSubjectLabel}
                   propertyLabel={fieldWorkSubjectAddress}
                   onStartNew={startCleanDraftJobComposer}

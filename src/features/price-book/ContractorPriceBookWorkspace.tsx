@@ -8,6 +8,7 @@ import {
   priceBookFilterOptions,
   priceBookItemIsArchived,
   priceBookPage,
+  type PriceBookLoadState,
   type PriceBookStatusView,
   type PriceBookTypeFilter,
 } from './priceBookView';
@@ -27,7 +28,7 @@ export type ContractorPriceBookItemDraft = {
   active: boolean;
 };
 
-export type PriceBookLoadState = 'idle' | 'loading' | 'ready' | 'error';
+export type { PriceBookLoadState } from './priceBookView';
 
 const TYPE_FILTERS: Array<{ value: PriceBookTypeFilter; label: string }> = [
   { value: 'all', label: 'All' },

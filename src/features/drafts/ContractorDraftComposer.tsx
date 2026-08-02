@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
+import { DraftPriceBookPicker } from '../price-book/DraftPriceBookPicker';
+import type { PriceBookLoadState } from '../price-book/priceBookView';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
 import { WorkComposerTotalsPanel } from '../work-composer/WorkComposerTotals';
 import type { WorkComposerLineDraft } from '../work-composer/types';
@@ -18,7 +20,7 @@ import {
   draftHasMeaningfulSavedWorkTemplateContent,
   type SavedWorkTemplateApplyMode,
 } from './savedWorkTemplateDraftIntegration';
-import type { EstimateLaborMode, EstimateTemplate } from '../../types';
+import type { ContractorPriceBookItem, EstimateLaborMode, EstimateTemplate } from '../../types';
 
 type ContractorDraftComposerProps = {
   draft: SharedDraftComposerDraft;
@@ -26,6 +28,10 @@ type ContractorDraftComposerProps = {
   localOptions: DraftJobCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
   savedWorkTemplates?: EstimateTemplate[];
+  priceBookItems?: ContractorPriceBookItem[];
+  priceBookLoadState?: PriceBookLoadState;
+  priceBookLoadError?: string;
+  canViewPriceBook?: boolean;
   currentDraftId?: string | null;
   canSave: boolean;
   saving: boolean;
@@ -69,6 +75,10 @@ export function ContractorDraftComposer({
   localOptions,
   checklistOptions = [],
   savedWorkTemplates = [],
+  priceBookItems = [],
+  priceBookLoadState = 'idle',
+  priceBookLoadError = '',
+  canViewPriceBook = false,
   currentDraftId,
   canSave,
   saving,
@@ -170,6 +180,13 @@ export function ContractorDraftComposer({
     onChange({
       ...draft,
       line_items: [...draft.line_items, createWorkComposerLineDraft()],
+    });
+  };
+
+  const addPriceBookLine = (line: WorkComposerLineDraft) => {
+    onChange({
+      ...draft,
+      line_items: [...draft.line_items, line],
     });
   };
 
@@ -583,6 +600,16 @@ export function ContractorDraftComposer({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {!isChecklistDraft && isEstimateIntent && canViewPriceBook ? (
+        <DraftPriceBookPicker
+          items={priceBookItems}
+          loadState={priceBookLoadState}
+          loadError={priceBookLoadError}
+          disabled={interactionDisabled || !canSave}
+          onAddLine={addPriceBookLine}
+        />
       ) : null}
 
       {isChecklistDraft ? (
