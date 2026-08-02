@@ -854,6 +854,7 @@ order by e.table_name;
       'line_type',
       'sku',
       'source',
+      'subcategory',
       'taxable',
       'title',
       'trade',
