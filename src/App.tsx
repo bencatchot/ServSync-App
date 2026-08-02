@@ -232,6 +232,16 @@ import {
 } from './features/price-book/ContractorPriceBookWorkspace';
 import { contractorPriceBookAccess } from './features/price-book/priceBookAccess';
 import { priceBookItemToEstimateLineDraft } from './features/price-book/priceBookEstimateLineSnapshot';
+import { PriceBookCsvReconciliationPanel } from './features/price-book/PriceBookCsvReconciliationPanel';
+import type {
+  PriceBookImportBatchResult,
+  PriceBookImportBatchSummary,
+  PriceBookImportPreview,
+  PriceBookImportRequestRow,
+  PriceBookImportSource,
+  PriceBookCsvMapping,
+  PriceBookImportAction,
+} from './features/price-book/priceBookCsvReconciliation';
 import {
   applyDraftJobScopeResult,
   createBlankDraftJobComposerDraft,
@@ -960,48 +970,6 @@ type ManualJobWorkItemDraft = {
   labor_hours: string;
   billable: boolean;
   completion_status: 'open' | 'completed' | 'removed';
-};
-type ContractorPriceBookCsvField =
-  | 'title'
-  | 'customer_description'
-  | 'internal_notes'
-  | 'trade'
-  | 'category'
-  | 'subcategory'
-  | 'line_type'
-  | 'unit'
-  | 'default_unit_price'
-  | 'default_unit_price_cents'
-  | 'taxable'
-  | 'labor_hours'
-  | 'sku'
-  | 'active';
-type ContractorPriceBookCsvMapping = Partial<Record<ContractorPriceBookCsvField, string>>;
-type ContractorPriceBookCsvRow = {
-  rowNumber: number;
-  values: Record<string, string>;
-};
-type ContractorPriceBookCsvPreviewRow = {
-  rowNumber: number;
-  payload: {
-    title: string;
-    customer_description: string;
-    internal_notes: string;
-    trade: string;
-    category: string;
-    subcategory: string | null;
-    line_type: EstimateLineType;
-    unit: string | null;
-    default_unit_price_cents: number | null;
-    taxable: boolean;
-    labor_hours: number | null;
-    sku: string | null;
-    source: string;
-    active: boolean;
-    archived_at: string | null;
-  };
-  errors: string[];
-  warnings: string[];
 };
 type EstimateDraft = {
   title: string;
@@ -1834,141 +1802,15 @@ function contractorPriceBookPriceLabel(item: Pick<ContractorPriceBookItem, 'defa
   return formatMoney(item.default_unit_price_cents);
 }
 
-const CONTRACTOR_PRICE_BOOK_CSV_MAX_BYTES = 1024 * 1024;
-const CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS = 500;
-const CONTRACTOR_PRICE_BOOK_CSV_SOURCE = 'csv_import';
-
-const CONTRACTOR_PRICE_BOOK_CSV_FIELDS: Array<{ key: ContractorPriceBookCsvField; label: string; required?: boolean; helper: string }> = [
-  { key: 'title', label: 'Title', required: true, helper: 'Item name or service title.' },
-  { key: 'customer_description', label: 'Customer description', helper: 'Customer-safe description.' },
-  { key: 'internal_notes', label: 'Internal notes', helper: 'Private contractor notes.' },
-  { key: 'trade', label: 'Trade', helper: 'HVAC, plumbing, electrical, etc.' },
-  { key: 'category', label: 'Category', helper: 'Service, repair, material, or your own grouping.' },
-  { key: 'subcategory', label: 'Subcategory', helper: 'Optional grouping beneath category.' },
-  { key: 'line_type', label: 'Line type', helper: 'labor, material, fee, or other.' },
-  { key: 'unit', label: 'Unit', helper: 'Each, hour, job, lot, etc.' },
-  { key: 'default_unit_price', label: 'Default price', helper: 'Dollar price such as $95.00. Blank means Price Required.' },
-  { key: 'default_unit_price_cents', label: 'Default price cents', helper: 'Integer cents if your export uses cents.' },
-  { key: 'taxable', label: 'Taxable', helper: 'true/false, yes/no, y/n, or 1/0.' },
-  { key: 'labor_hours', label: 'Labor hours', helper: 'Optional non-negative number.' },
-  { key: 'sku', label: 'SKU / code', helper: 'Optional item code.' },
-  { key: 'active', label: 'Active', helper: 'Optional true/false. Defaults active.' },
-];
-
-const CONTRACTOR_PRICE_BOOK_CSV_FIELD_ALIASES: Record<ContractorPriceBookCsvField, string[]> = {
-  title: ['title', 'item', 'itemname', 'item_name', 'name', 'service', 'servicename', 'service_name'],
-  customer_description: ['customerdescription', 'customer_description', 'description', 'desc', 'customerdesc', 'customer_desc'],
-  internal_notes: ['internalnotes', 'internal_notes', 'notes', 'note', 'private_notes', 'privatenotes', 'internalnote'],
-  trade: ['trade', 'trade_type', 'tradetype', 'discipline'],
-  category: ['category', 'group', 'section', 'work_category', 'workcategory'],
-  subcategory: ['subcategory', 'sub_category', 'subgroup', 'sub_group', 'subsection', 'sub_section', 'work_subcategory', 'worksubcategory'],
-  line_type: ['line_type', 'linetype', 'type', 'item_type', 'itemtype'],
-  unit: ['unit', 'uom', 'measure', 'unit_of_measure', 'unitofmeasure'],
-  default_unit_price: ['price', 'rate', 'amount', 'default_price', 'defaultprice', 'default_unit_price', 'defaultunitprice', 'unit_price', 'unitprice'],
-  default_unit_price_cents: ['default_unit_price_cents', 'defaultunitpricecents', 'price_cents', 'pricecents', 'amount_cents', 'amountcents'],
-  taxable: ['taxable', 'tax', 'is_taxable', 'istaxable'],
-  labor_hours: ['labor_hours', 'laborhours', 'hours', 'hrs', 'estimated_hours', 'estimatedhours'],
-  sku: ['sku', 'code', 'item_code', 'itemcode', 'part_number', 'partnumber'],
-  active: ['active', 'enabled', 'status'],
-};
-
-function normalizeCsvHeader(value: string) {
-  return value.toLowerCase().replace(/^\uFEFF/, '').replace(/[^a-z0-9]+/g, '');
-}
-
-function autoMapContractorPriceBookCsvHeaders(headers: string[]): ContractorPriceBookCsvMapping {
-  const normalizedHeaders = headers.map(header => ({ header, normalized: normalizeCsvHeader(header) }));
-  return CONTRACTOR_PRICE_BOOK_CSV_FIELDS.reduce<ContractorPriceBookCsvMapping>((mapping, field) => {
-    const aliases = CONTRACTOR_PRICE_BOOK_CSV_FIELD_ALIASES[field.key];
-    const matched = normalizedHeaders.find(candidate => aliases.includes(candidate.normalized));
-    if (matched) mapping[field.key] = matched.header;
-    return mapping;
-  }, {});
-}
-
-function parseContractorPriceBookCsv(text: string) {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = '';
-  let inQuotes = false;
-  const normalizedText = text.replace(/^\uFEFF/, '');
-
-  for (let index = 0; index < normalizedText.length; index += 1) {
-    const char = normalizedText[index];
-    const next = normalizedText[index + 1];
-    if (inQuotes) {
-      if (char === '"' && next === '"') {
-        cell += '"';
-        index += 1;
-      } else if (char === '"') {
-        inQuotes = false;
-      } else {
-        cell += char;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inQuotes = true;
-    } else if (char === ',') {
-      row.push(cell);
-      cell = '';
-    } else if (char === '\n') {
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = '';
-    } else if (char !== '\r') {
-      cell += char;
-    }
-  }
-  if (inQuotes) throw new Error('CSV has an unterminated quoted value.');
-  row.push(cell);
-  rows.push(row);
-  return rows;
-}
-
-function contractorPriceBookCsvValue(row: ContractorPriceBookCsvRow, mapping: ContractorPriceBookCsvMapping, field: ContractorPriceBookCsvField) {
-  const header = mapping[field];
-  if (!header) return '';
-  return row.values[header]?.trim() || '';
-}
-
-function parseContractorPriceBookDollarPrice(value: string) {
+function parseManualJobWorkItemDollarPrice(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return { cents: null as number | null };
   const cleaned = trimmed.replace(/\$/g, '').replace(/,/g, '').trim();
-  if (!/^-?\d+(\.\d{1,2})?$/.test(cleaned)) return { cents: null, error: 'Default price must be blank, 0, or a positive dollar amount.' };
+  if (!/^-?\d+(\.\d{1,2})?$/.test(cleaned)) return { cents: null, error: 'Unit price must be blank, 0, or a positive dollar amount.' };
   const amount = Number(cleaned);
-  if (!Number.isFinite(amount)) return { cents: null, error: 'Default price is not a valid number.' };
-  if (amount < 0) return { cents: null, error: 'Default price cannot be negative.' };
+  if (!Number.isFinite(amount)) return { cents: null, error: 'Unit price is not a valid number.' };
+  if (amount < 0) return { cents: null, error: 'Unit price cannot be negative.' };
   return { cents: Math.round(amount * 100) };
-}
-
-function parseContractorPriceBookCents(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return { cents: null as number | null };
-  const cleaned = trimmed.replace(/,/g, '');
-  if (!/^-?\d+$/.test(cleaned)) return { cents: null, error: 'Default price cents must be a whole number.' };
-  const cents = Number(cleaned);
-  if (!Number.isSafeInteger(cents)) return { cents: null, error: 'Default price cents is too large.' };
-  if (cents < 0) return { cents: null, error: 'Default price cannot be negative.' };
-  return { cents };
-}
-
-function parseContractorPriceBookOptionalNumber(value: string, label: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return { value: null as number | null };
-  const cleaned = trimmed.replace(/,/g, '');
-  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { value: null, error: `${label} must be blank, 0, or a positive number.` };
-  const parsed = Number(cleaned);
-  if (!Number.isFinite(parsed)) return { value: null, error: `${label} is not a valid number.` };
-  if (parsed < 0) return { value: null, error: `${label} cannot be negative.` };
-  return { value: Number(parsed.toFixed(2)) };
-}
-
-function parseManualJobWorkItemDollarPrice(value: string) {
-  const parsed = parseContractorPriceBookDollarPrice(value);
-  return parsed.error ? { ...parsed, error: parsed.error.replace('Default price', 'Unit price') } : parsed;
 }
 
 function parseManualJobWorkItemNumber(value: string, label: string, options: { required?: boolean } = {}) {
@@ -1985,98 +1827,6 @@ function parseManualJobWorkItemNumber(value: string, label: string, options: { r
   if (parsed < 0) return { value: null, error: `${label} cannot be negative.` };
   return { value: Number(parsed.toFixed(2)) };
 }
-
-function parseContractorPriceBookBoolean(value: string, fallback: boolean, label: string) {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return { value: fallback };
-  if (['true', 'yes', 'y', '1'].includes(normalized)) return { value: true };
-  if (['false', 'no', 'n', '0'].includes(normalized)) return { value: false };
-  if (label === 'Active' && ['active', 'enabled'].includes(normalized)) return { value: true };
-  if (label === 'Active' && ['inactive', 'disabled', 'archived'].includes(normalized)) return { value: false };
-  return { value: fallback, error: `${label} must be true/false, yes/no, y/n, or 1/0.` };
-}
-
-function parseContractorPriceBookLineType(value: string) {
-  const trimmed = value.trim();
-  const normalized = trimmed.toLowerCase();
-  if (!normalized) return { lineType: 'other' as EstimateLineType, warning: 'Line type was missing and will import as Other.' };
-  if (normalized === 'labor' || normalized === 'material' || normalized === 'fee' || normalized === 'other') {
-    return { lineType: normalized as EstimateLineType };
-  }
-  return {
-    lineType: 'other' as EstimateLineType,
-    warning: `Line type "${trimmed}" was not recognized and will import as Other.`,
-  };
-}
-
-function buildContractorPriceBookCsvPreviewRows(
-  rows: ContractorPriceBookCsvRow[],
-  mapping: ContractorPriceBookCsvMapping,
-  existingItems: ContractorPriceBookItem[],
-) {
-  const existingKeys = new Set(existingItems.map(item => normalizeText(`${item.title} ${item.sku || ''}`)));
-  const seenImportKeys = new Set<string>();
-  return rows.map<ContractorPriceBookCsvPreviewRow>(row => {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const title = contractorPriceBookCsvValue(row, mapping, 'title');
-    if (!title.trim()) errors.push('Title is required.');
-
-    const lineTypeParsed = parseContractorPriceBookLineType(contractorPriceBookCsvValue(row, mapping, 'line_type'));
-    if (lineTypeParsed.warning) warnings.push(lineTypeParsed.warning);
-
-    const priceCentsValue = contractorPriceBookCsvValue(row, mapping, 'default_unit_price_cents');
-    const priceValue = contractorPriceBookCsvValue(row, mapping, 'default_unit_price');
-    const parsedPrice = priceCentsValue
-      ? parseContractorPriceBookCents(priceCentsValue)
-      : parseContractorPriceBookDollarPrice(priceValue);
-    if (parsedPrice.error) errors.push(parsedPrice.error);
-
-    const laborHours = parseContractorPriceBookOptionalNumber(contractorPriceBookCsvValue(row, mapping, 'labor_hours'), 'Labor hours');
-    if (laborHours.error) errors.push(laborHours.error);
-
-    const taxable = parseContractorPriceBookBoolean(contractorPriceBookCsvValue(row, mapping, 'taxable'), true, 'Taxable');
-    if (taxable.error) errors.push(taxable.error);
-    const active = parseContractorPriceBookBoolean(contractorPriceBookCsvValue(row, mapping, 'active'), true, 'Active');
-    if (active.error) errors.push(active.error);
-
-    const sku = contractorPriceBookCsvValue(row, mapping, 'sku');
-    const duplicateKey = normalizeText(`${title} ${sku}`);
-    if (duplicateKey && existingKeys.has(duplicateKey)) warnings.push('Possible duplicate of an existing Price Book item.');
-    if (duplicateKey && seenImportKeys.has(duplicateKey)) warnings.push('Possible duplicate within this CSV import.');
-    if (duplicateKey) seenImportKeys.add(duplicateKey);
-
-    return {
-      rowNumber: row.rowNumber,
-      errors,
-      warnings,
-      payload: {
-        title: title.trim(),
-        customer_description: contractorPriceBookCsvValue(row, mapping, 'customer_description'),
-        internal_notes: contractorPriceBookCsvValue(row, mapping, 'internal_notes'),
-        trade: contractorPriceBookCsvValue(row, mapping, 'trade'),
-        category: contractorPriceBookCsvValue(row, mapping, 'category'),
-        subcategory: contractorPriceBookCsvValue(row, mapping, 'subcategory') || null,
-        line_type: lineTypeParsed.lineType,
-        unit: contractorPriceBookCsvValue(row, mapping, 'unit') || null,
-        default_unit_price_cents: parsedPrice.cents,
-        taxable: taxable.value,
-        labor_hours: laborHours.value,
-        sku: sku || null,
-        source: CONTRACTOR_PRICE_BOOK_CSV_SOURCE,
-        active: active.value,
-        archived_at: active.value ? null : new Date().toISOString(),
-      },
-    };
-  });
-}
-
-const CONTRACTOR_PRICE_BOOK_SAMPLE_CSV = [
-  'title,description,notes,trade,category,subcategory,line_type,unit,price,taxable,labor_hours,sku,active',
-  '"Standard service call","Initial visit and basic diagnostic review","Confirm scope before use",HVAC,Service,Diagnostics,fee,visit,$95.00,yes,,SVC-001,true',
-  '"Hourly labor","Labor billed by hour","Adjust hours before use",General,Labor,,labor,hour,85,true,1,LAB-001,true',
-  '"Permit coordination","Permit or inspection coordination when needed","Confirm local requirements",General,Fees,Permits,fee,each,,no,,PERMIT,true',
-].join('\n');
 
 function savedEstimateChargeLineDescription(charge: ContractorSavedEstimateCharge) {
   return charge.name;
@@ -21801,12 +21551,6 @@ function ContractorDashboard({
   const [contractorPriceBookFormOpen, setContractorPriceBookFormOpen] = useState(false);
   const [contractorPriceBookLoadState, setContractorPriceBookLoadState] = useState<PriceBookLoadState>('idle');
   const [contractorPriceBookLoadError, setContractorPriceBookLoadError] = useState('');
-  const [contractorPriceBookCsvFileName, setContractorPriceBookCsvFileName] = useState('');
-  const [contractorPriceBookCsvHeaders, setContractorPriceBookCsvHeaders] = useState<string[]>([]);
-  const [contractorPriceBookCsvRows, setContractorPriceBookCsvRows] = useState<ContractorPriceBookCsvRow[]>([]);
-  const [contractorPriceBookCsvMapping, setContractorPriceBookCsvMapping] = useState<ContractorPriceBookCsvMapping>({});
-  const [contractorPriceBookCsvError, setContractorPriceBookCsvError] = useState('');
-  const [importingContractorPriceBookCsv, setImportingContractorPriceBookCsv] = useState(false);
   const [serviceAgreementTemplateDraft, setServiceAgreementTemplateDraft] = useState<ServiceAgreementTemplateDraft>(() => createBlankServiceAgreementTemplateDraft());
   const [editingServiceAgreementTemplateId, setEditingServiceAgreementTemplateId] = useState<string | null>(null);
   const [savingServiceAgreementTemplate, setSavingServiceAgreementTemplate] = useState(false);
@@ -25991,117 +25735,70 @@ function ContractorDashboard({
     }
   };
 
-  const resetContractorPriceBookCsvImport = () => {
-    setContractorPriceBookCsvFileName('');
-    setContractorPriceBookCsvHeaders([]);
-    setContractorPriceBookCsvRows([]);
-    setContractorPriceBookCsvMapping({});
-    setContractorPriceBookCsvError('');
-  };
-
-  const contractorPriceBookCsvPreviewRows = buildContractorPriceBookCsvPreviewRows(
-    contractorPriceBookCsvRows,
-    contractorPriceBookCsvMapping,
-    contractorPriceBookItems,
-  );
-  const validContractorPriceBookCsvRows = contractorPriceBookCsvPreviewRows.filter(row => row.errors.length === 0);
-  const warningContractorPriceBookCsvRows = contractorPriceBookCsvPreviewRows.filter(row => row.errors.length === 0 && row.warnings.length > 0);
-  const blockedContractorPriceBookCsvRows = contractorPriceBookCsvPreviewRows.filter(row => row.errors.length > 0);
-
-  const loadContractorPriceBookCsvFile = async (file: File | null) => {
-    resetContractorPriceBookCsvImport();
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setContractorPriceBookCsvError('Upload a .csv file. Excel support is planned later; export Excel as CSV for now.');
-      return;
-    }
-    if (file.size > CONTRACTOR_PRICE_BOOK_CSV_MAX_BYTES) {
-      setContractorPriceBookCsvError('CSV files can be up to 1 MB for this beta import tool.');
-      return;
-    }
-    try {
-      const text = await file.text();
-      const parsedRows = parseContractorPriceBookCsv(text);
-      const firstNonBlankRowIndex = parsedRows.findIndex(row => row.some(cell => cell.trim()));
-      if (firstNonBlankRowIndex < 0) {
-        setContractorPriceBookCsvError('This CSV appears to be empty.');
-        return;
-      }
-      const headers = parsedRows[firstNonBlankRowIndex].map((header, index) => header.trim() || `Column ${index + 1}`);
-      const dataRows = parsedRows.slice(firstNonBlankRowIndex + 1)
-        .map((row, index) => ({ row, rowNumber: firstNonBlankRowIndex + index + 2 }))
-        .filter(({ row }) => row.some(cell => cell.trim()));
-      if (dataRows.length === 0) {
-        setContractorPriceBookCsvError('This CSV has headers but no item rows.');
-        return;
-      }
-      if (dataRows.length > CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS) {
-        setContractorPriceBookCsvError(`CSV imports are limited to ${CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS} item rows in this beta tool.`);
-        return;
-      }
-      const rows = dataRows.map<ContractorPriceBookCsvRow>(({ row, rowNumber }) => {
-        const values = headers.reduce<Record<string, string>>((nextValues, header, index) => {
-          nextValues[header] = row[index]?.trim() || '';
-          return nextValues;
-        }, {});
-        return { rowNumber, values };
-      });
-      setContractorPriceBookCsvFileName(file.name);
-      setContractorPriceBookCsvHeaders(headers);
-      setContractorPriceBookCsvRows(rows);
-      setContractorPriceBookCsvMapping(autoMapContractorPriceBookCsvHeaders(headers));
-      setContractorPriceBookCsvError('');
-    } catch (err) {
-      setContractorPriceBookCsvError(readableError(err, 'Unable to parse this CSV file.'));
+  const requirePriceBookImportAccess = () => {
+    if (!supabase || !contractor?.id || !canManageEstimateSettings || contractorPriceBookLoadState !== 'ready') {
+      throw new Error('Price Book import management is unavailable for this account.');
     }
   };
 
-  const updateContractorPriceBookCsvMapping = (field: ContractorPriceBookCsvField, header: string) => {
-    setContractorPriceBookCsvMapping(current => {
-      const next = { ...current };
-      if (header) next[field] = header;
-      else delete next[field];
-      return next;
+  const listPriceBookImportSources = async () => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_list_price_book_import_sources');
+    if (rpcError) throw rpcError;
+    return (data || []) as unknown as PriceBookImportSource[];
+  };
+
+  const createPriceBookImportSource = async (displayName: string) => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_create_price_book_import_source', {
+      p_display_name: displayName,
     });
+    if (rpcError) throw rpcError;
+    return data as unknown as PriceBookImportSource;
   };
 
-  const downloadContractorPriceBookSampleCsv = () => {
-    const blob = new Blob([CONTRACTOR_PRICE_BOOK_SAMPLE_CSV], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'servsync-price-book-sample.csv';
-    link.click();
-    URL.revokeObjectURL(url);
+  const previewPriceBookImport = async (sourceId: string, rows: PriceBookImportRequestRow[]) => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_preview_price_book_import', {
+      p_import_source_id: sourceId,
+      p_rows: rows,
+    });
+    if (rpcError) throw rpcError;
+    return data as unknown as PriceBookImportPreview;
   };
 
-  const importContractorPriceBookCsvRows = async () => {
-    if (!supabase || !contractor?.id || !canManageEstimateSettings || contractorPriceBookLoadState !== 'ready') return;
-    if (validContractorPriceBookCsvRows.length === 0) {
-      setContractorPriceBookCsvError('There are no valid rows to import.');
-      return;
-    }
-    const confirmed = window.confirm(`Import ${validContractorPriceBookCsvRows.length} valid Price Book item${validContractorPriceBookCsvRows.length === 1 ? '' : 's'}? Invalid rows will be skipped.`);
-    if (!confirmed) return;
-    setNotice('');
-    setError('');
-    setContractorPriceBookCsvError('');
-    setImportingContractorPriceBookCsv(true);
-    try {
-      const payloads = validContractorPriceBookCsvRows.map(row => ({
-        ...row.payload,
-        contractor_id: contractor.id,
-      }));
-      const { error: insertError } = await supabase.from('contractor_price_book_items').insert(payloads);
-      if (insertError) throw insertError;
-      setNotice(`Imported ${payloads.length} Price Book item${payloads.length === 1 ? '' : 's'} from CSV.`);
-      resetContractorPriceBookCsvImport();
-      await loadContractor();
-    } catch (err) {
-      setContractorPriceBookCsvError(readableError(err, 'Unable to import these Price Book rows.'));
-    } finally {
-      setImportingContractorPriceBookCsv(false);
-    }
+  const executePriceBookImport = async (input: {
+    sourceId: string;
+    rows: PriceBookImportRequestRow[];
+    actions: Record<string, PriceBookImportAction>;
+    idempotencyKey: string;
+    filename: string;
+    fileSha256: string;
+    fileSizeBytes: number;
+    mapping: PriceBookCsvMapping;
+  }) => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_execute_price_book_import', {
+      p_import_source_id: input.sourceId,
+      p_rows: input.rows,
+      p_actions: input.actions,
+      p_idempotency_key: input.idempotencyKey,
+      p_original_filename: input.filename,
+      p_file_sha256: input.fileSha256,
+      p_file_size_bytes: input.fileSizeBytes,
+      p_mapping_snapshot: input.mapping,
+    });
+    if (rpcError) throw rpcError;
+    return data as unknown as PriceBookImportBatchResult;
+  };
+
+  const listPriceBookImportBatches = async () => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_list_price_book_import_batches', {
+      p_limit: 20,
+    });
+    if (rpcError) throw rpcError;
+    return (data || []) as unknown as PriceBookImportBatchSummary[];
   };
 
   const expandEstimateLineGroup = (groupKey: EstimateLineGroupKey) => {
@@ -40293,134 +39990,19 @@ function ContractorDashboard({
                     onToggleActive={item => void toggleContractorPriceBookItemActive(item)}
                     onBulkUpdate={bulkUpdateContractorPriceBookItems}
                     csvTools={(
-                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div>
-                            <p className="text-sm font-bold text-slate-950">Upload CSV</p>
-                            <p className="mt-1 max-w-3xl text-xs leading-5 text-emerald-900">
-                              Upload a CSV price list to add multiple Price Book items at once. You will review everything before it is saved. Duplicate matches are warning-only; import adds valid rows and does not overwrite existing pricing. Blank price means Price Required; $0 means intentional no-charge.
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={downloadContractorPriceBookSampleCsv} className={buttonClass('secondary')}>
-                              <Download size={16} />
-                              Sample CSV
-                            </button>
-                            <label className={`${buttonClass('primary')} cursor-pointer`}>
-                              <Upload size={16} />
-                              Choose CSV
-                              <input
-                                type="file"
-                                accept=".csv,text/csv"
-                                className="sr-only"
-                                onChange={event => void loadContractorPriceBookCsvFile(event.target.files?.[0] || null)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        {contractorPriceBookCsvError && <div className="mt-3"><Notice tone="error" text={contractorPriceBookCsvError} /></div>}
-
-                        {contractorPriceBookCsvRows.length > 0 && (
-                          <div className="mt-4 space-y-4">
-                            <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-white p-3 text-xs leading-5 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <p className="font-bold text-slate-950">{contractorPriceBookCsvFileName}</p>
-                                <p>
-                                  Parsed {contractorPriceBookCsvRows.length} rows: {validContractorPriceBookCsvRows.length} valid, {warningContractorPriceBookCsvRows.length} with warnings, {blockedContractorPriceBookCsvRows.length} blocked.
-                                </p>
-                              </div>
-                              <button type="button" onClick={resetContractorPriceBookCsvImport} className={buttonClass('secondary')}>
-                                Clear CSV
-                              </button>
-                            </div>
-
-                            <div className="rounded-xl border border-emerald-200 bg-white p-3">
-                              <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Review column mapping</p>
-                              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {CONTRACTOR_PRICE_BOOK_CSV_FIELDS.map(field => (
-                                  <Field key={field.key} label={`${field.label}${field.required ? ' *' : ''}`}>
-                                    <select
-                                      className={inputClass()}
-                                      value={contractorPriceBookCsvMapping[field.key] || ''}
-                                      onChange={event => updateContractorPriceBookCsvMapping(field.key, event.target.value)}
-                                    >
-                                      <option value="">Do not import</option>
-                                      {contractorPriceBookCsvHeaders.map(header => (
-                                        <option key={`${field.key}-${header}`} value={header}>{header}</option>
-                                      ))}
-                                    </select>
-                                    <p className="mt-1 text-xs leading-5 text-slate-500">{field.helper}</p>
-                                  </Field>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className="rounded-xl border border-emerald-200 bg-white p-3">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Preview before import</p>
-                                  <p className="mt-1 text-xs leading-5 text-slate-500">Only valid rows will be imported. Invalid rows stay out of your Price Book. Review warnings before importing.</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={importingContractorPriceBookCsv || validContractorPriceBookCsvRows.length === 0}
-                                  onClick={() => void importContractorPriceBookCsvRows()}
-                                  className={buttonClass('primary')}
-                                >
-                                  <Upload size={16} />
-                                  {importingContractorPriceBookCsv ? 'Importing...' : 'Import ' + validContractorPriceBookCsvRows.length + ' valid'}
-                                </button>
-                              </div>
-                              <div className="mt-3 overflow-x-auto">
-                                <table className="min-w-[720px] text-left text-xs">
-                                  <thead className="text-slate-500">
-                                    <tr>
-                                      <th className="border-b border-slate-200 py-2 pr-3">Row</th>
-                                      <th className="border-b border-slate-200 py-2 pr-3">Title</th>
-                                      <th className="border-b border-slate-200 py-2 pr-3">Organization</th>
-                                      <th className="border-b border-slate-200 py-2 pr-3">Type</th>
-                                      <th className="border-b border-slate-200 py-2 pr-3">Price</th>
-                                      <th className="border-b border-slate-200 py-2 pr-3">Status</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {contractorPriceBookCsvPreviewRows.slice(0, 20).map(row => (
-                                      <tr key={row.rowNumber} className="align-top">
-                                        <td className="border-b border-slate-100 py-2 pr-3 font-semibold text-slate-500">{row.rowNumber}</td>
-                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-950">{row.payload.title || 'Missing title'}</td>
-                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">
-                                          {[row.payload.trade, row.payload.category, row.payload.subcategory].filter(Boolean).join(' · ') || 'Uncategorized'}
-                                        </td>
-                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{estimateLineTypeLabel(row.payload.line_type)}</td>
-                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{contractorPriceBookPriceLabel(row.payload)}</td>
-                                        <td className="border-b border-slate-100 py-2 pr-3">
-                                          {row.errors.length > 0 ? (
-                                            <div className="space-y-1 text-red-700">
-                                              <p className="font-bold">Blocked</p>
-                                              {row.errors.map(error => <p key={error}>{error}</p>)}
-                                            </div>
-                                          ) : row.warnings.length > 0 ? (
-                                            <div className="space-y-1 text-amber-700">
-                                              <p className="font-bold">Valid with warning</p>
-                                              {row.warnings.map(warning => <p key={warning}>{warning}</p>)}
-                                            </div>
-                                          ) : (
-                                            <span className="font-semibold text-emerald-700">Valid</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                              {contractorPriceBookCsvPreviewRows.length > 20 && (
-                                <p className="mt-2 text-xs text-slate-500">Showing the first 20 parsed rows for preview.</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <PriceBookCsvReconciliationPanel
+                        api={{
+                          listSources: listPriceBookImportSources,
+                          createSource: createPriceBookImportSource,
+                          preview: previewPriceBookImport,
+                          execute: executePriceBookImport,
+                          listBatches: listPriceBookImportBatches,
+                        }}
+                        onCompleted={async result => {
+                          setNotice(`Price Book import complete: ${result.add_count} added, ${result.update_count} updated, ${result.skip_count} skipped.`);
+                          await loadContractor();
+                        }}
+                      />
                     )}
                 />
               )}

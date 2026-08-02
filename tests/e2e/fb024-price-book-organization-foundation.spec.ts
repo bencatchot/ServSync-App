@@ -156,20 +156,19 @@ test.describe('FB-024 Price Book Organization Foundation v1', () => {
     expect(handler).not.toContain('.delete(');
   });
 
-  test('adds generic CSV subcategory mapping without changing add-only import boundaries', () => {
+  test('keeps generic CSV subcategory mapping inside the provider-neutral reconciliation contract', () => {
     const app = sourceFile('src/App.tsx');
-    const csvStart = app.indexOf('const CONTRACTOR_PRICE_BOOK_CSV_FIELDS');
-    const csvEnd = app.indexOf('function savedEstimateChargeLineDescription');
-    const csv = app.slice(csvStart, csvEnd);
-    const importer = app.slice(app.indexOf('const importContractorPriceBookCsvRows'), app.indexOf('const addSavedChargeToEstimateDraft'));
+    const csv = sourceFile('src/features/price-book/priceBookCsvReconciliation.ts');
+    const importer = sourceFile('src/features/price-book/PriceBookCsvReconciliationPanel.tsx');
 
     expect(csv).toContain("{ key: 'subcategory', label: 'Subcategory'");
     expect(csv).toContain("subcategory: ['subcategory', 'sub_category'");
-    expect(csv).toContain("subcategory: contractorPriceBookCsvValue(row, mapping, 'subcategory') || null");
-    expect(csv).toContain('title,description,notes,trade,category,subcategory,line_type');
-    expect(importer).toContain(".from('contractor_price_book_items').insert(payloads)");
-    expect(importer).not.toMatch(/\.upsert\(|\.update\(|\.delete\(/);
-    expect(app).toContain('CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS = 500');
+    expect(csv).toContain("'external_id,title,description,notes,trade,category,subcategory,line_type");
+    expect(csv).toContain('PRICE_BOOK_CSV_MAX_ROWS = 500');
+    expect(importer).toContain('Preview reconciliation');
+    expect(importer).toContain('Confirm and apply import');
+    expect(app).toContain("supabase!.rpc('servsync_execute_price_book_import'");
+    expect(app).not.toContain("supabase.from('contractor_price_book_items').insert(payloads)");
     expect(csv).not.toMatch(/Price Book Ninjas|Housecall Pro|Jobber|ServiceTitan/i);
   });
 

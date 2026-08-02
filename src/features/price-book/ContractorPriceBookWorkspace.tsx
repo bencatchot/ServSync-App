@@ -120,6 +120,7 @@ export function ContractorPriceBookWorkspace({
   onBulkUpdate: (itemIds: string[], changes: ContractorPriceBookBulkChanges, actionLabel: string) => Promise<boolean>;
 }) {
   const [status, setStatus] = useState<PriceBookStatusView>('active');
+  const [csvToolsMounted, setCsvToolsMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [lineType, setLineType] = useState<PriceBookTypeFilter>('all');
   const [trade, setTrade] = useState('');
@@ -655,12 +656,18 @@ export function ContractorPriceBookWorkspace({
       ) : null}
 
       {canMutate && csvTools ? (
-        <details className="rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="price-book-import-tools">
+        <details
+          className="rounded-2xl border border-slate-200 bg-white shadow-sm"
+          data-testid="price-book-import-tools"
+          onToggle={event => {
+            if (event.currentTarget.open) setCsvToolsMounted(true);
+          }}
+        >
           <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
             Import from CSV
             <ChevronDown size={17} />
           </summary>
-          <div className="border-t border-slate-200 p-4">{csvTools}</div>
+          {csvToolsMounted ? <div className="border-t border-slate-200 p-4">{csvTools}</div> : null}
         </details>
       ) : null}
     </section>
