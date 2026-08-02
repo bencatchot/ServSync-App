@@ -19,6 +19,7 @@ function item(index: number, overrides: Partial<ContractorPriceBookItem> = {}): 
     internal_notes: '',
     trade: index % 2 === 0 ? 'HVAC' : 'Plumbing',
     category: index % 3 === 0 ? 'Service' : 'Repair',
+    subcategory: index % 2 === 0 ? 'Diagnostics' : null,
     line_type: index % 2 === 0 ? 'labor' : 'material',
     unit: 'each',
     default_unit_price_cents: index * 100,
@@ -42,9 +43,9 @@ test.describe('FB-024 Price Book management cleanup', () => {
       item(3, { title: 'Archived inspection', trade: 'HVAC', active: false, archived_at: '2026-08-01T13:00:00.000Z', line_type: 'other' }),
     ];
 
-    expect(filterPriceBookItems(items, { status: 'active', search: 'water', lineType: 'all', trade: '', category: '' }).map(row => row.id)).toEqual(['item-1']);
-    expect(filterPriceBookItems(items, { status: 'active', search: '', lineType: 'material', trade: 'Plumbing', category: 'Material' }).map(row => row.id)).toEqual(['item-2']);
-    expect(filterPriceBookItems(items, { status: 'archived', search: '', lineType: 'all', trade: '', category: '' }).map(row => row.id)).toEqual(['item-3']);
+    expect(filterPriceBookItems(items, { status: 'active', search: 'water', lineType: 'all', trade: '', category: '', subcategory: '' }).map(row => row.id)).toEqual(['item-1']);
+    expect(filterPriceBookItems(items, { status: 'active', search: '', lineType: 'material', trade: 'Plumbing', category: 'Material', subcategory: '' }).map(row => row.id)).toEqual(['item-2']);
+    expect(filterPriceBookItems(items, { status: 'archived', search: '', lineType: 'all', trade: '', category: '', subcategory: '' }).map(row => row.id)).toEqual(['item-3']);
     expect(priceBookFilterOptions(items, 'trade')).toEqual(['HVAC', 'Plumbing']);
     expect(items[0].title).toBe('Water heater service');
   });

@@ -28,9 +28,11 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     }
 
     expect(priceBookTypeSource).toContain('category: string;');
+    expect(priceBookTypeSource).toContain('subcategory: string | null;');
     expect(priceBookTypeSource).toContain('taxable: boolean;');
     expect(priceBookTypeSource).not.toContain('default_quantity');
     expect(priceBookDraftSource).toContain('category: string;');
+    expect(priceBookDraftSource).toContain('subcategory: string;');
     expect(priceBookDraftSource).toContain('taxable: boolean;');
     expect(priceBookDraftSource).not.toContain('default_quantity');
     expect(csvFieldsSource).toContain("{ key: 'category'");
@@ -58,6 +60,7 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
       'item.sku',
       'item.trade',
       'item.category',
+      'item.subcategory',
       'item.taxable',
       'item.source',
     ]) {

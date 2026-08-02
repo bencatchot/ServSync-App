@@ -6,6 +6,43 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-02
 
+- Branch: `codex/price-book-organization-foundation-v1`
+- Starting main SHA: `4a5962e79f3002713d904d1710466f1db79740bc`
+- Files changed:
+  - `servsync-price-book-organization-foundation.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `src/features/price-book/ContractorPriceBookWorkspace.tsx`
+  - `src/features/price-book/DraftPriceBookPicker.tsx`
+  - `src/features/price-book/priceBookView.ts`
+  - focused Price Book organization, management, CSV, Draft-first picker, legacy estimate quick-pick, and shared snapshot regression coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements Price Book Organization Foundation v1. An additive migration adds nullable `subcategory` storage and a contractor-scoped `trade -> category -> subcategory` index while retaining the existing RLS authority and limiting the new insert/update column grant to authenticated users. Price Book management adds hierarchy fields and cascading filters, current-page-only bulk organization/item-type/archive/restore actions with confirmation and duplicate-action locking, and generic add-only CSV subcategory mapping. Draft-first and legacy Estimate Price Book insertion continue using the shared customer-safe snapshot mapper without organization metadata, Price Book IDs, or live linkage.
+- Reason for change: Contractors need a provider-neutral way to organize growing Price Books and make deliberate current-page maintenance changes before ServSync tackles provider imports, reconciliation, cost/margin, assemblies, or broader reusable-content maturity.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - focused Price Book organization, management, role/fail-closed rendering, CSV, Draft-first picker, legacy estimate quick-pick, and estimate item reuse Playwright coverage, including desktop 1280x720 and mobile 390x844 rendering: 42 passed
+  - additive migration/RLS-grant static coverage
+  - `git diff --check`, documentation structure/link checks, focused skipped-test scan, changed-file scope review, and added-line sensitive-value/token scan
+  - `npm run lint` attempted; the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup incompatibility still stops lint before changed source is evaluated
+- Known risks or follow-ups:
+  - The migration was created but was not applied to Production, Demo, Sandbox, or any other environment. It must be separately approved and applied before any frontend promotion because the updated application query selects `subcategory`.
+  - Bulk selection is deliberately limited to the visible 25-item page and clears on search, filtering, status, paging, refresh, and successful mutation. Cross-page selection, bulk delete, and backend pagination remain excluded.
+  - CSV remains preview-first, add-only, duplicate-warning-only, and capped at 500 rows. Repeat-import reconciliation, updates/merge, import batches, rollback, cost/margin, provider-specific mappings, Saved Charges, assemblies, and broader Price Book maturity remain future work under active FB-024.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records Price Book Organization Foundation v1 source scope and the unapplied migration while remaining active for broader maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor Estimate/Price Book direction now records the provider-neutral hierarchy and bounded bulk/CSV behavior without claiming environment rollout or broader completion.
+- Marketing inventory impact:
+  - MARKETING PRODUCT INVENTORY UPDATED: NO
+  - REASON: The migration is not applied and the feature is not yet live; current marketing claims should not be broadened from a draft implementation branch.
+
 - Branch: `codex/draft-first-production-rollout-closeout-v1`
 - Starting main SHA: `b23e18708601c515ff218823caf8825d5d72fd00`
 - Files changed:

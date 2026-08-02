@@ -53,6 +53,8 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(csvSource).toContain('const CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS = 500');
     expect(csvSource).toContain("{ key: 'title', label: 'Title', required: true");
     expect(csvSource).toContain("{ key: 'line_type'");
+    expect(csvSource).toContain("{ key: 'subcategory'");
+    expect(csvSource).toContain("subcategory: ['subcategory', 'sub_category'");
     expect(csvSource).toContain("{ key: 'default_unit_price'");
     expect(csvSource).toContain("{ key: 'default_unit_price_cents'");
     expect(csvSource).toContain('CSV has an unterminated quoted value.');
@@ -116,11 +118,7 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
 
   test('Price Book quick-pick remains estimate-only and invoice quick-pick remains future', () => {
     const source = appSource();
-    const mapperSource = sourceBetween(
-      source,
-      'function estimateLineDraftFromPriceBookItem',
-      'function createBlankInvoiceDraft',
-    );
+    const mapperSource = sourceFile('src/features/price-book/priceBookEstimateLineSnapshot.ts');
 
     expect(source).toContain("estimateLineSourcePanel === 'saved' && renderEstimateSavedItemPicker()");
     expect(source).not.toContain('{isInvoiceWorkspaceTab && renderEstimateSavedItemPicker()}');
@@ -133,6 +131,7 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
       'item.sku',
       'item.trade',
       'item.category',
+      'item.subcategory',
       'item.taxable',
       'item.source',
       'item.default_quantity',

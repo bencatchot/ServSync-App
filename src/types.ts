@@ -578,6 +578,7 @@ export interface ContractorPriceBookItem {
   internal_notes: string;
   trade: string;
   category: string;
+  subcategory: string | null;
   line_type: EstimateLineType;
   unit: string | null;
   default_unit_price_cents: number | null;
