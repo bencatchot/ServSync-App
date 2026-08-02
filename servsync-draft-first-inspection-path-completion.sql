@@ -106,6 +106,16 @@ revoke all on function public.servsync_notify_field_work_report(uuid) from anon;
 revoke all on function public.servsync_notify_field_work_report(uuid) from authenticated;
 grant execute on function public.servsync_notify_field_work_report(uuid) to authenticated;
 
+revoke all on function public.current_user_can_manage_contractor_team(uuid) from public;
+revoke all on function public.current_user_can_manage_contractor_team(uuid) from anon;
+revoke all on function public.current_user_can_manage_contractor_team(uuid) from authenticated;
+grant execute on function public.current_user_can_manage_contractor_team(uuid) to authenticated;
+
+revoke all on function public.current_user_can_write_contractor_jobs(uuid) from public;
+revoke all on function public.current_user_can_write_contractor_jobs(uuid) from anon;
+revoke all on function public.current_user_can_write_contractor_jobs(uuid) from authenticated;
+grant execute on function public.current_user_can_write_contractor_jobs(uuid) to authenticated;
+
 drop policy if exists "Inspection templates: contractor team creates" on public.inspection_templates;
 create policy "Inspection templates: contractor team creates"
   on public.inspection_templates for insert to authenticated
@@ -136,6 +146,7 @@ create policy "Inspection templates: contractor team deletes"
 
 revoke all on table public.inspection_templates from public;
 revoke all on table public.inspection_templates from anon;
+revoke all on table public.inspection_templates from authenticated;
 grant select, insert, update, delete on table public.inspection_templates to authenticated;
 
 drop policy if exists "insp_media_upload" on storage.objects;

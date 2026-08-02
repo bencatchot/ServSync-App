@@ -238,6 +238,14 @@ test.describe('FB-007 Draft-first Inspection Path Completion v1', () => {
     expect(sql).toContain('revoke all on function public.servsync_notify_field_work_report(uuid) from public;');
     expect(sql).toContain('revoke all on function public.servsync_notify_field_work_report(uuid) from anon;');
     expect(sql).toContain('grant execute on function public.servsync_notify_field_work_report(uuid) to authenticated;');
+    expect(sql).toContain('revoke all on function public.current_user_can_manage_contractor_team(uuid) from public;');
+    expect(sql).toContain('revoke all on function public.current_user_can_manage_contractor_team(uuid) from anon;');
+    expect(sql).toContain('grant execute on function public.current_user_can_manage_contractor_team(uuid) to authenticated;');
+    expect(sql).toContain('revoke all on function public.current_user_can_write_contractor_jobs(uuid) from public;');
+    expect(sql).toContain('revoke all on function public.current_user_can_write_contractor_jobs(uuid) from anon;');
+    expect(sql).toContain('grant execute on function public.current_user_can_write_contractor_jobs(uuid) to authenticated;');
+    expect(sql).toContain('revoke all on table public.inspection_templates from authenticated;');
+    expect(sql).toContain('grant select, insert, update, delete on table public.inspection_templates to authenticated;');
     expect(sql).not.toMatch(/\buqgtheclhxqlnjpfmheq\b|\bzpzdkoaubyjtsomccxya\b|\bbdytwgejqnlblhrnqxkp\b/);
     expect(sql).not.toMatch(/\binsert\s+into\s+public\.|\bupdate\s+public\.|\bdelete\s+from\s+public\./i);
   });
