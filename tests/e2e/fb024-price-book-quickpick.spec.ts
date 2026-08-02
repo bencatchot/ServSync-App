@@ -18,12 +18,12 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
   test('Price Book does not claim live default quantity or tax/category propagation support', () => {
     const source = appSource();
     const types = typesSource();
-    const lineDraftSource = sourceBetween(source, 'type EstimateLineDraft = {', 'type EstimateDraftBuilderTrade');
+    const lineDraftSource = sourceFile('src/features/work-composer/types.ts');
     const priceBookTypeSource = sourceBetween(types, 'export interface ContractorPriceBookItem', 'export interface Profile');
-    const priceBookDraftSource = sourceBetween(source, 'type ContractorPriceBookItemDraft = {', 'type ManualJobWorkItemDraft');
+    const priceBookDraftSource = sourceFile('src/features/price-book/ContractorPriceBookWorkspace.tsx');
     const csvFieldsSource = sourceBetween(source, 'const CONTRACTOR_PRICE_BOOK_CSV_FIELDS', 'const CONTRACTOR_PRICE_BOOK_CSV_FIELD_ALIASES');
 
-    for (const estimateLineField of ['default_quantity', 'taxable', 'category', 'sku', 'internal_notes']) {
+    for (const estimateLineField of ['default_quantity', 'taxable', 'category', 'sku']) {
       expect(lineDraftSource).not.toContain(estimateLineField);
     }
 

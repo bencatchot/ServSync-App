@@ -107,7 +107,7 @@ export type ContractorWorkDashboardProps = {
   canStartDraft: boolean;
   canUseTemplates: boolean;
   canUseServicePlans: boolean;
-  canUseCustomPricing: boolean;
+  canViewPriceBook: boolean;
   estimateCount: number;
   activeJobCount: number;
   invoiceCount: number;
@@ -131,7 +131,7 @@ export function ContractorWorkDashboard({
   canStartDraft,
   canUseTemplates,
   canUseServicePlans,
-  canUseCustomPricing,
+  canViewPriceBook,
   estimateCount,
   activeJobCount,
   invoiceCount,
@@ -150,7 +150,7 @@ export function ContractorWorkDashboard({
     status: loading ? 'loading' : loadError ? 'error' : 'ready',
     count,
   });
-  const actionsAvailable = canStartDraft || canUseTemplates || canUseServicePlans || canUseCustomPricing;
+  const actionsAvailable = canStartDraft || canUseTemplates || canUseServicePlans || canViewPriceBook;
 
   return (
     <section data-testid="contractor-work-dashboard" className="space-y-5">
@@ -234,8 +234,8 @@ export function ContractorWorkDashboard({
             {canUseServicePlans ? (
               <ToolAction testId="contractor-work-open-service-plans" label="Service Plans" helper="Plan templates and homeowner offers" icon={<Layers3 size={18} />} onClick={onOpenServicePlans} />
             ) : null}
-            {canUseCustomPricing ? (
-              <ToolAction testId="contractor-work-open-custom-pricing" label="Custom Pricing" helper="Manage the private pricing library" icon={<Settings2 size={18} />} onClick={onOpenCustomPricing} />
+            {canViewPriceBook ? (
+              <ToolAction testId="contractor-work-open-custom-pricing" label="Price Book" helper="View reusable pricing items" icon={<Settings2 size={18} />} onClick={onOpenCustomPricing} />
             ) : null}
           </div>
         </section>

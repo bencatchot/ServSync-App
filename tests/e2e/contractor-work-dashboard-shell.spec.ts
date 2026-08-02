@@ -172,12 +172,14 @@ test.describe('Jobs overview redesign guardrails', () => {
 
     expect(source).toContain('canUseTemplates={canManageInspectionTemplates || canManageEstimateSettings}');
     expect(source).toContain('canUseServicePlans={canManageServiceAgreements}');
-    expect(source).toContain('canUseCustomPricing={canManageEstimateSettings}');
+    expect(source).toContain('canViewPriceBook={priceBookAccess.canView}');
     expect(component).toContain('{canStartDraft ? (');
     expect(component).toContain('{canUseTemplates ? (');
     expect(component).toContain('{canUseServicePlans ? (');
-    expect(component).toContain('{canUseCustomPricing ? (');
+    expect(component).toContain('{canViewPriceBook ? (');
     expect(component).toContain('Saved Work Templates and Inspection Checklists');
+    expect(component).toContain('label="Price Book"');
+    expect(source).toContain('contractorPriceBookAccess(contractor, teamAccess, profile.id)');
     expect(composer).not.toContain('Service Plans');
     expect(composer).not.toContain('service_agreement');
   });

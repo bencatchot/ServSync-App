@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-01
 
+- Branch: `codex/fb024-price-book-management-v1`
+- Starting main SHA: `b08073214ffeebb01d55ba22af3e290b954423e1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/work/ContractorWorkDashboard.tsx`
+  - `src/features/price-book/ContractorPriceBookWorkspace.tsx`
+  - `src/features/price-book/priceBookView.ts`
+  - focused Price Book, CSV, estimate reuse, Jobs dashboard, and search/filter tests under `tests/e2e/`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements FB-024 Price Book management cleanup. Visible Custom Pricing labels become Price Book while stable internal route and data identifiers remain unchanged. The management destination now leads with search, active/archived tabs, type/trade/category filters, compact 25-row pages, explicit loading/error/empty/no-results states, a short basic item form with Advanced Options, and collapsed CSV import tools. Frontend management authority now matches the existing SQL owner/admin/office rule.
+- Reason for change: The existing private Price Book foundation was capable but visually overloaded: CSV import and an always-expanded eleven-field form appeared before ordinary item management, cards exposed excessive detail, and failed loading could resemble an empty library. The cleanup makes routine pricing maintenance faster and clearer without changing stored records, snapshot behavior, or backend authority.
+- Tests/checks run:
+  - `npm run typecheck`
+  - focused Price Book management, rendered role/load/volume behavior, CSV, quick-pick, estimate reuse, Jobs dashboard, and search/filter Playwright coverage: 45 passed
+  - build, lint assessment, and diff/safety checks; Preview validation remains required after the draft PR is opened
+- Known risks or follow-ups:
+  - Filtering remains client-side over the existing loaded Price Book query. UI pagination limits rendering to 25 rows, but complete 1,000-item support still requires separate backend pagination/query-cap design.
+  - The durable Draft-first composer still has no Price Book picker. Search/filter snapshot insertion is the next FB-024 implementation slice; multi-select and quantity staging remain separate follow-up work.
+  - Favorites, usage history, assemblies, cost/margin, bulk editing/export, create-from-Draft, and direct invoice selection remain excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 now records completed management cleanup and names Draft-first picker integration as the next meaningful slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Product and Work-module terminology now consistently present the contractor-facing capability as Price Book while documenting the management behavior and stable internal identifiers.
+
 - Branch: `codex/jobs-overview-redesign-v1`
 - Starting main SHA: `c1f06fdf971b4b0218c81b823408473b932b1fa4`
 - Files changed:
