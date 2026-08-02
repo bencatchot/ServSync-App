@@ -531,7 +531,7 @@ begin
       then jsonb_build_object('default_unit_price_cents', null)
       else '{}'::jsonb
     end;
-    v_fingerprint := encode(digest(convert_to(jsonb_build_object(
+    v_fingerprint := encode(extensions.digest(convert_to(jsonb_build_object(
       'mapped_fields', to_jsonb(v_mapped_fields),
       'values', v_values
     )::text, 'UTF8'), 'sha256'), 'hex');
@@ -958,7 +958,7 @@ begin
     raise exception 'Price Book import source is unavailable.';
   end if;
 
-  v_request_hash := encode(digest(convert_to(jsonb_build_object(
+  v_request_hash := encode(extensions.digest(convert_to(jsonb_build_object(
     'source_id', p_import_source_id,
     'rows', p_rows,
     'actions', p_actions,

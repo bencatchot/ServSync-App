@@ -131,6 +131,8 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(sql).toContain('pg_advisory_xact_lock');
     expect(sql).toContain('idempotency_key');
     expect(sql).toContain('request_hash');
+    expect(sql.match(/extensions\.digest\(/g)).toHaveLength(2);
+    expect(sql).not.toMatch(/(?<!extensions\.)\bdigest\(/);
     expect(sql).toContain("v_action in ('add', 'update')");
     expect(sql).toContain('Choose exactly one explicit action for every import row.');
     expect(sql).toContain('Import file size must be between 1 byte and 1 MB.');
