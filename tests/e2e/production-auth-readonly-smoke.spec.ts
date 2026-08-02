@@ -210,14 +210,15 @@ test.describe('production authenticated read-only smoke', () => {
 
       await openSidebarTab(page, /Homeowners/i);
       await expectActiveHeading(page, /^Homeowners$/i);
-      await expect(main.getByPlaceholder(/Search homeowner, city, address/i)).toBeVisible();
+      await expect(main.getByRole('textbox', { name: /^Search customers and contacts$/i })).toBeVisible();
 
       await openSidebarTab(page, /Service Requests/i);
       await expectActiveHeading(page, /^Service Requests$/i);
 
       await openSidebarTab(page, /^Jobs\b/i);
       await expectActiveHeading(page, /^Jobs$/i);
-      await expect(main.getByRole('heading', { level: 3, name: /^Estimates \/ Invoices$/i })).toBeVisible();
+      await expect(main.getByTestId('contractor-jobs-at-a-glance')).toBeVisible();
+      await expect(main.getByTestId('contractor-work-start-draft')).toBeVisible();
 
       await openSidebarTab(page, /^Calendar\b/i);
       await expectActiveHeading(page, /^Calendar$/i);
