@@ -12,6 +12,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `servsync-price-book-repeat-import-reconciliation.sql`
   - `src/App.tsx`
   - `src/features/price-book/PriceBookCsvReconciliationPanel.tsx`
+  - `src/features/price-book/ContractorPriceBookWorkspace.tsx`
   - `src/features/price-book/priceBookCsvReconciliation.ts`
   - focused CSV, Price Book management, organization, Draft-first picker, legacy estimate quick-pick, and reconciliation coverage under `tests/e2e/`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`

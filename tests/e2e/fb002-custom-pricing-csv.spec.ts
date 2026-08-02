@@ -27,6 +27,7 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(customPricingSource).not.toContain('<Card title="Price Book"');
     expect(customPricingSource).toContain('<ContractorPriceBookWorkspace');
     expect(customPricingSource).toContain('<PriceBookCsvReconciliationPanel');
+    expect(sourceFile('src/features/price-book/ContractorPriceBookWorkspace.tsx')).toContain('if (event.currentTarget.open) setCsvToolsMounted(true)');
     expect(panel).toContain('Repeat-import reconciliation');
     expect(panel).toContain('Sample CSV');
     expect(panel).toContain('Choose CSV');
