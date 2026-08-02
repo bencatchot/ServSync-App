@@ -43113,7 +43113,8 @@ function ContractorDashboard({
                   const linkedServiceRequest = activeInspection.service_request_id
                     ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
                     : null;
-                  const reportSentAndCompleted = activeInspection.status === 'finalized'
+                  const reportSentAndCompleted = Boolean(activeInspection.homeowner_user_id)
+                    && activeInspection.status === 'finalized'
                     && (activeInspection.service_request_id ? linkedServiceRequest?.status === 'closed' : true);
                   const reportSendHelperText = activeInspection.status !== 'finalized'
                     ? 'Finalize the report before sending it.'
