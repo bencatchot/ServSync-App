@@ -102,7 +102,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     const estimateSendSource = sourceBetween(app, 'const sendEstimateToHomeowner = async', 'const createJobFromAcceptedEstimate = async');
     const jobCreateSource = sourceBetween(app, 'const createJobFromAcceptedEstimate = async', 'const openSaveEstimateTemplateModal =');
     const homeMapSource = sourceBetween(app, 'const submitContractorHomeMapDraft = async', 'const proposeAppointmentWindows = async');
-    const agreementSource = sourceBetween(app, 'const saveServiceAgreementOfferDraft = async', 'const importContractorPriceBookCsvRows = async');
+    const agreementSource = sourceBetween(app, 'const saveServiceAgreementOfferDraft = async', 'const requirePriceBookImportAccess = () => {');
     const reportSource = sourceBetween(app, 'const finalizeInspection = async', 'const deleteInspection = async');
 
     expect(estimateSaveSource).toContain("'Draft estimate saved'");

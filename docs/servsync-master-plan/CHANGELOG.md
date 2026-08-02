@@ -6,6 +6,42 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-02
 
+- Branch: `codex/price-book-repeat-import-reconciliation-v1`
+- Starting main SHA: `d21d3f1b6c91a136ed3336b53af1a08ac8f65a13`
+- Files changed:
+  - `servsync-price-book-repeat-import-reconciliation.sql`
+  - `src/App.tsx`
+  - `src/features/price-book/PriceBookCsvReconciliationPanel.tsx`
+  - `src/features/price-book/priceBookCsvReconciliation.ts`
+  - focused CSV, Price Book management, organization, Draft-first picker, legacy estimate quick-pick, and reconciliation coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements Price Book Repeat-Import Reconciliation v1 as the first post-organization FB-024 slice. A source-only additive migration adds private tenant-owned import-source identities, immutable batch and row audit, minimal touched-field before/after patches, reuse of the private provider-neutral external-object mapping foundation, deterministic preview matching, three-way manual-edit preservation, and one explicit-action, idempotent, all-or-nothing execute RPC. The CSV workspace now selects a stable catalog source, maps a generic external item ID, reviews Current/Incoming/Result values, and requires an explicit Add, Update, or Skip action while preserving the 1 MB/500-row limits and Price Required versus explicit zero semantics.
+- Reason for change: Contractors need safe repeat imports that can reconcile stable source records without replacing omitted fields, overwriting conflicting manual edits, exposing private mapping metadata, or relying on filenames as identity.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - 48 focused reconciliation, CSV, Price Book management/organization/rendering, Draft-first picker, legacy estimate quick-pick, and estimate item-reuse Playwright checks, including desktop 1280x720 and mobile 390x844 reconciliation rendering
+  - additive migration/RLS/grant/authority/idempotency/immutability static coverage
+  - `git diff --check`, documentation structure/link checks, focused skipped-test scan, changed-file scope review, and added-line sensitive-value/token scan
+  - `npm run lint` attempted; the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup incompatibility still stops lint before changed source is evaluated
+  - legacy action-feedback regression behavior: 5 passed; its inherited Bundle 4A branch-file allowlist assertion remains stale for later feature branches and is reported separately
+- Known risks or follow-ups:
+  - The migration was created but was not applied to Production, Demo, Sandbox, or any other environment. The reconciliation UI requires a separately approved database rollout before frontend promotion.
+  - Rollback mutation is deliberately excluded. The immutable audit captures only sanitized mapped-field before/after patches for a later guarded rollback slice; raw CSV content is not retained.
+  - Rows without a stable external item ID remain Add/Skip duplicate-warning flows. XLSX, cost/margin, Saved Charges, assemblies, export, provider-specific parsers/APIs, scheduled sync, and broader maturity remain future work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 now records Repeat-Import Reconciliation v1 as source-complete but unapplied and keeps guarded batch rollback as the next focused slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Price Book roadmap now distinguishes stable provider-neutral reconciliation and immutable audit from excluded rollback, provider integration, and broader maturity work.
+- Marketing inventory impact:
+  - MARKETING PRODUCT INVENTORY UPDATED: NO
+  - REASON: The migration is not applied and this branch is not deployed; no live capability claim should change.
+
 - Branch: `codex/price-book-organization-foundation-v1`
 - Starting main SHA: `4a5962e79f3002713d904d1710466f1db79740bc`
 - Files changed:

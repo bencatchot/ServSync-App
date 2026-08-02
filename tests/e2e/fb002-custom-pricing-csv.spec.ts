@@ -17,6 +17,7 @@ function sourceBetween(source: string, start: string, end: string) {
 test.describe('FB-002 Price Book CSV preview regression', () => {
   test('CSV import surface is private, preview-first, and mobile-tolerant', () => {
     const source = appSource();
+    const panel = sourceFile('src/features/price-book/PriceBookCsvReconciliationPanel.tsx');
     const customPricingSource = sourceBetween(
       source,
       "{contractorJobsView === 'custom_pricing' && (",
@@ -25,32 +26,24 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
 
     expect(customPricingSource).not.toContain('<Card title="Price Book"');
     expect(customPricingSource).toContain('<ContractorPriceBookWorkspace');
-    expect(customPricingSource).toContain('Upload CSV');
-    expect(customPricingSource).toContain('Sample CSV');
-    expect(customPricingSource).toContain('Choose CSV');
-    expect(customPricingSource).toContain('accept=".csv,text/csv"');
-    expect(customPricingSource).toContain('Review column mapping');
-    expect(customPricingSource).toContain('Preview before import');
-    expect(customPricingSource).toContain('Only valid rows will be imported');
-    expect(customPricingSource).toContain('Invalid rows stay out of your Price Book');
-    expect(customPricingSource).toContain('Review warnings before importing');
-    expect(customPricingSource).toContain('Duplicate matches are warning-only');
-    expect(customPricingSource).toContain('import adds valid rows and does not overwrite existing pricing');
-    expect(customPricingSource).toContain('overflow-x-auto');
-    expect(customPricingSource).toContain('min-w-[720px]');
-    expect(customPricingSource).toContain('Showing the first 20 parsed rows for preview.');
+    expect(customPricingSource).toContain('<PriceBookCsvReconciliationPanel');
+    expect(panel).toContain('Repeat-import reconciliation');
+    expect(panel).toContain('Sample CSV');
+    expect(panel).toContain('Choose CSV');
+    expect(panel).toContain('accept=".csv,text/csv"');
+    expect(panel).toContain('Upload and map CSV');
+    expect(panel).toContain('Preview reconciliation');
+    expect(panel).toContain('Review Add, Update, and Skip');
+    expect(panel).toContain('Conflicting manual edits remain unchanged.');
+    expect(panel).toContain('PREVIEW_PAGE_SIZE = 25');
   });
 
-  test('CSV parser and preview validation cover required fields, prices, row limits, and line-type fallback', () => {
-    const source = appSource();
-    const csvSource = sourceBetween(
-      source,
-      'const CONTRACTOR_PRICE_BOOK_CSV_MAX_BYTES',
-      'function savedEstimateChargeLineDescription',
-    );
+  test('CSV parser and preview validation cover identity, prices, row limits, and strict line types', () => {
+    const csvSource = sourceFile('src/features/price-book/priceBookCsvReconciliation.ts');
 
-    expect(csvSource).toContain('const CONTRACTOR_PRICE_BOOK_CSV_MAX_BYTES = 1024 * 1024');
-    expect(csvSource).toContain('const CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS = 500');
+    expect(csvSource).toContain('PRICE_BOOK_CSV_MAX_BYTES = 1024 * 1024');
+    expect(csvSource).toContain('PRICE_BOOK_CSV_MAX_ROWS = 500');
+    expect(csvSource).toContain("{ key: 'external_item_id'");
     expect(csvSource).toContain("{ key: 'title', label: 'Title', required: true");
     expect(csvSource).toContain("{ key: 'line_type'");
     expect(csvSource).toContain("{ key: 'subcategory'");
@@ -58,62 +51,30 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(csvSource).toContain("{ key: 'default_unit_price'");
     expect(csvSource).toContain("{ key: 'default_unit_price_cents'");
     expect(csvSource).toContain('CSV has an unterminated quoted value.');
-    expect(csvSource).toContain('if (!title.trim()) errors.push(\'Title is required.\');');
-    expect(csvSource).toContain('Default price must be blank, 0, or a positive dollar amount.');
-    expect(csvSource).toContain('Default price cents must be a whole number.');
-    expect(csvSource).toContain('Default price cannot be negative.');
-    expect(csvSource).toContain('if (!trimmed) return { cents: null as number | null };');
-    expect(csvSource).toContain('return { cents: Math.round(amount * 100) };');
-    expect(csvSource).toContain("if (!normalized) return { lineType: 'other' as EstimateLineType, warning: 'Line type was missing and will import as Other.' };");
-    expect(csvSource).toContain('Line type "${trimmed}" was not recognized and will import as Other.');
+    expect(csvSource).toContain("if (!title) errors.push('Title is required.')");
+    expect(csvSource).toContain('Default price must be blank, zero, or a positive amount.');
+    expect(csvSource).toContain('Default price cents must be a non-negative whole number.');
+    expect(csvSource).toContain("values.default_unit_price_cents = parsedPrice.value");
+    expect(csvSource).toContain('Line type must be labor, material, fee, or other.');
   });
 
-  test('duplicate detection remains warning-only and import remains add-only', () => {
+  test('server reconciliation replaces direct add-only table insertion', () => {
     const source = appSource();
-    const previewSource = sourceBetween(
-      source,
-      'function buildContractorPriceBookCsvPreviewRows',
-      'const CONTRACTOR_PRICE_BOOK_SAMPLE_CSV',
-    );
-    const importSource = sourceBetween(
-      source,
-      'const importContractorPriceBookCsvRows = async () => {',
-      'const addSavedChargeToEstimateDraft =',
-    );
-
-    expect(previewSource).toContain('const existingKeys = new Set');
-    expect(previewSource).toContain('const seenImportKeys = new Set<string>();');
-    expect(previewSource).toContain('Possible duplicate of an existing Price Book item.');
-    expect(previewSource).toContain('Possible duplicate within this CSV import.');
-    expect(previewSource).toContain('warnings.push');
-    expect(previewSource).toContain('source: CONTRACTOR_PRICE_BOOK_CSV_SOURCE');
-    expect(previewSource).not.toContain('errors.push(\'Possible duplicate');
-
-    expect(importSource).toContain('validContractorPriceBookCsvRows.length === 0');
-    expect(importSource).toContain('Invalid rows will be skipped.');
-    expect(importSource).toContain('const payloads = validContractorPriceBookCsvRows.map');
-    expect(importSource).toContain("supabase.from('contractor_price_book_items').insert(payloads)");
-    expect(importSource).not.toContain('.upsert(');
-    expect(importSource).not.toContain('.update(');
-    expect(importSource).not.toContain('.delete(');
-    expect(importSource).not.toContain('onConflict');
+    expect(source).toContain("supabase!.rpc('servsync_preview_price_book_import'");
+    expect(source).toContain("supabase!.rpc('servsync_execute_price_book_import'");
+    expect(source).toContain('p_idempotency_key: input.idempotencyKey');
+    expect(source).not.toContain("supabase.from('contractor_price_book_items').insert(payloads)");
   });
 
-  test('valid rows are separated from blocked rows before import', () => {
-    const source = appSource();
-    const contractorViewSource = sourceBetween(
-      source,
-      'const contractorPriceBookCsvPreviewRows = buildContractorPriceBookCsvPreviewRows',
-      'const addSavedChargeToEstimateDraft =',
-    );
-
-    expect(contractorViewSource).toContain('const validContractorPriceBookCsvRows = contractorPriceBookCsvPreviewRows.filter(row => row.errors.length === 0);');
-    expect(contractorViewSource).toContain('const warningContractorPriceBookCsvRows = contractorPriceBookCsvPreviewRows.filter(row => row.errors.length === 0 && row.warnings.length > 0);');
-    expect(contractorViewSource).toContain('const blockedContractorPriceBookCsvRows = contractorPriceBookCsvPreviewRows.filter(row => row.errors.length > 0);');
-    expect(contractorViewSource).toContain('CSV imports are limited to ${CONTRACTOR_PRICE_BOOK_CSV_MAX_ROWS} item rows in this beta tool.');
-    expect(contractorViewSource).toContain('This CSV appears to be empty.');
-    expect(contractorViewSource).toContain('This CSV has headers but no item rows.');
-    expect(contractorViewSource).toContain("setContractorPriceBookCsvMapping(autoMapContractorPriceBookCsvHeaders(headers));");
+  test('blocked rows stop preview while blank non-price fields preserve existing values', () => {
+    const csv = sourceFile('src/features/price-book/priceBookCsvReconciliation.ts');
+    const panel = sourceFile('src/features/price-book/PriceBookCsvReconciliationPanel.tsx');
+    expect(csv).toContain("if (!value) return;");
+    expect(csv).toContain("mappedFields.push('default_unit_price_cents')");
+    expect(csv).toContain('External item ID is repeated in this file.');
+    expect(panel).toContain('blockedLocalRows.length > 0');
+    expect(panel).toContain('Resolve {blockedLocalRows.length} blocked row');
+    expect(panel).toContain('disabled={!sourceId || !mapping.title || blockedLocalRows.length > 0');
   });
 
   test('Price Book quick-pick remains estimate-only and invoice quick-pick remains future', () => {

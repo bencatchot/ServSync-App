@@ -21,7 +21,7 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     const lineDraftSource = sourceFile('src/features/work-composer/types.ts');
     const priceBookTypeSource = sourceBetween(types, 'export interface ContractorPriceBookItem', 'export interface Profile');
     const priceBookDraftSource = sourceFile('src/features/price-book/ContractorPriceBookWorkspace.tsx');
-    const csvFieldsSource = sourceBetween(source, 'const CONTRACTOR_PRICE_BOOK_CSV_FIELDS', 'const CONTRACTOR_PRICE_BOOK_CSV_FIELD_ALIASES');
+    const csvFieldsSource = sourceFile('src/features/price-book/priceBookCsvReconciliation.ts');
 
     for (const estimateLineField of ['default_quantity', 'taxable', 'category', 'sku']) {
       expect(lineDraftSource).not.toContain(estimateLineField);
