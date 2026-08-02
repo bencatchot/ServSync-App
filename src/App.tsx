@@ -42229,7 +42229,7 @@ function ContractorDashboard({
                           ) : activeRooms.map(rm => {
                             const flagged = rm.items.filter(item => {
                               const f = localFindings[findingStateKey(rm, item)];
-                              return f && findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status);
+                              return f && findingStatusNeedsAttention(f.status);
                             }).length;
                             const roomKey = roomIdentityKey(rm);
                             const roomLabel = roomDisplayLabel(rm);
@@ -42653,7 +42653,7 @@ function ContractorDashboard({
                               const roomKey = roomIdentityKey(room);
                               const roomLabel = roomDisplayLabel(room);
                               const findings = room.items.map(item => localFindings[findingStateKey(room, item)]);
-                              const issueCount = findings.filter(f => f && findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status)).length;
+                              const issueCount = findings.filter(f => f && findingStatusNeedsAttention(f.status)).length;
                               const isActive = roomKey === activeWorkRoomKey;
                               return (
                                 <button

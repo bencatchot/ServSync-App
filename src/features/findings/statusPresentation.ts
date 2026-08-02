@@ -24,6 +24,8 @@ export const FINDING_STATUS_ORDER: FindingStatus[] = [
   'Urgent',
 ];
 
+const FINDING_STATUS_VALUES = new Set<string>(FINDING_STATUS_ORDER);
+
 const FINDING_STATUS_PRESENTATIONS: Record<FindingStatus, FindingStatusPresentation> = {
   'Not Recorded': {
     value: UNANSWERED_FINDING_STATUS,
@@ -77,11 +79,11 @@ const FINDING_STATUS_PRESENTATIONS: Record<FindingStatus, FindingStatusPresentat
 };
 
 export function findingStatusIsUnanswered(status?: FindingStatus | string | null) {
-  return status === UNANSWERED_FINDING_STATUS;
+  return status === UNANSWERED_FINDING_STATUS || !status || !FINDING_STATUS_VALUES.has(status);
 }
 
 export function findingStatusIsRecorded(status?: FindingStatus | string | null) {
-  return !findingStatusIsUnanswered(status);
+  return Boolean(status && FINDING_STATUS_VALUES.has(status) && status !== UNANSWERED_FINDING_STATUS);
 }
 
 export function findingStatusNeedsAttention(status?: FindingStatus | string | null) {

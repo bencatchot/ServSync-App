@@ -49,6 +49,10 @@ test.describe('Findings condition/status presentation', () => {
     expect(findingStatusIsCleared('Not Applicable')).toBe(true);
     expect(findingStatusNeedsAttention('Not Applicable')).toBe(false);
     expect(findingStatusNeedsAttention('Monitor')).toBe(true);
+    expect(findingStatusIsUnanswered('Needs Review')).toBe(true);
+    expect(findingStatusIsRecorded('Needs Review')).toBe(false);
+    expect(findingStatusIsUnanswered(null)).toBe(true);
+    expect(findingStatusIsRecorded(null)).toBe(false);
   });
 
   test('falls back safely for unknown runtime finding values', () => {
@@ -138,7 +142,7 @@ test.describe('Findings condition/status presentation', () => {
 
     expect(pdfSource).toContain('STATUS_PDF');
     expect(pdfSource).toContain("'Not Recorded': { bg: [241, 245, 249], text: [100, 116, 139] }");
-    expect(pdfSource).toContain("filter(f => f.status !== 'Not Recorded')");
+    expect(pdfSource).toContain('filter(f => findingStatusIsRecorded(f.status))');
     expect(pdfSource).toContain("allFindings.length === 0 ? 'NO FINDINGS'");
     expect(pdfSource).toContain('Fixed On Site');
     expect(pdfSource).toContain('Needs Repair');

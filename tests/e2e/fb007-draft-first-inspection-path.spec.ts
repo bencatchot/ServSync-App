@@ -206,6 +206,9 @@ test.describe('FB-007 Draft-first Inspection Path Completion v1', () => {
     expect(pdf).toContain('const notApplicableCount =');
     expect(pdf).toContain("{ label: 'N/A'");
     expect(pdf).toContain('const attentionFindings = recordedFindings.filter(f => findingStatusNeedsAttention(f.status));');
+
+    const app = sourceFile('src/App.tsx');
+    expect(app).not.toContain("findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status)");
   });
 
   test('report lifecycle copy describes filing visibility and completion separately', () => {
@@ -229,6 +232,12 @@ test.describe('FB-007 Draft-first Inspection Path Completion v1', () => {
     expect(sql).toContain('revoke all on function public.servsync_can_upload_field_work_report_path(text) from public;');
     expect(sql).toContain('revoke all on function public.servsync_can_upload_field_work_report_path(text) from anon;');
     expect(sql).toContain('grant execute on function public.servsync_can_upload_field_work_report_path(text) to authenticated;');
+    expect(sql).toContain('revoke all on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) from public;');
+    expect(sql).toContain('revoke all on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) from anon;');
+    expect(sql).toContain('grant execute on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) to authenticated;');
+    expect(sql).toContain('revoke all on function public.servsync_notify_field_work_report(uuid) from public;');
+    expect(sql).toContain('revoke all on function public.servsync_notify_field_work_report(uuid) from anon;');
+    expect(sql).toContain('grant execute on function public.servsync_notify_field_work_report(uuid) to authenticated;');
     expect(sql).not.toMatch(/\buqgtheclhxqlnjpfmheq\b|\bzpzdkoaubyjtsomccxya\b|\bbdytwgejqnlblhrnqxkp\b/);
     expect(sql).not.toMatch(/\binsert\s+into\s+public\.|\bupdate\s+public\.|\bdelete\s+from\s+public\./i);
   });

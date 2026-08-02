@@ -34,6 +34,12 @@ begin
   if to_regprocedure('public.servsync_storage_extension_is_allowed(text,text[])') is null then
     raise exception 'Missing required function: public.servsync_storage_extension_is_allowed(text,text[])';
   end if;
+  if to_regprocedure('public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)') is null then
+    raise exception 'Missing required function: public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)';
+  end if;
+  if to_regprocedure('public.servsync_notify_field_work_report(uuid)') is null then
+    raise exception 'Missing required function: public.servsync_notify_field_work_report(uuid)';
+  end if;
 end
 $$;
 
@@ -89,6 +95,16 @@ revoke all on function public.servsync_can_upload_field_work_report_path(text) f
 revoke all on function public.servsync_can_upload_field_work_report_path(text) from anon;
 revoke all on function public.servsync_can_upload_field_work_report_path(text) from authenticated;
 grant execute on function public.servsync_can_upload_field_work_report_path(text) to authenticated;
+
+revoke all on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) from public;
+revoke all on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) from anon;
+revoke all on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) from authenticated;
+grant execute on function public.servsync_finalize_field_work(uuid, jsonb, text, text, text, integer) to authenticated;
+
+revoke all on function public.servsync_notify_field_work_report(uuid) from public;
+revoke all on function public.servsync_notify_field_work_report(uuid) from anon;
+revoke all on function public.servsync_notify_field_work_report(uuid) from authenticated;
+grant execute on function public.servsync_notify_field_work_report(uuid) to authenticated;
 
 drop policy if exists "Inspection templates: contractor team creates" on public.inspection_templates;
 create policy "Inspection templates: contractor team creates"

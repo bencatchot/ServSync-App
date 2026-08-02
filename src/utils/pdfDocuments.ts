@@ -13,7 +13,7 @@ import type {
   InvoiceLineItem,
   LegacyEstimateLineType,
 } from '../types';
-import { findingStatusNeedsAttention } from '../features/findings/statusPresentation';
+import { findingStatusIsRecorded, findingStatusNeedsAttention } from '../features/findings/statusPresentation';
 
 function normalizeText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -456,8 +456,8 @@ export async function generateInspectionPdf(
     pdf.line(margin, yy, pageW - margin, yy);
   }
 
-  const allFindings = inspection.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Not Recorded');
-  const findingsWithRoom = inspection.rooms_with_findings.flatMap(r => r.findings.map(f => ({ ...f, room: r.room }))).filter(f => f.status !== 'Not Recorded');
+  const allFindings = inspection.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusIsRecorded(f.status));
+  const findingsWithRoom = inspection.rooms_with_findings.flatMap(r => r.findings.map(f => ({ ...f, room: r.room }))).filter(f => findingStatusIsRecorded(f.status));
   const urgentCount = allFindings.filter(f => f.status === 'Urgent').length;
   const needsRepairCount = allFindings.filter(f => f.status === 'Needs Repair').length;
   const monitorCount = allFindings.filter(f => f.status === 'Monitor').length;
@@ -643,7 +643,7 @@ export async function generateInspectionPdf(
 
   // Room sections
   for (const roomData of inspection.rooms_with_findings) {
-    const recordedFindings = roomData.findings.filter(f => f.status !== 'Not Recorded');
+    const recordedFindings = roomData.findings.filter(f => findingStatusIsRecorded(f.status));
     if (recordedFindings.length === 0) continue;
     const detailFindings = recordedFindings.filter(f => f.status !== 'Pass');
     const attentionFindings = recordedFindings.filter(f => findingStatusNeedsAttention(f.status));
