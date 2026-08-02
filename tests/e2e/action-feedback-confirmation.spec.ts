@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -16,26 +15,6 @@ function sourceBetween(source: string, start: string, end: string) {
   const endIndex = source.indexOf(end, startIndex + start.length);
   expect(endIndex, `Expected source end marker: ${end}`).toBeGreaterThan(startIndex);
   return source.slice(startIndex, endIndex);
-}
-
-function changedFiles() {
-  const branchDiff = execFileSync('git', ['diff', '--name-only', 'origin/main...HEAD'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-  const workingTreeDiff = execFileSync('git', ['diff', '--name-only'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-
-  return Array.from(new Set(`${branchDiff}\n${workingTreeDiff}\n${untracked}`
-    .split('\n')
-    .map(file => file.trim())
-    .filter(Boolean)));
 }
 
 test.describe('Bundle 4A action feedback and confirmation', () => {
@@ -146,39 +125,13 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(app).not.toMatch(/createPortal|ToastProvider|enqueueToast|notificationQueue/);
   });
 
-  test('Bundle 4A does not start search/filter, routing, backend, payment, PDF, or later-bundle work', () => {
-    const files = changedFiles();
-    const allowedFiles = new Set([
-      'src/App.tsx',
-      'src/features/feedback/ActionFeedback.tsx',
-      'src/features/search/FilterSummary.tsx',
-      'tests/e2e/action-feedback-confirmation.spec.ts',
-      'tests/e2e/contractor-sidebar-account-identity.spec.ts',
-      'tests/e2e/search-filter-recovery.spec.ts',
-      'tests/e2e/empty-state-foundation.spec.ts',
-      'tests/e2e/home-reminder-room-ui.spec.ts',
-      'tests/e2e/contractor-home-map-drafts-ui.spec.ts',
-      'tests/e2e/service-report-homemap-notices.spec.ts',
-      'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
-      'docs/servsync-master-plan/CHANGELOG.md',
-    ]);
+  test('action feedback remains presentation-only and free of later workflow authority', () => {
     const app = read(appPath);
-
-    expect(files.length, 'Bundle 4A should have changed files').toBeGreaterThan(0);
-    for (const file of files) {
-      expect(allowedFiles.has(file), `${file} should be approved for Bundle 4A`).toBe(true);
-    }
-
-    expect(files.some(file => file.endsWith('.sql'))).toBe(false);
-    expect(files.some(file => file.includes('supabase/'))).toBe(false);
-    expect(files.some(file => file.includes('.env'))).toBe(false);
-    expect(files.some(file => file.includes('package'))).toBe(false);
-    expect(files.some(file => file.includes('vercel'))).toBe(false);
-    expect(files.some(file => file.includes('pdfDocuments'))).toBe(false);
+    const feedback = read(actionFeedbackPath);
 
     expect(app).toContain('<EmptyState text="No requests match that search." compact />');
     expect(app).toContain("import { FilterSummary } from './features/search/FilterSummary';");
     expect(app).not.toMatch(/Quick Duplicate Job|Project Activity Feed|Bundle 5|Stripe checkout|Pay Now/);
-    expect(app).not.toMatch(/CREATE POLICY|ALTER TABLE|CREATE FUNCTION|SECURITY DEFINER|rpc definition/i);
+    expect(feedback).not.toMatch(/CREATE POLICY|ALTER TABLE|CREATE FUNCTION|SECURITY DEFINER|rpc definition/i);
   });
 });

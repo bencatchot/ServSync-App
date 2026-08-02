@@ -17,6 +17,7 @@ export const UNANSWERED_FINDING_STATUS = 'Not Recorded' satisfies FindingStatus;
 export const FINDING_STATUS_ORDER: FindingStatus[] = [
   UNANSWERED_FINDING_STATUS,
   'Pass',
+  'Not Applicable',
   'Monitor',
   'Fixed On Site',
   'Needs Repair',
@@ -37,6 +38,13 @@ const FINDING_STATUS_PRESENTATIONS: Record<FindingStatus, FindingStatusPresentat
     tone: 'success',
     borderColor: '#16a34a',
     dotClass: 'bg-emerald-500',
+  },
+  'Not Applicable': {
+    value: 'Not Applicable',
+    label: 'Not Applicable',
+    tone: 'muted',
+    borderColor: '#94a3b8',
+    dotClass: 'bg-slate-400',
   },
   Monitor: {
     value: 'Monitor',
@@ -74,6 +82,14 @@ export function findingStatusIsUnanswered(status?: FindingStatus | string | null
 
 export function findingStatusIsRecorded(status?: FindingStatus | string | null) {
   return !findingStatusIsUnanswered(status);
+}
+
+export function findingStatusNeedsAttention(status?: FindingStatus | string | null) {
+  return status === 'Monitor' || status === 'Needs Repair' || status === 'Urgent';
+}
+
+export function findingStatusIsCleared(status?: FindingStatus | string | null) {
+  return status === 'Pass' || status === 'Fixed On Site' || status === 'Not Applicable';
 }
 
 const FALLBACK_DOT_CLASSES: Record<StatusTone, string> = {

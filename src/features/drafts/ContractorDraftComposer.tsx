@@ -11,6 +11,7 @@ import { createWorkComposerLineDraft, workComposerDraftFinancialBreakdown } from
 import { draftJobTotalsRows } from '../jobs/draftJobMappings';
 import {
   createDraftChecklistSnapshot,
+  draftChecklistSourceMatchesDraftSubject,
   type DraftChecklistSourceOption,
 } from './checklistDraftScope';
 import { DraftOutcomeSelector } from './DraftOutcomeSelector';
@@ -114,7 +115,8 @@ export function ContractorDraftComposer({
   const selectedChecklistKey = draft.checklist_source
     ? `${draft.checklist_source.source_kind}:${draft.checklist_source.source_id}`
     : '';
-  const selectedChecklist = checklistOptions.find(option => `${option.source_kind}:${option.source_id}` === selectedChecklistKey) ?? null;
+  const eligibleChecklistOptions = checklistOptions.filter(option => draftChecklistSourceMatchesDraftSubject(option, draft));
+  const selectedChecklist = eligibleChecklistOptions.find(option => `${option.source_kind}:${option.source_id}` === selectedChecklistKey) ?? null;
   const isEstimateIntent = draft.intended_output === 'estimate';
   const isInvoiceIntent = draft.intended_output === 'invoice';
   const showEstimateLaborControls = !isChecklistDraft && isEstimateIntent;
@@ -263,7 +265,7 @@ export function ContractorDraftComposer({
   };
 
   const updateChecklistSource = (value: string) => {
-    const option = checklistOptions.find(item => `${item.source_kind}:${item.source_id}` === value) ?? null;
+    const option = eligibleChecklistOptions.find(item => `${item.source_kind}:${item.source_id}` === value) ?? null;
     onChange({
       ...draft,
       work_format: 'inspection_checklist',
@@ -271,6 +273,13 @@ export function ContractorDraftComposer({
       checklist_source: option ? createDraftChecklistSnapshot(option) : null,
       job_session: { ...draft.job_session, visited: true },
     });
+  };
+
+  const updateDraftSubject = (nextDraft: SharedDraftComposerDraft) => {
+    const selectedOption = checklistOptions.find(option => `${option.source_kind}:${option.source_id}` === selectedChecklistKey) ?? null;
+    onChange(selectedOption && !draftChecklistSourceMatchesDraftSubject(selectedOption, nextDraft)
+      ? { ...nextDraft, checklist_source: null }
+      : nextDraft);
   };
 
   return (
@@ -324,7 +333,7 @@ export function ContractorDraftComposer({
             className={fieldClass()}
             value={draft.subject_type}
             disabled={subjectTypeLocked}
-            onChange={event => onChange({
+            onChange={event => updateDraftSubject({
               ...draft,
               subject_type: event.target.value as SharedDraftComposerDraft['subject_type'],
               homeowner_user_id: '',
@@ -345,7 +354,7 @@ export function ContractorDraftComposer({
             value={selectedCustomerId}
             onChange={event => {
               const option = customerOptions.find(item => item.id === event.target.value) ?? null;
-              onChange({
+              updateDraftSubject({
                 ...draft,
                 homeowner_user_id: draft.subject_type === 'connected' ? event.target.value : '',
                 home_id: draft.subject_type === 'connected' ? option?.properties[0]?.id ?? '' : '',
@@ -366,7 +375,7 @@ export function ContractorDraftComposer({
             data-testid="durable-draft-property"
             className={fieldClass()}
             value={selectedPropertyId}
-            onChange={event => onChange({
+            onChange={event => updateDraftSubject({
               ...draft,
               home_id: draft.subject_type === 'connected' ? event.target.value : '',
               local_home_id: draft.subject_type === 'local' ? event.target.value : '',
@@ -627,7 +636,7 @@ export function ContractorDraftComposer({
             >
               <option value="">Choose an Inspection Checklist...</option>
               {['Home-specific Inspection Checklists', 'Your Inspection Checklists', 'Starter Inspection Checklists'].map(group => {
-                const groupOptions = checklistOptions.filter(option => option.group_label === group);
+                const groupOptions = eligibleChecklistOptions.filter(option => option.group_label === group);
                 return groupOptions.length > 0 ? (
                   <optgroup key={group} label={group}>
                     {groupOptions.map(option => (

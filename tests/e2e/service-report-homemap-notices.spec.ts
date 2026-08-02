@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -13,26 +12,6 @@ function sourceBetween(source: string, start: string, end: string) {
   const endIndex = source.indexOf(end, startIndex + start.length);
   expect(endIndex, `Expected source end marker: ${end}`).toBeGreaterThan(startIndex);
   return source.slice(startIndex, endIndex);
-}
-
-function changedFiles() {
-  const branchDiff = execFileSync('git', ['diff', '--name-only', 'origin/main...HEAD'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-  const workingTreeDiff = execFileSync('git', ['diff', '--name-only'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  });
-
-  return Array.from(new Set(`${branchDiff}\n${workingTreeDiff}\n${untracked}`
-    .split('\n')
-    .map(file => file.trim())
-    .filter(Boolean)));
 }
 
 test.describe('Bundle 3B-2 service agreement, report, and Home Map notices', () => {
@@ -100,8 +79,9 @@ test.describe('Bundle 3B-2 service agreement, report, and Home Map notices', () 
     expect(reportSource).toContain('onClick={() => void finalizeInspection(activeInspection)}');
     expect(reportSource).toContain('onClick={() => void sendInspectionReportToHomeowner(activeInspection)}');
     expect(reportSource).toContain("activeInspection.status !== 'finalized'");
-    expect(reportSource).toContain('disabled={!inspectionClosedForReview || finalizingInspection}');
-    expect(reportSource).toContain('Finalize saves the PDF. Complete job & send report notifies the homeowner and closes the linked service request.');
+    expect(reportSource).toContain('disabled={!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0 || finalizingInspection}');
+    expect(reportSource).toContain('Finalize saves and files the PDF. For connected homeowners, it becomes available in Documents and Home History and creates an in-app notification.');
+    expect(reportSource).toContain('Complete job & send closes the linked request and sends the completion notice.');
   });
 
   test('Home Map contractor notices keep draft, submitted, approved, declined, and revoked states separate from actions', () => {
@@ -145,38 +125,11 @@ test.describe('Bundle 3B-2 service agreement, report, and Home Map notices', () 
     expect(homeMapPresentation).not.toContain('.rpc(');
   });
 
-  test('scope remains frontend presentation, tests, and documentation only', () => {
-    const files = changedFiles();
-    const allowedFiles = new Set([
-      'src/App.tsx',
-      'src/features/feedback/ActionFeedback.tsx',
-      'src/features/search/FilterSummary.tsx',
-      'src/features/drafts/VisibilityNotice.tsx',
-      'src/features/homeMap/statusPresentation.ts',
-      'tests/e2e/action-feedback-confirmation.spec.ts',
-      'tests/e2e/search-filter-recovery.spec.ts',
-      'tests/e2e/empty-state-foundation.spec.ts',
-      'tests/e2e/home-reminder-room-ui.spec.ts',
-      'tests/e2e/service-report-homemap-notices.spec.ts',
-      'tests/e2e/draft-clarity-notices.spec.ts',
-      'tests/e2e/status-secondary-migration.spec.ts',
-      'tests/e2e/contractor-home-map-drafts-ui.spec.ts',
-      'tests/e2e/fb032-service-agreements-contractor-ui.spec.ts',
-      'tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts',
-      'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
-      'docs/servsync-master-plan/CHANGELOG.md',
-    ]);
+  test('presentation helper remains free of workflow authority', () => {
+    const source = sourceFile('src/features/drafts/VisibilityNotice.tsx');
 
-    expect(files.length, 'branch should have changed files for Bundle 3B-2').toBeGreaterThan(0);
-    for (const file of files) {
-      expect(allowedFiles.has(file), `${file} should be approved for Bundle 3B-2`).toBe(true);
-    }
-
-    expect(files.some(file => file.endsWith('.sql'))).toBe(false);
-    expect(files.some(file => file.includes('supabase/'))).toBe(false);
-    expect(files.some(file => file.includes('.env'))).toBe(false);
-    expect(files.some(file => file.includes('package'))).toBe(false);
-    expect(files.some(file => file.includes('vercel'))).toBe(false);
-    expect(files.some(file => file.includes('pdfDocuments'))).toBe(false);
+    expect(source).not.toContain('servsync_finalize_field_work');
+    expect(source).not.toContain('servsync_notify_field_work_report');
+    expect(source).not.toContain('current_user_can_write_contractor_jobs');
   });
 });

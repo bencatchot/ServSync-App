@@ -8,8 +8,10 @@ import {
   findingStatusAccentClass,
   findingStatusBorderColor,
   findingStatusDotClass,
+  findingStatusIsCleared,
   findingStatusIsRecorded,
   findingStatusIsUnanswered,
+  findingStatusNeedsAttention,
   findingStatusPresentation,
   findingStatusSelectedButtonClass,
 } from '../../src/features/findings/statusPresentation';
@@ -25,12 +27,13 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Findings condition/status presentation', () => {
-  test('defines neutral unanswered status plus canonical presentation for the five recorded finding values', () => {
-    expect(FINDING_STATUS_ORDER).toEqual(['Not Recorded', 'Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);
+  test('defines neutral unanswered and not-applicable states plus canonical recorded finding values', () => {
+    expect(FINDING_STATUS_ORDER).toEqual(['Not Recorded', 'Pass', 'Not Applicable', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);
 
     expect(UNANSWERED_FINDING_STATUS).toBe('Not Recorded');
     expect(findingStatusPresentation('Not Recorded')).toMatchObject({ label: 'Not Recorded', tone: 'neutral', dotClass: 'bg-slate-400' });
     expect(findingStatusPresentation('Pass')).toMatchObject({ label: 'Pass', tone: 'success', dotClass: 'bg-emerald-500' });
+    expect(findingStatusPresentation('Not Applicable')).toMatchObject({ label: 'Not Applicable', tone: 'muted', dotClass: 'bg-slate-400' });
     expect(findingStatusPresentation('Monitor')).toMatchObject({ label: 'Monitor', tone: 'info', dotClass: 'bg-blue-500' });
     expect(findingStatusPresentation('Fixed On Site')).toMatchObject({ label: 'Fixed On Site', tone: 'violet', dotClass: 'bg-violet-500' });
     expect(findingStatusPresentation('Needs Repair')).toMatchObject({ label: 'Needs Repair', tone: 'warning', dotClass: 'bg-amber-500' });
@@ -43,6 +46,9 @@ test.describe('Findings condition/status presentation', () => {
     expect(findingStatusIsUnanswered('Not Recorded')).toBe(true);
     expect(findingStatusIsRecorded('Not Recorded')).toBe(false);
     expect(findingStatusIsRecorded('Monitor')).toBe(true);
+    expect(findingStatusIsCleared('Not Applicable')).toBe(true);
+    expect(findingStatusNeedsAttention('Not Applicable')).toBe(false);
+    expect(findingStatusNeedsAttention('Monitor')).toBe(true);
   });
 
   test('falls back safely for unknown runtime finding values', () => {
@@ -91,7 +97,7 @@ test.describe('Findings condition/status presentation', () => {
     expect(source).toContain("activeInspection.status === 'draft' && (!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0)");
 
     expect(roomSummary).toContain("const rUrgent = r.findings.some(f => f.status === 'Urgent');");
-    expect(roomSummary).toContain("const rIssues = r.findings.filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length;");
+    expect(roomSummary).toContain('const rIssues = r.findings.filter(f => findingStatusNeedsAttention(f.status)).length;');
     expect(roomSummary).toContain("const rFixed = r.findings.filter(f => f.status === 'Fixed On Site').length;");
     expect(roomSummary).toContain("findingStatusPresentation(rUrgent ? 'Urgent' : 'Needs Repair').tone");
     expect(roomSummary).toContain("findingStatusPresentation('Fixed On Site').tone");

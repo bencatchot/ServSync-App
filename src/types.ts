@@ -1309,7 +1309,7 @@ export type HomeDocumentUploadSource =
   | 'home_photo'
   | 'app_generated';
 
-export type FindingStatus = 'Not Recorded' | 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';
+export type FindingStatus = 'Not Recorded' | 'Pass' | 'Not Applicable' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';
 
 export interface InspectionRoomFinding {
   source_key?: string;
