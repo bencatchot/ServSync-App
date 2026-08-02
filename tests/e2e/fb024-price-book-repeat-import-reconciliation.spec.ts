@@ -39,6 +39,7 @@ async function installImportHarness(page: Page) {
               row_fingerprint: 'a'.repeat(64),
               mapped_fields: row.mapped_fields,
               match_type: index === 0 ? 'none' : 'external_id',
+              reconciliation_status: index === 0 ? 'new' : 'changed',
               match_confidence: index === 0 ? 'none' : 'high',
               target_item_id: index === 0 ? null : 'item-2',
               target_updated_at: index === 0 ? null : '2026-08-02T12:00:00.000Z',
@@ -93,6 +94,14 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(sourceFile('src/features/price-book/priceBookCsvReconciliation.ts')).not.toMatch(/Price Book Ninjas|Housecall Pro|Jobber|ServiceTitan/i);
   });
 
+  test('blocks exact repeated rows without stable external IDs', () => {
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv('title,price\nDiagnostic visit,95\nDiagnostic visit,95'));
+    const rows = buildPriceBookImportRows(parsed.rows, autoMapPriceBookCsvHeaders(parsed.headers));
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every(row => row.errors.includes('This exact row is repeated without an external item ID.'))).toBe(true);
+  });
+
   test('rejects duplicate CSV headers before mapping can become ambiguous', () => {
     expect(() => priceBookCsvRowsFromParsed(parsePriceBookCsv('title,Title\nFirst,Second')))
       .toThrow('CSV headers must be unique so every mapped field is deterministic.');
@@ -127,6 +136,10 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(sql).toContain('Import file size must be between 1 byte and 1 MB.');
     expect(sql).toContain('p_file_size_bytes');
     expect(sql).toContain('Normalized values must contain only declared mapped fields.');
+    expect(sql).toContain('Normalized Price Book import rows are too large.');
+    expect(sql).toContain('This exact row is repeated without an external item ID.');
+    expect(sql).toContain('More than one import row resolves to the same Price Book item.');
+    expect(sql).toContain("'reconciliation_status'");
     expect(sql).toContain("elsif v_current is not distinct from v_baseline then");
     expect(sql).toContain("elsif v_current is not distinct from v_incoming then");
     expect(sql).toContain("v_conflicts := array_append(v_conflicts, v_field)");
@@ -159,6 +172,8 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     await expect(page.getByText('2 rows; 0 blocked before server preview.')).toBeVisible();
     await page.getByRole('button', { name: 'Preview reconciliation' }).click();
     await expect(page.getByTestId('price-book-import-review-row')).toHaveCount(2);
+    await expect(page.getByText(/Row 2 · New · New item/i)).toBeVisible();
+    await expect(page.getByText(/Row 3 · Changed · Stable external ID match/i)).toBeVisible();
     await expect(page.getByLabel('Action').nth(0)).toHaveValue('add');
     await expect(page.getByLabel('Action').nth(1)).toHaveValue('update');
     await expect(page.getByText('Price Required').first()).toBeVisible();

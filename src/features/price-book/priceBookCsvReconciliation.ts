@@ -29,6 +29,7 @@ export type PriceBookCsvRow = {
 
 export type PriceBookImportAction = 'add' | 'update' | 'skip';
 export type PriceBookImportMatchType = 'none' | 'external_id' | 'sku_suggestion' | 'exact_duplicate' | 'ambiguous';
+export type PriceBookImportReconciliationStatus = 'new' | 'unchanged' | 'changed' | 'ambiguous' | 'invalid';
 
 export type PriceBookNormalizedValues = Partial<{
   title: string;
@@ -77,6 +78,7 @@ export type PriceBookImportPreviewRow = {
   row_fingerprint: string;
   mapped_fields: string[];
   match_type: PriceBookImportMatchType;
+  reconciliation_status: PriceBookImportReconciliationStatus;
   match_confidence: 'none' | 'low' | 'medium' | 'high';
   target_item_id: string | null;
   target_updated_at: string | null;
@@ -302,7 +304,7 @@ export function buildPriceBookImportRows(rows: PriceBookCsvRow[], mapping: Price
     if (externalId) repeatedExternalIds.set(externalId, (repeatedExternalIds.get(externalId) || 0) + 1);
   });
 
-  return rows.map(row => {
+  const normalizedRows = rows.map(row => {
     const errors: string[] = [];
     const warnings: string[] = [];
     const values: PriceBookNormalizedValues = {};
@@ -380,6 +382,29 @@ export function buildPriceBookImportRows(rows: PriceBookCsvRow[], mapping: Price
         mapped_fields: Array.from(new Set(mappedFields)),
         values,
       },
+    };
+  });
+
+  const repeatedUnidentifiedRows = new Map<string, number>();
+  normalizedRows.forEach(row => {
+    if (row.externalItemId) return;
+    const signature = JSON.stringify({
+      mappedFields: [...row.requestRow.mapped_fields].sort(),
+      values: row.requestRow.values,
+    });
+    repeatedUnidentifiedRows.set(signature, (repeatedUnidentifiedRows.get(signature) || 0) + 1);
+  });
+
+  return normalizedRows.map(row => {
+    if (row.externalItemId) return row;
+    const signature = JSON.stringify({
+      mappedFields: [...row.requestRow.mapped_fields].sort(),
+      values: row.requestRow.values,
+    });
+    if ((repeatedUnidentifiedRows.get(signature) || 0) < 2) return row;
+    return {
+      ...row,
+      errors: [...row.errors, 'This exact row is repeated without an external item ID.'],
     };
   });
 }

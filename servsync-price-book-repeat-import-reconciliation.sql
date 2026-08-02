@@ -406,6 +406,9 @@ begin
   if jsonb_array_length(p_rows) < 1 or jsonb_array_length(p_rows) > 500 then
     raise exception 'Price Book imports require between 1 and 500 rows.';
   end if;
+  if length(p_rows::text) > 4194304 then
+    raise exception 'Normalized Price Book import rows are too large.';
+  end if;
 
   select * into v_source
     from public.contractor_price_book_import_sources
@@ -422,7 +425,7 @@ begin
     v_row_number := nullif(v_row ->> 'row_number', '')::integer;
     v_external_item_id := nullif(trim(v_row ->> 'external_item_id'), '');
     v_values := coalesce(v_row -> 'values', '{}'::jsonb);
-    select coalesce(array_agg(value), '{}'::text[])
+    select coalesce(array_agg(value order by value), '{}'::text[])
       into v_mapped_fields
       from jsonb_array_elements_text(coalesce(v_row -> 'mapped_fields', '[]'::jsonb));
 
@@ -725,6 +728,52 @@ begin
       'errors', v_errors
     ));
   end loop;
+
+  select coalesce(jsonb_agg(
+    case
+      when duplicate_unidentified_count > 1 then
+        row_value || jsonb_build_object(
+          'match_type', 'ambiguous',
+          'match_confidence', 'low',
+          'reconciliation_status', 'invalid',
+          'recommended_action', 'skip',
+          'allowed_actions', jsonb_build_array('skip'),
+          'errors', coalesce(row_value -> 'errors', '[]'::jsonb)
+            || jsonb_build_array('This exact row is repeated without an external item ID.')
+        )
+      when duplicate_target_count > 1 then
+        row_value || jsonb_build_object(
+          'match_type', 'ambiguous',
+          'match_confidence', 'low',
+          'reconciliation_status', 'ambiguous',
+          'recommended_action', 'skip',
+          'allowed_actions', jsonb_build_array('skip'),
+          'errors', coalesce(row_value -> 'errors', '[]'::jsonb)
+            || jsonb_build_array('More than one import row resolves to the same Price Book item.')
+        )
+      else row_value || jsonb_build_object(
+        'reconciliation_status', case
+          when jsonb_array_length(coalesce(row_value -> 'errors', '[]'::jsonb)) > 0 then 'invalid'
+          when row_value ->> 'match_type' = 'ambiguous'
+            or jsonb_array_length(coalesce(row_value -> 'conflict_fields', '[]'::jsonb)) > 0 then 'ambiguous'
+          when nullif(row_value ->> 'target_item_id', '') is null then 'new'
+          when row_value -> 'current_values' is not distinct from row_value -> 'result_values' then 'unchanged'
+          else 'changed'
+        end
+      )
+    end
+    order by row_ordinality
+  ), '[]'::jsonb)
+    into v_rows
+    from (
+      select row_value,
+             row_ordinality,
+             count(*) filter (where nullif(row_value ->> 'external_item_id', '') is null)
+               over (partition by row_value ->> 'row_fingerprint') as duplicate_unidentified_count,
+             count(*) filter (where nullif(row_value ->> 'target_item_id', '') is not null)
+               over (partition by row_value ->> 'target_item_id') as duplicate_target_count
+        from jsonb_array_elements(v_rows) with ordinality rows(row_value, row_ordinality)
+    ) classified_rows;
 
   return jsonb_build_object(
     'source', jsonb_build_object('id', v_source.id, 'display_name', v_source.display_name),

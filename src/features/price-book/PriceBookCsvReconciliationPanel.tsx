@@ -91,6 +91,14 @@ function matchLabel(matchType: PriceBookImportPreview['rows'][number]['match_typ
   return 'New item';
 }
 
+function reconciliationStatusLabel(status: PriceBookImportPreview['rows'][number]['reconciliation_status']) {
+  if (status === 'new') return 'New';
+  if (status === 'unchanged') return 'Unchanged';
+  if (status === 'changed') return 'Changed';
+  if (status === 'ambiguous') return 'Ambiguous';
+  return 'Invalid';
+}
+
 export function PriceBookCsvReconciliationPanel({
   api,
   onCompleted,
@@ -364,7 +372,7 @@ export function PriceBookCsvReconciliationPanel({
             {previewRows.map(row => (
               <article key={row.row_number} className="rounded-xl border border-slate-200 p-3" data-testid="price-book-import-review-row">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0"><p className="text-xs font-bold uppercase text-slate-500">Row {row.row_number} · {matchLabel(row.match_type)}</p><h5 className="mt-1 truncate font-bold text-slate-950">{valueLabel('title', row.incoming_values.title)}</h5><p className="mt-1 text-xs font-semibold text-slate-600">{valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p></div>
+                  <div className="min-w-0"><p className="text-xs font-bold uppercase text-slate-500">Row {row.row_number} · {reconciliationStatusLabel(row.reconciliation_status)} · {matchLabel(row.match_type)}</p><h5 className="mt-1 truncate font-bold text-slate-950">{valueLabel('title', row.incoming_values.title)}</h5><p className="mt-1 text-xs font-semibold text-slate-600">{valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p></div>
                   <label className="text-xs font-bold text-slate-700">Action<select className={`${inputClass} mt-1`} value={actions[String(row.row_number)]} disabled={executing} onChange={event => setActions(current => ({ ...current, [String(row.row_number)]: event.target.value as PriceBookImportAction }))}>{row.allowed_actions.map(action => <option key={action} value={action}>{actionLabel(action)}</option>)}</select></label>
                 </div>
                 {row.errors.length > 0 ? <div className="mt-2 text-xs text-red-700">{row.errors.join(' ')}</div> : null}

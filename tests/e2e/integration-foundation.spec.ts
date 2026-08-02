@@ -153,7 +153,7 @@ test.describe('provider-neutral integration foundation source checks', () => {
     expect(catalog).toContain("'integration_outbox_events'");
     expect(docs).toMatch(/provider-neutral integration foundation/i);
     expect(docs).toMatch(/no live integrations/i);
-    expect(docs).toMatch(/QuickBooks\/accounting sync is not live/i);
+    expect(docs).toMatch(/QuickBooks\/accounting sync[\s\S]{0,120}(?:is|are) not live/i);
     expect(docs).toMatch(/payments\/Stripe/i);
   });
 });

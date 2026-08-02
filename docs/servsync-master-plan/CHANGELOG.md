@@ -19,7 +19,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Completed_Features.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Implements Price Book Repeat-Import Reconciliation v1 as the first post-organization FB-024 slice. A source-only additive migration adds private tenant-owned import-source identities, immutable batch and row audit, minimal touched-field before/after patches, reuse of the private provider-neutral external-object mapping foundation, deterministic preview matching, three-way manual-edit preservation, and one explicit-action, idempotent, all-or-nothing execute RPC. The CSV workspace now selects a stable catalog source, maps a generic external item ID, reviews Current/Incoming/Result values, and requires an explicit Add, Update, or Skip action while preserving the 1 MB/500-row limits and Price Required versus explicit zero semantics.
+- Summary of change: Implements Price Book Repeat-Import Reconciliation v1 as the first post-organization FB-024 slice. A source-only additive migration adds private tenant-owned import-source identities, immutable batch and row audit, minimal touched-field before/after patches, reuse of the private provider-neutral external-object mapping foundation, deterministic preview matching, three-way manual-edit preservation, and one explicit-action, idempotent, all-or-nothing execute RPC. The CSV workspace now selects a stable catalog source, maps a generic external item ID, classifies New/Unchanged/Changed/Ambiguous/Invalid rows, reviews Current/Incoming/Result values, and requires an explicit Add, Update, or Skip action. Exact repeated no-ID rows, multi-row target collisions, and oversized normalized RPC payloads fail closed while the 1 MB/500-row limits and Price Required versus explicit zero semantics remain intact.
 - Reason for change: Contractors need safe repeat imports that can reconcile stable source records without replacing omitted fields, overwriting conflicting manual edits, exposing private mapping metadata, or relying on filenames as identity.
 - Tests/checks run:
   - `npm run typecheck`
@@ -32,7 +32,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Known risks or follow-ups:
   - The migration was created but was not applied to Production, Demo, Sandbox, or any other environment. The reconciliation UI requires a separately approved database rollout before frontend promotion.
   - Rollback mutation is deliberately excluded. The immutable audit captures only sanitized mapped-field before/after patches for a later guarded rollback slice; raw CSV content is not retained.
-  - Rows without a stable external item ID remain Add/Skip duplicate-warning flows. XLSX, cost/margin, Saved Charges, assemblies, export, provider-specific parsers/APIs, scheduled sync, and broader maturity remain future work.
+  - Rows without a stable external item ID remain Add/Skip duplicate-warning flows unless the same normalized no-ID row is repeated in one file, which is blocked. XLSX, cost/margin, Saved Charges, assemblies, export, provider-specific parsers/APIs, scheduled sync, and broader maturity remain future work.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-024 now records Repeat-Import Reconciliation v1 as source-complete but unapplied and keeps guarded batch rollback as the next focused slice.
