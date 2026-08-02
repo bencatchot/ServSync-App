@@ -2,6 +2,7 @@ import type { ContractorPriceBookItem, EstimateLineType } from '../../types';
 
 export type PriceBookStatusView = 'active' | 'archived';
 export type PriceBookTypeFilter = 'all' | EstimateLineType;
+export type PriceBookLoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export type PriceBookFilters = {
   status: PriceBookStatusView;

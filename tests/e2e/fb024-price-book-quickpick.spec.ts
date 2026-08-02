@@ -40,13 +40,9 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
 
   test('maps Price Book items into editable estimate lines with safe fields only', () => {
     const source = appSource();
-    const mapperSource = sourceBetween(
-      source,
-      'function estimateLineDraftFromPriceBookItem',
-      'function createBlankInvoiceDraft',
-    );
+    const mapperSource = sourceFile('src/features/price-book/priceBookEstimateLineSnapshot.ts');
 
-    expect(mapperSource).toContain('line_type: normalizeEstimateLineType(item.line_type)');
+    expect(mapperSource).toContain('line_type: normalizeWorkComposerLineType(item.line_type)');
     expect(mapperSource).toContain('description: item.title');
     expect(mapperSource).toContain('line_title: item.title');
     expect(mapperSource).toContain("customer_description: item.customer_description || ''");
@@ -67,6 +63,8 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     ]) {
       expect(mapperSource).not.toContain(privateMetadata);
     }
+    expect(source).toContain('const nextLine = priceBookItemToEstimateLineDraft(item);');
+    expect(source).not.toContain('function estimateLineDraftFromPriceBookItem');
   });
 
   test('unified saved-item picker copy explains quantity, review, and private metadata boundaries', () => {
