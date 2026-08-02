@@ -4,6 +4,40 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-02
+
+- Branch: `codex/draft-first-production-rollout-closeout-v1`
+- Starting main SHA: `b23e18708601c515ff218823caf8825d5d72fd00`
+- Files changed:
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Records the owner-approved Production activation of Draft-first as the standard Jobs experience for authorized contractors. The controlled rollout verified the complete installed Production durable Draft foundation, retained the existing READY deployment at main SHA `b23e18708601c515ff218823caf8825d5d72fd00`, confirmed all three compiled global gates as `true`, and changed only the private server rollout setting from `cohort` to `all_contractors`. No SQL file, Vercel variable, deployment, contractor billing row, or application record changed during activation. Public smoke passed 7/7 before and after activation. Dedicated homeowner read-only smoke passed, and corrected contractor owner read-only validation confirmed the Draft-first Jobs landing on desktop and mobile with zero console errors or failed requests.
+- Reason for change: Planning and marketing records still described Draft-first as Preview/cohort-bound after the approved Production rollout. Current documentation must distinguish the now-live standard exposure from unfinished role coverage, mutation smoke, telemetry, and later Draft-first maturity.
+- Tests/checks run:
+  - `npm run typecheck`
+  - Production build with all three Draft/Work flags explicitly enabled
+  - focused Draft-first source, mapping, persistence, launch, authorization, Price Book, and legacy regression coverage
+  - Production public smoke before and after activation: 7/7 each
+  - `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke`: homeowner passed; contractor authentication passed but the existing test stopped on the stale `Search homeowner, city, address` placeholder
+  - corrected no-mutation contractor owner browser validation at 1280x720 and 390x844: Draft-first Jobs visible, legacy combined Jobs heading absent, zero console errors, zero failed requests
+  - Production catalog, RLS, grants, function signature, rollout-mode, record-count, and waiting-lock verification
+- Known risks or follow-ups:
+  - Mutating Production Draft save/reopen/launch smoke was not performed. Optional field-tech/viewer credentials and stable record IDs remain unconfigured.
+  - The dedicated read-only Production smoke spec still has a stale Homeowners search placeholder assertion and should be corrected in a separate test-only change.
+  - FB-024 remains active for broader Price Book maturity. FB-035 remains active for controlled mutation evidence, optional role coverage, telemetry, and later Draft-first maturity.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records standard Production exposure and narrows the remaining work; FB-024 records the merged Production-visible Draft-first picker while preserving future maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first execution summary now records the verified Production deployment, all-contractor server mode, enabled global gates, and bounded authenticated validation evidence.
+- Marketing inventory impact:
+  - MARKETING PRODUCT INVENTORY UPDATED: YES
+  - REASON: Draft-first Jobs and the Estimate Draft Price Book picker are now Production-live beta capabilities, while role, payment, provider-delivery, and broader maturity claims remain bounded.
+
 ## 2026-08-01
 
 - Branch: `agent/fb024-draft-first-price-book-picker-v1`

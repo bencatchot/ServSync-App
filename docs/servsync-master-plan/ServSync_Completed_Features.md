@@ -1,8 +1,8 @@
 # ServSync Completed Features
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
-Last reconciled against `origin/main` at `e67ef9ceaa0f3bd948bdb0de33bbde6f11d8dd38` (merged PR #361).
+Last reconciled against `origin/main` at `b23e18708601c515ff218823caf8825d5d72fd00` (merged PR #362).
 
 ## Purpose
 
@@ -22,7 +22,7 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 | ID | Completed milestone | Completion evidence on current main | Remaining active or future work |
 | --- | --- | --- | --- |
 | FB-001 | Invite a Contractor to ServSync v1 | Backlog/changelog history records the homeowner contractor invite lead workflow as completed/functional; current source and marketing inventory retain contractor invite/claim lead surfaces while excluding automated outreach claims. | Future outreach analytics, duplicate lead grouping, and claim-flow improvements must be separately scoped. |
-| FB-002 | Contractor Estimate Defaults & Templates v1 | Estimate templates, saved charges, Price Book foundation, CSV preview/import coverage, estimate-only quick-pick behavior, and the PR #361 Price Book management cleanup are merged and documented through the changelog and source/tests. | Price Book maturity, including the Draft-first picker and later reusable-content work, remains active under FB-024. |
+| FB-002 | Contractor Estimate Defaults & Templates v1 | Estimate templates, saved charges, Price Book foundation, CSV preview/import coverage, legacy estimate quick-pick behavior, PR #361 Price Book management cleanup, and PR #362 Draft-first Price Book Picker v1 are merged and documented through the changelog and source/tests. | Broader Price Book and reusable-content maturity remains active under FB-024. |
 | FB-003 | Core connection and multi-property permission milestone | Connection request, connected contractor/customer context, per-property permission direction, and controlled-beta permission evidence are represented in source, tests, master-plan sections, and changelog. | Local-customer multi-property claim completed separately under FB-003A; request-free operational document delivery authorization remains active under FB-003B. |
 | FB-003A | Local-Customer Multi-Property Claim | Completed 2026-08-01. PR #348 merged at `a20cee5ef184709ca462f6546f54a61e655aa058`, adding explicit selected-property invitation membership, token-free multi-property preview, complete create-or-match mapping, atomic acceptance, legacy single-property compatibility, replay protection, stale invalidation, connected-homeowner null safety, tenant isolation, and token containment. The reviewed SQL was applied to Production with catalog/security validation and public smoke passed 7/7; authenticated Tests A-H passed only in Demo against source `6e5226e869e64bfed3102acfa09779b846cbbb88`, as recorded in [FB-003A Authenticated Demo Validation](../demo/validation/FB-003A_Authenticated_Demo_Validation.md). | Automated/provider delivery remains excluded under FB-003B. Raw expected-replay RPC/JSON detail is separate P3 polish under FB-036. |
 | FB-011 | Mobile Workflow Polish controlled-beta baseline | Mobile shell/navigation slices, responsive overflow fixes, mobile smoke coverage, PWA metadata, app-link helper, and mobile checklist documentation are merged and recorded in the changelog. | Native apps remain FB-015; any additional mobile QA should be a new focused follow-up. |
