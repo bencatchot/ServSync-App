@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const priceBookMapperSource = () => sourceFile('src/features/price-book/priceBookEstimateLineSnapshot.ts');
 const workComposerDraftSource = () => sourceFile('src/features/work-composer/workComposerDrafts.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
@@ -81,31 +82,32 @@ test.describe('Estimate item reuse polish', () => {
 
   test('insertion reuses approved mappers, appends to the draft array, expands groups, and focuses inserted lines', () => {
     const source = appSource();
-    const mapperSource = sourceBetween(source, 'function estimateLineDraftFromSavedCharge', 'function createBlankInvoiceDraft');
+    const savedChargeMapperSource = sourceBetween(source, 'function estimateLineDraftFromSavedCharge', 'function createBlankInvoiceDraft');
+    const priceBookMapper = priceBookMapperSource();
     const insertionSource = sourceBetween(source, 'const addSavedChargeToEstimateDraft =', 'const addBlankEstimateLineToDraft =');
 
-    expect(mapperSource).toContain('line_type: normalizeEstimateLineType(charge.line_type)');
-    expect(mapperSource).toContain('description: savedEstimateChargeLineDescription(charge)');
-    expect(mapperSource).toContain('line_title: charge.name');
-    expect(mapperSource).toContain("customer_description: ''");
-    expect(mapperSource).toContain('quantity: String(Number(charge.default_quantity || 1))');
-    expect(mapperSource).toContain("unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')");
-    expect(mapperSource).toContain('unit_price: charge.amount_cents === 0 ?');
-    expect(mapperSource).toContain('line_type: normalizeEstimateLineType(item.line_type)');
-    expect(mapperSource).toContain('description: item.title');
-    expect(mapperSource).toContain('line_title: item.title');
-    expect(mapperSource).toContain("customer_description: item.customer_description || ''");
-    expect(mapperSource).toContain("quantity: '1'");
-    expect(mapperSource).toContain("unit: item.unit || 'each'");
-    expect(mapperSource).toContain('item.default_unit_price_cents');
-    expect(mapperSource).toContain('item.labor_hours');
-    expect(mapperSource).not.toContain('job_work_item_id');
-    expect(mapperSource).not.toContain('contractor_id');
-    expect(mapperSource).not.toContain('estimate_id');
-    expect(mapperSource).not.toContain('invoice_id');
+    expect(savedChargeMapperSource).toContain('line_type: normalizeEstimateLineType(charge.line_type)');
+    expect(savedChargeMapperSource).toContain('description: savedEstimateChargeLineDescription(charge)');
+    expect(savedChargeMapperSource).toContain('line_title: charge.name');
+    expect(savedChargeMapperSource).toContain("customer_description: ''");
+    expect(savedChargeMapperSource).toContain('quantity: String(Number(charge.default_quantity || 1))');
+    expect(savedChargeMapperSource).toContain("unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')");
+    expect(savedChargeMapperSource).toContain('unit_price: charge.amount_cents === 0 ?');
+    expect(priceBookMapper).toContain('line_type: normalizeWorkComposerLineType(item.line_type)');
+    expect(priceBookMapper).toContain('description: item.title');
+    expect(priceBookMapper).toContain('line_title: item.title');
+    expect(priceBookMapper).toContain("customer_description: item.customer_description || ''");
+    expect(priceBookMapper).toContain("quantity: '1'");
+    expect(priceBookMapper).toContain("unit: item.unit || 'each'");
+    expect(priceBookMapper).toContain('item.default_unit_price_cents');
+    expect(priceBookMapper).toContain('item.labor_hours');
+    expect(priceBookMapper).not.toContain('job_work_item_id');
+    expect(priceBookMapper).not.toContain('contractor_id');
+    expect(priceBookMapper).not.toContain('estimate_id');
+    expect(priceBookMapper).not.toContain('invoice_id');
 
     expect(insertionSource).toContain('const nextLine = estimateLineDraftFromSavedCharge(charge);');
-    expect(insertionSource).toContain('const nextLine = estimateLineDraftFromPriceBookItem(item);');
+    expect(insertionSource).toContain('const nextLine = priceBookItemToEstimateLineDraft(item);');
     expect(insertionSource).toContain('expandEstimateLineGroup(estimateLineVisualGroup(nextLine));');
     expect(insertionSource).toContain('line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine]');
     expect(insertionSource).toContain('setEstimateLineFocusId(nextLine.id)');

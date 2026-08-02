@@ -10,6 +10,7 @@ export type PriceBookFilters = {
   lineType: PriceBookTypeFilter;
   trade: string;
   category: string;
+  subcategory: string;
 };
 
 export const PRICE_BOOK_PAGE_SIZE = 25;
@@ -22,10 +23,10 @@ export function priceBookItemIsArchived(item: ContractorPriceBookItem) {
   return !item.active || Boolean(item.archived_at);
 }
 
-export function priceBookFilterOptions(items: ContractorPriceBookItem[], field: 'trade' | 'category') {
+export function priceBookFilterOptions(items: ContractorPriceBookItem[], field: 'trade' | 'category' | 'subcategory') {
   const labels = new Map<string, string>();
   items.forEach(item => {
-    const label = item[field].trim();
+    const label = (item[field] || '').trim();
     if (!label) return;
     const key = normalize(label);
     if (!labels.has(key)) labels.set(key, label);
@@ -37,12 +38,14 @@ export function filterPriceBookItems(items: ContractorPriceBookItem[], filters: 
   const search = normalize(filters.search);
   const trade = normalize(filters.trade);
   const category = normalize(filters.category);
+  const subcategory = normalize(filters.subcategory);
 
   return items
     .filter(item => filters.status === 'archived' ? priceBookItemIsArchived(item) : !priceBookItemIsArchived(item))
     .filter(item => filters.lineType === 'all' || item.line_type === filters.lineType)
     .filter(item => !trade || normalize(item.trade) === trade)
     .filter(item => !category || normalize(item.category) === category)
+    .filter(item => !subcategory || normalize(item.subcategory) === subcategory)
     .filter(item => {
       if (!search) return true;
       return normalize([
@@ -51,6 +54,7 @@ export function filterPriceBookItems(items: ContractorPriceBookItem[], filters: 
         item.internal_notes,
         item.trade,
         item.category,
+        item.subcategory,
         item.sku,
         item.unit,
       ].filter(Boolean).join(' ')).includes(search);

@@ -225,7 +225,11 @@ import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
 import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
 import { contractorJobsNeedsAttentionCount } from './features/work/contractorWorkSelectors';
-import { ContractorPriceBookWorkspace, type PriceBookLoadState } from './features/price-book/ContractorPriceBookWorkspace';
+import {
+  ContractorPriceBookWorkspace,
+  type ContractorPriceBookBulkChanges,
+  type PriceBookLoadState,
+} from './features/price-book/ContractorPriceBookWorkspace';
 import { contractorPriceBookAccess } from './features/price-book/priceBookAccess';
 import { priceBookItemToEstimateLineDraft } from './features/price-book/priceBookEstimateLineSnapshot';
 import {
@@ -936,6 +940,7 @@ type ContractorPriceBookItemDraft = {
   internal_notes: string;
   trade: string;
   category: string;
+  subcategory: string;
   line_type: EstimateLineType;
   unit: string;
   default_unit_price: string;
@@ -962,6 +967,7 @@ type ContractorPriceBookCsvField =
   | 'internal_notes'
   | 'trade'
   | 'category'
+  | 'subcategory'
   | 'line_type'
   | 'unit'
   | 'default_unit_price'
@@ -983,6 +989,7 @@ type ContractorPriceBookCsvPreviewRow = {
     internal_notes: string;
     trade: string;
     category: string;
+    subcategory: string | null;
     line_type: EstimateLineType;
     unit: string | null;
     default_unit_price_cents: number | null;
@@ -1671,6 +1678,7 @@ function createBlankContractorPriceBookItemDraft(overrides: Partial<ContractorPr
     internal_notes: '',
     trade: '',
     category: '',
+    subcategory: '',
     line_type: 'material',
     unit: 'each',
     default_unit_price: '',
@@ -1689,6 +1697,7 @@ function contractorPriceBookItemDraftFromRecord(item: ContractorPriceBookItem): 
     internal_notes: item.internal_notes || '',
     trade: item.trade || '',
     category: item.category || '',
+    subcategory: item.subcategory || '',
     line_type: normalizeEstimateLineType(item.line_type),
     unit: item.unit || '',
     default_unit_price: item.default_unit_price_cents === null || item.default_unit_price_cents === undefined
@@ -1835,6 +1844,7 @@ const CONTRACTOR_PRICE_BOOK_CSV_FIELDS: Array<{ key: ContractorPriceBookCsvField
   { key: 'internal_notes', label: 'Internal notes', helper: 'Private contractor notes.' },
   { key: 'trade', label: 'Trade', helper: 'HVAC, plumbing, electrical, etc.' },
   { key: 'category', label: 'Category', helper: 'Service, repair, material, or your own grouping.' },
+  { key: 'subcategory', label: 'Subcategory', helper: 'Optional grouping beneath category.' },
   { key: 'line_type', label: 'Line type', helper: 'labor, material, fee, or other.' },
   { key: 'unit', label: 'Unit', helper: 'Each, hour, job, lot, etc.' },
   { key: 'default_unit_price', label: 'Default price', helper: 'Dollar price such as $95.00. Blank means Price Required.' },
@@ -1851,6 +1861,7 @@ const CONTRACTOR_PRICE_BOOK_CSV_FIELD_ALIASES: Record<ContractorPriceBookCsvFiel
   internal_notes: ['internalnotes', 'internal_notes', 'notes', 'note', 'private_notes', 'privatenotes', 'internalnote'],
   trade: ['trade', 'trade_type', 'tradetype', 'discipline'],
   category: ['category', 'group', 'section', 'work_category', 'workcategory'],
+  subcategory: ['subcategory', 'sub_category', 'subgroup', 'sub_group', 'subsection', 'sub_section', 'work_subcategory', 'worksubcategory'],
   line_type: ['line_type', 'linetype', 'type', 'item_type', 'itemtype'],
   unit: ['unit', 'uom', 'measure', 'unit_of_measure', 'unitofmeasure'],
   default_unit_price: ['price', 'rate', 'amount', 'default_price', 'defaultprice', 'default_unit_price', 'defaultunitprice', 'unit_price', 'unitprice'],
@@ -2045,6 +2056,7 @@ function buildContractorPriceBookCsvPreviewRows(
         internal_notes: contractorPriceBookCsvValue(row, mapping, 'internal_notes'),
         trade: contractorPriceBookCsvValue(row, mapping, 'trade'),
         category: contractorPriceBookCsvValue(row, mapping, 'category'),
+        subcategory: contractorPriceBookCsvValue(row, mapping, 'subcategory') || null,
         line_type: lineTypeParsed.lineType,
         unit: contractorPriceBookCsvValue(row, mapping, 'unit') || null,
         default_unit_price_cents: parsedPrice.cents,
@@ -2060,10 +2072,10 @@ function buildContractorPriceBookCsvPreviewRows(
 }
 
 const CONTRACTOR_PRICE_BOOK_SAMPLE_CSV = [
-  'title,description,notes,trade,category,line_type,unit,price,taxable,labor_hours,sku,active',
-  '"Standard service call","Initial visit and basic diagnostic review","Confirm scope before use",HVAC,Service,fee,visit,$95.00,yes,,SVC-001,true',
-  '"Hourly labor","Labor billed by hour","Adjust hours before use",General,Labor,labor,hour,85,true,1,LAB-001,true',
-  '"Permit coordination","Permit or inspection coordination when needed","Confirm local requirements",General,Fees,fee,each,,no,,PERMIT,true',
+  'title,description,notes,trade,category,subcategory,line_type,unit,price,taxable,labor_hours,sku,active',
+  '"Standard service call","Initial visit and basic diagnostic review","Confirm scope before use",HVAC,Service,Diagnostics,fee,visit,$95.00,yes,,SVC-001,true',
+  '"Hourly labor","Labor billed by hour","Adjust hours before use",General,Labor,,labor,hour,85,true,1,LAB-001,true',
+  '"Permit coordination","Permit or inspection coordination when needed","Confirm local requirements",General,Fees,Permits,fee,each,,no,,PERMIT,true',
 ].join('\n');
 
 function savedEstimateChargeLineDescription(charge: ContractorSavedEstimateCharge) {
@@ -22788,7 +22800,7 @@ function ContractorDashboard({
             .order('created_at', { ascending: true }),
           supabase
             .from('contractor_price_book_items')
-            .select('id, contractor_id, title, customer_description, internal_notes, trade, category, line_type, unit, default_unit_price_cents, taxable, labor_hours, sku, source, active, archived_at, created_at, updated_at')
+            .select('id, contractor_id, title, customer_description, internal_notes, trade, category, subcategory, line_type, unit, default_unit_price_cents, taxable, labor_hours, sku, source, active, archived_at, created_at, updated_at')
             .eq('contractor_id', loadedContractor.id)
             .order('active', { ascending: false })
             .order('title', { ascending: true }),
@@ -25633,6 +25645,7 @@ function ContractorDashboard({
       internal_notes: contractorPriceBookDraft.internal_notes.trim(),
       trade: contractorPriceBookDraft.trade.trim(),
       category: contractorPriceBookDraft.category.trim(),
+      subcategory: contractorPriceBookDraft.subcategory.trim() || null,
       line_type: normalizeEstimateLineType(contractorPriceBookDraft.line_type),
       unit: contractorPriceBookDraft.unit.trim() || null,
       default_unit_price_cents: priceValue === null ? null : dollarsToCents(contractorPriceBookDraft.default_unit_price),
@@ -25653,6 +25666,7 @@ function ContractorDashboard({
               internal_notes: payload.internal_notes,
               trade: payload.trade,
               category: payload.category,
+              subcategory: payload.subcategory,
               line_type: payload.line_type,
               unit: payload.unit,
               default_unit_price_cents: payload.default_unit_price_cents,
@@ -25700,6 +25714,44 @@ function ContractorDashboard({
       setError(readableError(err, 'Unable to update this Price Book item.'));
     } finally {
       setTogglingContractorPriceBookItemId(null);
+    }
+  };
+
+  const bulkUpdateContractorPriceBookItems = async (
+    itemIds: string[],
+    changes: ContractorPriceBookBulkChanges,
+    actionLabel: string,
+  ) => {
+    if (!supabase || !contractor?.id || !canManageEstimateSettings || contractorPriceBookLoadState !== 'ready') return false;
+    const uniqueIds = [...new Set(itemIds)];
+    const loadedIds = new Set(contractorPriceBookItems.map(item => item.id));
+    if (uniqueIds.length === 0 || uniqueIds.some(id => !loadedIds.has(id))) {
+      setError('The Price Book selection changed. Refresh the view and select the items again.');
+      return false;
+    }
+
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: updateError } = await supabase
+        .from('contractor_price_book_items')
+        .update(changes)
+        .eq('contractor_id', contractor.id)
+        .in('id', uniqueIds)
+        .select('id');
+      if (updateError) throw updateError;
+      const updatedIds = new Set((data || []).map(row => row.id));
+      if (updatedIds.size !== uniqueIds.length || uniqueIds.some(id => !updatedIds.has(id))) {
+        await loadContractor();
+        setError('Not every selected Price Book item was updated. The list was refreshed; review the results before trying again.');
+        return false;
+      }
+      setNotice(`Applied ${actionLabel} to ${uniqueIds.length} Price Book item${uniqueIds.length === 1 ? '' : 's'}.`);
+      await loadContractor();
+      return true;
+    } catch (err) {
+      setError(readableError(err, 'Unable to update the selected Price Book items. No additional actions were attempted.'));
+      return false;
     }
   };
 
@@ -40239,6 +40291,7 @@ function ContractorDashboard({
                     onSave={() => void saveContractorPriceBookItem()}
                     onEdit={editContractorPriceBookItem}
                     onToggleActive={item => void toggleContractorPriceBookItemActive(item)}
+                    onBulkUpdate={bulkUpdateContractorPriceBookItems}
                     csvTools={(
                       <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -40325,6 +40378,7 @@ function ContractorDashboard({
                                     <tr>
                                       <th className="border-b border-slate-200 py-2 pr-3">Row</th>
                                       <th className="border-b border-slate-200 py-2 pr-3">Title</th>
+                                      <th className="border-b border-slate-200 py-2 pr-3">Organization</th>
                                       <th className="border-b border-slate-200 py-2 pr-3">Type</th>
                                       <th className="border-b border-slate-200 py-2 pr-3">Price</th>
                                       <th className="border-b border-slate-200 py-2 pr-3">Status</th>
@@ -40335,6 +40389,9 @@ function ContractorDashboard({
                                       <tr key={row.rowNumber} className="align-top">
                                         <td className="border-b border-slate-100 py-2 pr-3 font-semibold text-slate-500">{row.rowNumber}</td>
                                         <td className="border-b border-slate-100 py-2 pr-3 text-slate-950">{row.payload.title || 'Missing title'}</td>
+                                        <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">
+                                          {[row.payload.trade, row.payload.category, row.payload.subcategory].filter(Boolean).join(' · ') || 'Uncategorized'}
+                                        </td>
                                         <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{estimateLineTypeLabel(row.payload.line_type)}</td>
                                         <td className="border-b border-slate-100 py-2 pr-3 text-slate-600">{contractorPriceBookPriceLabel(row.payload)}</td>
                                         <td className="border-b border-slate-100 py-2 pr-3">

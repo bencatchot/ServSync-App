@@ -13,6 +13,7 @@ function item(index: number): ContractorPriceBookItem {
     internal_notes: '',
     trade: index % 2 === 0 ? 'HVAC' : 'Plumbing',
     category: index % 3 === 0 ? 'Service' : 'Repair',
+    subcategory: index % 2 === 0 ? 'Diagnostics' : null,
     line_type: index % 2 === 0 ? 'labor' : 'material',
     unit: 'each',
     default_unit_price_cents: index * 100,
@@ -33,6 +34,7 @@ const blankDraft: ContractorPriceBookItemDraft = {
   internal_notes: '',
   trade: '',
   category: '',
+  subcategory: '',
   line_type: 'labor',
   unit: '',
   default_unit_price: '',
@@ -74,6 +76,7 @@ export function renderPriceBookWorkspace({
       onSave: () => undefined,
       onEdit: () => undefined,
       onToggleActive: () => undefined,
+      onBulkUpdate: async () => true,
     }),
   );
 }

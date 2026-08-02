@@ -68,6 +68,7 @@ export function DraftPriceBookPicker({
     lineType: 'all',
     trade: '',
     category: '',
+    subcategory: '',
   }), [items]);
   const trades = useMemo(() => priceBookFilterOptions(activeItems, 'trade'), [activeItems]);
   const categories = useMemo(() => priceBookFilterOptions(activeItems, 'category'), [activeItems]);
@@ -77,6 +78,7 @@ export function DraftPriceBookPicker({
     lineType,
     trade,
     category,
+    subcategory: '',
   }), [category, items, lineType, search, trade]);
   const pickerDisabled = disabled || !ready;
   const stateCopy = loadStateCopy(loadState, loadError);

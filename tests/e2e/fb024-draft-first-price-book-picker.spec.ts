@@ -17,6 +17,7 @@ function priceBookItem(overrides: Partial<ContractorPriceBookItem> = {}): Contra
     internal_notes: 'Private margin target',
     trade: 'Plumbing',
     category: 'Repair',
+    subcategory: 'Fittings',
     line_type: 'material',
     unit: 'each',
     default_unit_price_cents: 0,
@@ -48,7 +49,7 @@ async function installComposerHarness(page: Page) {
     const item = (overrides: Record<string, unknown> = {}) => ({
       id: 'price-book-1', contractor_id: contractorId, title: 'Copper fitting replacement',
       customer_description: 'Includes one standard copper fitting.', internal_notes: 'Private margin target',
-      trade: 'Plumbing', category: 'Repair', line_type: 'material', unit: 'each',
+      trade: 'Plumbing', category: 'Repair', subcategory: 'Fittings', line_type: 'material', unit: 'each',
       default_unit_price_cents: 0, taxable: true, labor_hours: 1.25, sku: 'PRIVATE-SKU', source: 'csv_import',
       active: true, archived_at: null, created_at: '2026-08-01T12:00:00.000Z', updated_at: '2026-08-01T12:00:00.000Z',
       ...overrides,
@@ -196,6 +197,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     expect(JSON.stringify(prepared.payload)).not.toContain('price-book-1');
     expect(JSON.stringify(prepared.payload)).not.toContain('PRIVATE-SKU');
     expect(JSON.stringify(prepared.payload)).not.toContain('Private margin target');
+    expect(JSON.stringify(prepared.payload)).not.toContain('Fittings');
   });
 
   test('wires the picker only through authorized standard Estimate Draft state without backend actions', () => {
