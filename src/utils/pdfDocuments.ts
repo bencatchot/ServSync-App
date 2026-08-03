@@ -13,6 +13,7 @@ import type {
   InvoiceLineItem,
   LegacyEstimateLineType,
 } from '../types';
+import { findingStatusIsRecorded, findingStatusNeedsAttention } from '../features/findings/statusPresentation';
 
 function normalizeText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -430,6 +431,7 @@ export async function generateInspectionPdf(
   const STATUS_PDF: Record<FindingStatus, { bg: readonly number[]; text: readonly number[] }> = {
     'Not Recorded': { bg: [241, 245, 249], text: [100, 116, 139] },
     'Pass':         { bg: [220, 252, 231], text: [22, 163, 74] },
+    'Not Applicable': { bg: [241, 245, 249], text: [100, 116, 139] },
     'Monitor':      { bg: [219, 234, 254], text: [37, 99, 235] },
     'Fixed On Site':{ bg: [237, 233, 254], text: [109, 40, 217] },
     'Needs Repair': { bg: [254, 243, 199], text: [217, 119, 6] },
@@ -454,13 +456,14 @@ export async function generateInspectionPdf(
     pdf.line(margin, yy, pageW - margin, yy);
   }
 
-  const allFindings = inspection.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Not Recorded');
-  const findingsWithRoom = inspection.rooms_with_findings.flatMap(r => r.findings.map(f => ({ ...f, room: r.room }))).filter(f => f.status !== 'Not Recorded');
+  const allFindings = inspection.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusIsRecorded(f.status));
+  const findingsWithRoom = inspection.rooms_with_findings.flatMap(r => r.findings.map(f => ({ ...f, room: r.room }))).filter(f => findingStatusIsRecorded(f.status));
   const urgentCount = allFindings.filter(f => f.status === 'Urgent').length;
   const needsRepairCount = allFindings.filter(f => f.status === 'Needs Repair').length;
   const monitorCount = allFindings.filter(f => f.status === 'Monitor').length;
   const fixedCount = allFindings.filter(f => f.status === 'Fixed On Site').length;
   const passCount = allFindings.filter(f => f.status === 'Pass').length;
+  const notApplicableCount = allFindings.filter(f => f.status === 'Not Applicable').length;
   const issueCount = urgentCount + needsRepairCount;
   const attentionGroups: Array<{ status: FindingStatus; title: string; findings: Array<InspectionRoomFinding & { room: string }> }> = [
     { status: 'Urgent', title: 'Urgent Items', findings: findingsWithRoom.filter(f => f.status === 'Urgent') },
@@ -533,13 +536,14 @@ export async function generateInspectionPdf(
   txt(`Prepared: ${today}`, margin, y, GRAY, 8); y += 9;
 
   // Stats row
-  const boxW = (contentW - 10) / 5;
+  const boxW = (contentW - 12.5) / 6;
   const stats = [
     { label: 'Urgent',    value: String(urgentCount),    ...STATUS_PDF['Urgent'] },
     { label: 'Repair',    value: String(needsRepairCount), ...STATUS_PDF['Needs Repair'] },
     { label: 'Monitor',   value: String(monitorCount),   ...STATUS_PDF['Monitor'] },
     { label: 'Fixed',     value: String(fixedCount),     ...STATUS_PDF['Fixed On Site'] },
     { label: 'Pass',      value: String(passCount),      ...STATUS_PDF['Pass'] },
+    { label: 'N/A',       value: String(notApplicableCount), ...STATUS_PDF['Not Applicable'] },
   ];
   stats.forEach((s, i) => {
     const bx = margin + i * (boxW + 2.5);
@@ -639,31 +643,34 @@ export async function generateInspectionPdf(
 
   // Room sections
   for (const roomData of inspection.rooms_with_findings) {
-    const recordedFindings = roomData.findings.filter(f => f.status !== 'Not Recorded');
+    const recordedFindings = roomData.findings.filter(f => findingStatusIsRecorded(f.status));
     if (recordedFindings.length === 0) continue;
-    const nonPassFindings = recordedFindings.filter(f => f.status !== 'Pass');
+    const detailFindings = recordedFindings.filter(f => f.status !== 'Pass');
+    const attentionFindings = recordedFindings.filter(f => findingStatusNeedsAttention(f.status));
+    const notApplicableFindings = recordedFindings.filter(f => f.status === 'Not Applicable');
     const passFindings = recordedFindings.filter(f => f.status === 'Pass');
     const hasUrgent = recordedFindings.some(f => f.status === 'Urgent');
 
     checkPageBreak(20);
     drawRect(margin, y, contentW, 12, DARK, 2);
     txt(roomData.room.toUpperCase(), margin + 4, y + 8, WHITE, 10, true);
-    const rBadgeLabel = hasUrgent ? 'URGENT' : nonPassFindings.length > 0 ? 'HAS ISSUES' : 'CLEAR';
-    const rBadgeBg = hasUrgent ? STATUS_PDF['Urgent'].bg : nonPassFindings.length > 0 ? STATUS_PDF['Needs Repair'].bg : STATUS_PDF['Pass'].bg;
-    const rBadgeTxt = hasUrgent ? STATUS_PDF['Urgent'].text : nonPassFindings.length > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
+    const rBadgeLabel = hasUrgent ? 'URGENT' : attentionFindings.length > 0 ? 'HAS ISSUES' : 'CLEAR';
+    const rBadgeBg = hasUrgent ? STATUS_PDF['Urgent'].bg : attentionFindings.length > 0 ? STATUS_PDF['Needs Repair'].bg : STATUS_PDF['Pass'].bg;
+    const rBadgeTxt = hasUrgent ? STATUS_PDF['Urgent'].text : attentionFindings.length > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
     drawRect(pageW - margin - 32, y + 2, 32, 8, rBadgeBg, 2);
     txt(rBadgeLabel, pageW - margin - 16, y + 7.5, rBadgeTxt, 7, true, 'center');
     y += 14;
-    txt(`${recordedFindings.length} items  ·  ${passFindings.length} passed  ·  ${nonPassFindings.length} need attention`, margin, y, GRAY, 8);
+    txt(`${recordedFindings.length} items  ·  ${passFindings.length} passed  ·  ${notApplicableFindings.length} N/A  ·  ${attentionFindings.length} need attention`, margin, y, GRAY, 8);
     y += 7;
 
-    if (nonPassFindings.length > 0) {
+    if (detailFindings.length > 0) {
       txt('FINDINGS', margin, y, GRAY, 7, true); y += 5;
-      for (const f of nonPassFindings) {
+      for (const f of detailFindings) {
         const sc = STATUS_PDF[f.status];
+        const showActionFields = findingStatusNeedsAttention(f.status) || f.status === 'Fixed On Site';
         const notesLines = f.notes ? pdf.splitTextToSize(f.notes, contentW - 10).length : 0;
-        const actionLine = f.action ? 1 : 0;
-        const dueLine = f.due ? 1 : 0;
+        const actionLine = showActionFields && f.action ? 1 : 0;
+        const dueLine = findingStatusNeedsAttention(f.status) && f.due ? 1 : 0;
         const fH = 10 + notesLines * 4.5 + (actionLine + dueLine) * 5 + 8 + photoRowHeight(f);
         checkPageBreak(fH);
         pdf.setFillColor(sc.text[0], sc.text[1], sc.text[2]);
@@ -677,11 +684,11 @@ export async function generateInspectionPdf(
           txt(f.notes, margin + 6, y + yOff, GRAY, 8, false, 'left', contentW - 10);
           yOff += notesLines * 4.5;
         }
-        if (f.action) {
+        if (showActionFields && f.action) {
           txt(`Action: ${f.action}`, margin + 6, y + yOff, [37, 99, 235], 7.5, false, 'left', contentW - 10);
           yOff += 5;
         }
-        if (f.due) {
+        if (findingStatusNeedsAttention(f.status) && f.due) {
           txt(`Due: ${f.due}`, margin + 6, y + yOff, [217, 119, 6], 7.5, false, 'left', contentW - 10);
           yOff += 5;
         }

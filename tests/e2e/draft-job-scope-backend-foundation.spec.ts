@@ -234,7 +234,7 @@ test.describe('Draft Job backend foundation', () => {
     expect(files.length).toBeGreaterThan(0);
     expect(files).not.toContain('servsync-draft-job-scope-backend-foundation.sql');
     if (files.includes('src/types.ts')) {
-      expect(types).toContain("export type FindingStatus = 'Not Recorded' | 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';");
+      expect(types).toContain("export type FindingStatus = 'Not Recorded' | 'Pass' | 'Not Applicable' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';");
     }
     expect(files.some(file => file.includes('package'))).toBe(false);
     expect(files.some(file => file.includes('vercel'))).toBe(false);

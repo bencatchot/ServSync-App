@@ -660,7 +660,7 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(sql).toContain("'status', 'Not Recorded'");
     expect(sql).not.toContain("'status', 'Monitor'");
     expect(sql).not.toContain("'status', 'Pass'");
-    expect(sourceFile('src/features/drafts/durableDraftOutputValidation.ts')).toContain("const FINDING_STATUSES = new Set(['Not Recorded', 'Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);");
+    expect(sourceFile('src/features/drafts/durableDraftOutputValidation.ts')).toContain("const FINDING_STATUSES = new Set(['Not Recorded', 'Pass', 'Not Applicable', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent']);");
     expect(sql).toContain('revoke execute on function public.servsync_private_work_draft_checklist_source');
     expect(sql).toContain('revoke execute on function public.servsync_private_canonical_starter_checklist_source');
     expect(sql).toContain('revoke execute on function public.servsync_private_checklist_source_to_rooms_with_findings');

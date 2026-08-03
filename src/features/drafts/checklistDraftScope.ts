@@ -1,6 +1,7 @@
 import type { InspectionRoomData, InspectionTemplateRoom } from '../../types';
 import { UNANSWERED_FINDING_STATUS } from '../findings/statusPresentation';
 import { DRAFT_CHECKLIST_STARTER_OPTIONS } from './checklistStarterCatalog';
+import type { SharedDraftComposerDraft } from './draftComposerTypes';
 
 export const DRAFT_CHECKLIST_UNANSWERED_STATUS = UNANSWERED_FINDING_STATUS;
 
@@ -36,7 +37,46 @@ export type DraftChecklistSourceSnapshot = {
 export type DraftChecklistSourceOption = Omit<DraftChecklistSourceSnapshot, 'schema_version' | 'snapshot_fingerprint' | 'rooms'> & {
   group_label: string;
   rooms: InspectionTemplateRoom[];
+  subject_binding?:
+    | {
+        subject_type: 'connected';
+        homeowner_user_id: string | null;
+        home_id: string;
+      }
+    | {
+        subject_type: 'local';
+        local_contact_id: string | null;
+        local_home_id: string;
+      };
 };
+
+export function draftChecklistSourceMatchesDraftSubject(
+  option: DraftChecklistSourceOption,
+  draft: Pick<
+    SharedDraftComposerDraft,
+    'subject_type' | 'homeowner_user_id' | 'home_id' | 'local_contact_id' | 'local_home_id'
+  >,
+) {
+  if (option.source_kind !== 'home_inspection_checklist') return true;
+  const binding = option.subject_binding;
+  if (!binding || binding.subject_type !== draft.subject_type) return false;
+
+  if (binding.subject_type === 'connected') {
+    return Boolean(
+      binding.home_id
+      && draft.home_id
+      && binding.home_id === draft.home_id
+      && (!binding.homeowner_user_id || binding.homeowner_user_id === draft.homeowner_user_id),
+    );
+  }
+
+  return Boolean(
+    binding.local_home_id
+    && draft.local_home_id
+    && binding.local_home_id === draft.local_home_id
+    && (!binding.local_contact_id || binding.local_contact_id === draft.local_contact_id),
+  );
+}
 
 const SOURCE_KINDS: readonly DraftChecklistSourceKind[] = [
   'starter_inspection_checklist',

@@ -6,6 +6,44 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-02
 
+- Branch: `codex/fb007-draft-first-inspection-path-v1`
+- Starting main SHA: `4de490183de88cf0cdb381649b065d2614da6af7`
+- Files changed:
+  - `servsync-draft-first-inspection-path-completion.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/drafts/checklistDraftScope.ts`
+  - `src/features/drafts/durableDraftOutputValidation.ts`
+  - `src/features/findings/statusPresentation.ts`
+  - `src/utils/pdfDocuments.ts`
+  - focused Draft/checklist, finding-status, report lifecycle, and SQL coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements FB-007 Draft-first Inspection Path Completion v1. Contextual connected-homeowner and local-customer starts now enter the existing shared durable Draft composer with Job intent and an exact customer/property-bound checklist snapshot when appropriate, while the legacy form remains the fail-closed fallback whenever Draft-first is unavailable. Home-specific checklist choices are filtered to the selected Draft property. Checklist findings add a neutral recorded `Not Applicable` state across validation, editor, summaries, and PDF output without treating it as an issue; unknown runtime statuses remain visible but are treated as unanswered and excluded from PDF finding groups until corrected. Report copy now accurately distinguishes finalization/file visibility and its in-app notification from the later completion action; finalized local-customer reports remain filed-only and do not show a sent state without a ServSync homeowner profile. A source-only additive SQL patch narrows inspection-template mutations to owner/admin managers and report/media uploads to job-writing roles, explicitly removes PUBLIC/anonymous execution from the existing role/report RPCs, and clears legacy authenticated table privileges before restoring only the reviewed CRUD surface.
+- Reason for change: Inspection/checklist work already had durable Draft persistence, checklist snapshots, launch, execution, reports, and starter templates, but contextual starts still bypassed Draft-first, N/A was missing, lifecycle copy understated finalization effects, and selected role-sensitive write surfaces were broader than the intended product authority.
+- Tests/checks run:
+  - `npm run typecheck`
+  - production build
+  - focused FB-007, durable Draft/checklist, finding status, report lifecycle, SQL hardening, and legacy regression Playwright coverage
+  - `git diff --check`, documentation structure/link checks, focused skipped-test scan, changed-file scope review, and added-line sensitive-value/token scan
+  - `npm run lint` attempted; any inherited ESLint startup failure is reported separately in the PR validation record
+- Known risks or follow-ups:
+  - `servsync-draft-first-inspection-path-completion.sql` (SHA-256 `f4ab79b68ebe56edd36f6c545fac08584558f6da520672e2bee74b3508f93473`) was created but not applied to Production, Demo, Sandbox, or any other environment. Its rollout requires separate approval.
+  - Authenticated Preview validation is still required for desktop/mobile contextual starts, save/resume, launch, active checklist completion, N/A reporting, finalization visibility, and role denial before rollout.
+  - FB-007 remains active for broader trade checklist coverage, finding-to-follow-up-work conversion, reopening/correction rules, and later inspection maturity. This slice does not migrate or reinterpret legacy records.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the focused implementation in progress and its remaining review, SQL rollout, and authenticated validation gates; FB-024 stale PR #366 rollout wording was reconciled.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Job/Draft-first description now reflects the live all-contractors rollout and the bounded FB-007 convergence model without claiming the new migration is installed.
+- Marketing inventory impact:
+  - MARKETING PRODUCT INVENTORY UPDATED: NO
+  - REASON: This is an unmerged branch with unapplied SQL and no newly validated live capability.
+
 - Branch: `codex/price-book-repeat-import-reconciliation-v1`
 - Starting main SHA: `d21d3f1b6c91a136ed3336b53af1a08ac8f65a13`
 - Files changed:

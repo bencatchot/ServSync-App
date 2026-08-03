@@ -109,8 +109,10 @@ import {
   FINDING_STATUS_ORDER,
   UNANSWERED_FINDING_STATUS,
   findingStatusBorderColor,
+  findingStatusIsCleared,
   findingStatusIsRecorded,
   findingStatusIsUnanswered,
+  findingStatusNeedsAttention,
   findingStatusPresentation,
   findingStatusSelectedButtonClass,
 } from './features/findings/statusPresentation';
@@ -135,7 +137,11 @@ import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { useDurableDraftSummary } from './features/drafts/useDurableDraftSummary';
-import type { DraftChecklistSourceOption } from './features/drafts/checklistDraftScope';
+import {
+  createDraftChecklistSnapshot,
+  draftChecklistSourceMatchesDraftSubject,
+  type DraftChecklistSourceOption,
+} from './features/drafts/checklistDraftScope';
 import { DRAFT_CHECKLIST_STARTER_OPTIONS } from './features/drafts/checklistStarterCatalog';
 import {
   DurableDraftOutputHeading,
@@ -5015,6 +5021,7 @@ function buildProfessionalReportSummary(rooms: InspectionRoomData[]): ReportSumm
   const monitor = allFindings.filter(f => f.status === 'Monitor');
   const fixed = allFindings.filter(f => f.status === 'Fixed On Site');
   const pass = allFindings.filter(f => f.status === 'Pass');
+  const notApplicable = allFindings.filter(f => f.status === 'Not Applicable');
   const issueCount = urgent.length + repair.length;
 
   const urgentWithRoom = urgent.map(f => {
@@ -5024,8 +5031,8 @@ function buildProfessionalReportSummary(rooms: InspectionRoomData[]): ReportSumm
   });
 
   const intro = issueCount === 0
-    ? `A thorough job review of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} was completed. The property is in good overall condition with ${pass.length} item${pass.length !== 1 ? 's' : ''} passing the checklist.${monitor.length > 0 ? ` ${monitor.length} item${monitor.length !== 1 ? 's' : ''} should be monitored at the next visit.` : ''}`
-    : `A comprehensive job review of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} identified ${issueCount} item${issueCount !== 1 ? 's' : ''} requiring attention — ${urgent.length} urgent and ${repair.length} in need of repair.${pass.length > 0 ? ` ${pass.length} item${pass.length !== 1 ? 's' : ''} passed with no issues noted.` : ''}`;
+    ? `A thorough job review of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} was completed. The property is in good overall condition with ${pass.length} item${pass.length !== 1 ? 's' : ''} passing the checklist.${notApplicable.length > 0 ? ` ${notApplicable.length} item${notApplicable.length !== 1 ? 's were' : ' was'} marked not applicable.` : ''}${monitor.length > 0 ? ` ${monitor.length} item${monitor.length !== 1 ? 's' : ''} should be monitored at the next visit.` : ''}`
+    : `A comprehensive job review of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} identified ${issueCount} item${issueCount !== 1 ? 's' : ''} requiring attention — ${urgent.length} urgent and ${repair.length} in need of repair.${pass.length > 0 ? ` ${pass.length} item${pass.length !== 1 ? 's' : ''} passed with no issues noted.` : ''}${notApplicable.length > 0 ? ` ${notApplicable.length} item${notApplicable.length !== 1 ? 's were' : ' was'} marked not applicable.` : ''}`;
 
   const urgentText = urgent.length > 0
     ? `${urgent.length} item${urgent.length !== 1 ? 's' : ''} require${urgent.length === 1 ? 's' : ''} immediate professional attention.`
@@ -5043,7 +5050,7 @@ function buildProfessionalReportSummary(rooms: InspectionRoomData[]): ReportSumm
     : '';
   const followUpText = [repairPart, monitorPart].filter(Boolean).join(' ');
 
-  const savingsDetails = inspectionCostSavingsDetails(allFindings.filter(f => f.status !== 'Pass'));
+  const savingsDetails = inspectionCostSavingsDetails(allFindings.filter(f => findingStatusNeedsAttention(f.status) || f.status === 'Fixed On Site'));
 
   return { intro, urgentText, urgentWithRoom, fixedText, followUpText, savingsDetails };
 }
@@ -28305,7 +28312,7 @@ function ContractorDashboard({
     ...inspectionContractorTemplatesForNewJob,
   ];
   const draftChecklistSourceOptions: DraftChecklistSourceOption[] = [
-    ...inspectionHomeTemplatesForNewJob.map(template => ({
+    ...homeScopedInspectionTemplates.map(template => ({
       source_kind: 'home_inspection_checklist' as const,
       source_id: template.id,
       source_label: template.name,
@@ -28314,8 +28321,19 @@ function ContractorDashboard({
       source_updated_at: template.updated_at ?? template.created_at ?? null,
       rooms: template.rooms,
       group_label: 'Home-specific Inspection Checklists',
+      subject_binding: template.home_id
+        ? {
+            subject_type: 'connected' as const,
+            homeowner_user_id: template.homeowner_user_id ?? null,
+            home_id: template.home_id,
+          }
+        : {
+            subject_type: 'local' as const,
+            local_contact_id: template.local_contact_id ?? null,
+            local_home_id: template.local_home_id ?? '',
+          },
     })),
-    ...inspectionContractorTemplatesForNewJob.map(template => ({
+    ...contractorScopedInspectionTemplates.filter(customTemplateLooksInspectionLike).map(template => ({
       source_kind: 'contractor_inspection_checklist' as const,
       source_id: template.id,
       source_label: template.name,
@@ -29248,6 +29266,48 @@ function ContractorDashboard({
     const workflowKind = options?.workflowKind ?? starter?.kind ?? 'work_order';
     return { templateSource, starterTemplateId, workflowKind };
   };
+  const openContextualSharedDraft = (
+    draft: DraftJobComposerDraft,
+    selection: ReturnType<typeof resolveFieldWorkTemplateSelection> & { templateId?: string; jobMode: JobWorkflowMode },
+  ) => {
+    if (!sharedDraftComposerEnabled) return false;
+    if (!durableDraftCapabilities.canPersistDraft) {
+      setError('You do not have access to save contractor Drafts.');
+      setInspectionView('list');
+      setContractorJobsViewAndScroll('overview');
+      return true;
+    }
+
+    const baseDraft = sharedDraftComposerDraftFromDraftJob(draft, {
+      intendedOutput: 'job',
+      jobSession: { visited: true },
+    });
+    const checklistSourceId = selection.templateSource === 'starter'
+      ? selection.starterTemplateId
+      : selection.templateSource === 'custom'
+        ? selection.templateId ?? ''
+        : '';
+    const checklistOption = selection.jobMode === 'checklist' && checklistSourceId
+      ? draftChecklistSourceOptions.find(option => (
+          option.source_id === checklistSourceId
+          && draftChecklistSourceMatchesDraftSubject(option, baseDraft)
+        )) ?? null
+      : null;
+    const initialDraft = selection.jobMode === 'checklist'
+      ? {
+          ...baseDraft,
+          work_format: 'inspection_checklist' as const,
+          intended_output: 'job' as const,
+          checklist_source: checklistOption ? createDraftChecklistSnapshot(checklistOption) : null,
+        }
+      : baseDraft;
+
+    setDurableDraftOpenTarget({ kind: 'new', initialDraft });
+    setInspectionView('draft_job');
+    setContractorJobsView('new_jobs');
+    setContractorTab('inspections');
+    return true;
+  };
   const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
@@ -29255,6 +29315,15 @@ function ContractorDashboard({
       ? connectedHomeList(connection).find(home => home.id === options.homeId) ?? connectedHomeList(connection)[0] ?? connection.home ?? null
       : connectedHomeList(connection)[0] ?? connection.home ?? null;
     setJobsCustomerFilterSubjectId(connection.connection_id);
+    const name = options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind, templateSource);
+    if (openContextualSharedDraft(createBlankDraftJobComposerDraft({
+      subject_type: 'connected',
+      homeowner_user_id: connection.homeowner_user_id,
+      home_id: options?.homeId ?? defaultHome?.id ?? '',
+      service_request_id: options?.serviceRequestId ?? '',
+      title: name,
+      scope: options?.scope ?? '',
+    }), { templateSource, starterTemplateId, workflowKind, templateId: options?.templateId, jobMode })) return;
     setInspectionNewDraft({
       subject_type: 'connected',
       homeowner_user_id: connection.homeowner_user_id,
@@ -29262,7 +29331,7 @@ function ContractorDashboard({
       local_contact_id: '',
       local_home_id: '',
       service_request_id: options?.serviceRequestId ?? '',
-      name: options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind, templateSource),
+      name,
       scope: options?.scope ?? '',
       job_mode: jobMode,
       job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
@@ -29286,6 +29355,14 @@ function ContractorDashboard({
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
     setJobsCustomerFilterSubjectId(`local:${currentContact.id}`);
+    const name = options?.name ?? buildLocalFieldWorkName(currentContact, starterTemplateId, workflowKind, templateSource);
+    if (openContextualSharedDraft(createBlankDraftJobComposerDraft({
+      subject_type: 'local',
+      local_contact_id: currentContact.id,
+      local_home_id: selectedLocalHomeId,
+      title: name,
+      scope: options?.scope ?? '',
+    }), { templateSource, starterTemplateId, workflowKind, templateId: options?.templateId, jobMode })) return;
     setInspectionNewDraft({
       subject_type: 'local',
       homeowner_user_id: '',
@@ -29293,7 +29370,7 @@ function ContractorDashboard({
       local_contact_id: currentContact.id,
       local_home_id: selectedLocalHomeId,
       service_request_id: '',
-      name: options?.name ?? buildLocalFieldWorkName(currentContact, starterTemplateId, workflowKind, templateSource),
+      name,
       scope: options?.scope ?? '',
       job_mode: jobMode,
       job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
@@ -39776,7 +39853,7 @@ function ContractorDashboard({
                             {records.map(insp => {
                           const checklistStyle = isChecklistJob(insp);
                           const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
-                          const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
+                          const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusNeedsAttention(f.status)).length : 0;
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
                           const linkedEstimate = insp.estimate_id ? estimates.find(estimate => estimate.id === insp.estimate_id) ?? null : null;
@@ -40956,7 +41033,7 @@ function ContractorDashboard({
                     {operationalInspections.slice(0, 5).map(insp => {
                       const checklistStyle = isChecklistJob(insp);
                       const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
-                      const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
+                      const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => findingStatusNeedsAttention(f.status)).length : 0;
                       const subjectLabel = fieldWorkSubjectLabel(insp);
                       const subjectAddress = fieldWorkSubjectAddress(insp);
                       return (
@@ -41581,7 +41658,7 @@ function ContractorDashboard({
             }));
             const workingFindings = workingRooms.flatMap(r => r.findings);
             const urgentCountFin = workingFindings.filter(f => f.status === 'Urgent').length;
-            const issueCountFin = workingFindings.filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+            const issueCountFin = workingFindings.filter(f => findingStatusNeedsAttention(f.status)).length;
             const fixedCountFin = workingFindings.filter(f => f.status === 'Fixed On Site').length;
             const checklistItemCount = activeRooms.reduce((count, room) => count + room.items.length, 0);
             const fieldWorkSteps: Array<{ id: typeof inspectionSubTab; title: string; helper: string; count: string }> = [
@@ -42152,7 +42229,7 @@ function ContractorDashboard({
                           ) : activeRooms.map(rm => {
                             const flagged = rm.items.filter(item => {
                               const f = localFindings[findingStateKey(rm, item)];
-                              return f && findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status);
+                              return f && findingStatusNeedsAttention(f.status);
                             }).length;
                             const roomKey = roomIdentityKey(rm);
                             const roomLabel = roomDisplayLabel(rm);
@@ -42576,7 +42653,7 @@ function ContractorDashboard({
                               const roomKey = roomIdentityKey(room);
                               const roomLabel = roomDisplayLabel(room);
                               const findings = room.items.map(item => localFindings[findingStateKey(room, item)]);
-                              const issueCount = findings.filter(f => f && findingStatusIsRecorded(f.status) && !['Pass', 'Fixed On Site'].includes(f.status)).length;
+                              const issueCount = findings.filter(f => f && findingStatusNeedsAttention(f.status)).length;
                               const isActive = roomKey === activeWorkRoomKey;
                               return (
                                 <button
@@ -42619,8 +42696,8 @@ function ContractorDashboard({
                                   <div
                                     key={item}
                                     data-testid="inspection-finding-card"
-                                    className={`rounded-2xl border bg-white overflow-hidden transition-colors ${status !== 'Pass' ? `border-2` : ''}`}
-                                    style={{ borderColor: status === 'Pass' ? '#e2e8f0' : findingStatusBorderColor(status) }}
+                                    className={`rounded-2xl border bg-white overflow-hidden transition-colors ${findingStatusIsCleared(status) ? '' : 'border-2'}`}
+                                    style={{ borderColor: findingStatusIsCleared(status) ? '#e2e8f0' : findingStatusBorderColor(status) }}
                                   >
                                     <div className="p-4">
                                       <div className="flex items-start justify-between gap-2 mb-3">
@@ -42661,7 +42738,7 @@ function ContractorDashboard({
                                           onChange={e => setLocalFindings(prev => ({ ...prev, [key]: { ...current, notes: e.target.value } }))}
                                         />
                                       </div>
-                                      {current.status !== 'Pass' && findingStatusIsRecorded(current.status) && (
+                                      {(findingStatusNeedsAttention(current.status) || current.status === 'Fixed On Site') && (
                                         <div className="grid grid-cols-2 gap-3">
                                           <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -42991,6 +43068,7 @@ function ContractorDashboard({
                   const statusCounts = Object.fromEntries(FINDING_STATUS_ORDER.map(s => [s, recordedReportFindings.filter(f => f.status === s).length])) as Record<FindingStatus, number>;
                   const openReportFindings = statusCounts.Urgent + statusCounts['Needs Repair'] + statusCounts.Monitor;
                   const clearedReportFindings = statusCounts.Pass + statusCounts['Fixed On Site'];
+                  const notApplicableReportFindings = statusCounts['Not Applicable'];
                   const reportPhotoCount = recordedReportFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
                   const meaningfulReportFindingCount = recordedReportFindings.filter(finding =>
                     finding.status !== 'Pass'
@@ -43035,7 +43113,8 @@ function ContractorDashboard({
                   const linkedServiceRequest = activeInspection.service_request_id
                     ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
                     : null;
-                  const reportSentAndCompleted = activeInspection.status === 'finalized'
+                  const reportSentAndCompleted = Boolean(activeInspection.homeowner_user_id)
+                    && activeInspection.status === 'finalized'
                     && (activeInspection.service_request_id ? linkedServiceRequest?.status === 'closed' : true);
                   const reportSendHelperText = activeInspection.status !== 'finalized'
                     ? 'Finalize the report before sending it.'
@@ -43044,7 +43123,7 @@ function ContractorDashboard({
                       : 'Send the report to the homeowner and close the linked request when applicable.';
                   const finalizeReportHelperText = activeInspection.status === 'draft'
                     ? inspectionClosedForReview
-                      ? 'Finalize saves the PDF and files the report. It does not send anything until you choose to send it.'
+                      ? 'Finalize saves and files the PDF. For connected homeowners, it becomes available in Documents and Home History and creates an in-app notification.'
                       : 'Close the job for review before finalizing the report.'
                     : 'Report PDF has been filed to Documents.';
                   return (
@@ -43082,7 +43161,7 @@ function ContractorDashboard({
                             </div>
                             <div className="bg-slate-50 rounded-xl px-4 py-3">
                               <p className="text-xs text-slate-400 font-medium">Findings</p>
-                              <p className="text-sm text-slate-800 font-semibold mt-0.5">{openReportFindings} open · {clearedReportFindings} cleared</p>
+                              <p className="text-sm text-slate-800 font-semibold mt-0.5">{openReportFindings} open · {clearedReportFindings} cleared · {notApplicableReportFindings} N/A</p>
                             </div>
                             <div className="bg-slate-50 rounded-xl px-4 py-3">
                               <p className="text-xs text-slate-400 font-medium">Photos</p>
@@ -43397,13 +43476,14 @@ function ContractorDashboard({
                         if (roomData.findings.length === 0) return null;
                         const recordedRoomFindings = roomData.findings.filter(f => findingStatusIsRecorded(f.status));
                         const unansweredRoomFindings = roomData.findings.filter(f => findingStatusIsUnanswered(f.status));
-                        const nonPass = recordedRoomFindings.filter(f => f.status !== 'Pass');
+                        const detailedFindings = recordedRoomFindings.filter(f => f.status !== 'Pass');
                         const passWithNotes = recordedRoomFindings.filter(f => f.status === 'Pass' && f.notes);
                         const passNoNotes = recordedRoomFindings.filter(f => f.status === 'Pass' && !f.notes);
                         const pass = recordedRoomFindings.filter(f => f.status === 'Pass');
                         const fixed = recordedRoomFindings.filter(f => f.status === 'Fixed On Site');
-                        const hasUrgent = nonPass.some(f => f.status === 'Urgent');
-                        const openCount = recordedRoomFindings.filter(f => f.status === 'Urgent' || f.status === 'Needs Repair').length;
+                        const hasUrgent = detailedFindings.some(f => f.status === 'Urgent');
+                        const openCount = recordedRoomFindings.filter(f => findingStatusNeedsAttention(f.status)).length;
+                        const notApplicableCount = recordedRoomFindings.filter(f => f.status === 'Not Applicable').length;
                         return (
                           <div key={roomData.room} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -43412,7 +43492,7 @@ function ContractorDashboard({
                                 <div>
                                   <h3 className="font-semibold text-slate-800">{roomData.room}</h3>
                                   <p className="text-xs text-slate-400">
-                                    {recordedRoomFindings.length} recorded · {unansweredRoomFindings.length} not recorded · {pass.length + fixed.length} pass · {fixed.length} fixed · {openCount} open
+                                    {recordedRoomFindings.length} recorded · {unansweredRoomFindings.length} not recorded · {pass.length} pass · {fixed.length} fixed · {notApplicableCount} N/A · {openCount} open
                                   </p>
                                 </div>
                               </div>
@@ -43433,7 +43513,7 @@ function ContractorDashboard({
                                   <p className="mt-1 text-xs leading-5 text-slate-500">Select a real condition in Work Notes before this room can be reviewed or included in a report.</p>
                                 </div>
                               )}
-                              {[...nonPass, ...passWithNotes].map((f, i) => (
+                              {[...detailedFindings, ...passWithNotes].map((f, i) => (
                                 <div key={i} className="border-l-4 rounded-r-xl overflow-hidden" style={{ borderLeftColor: findingStatusBorderColor(f.status) }}>
                                   <div className="pl-4 pr-4 py-3 bg-slate-50">
                                     <div className="flex items-center justify-between mb-2">
@@ -43446,10 +43526,10 @@ function ContractorDashboard({
                                         <p className="text-sm text-slate-700">{f.notes}</p>
                                       </div>
                                     )}
-                                    {f.action && (
+                                    {f.action && (findingStatusNeedsAttention(f.status) || f.status === 'Fixed On Site') && (
                                       <p className="text-sm text-blue-600 font-medium">{f.status === 'Fixed On Site' ? '✓ ' : '→ '}{f.action}</p>
                                     )}
-                                    {f.due && <p className="text-xs text-slate-400 mt-1">Follow-up: {f.due}</p>}
+                                    {f.due && findingStatusNeedsAttention(f.status) && <p className="text-xs text-slate-400 mt-1">Follow-up: {f.due}</p>}
                                     {(f.photos ?? []).length > 0 && (
                                       <div className="grid grid-cols-4 gap-2 mt-3">
                                         {(f.photos ?? []).map((url, pi) => (
@@ -43482,7 +43562,7 @@ function ContractorDashboard({
                         <div className="space-y-2">
                           {reportRooms.map(r => {
                             const rUrgent = r.findings.some(f => f.status === 'Urgent');
-                            const rIssues = r.findings.filter(f => findingStatusIsRecorded(f.status) && f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+                            const rIssues = r.findings.filter(f => findingStatusNeedsAttention(f.status)).length;
                             const rFixed = r.findings.filter(f => f.status === 'Fixed On Site').length;
                             const photoCount = r.findings.reduce((c, f) => c + (f.photos?.length ?? 0), 0);
                             return (
@@ -43576,7 +43656,7 @@ function ContractorDashboard({
                         )}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="text-[11px] leading-relaxed text-slate-400 px-1">
-                          Finalize saves the PDF. Complete job & send report notifies the homeowner and closes the linked service request.
+                          Finalize saves and files the PDF. Connected homeowners can then view it in Documents and Home History and receive an in-app notification. Complete job & send closes the linked request and sends the completion notice.
                         </p>}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
