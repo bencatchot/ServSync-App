@@ -31,6 +31,7 @@ type RpcSignatureRow = {
   public_execute: boolean | null;
   anon_execute: boolean | null;
   authenticated_execute: boolean | null;
+  service_role_execute: boolean | null;
 };
 
 type BucketRow = {
@@ -135,6 +136,7 @@ const CORE_PRIVATE_TABLES = [
   'invoices',
   'invoice_line_items',
   'local_invoice_delivery_links',
+  'local_invoice_delivery_rate_buckets',
   'inspections',
   'home_maintenance_log',
   'home_reminders',
@@ -283,8 +285,11 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_private_durable_draft_rollout_mode',
   'servsync_private_can_prepare_local_customer_claim_invites',
   'servsync_private_can_manage_local_invoice_delivery',
+  'servsync_private_cleanup_local_invoice_delivery_rate_limits',
+  'servsync_private_consume_local_invoice_delivery_rate_limit',
   'servsync_private_current_local_invoice_delivery_contractor_id',
   'servsync_private_local_invoice_delivery_metadata',
+  'servsync_private_render_local_invoice_delivery',
   'servsync_record_home_access_invite_delivery_result',
 ];
 
@@ -374,7 +379,8 @@ select
       and acl.privilege_type = 'EXECUTE'
   ) as public_execute,
   has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
-  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute
+  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute,
+  has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_execute
 from expected e
 left join pg_proc p
   on p.oid = e.signature::regprocedure
@@ -502,7 +508,7 @@ where c.relnamespace = 'public'::regnamespace
     expect(rows[0].authenticated_delete, 'authenticated should not directly DELETE claim invites').toBe(false);
   });
 
-  test('local invoice delivery grants remain RPC-only for every browser role', () => {
+  test('local invoice delivery and rate-limit storage remain private for every browser role', () => {
     const rows = runCatalogQuery<TablePrivilegeRow>(`
 select
   c.relname as table_name,
@@ -520,19 +526,21 @@ select
   has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
   has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete
 from pg_class c
-where c.relname = 'local_invoice_delivery_links'
-  and c.relnamespace = 'public'::regnamespace;
+where c.relname in ('local_invoice_delivery_links', 'local_invoice_delivery_rate_buckets')
+  and c.relnamespace = 'public'::regnamespace
+order by c.relname;
     `);
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
-    expect(row.exists).toBe(true);
-    expect(row.public_select || row.public_insert || row.public_update || row.public_delete).toBe(false);
-    expect(row.anon_select || row.anon_insert || row.anon_update || row.anon_delete).toBe(false);
-    expect(row.authenticated_select || row.authenticated_insert || row.authenticated_update || row.authenticated_delete).toBe(false);
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.exists).toBe(true);
+      expect(row.public_select || row.public_insert || row.public_update || row.public_delete).toBe(false);
+      expect(row.anon_select || row.anon_insert || row.anon_update || row.anon_delete).toBe(false);
+      expect(row.authenticated_select || row.authenticated_insert || row.authenticated_update || row.authenticated_delete).toBe(false);
+    }
   });
 
-  test('anonymous invoice delivery lookup is the only anonymous grant in its foundation', () => {
+  test('invoice delivery lookup is callable only through the service-role gateway', () => {
     const rows = runCatalogQuery<RpcSignatureRow>(
       securityDefinerRpcSignatureCatalogQuery(['servsync_lookup_local_invoice_delivery(text)']),
     );
@@ -542,8 +550,9 @@ where c.relname = 'local_invoice_delivery_links'
     expect(rows[0].security_definer).toBe(true);
     expect(rows[0].search_path_public).toBe(true);
     expect(rows[0].public_execute).toBe(false);
-    expect(rows[0].anon_execute).toBe(true);
+    expect(rows[0].anon_execute).toBe(false);
     expect(rows[0].authenticated_execute).toBe(false);
+    expect(rows[0].service_role_execute).toBe(true);
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {

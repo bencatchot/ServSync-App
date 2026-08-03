@@ -465,6 +465,7 @@ export type RequestFreeInvoiceDeliveryState =
   | 'revoked'
   | 'replaced'
   | 'unavailable'
+  | 'rate_limited'
   | 'error';
 
 export interface RequestFreeInvoiceLineItem {

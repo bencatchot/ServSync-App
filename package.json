@@ -31,11 +31,12 @@
     "test:controlled-ops": "node --test tests/controlled-ops/*.test.mjs",
     "test:controlled-ops:browser": "node --test tests/controlled-ops/browser-*.test.mjs",
     "test:controlled-ops:browser:pilot": "node tests/controlled-ops/browser-pilot/run-pilot.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/firewall": "1.2.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.344.0",
     "qrcode.react": "^4.2.0",
@@ -45,6 +46,7 @@
   "devDependencies": {
     "@eslint/js": "^9.9.1",
     "@playwright/test": "^1.60.0",
+    "@types/node": "24.5.2",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.2",

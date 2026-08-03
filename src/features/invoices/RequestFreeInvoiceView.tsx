@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Building2, FileText, MapPin, ShieldCheck } from 'lucide-react';
-import { publicSupabase } from '../../publicSupabaseClient';
 import type {
   RequestFreeInvoiceDeliveryLookup,
   RequestFreeInvoiceDocument,
@@ -11,7 +10,7 @@ import { invoiceStatusLabel } from './status';
 type ViewState =
   | { status: 'loading' }
   | { status: 'ready'; invoice: RequestFreeInvoiceDocument }
-  | { status: 'invalid' | 'expired' | 'revoked' | 'replaced' | 'unavailable' | 'error' };
+  | { status: 'invalid' | 'expired' | 'revoked' | 'replaced' | 'unavailable' | 'rate_limited' | 'error' };
 
 function money(cents: number | null) {
   if (cents === null) return 'Price required';
@@ -37,6 +36,7 @@ function stateFromLookup(result: RequestFreeInvoiceDeliveryLookup): ViewState {
   if (result.state === 'revoked') return { status: 'revoked' };
   if (result.state === 'replaced') return { status: 'replaced' };
   if (result.state === 'unavailable') return { status: 'unavailable' };
+  if (result.state === 'rate_limited') return { status: 'rate_limited' };
   if (result.state === 'error') return { status: 'error' };
   return { status: 'invalid' };
 }
@@ -61,6 +61,10 @@ const unavailableCopy: Record<Exclude<ViewState['status'], 'loading' | 'ready'>,
   unavailable: {
     title: 'Invoice unavailable',
     body: 'This invoice cannot be viewed from this link. Contact the contractor for help.',
+  },
+  rate_limited: {
+    title: 'Please wait before trying again',
+    body: 'This secure link has been checked too many times recently. Wait a minute, then try again.',
   },
   error: {
     title: 'Invoice temporarily unavailable',
@@ -99,12 +103,7 @@ export function RequestFreeInvoiceView({ token }: { token: string }) {
     tokenRef.current = token;
     const lookupToken = tokenRef.current;
     setView({ status: 'loading' });
-    if (!publicSupabase) {
-      setView({ status: 'error' });
-      tokenRef.current = '';
-      return;
-    }
-    void lookupRequestFreeInvoice(publicSupabase, lookupToken)
+    void lookupRequestFreeInvoice(lookupToken)
       .then(result => {
         if (!cancelled) setView(stateFromLookup(result));
       })

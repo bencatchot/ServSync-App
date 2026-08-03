@@ -67,13 +67,22 @@ export async function revokeLocalInvoiceDeliveryLink(client: SupabaseClient, lin
   return requireResult<LocalInvoiceDeliveryLinkMetadata>(data, 'ServSync did not confirm the link revocation.');
 }
 
-export async function lookupRequestFreeInvoice(client: SupabaseClient, token: string) {
+export async function lookupRequestFreeInvoice(token: string, request: typeof fetch = fetch) {
   if (!TOKEN_PATTERN.test(token)) {
     return { state: 'invalid' } satisfies RequestFreeInvoiceDeliveryLookup;
   }
-  const { data, error } = await client.rpc('servsync_lookup_local_invoice_delivery', {
-    p_token: token,
+  const response = await request('/api/request-free-local-invoice-delivery', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+    cache: 'no-store',
+    credentials: 'omit',
+    headers: { 'Content-Type': 'application/json' },
+    referrerPolicy: 'no-referrer',
   });
-  if (error) throw new Error('Invoice lookup is temporarily unavailable.');
+  if (response.status === 429) {
+    return { state: 'rate_limited' } satisfies RequestFreeInvoiceDeliveryLookup;
+  }
+  if (!response.ok) throw new Error('Invoice lookup is temporarily unavailable.');
+  const data: unknown = await response.json();
   return requireResult<RequestFreeInvoiceDeliveryLookup>(data, 'Invoice lookup is temporarily unavailable.');
 }

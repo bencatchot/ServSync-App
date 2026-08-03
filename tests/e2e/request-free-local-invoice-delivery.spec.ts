@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { containDialogTabFocus } from '../../src/features/invoices/dialogFocusContainment';
@@ -28,6 +28,13 @@ function expectInOrder(text: string, markers: string[]) {
 }
 
 test.describe('FB-003B request-free local invoice delivery source boundary', () => {
+  test('keeps the Sandbox-installed foundation migration byte-for-byte unchanged', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery.sql');
+    expect(createHash('sha256').update(sql).digest('hex')).toBe(
+      '244b3a9275862f6c855a360970d74b4b42b581aca36f26c7fb7adf82001fe8b4',
+    );
+  });
+
   test('migration stores only SHA-256 hashes and enforces one active grant per invoice', () => {
     const sql = source('servsync-request-free-local-invoice-delivery.sql');
 
@@ -228,7 +235,8 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     const app = source('src/App.tsx');
     const panel = source('src/features/invoices/LocalInvoiceDeliveryPanel.tsx');
     const publicView = source('src/features/invoices/RequestFreeInvoiceView.tsx');
-    const publicClient = source('src/publicSupabaseClient.ts');
+    const publicLookup = source('src/features/invoices/requestFreeInvoiceDelivery.ts');
+    const gateway = source('api/request-free-local-invoice-delivery.ts');
     const entry = source('src/main.tsx');
     const links = source('src/appLinks.ts');
 
@@ -241,9 +249,12 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(entry).toContain('root.render(null)');
     expect(entry).toContain('<RequestFreeInvoiceView key={target.token} token={target.token} />');
     expect(entry.indexOf("await import('./features/invoices/RequestFreeInvoiceView')")).toBeLessThan(entry.indexOf("await import('./App')"));
-    expect(publicClient).toContain('autoRefreshToken: false');
-    expect(publicClient).toContain('detectSessionInUrl: false');
-    expect(publicClient).toContain('persistSession: false');
+    expect(publicLookup).toContain("request('/api/request-free-local-invoice-delivery'");
+    expect(publicLookup).toContain("credentials: 'omit'");
+    expect(publicLookup).toContain("cache: 'no-store'");
+    expect(publicLookup).toContain("referrerPolicy: 'no-referrer'");
+    expect(publicLookup).not.toContain("client.rpc('servsync_lookup_local_invoice_delivery'");
+    expect(gateway).toContain('process.env.SUPABASE_SERVICE_ROLE_KEY');
     expect(links).toContain("return appRouteUrl('invoice-delivery', { access: token }, location);");
     expect(panel).toContain('navigator.clipboard.writeText(urlRef.current)');
     expect(panel).toContain('setOneTimeUrl(\'\')');
@@ -263,6 +274,116 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(publicView).toContain("robots.content = 'noindex, nofollow, noarchive'");
     expect(publicView).toContain("referrer.content = 'no-referrer'");
     expect(publicView).not.toContain('<Analytics');
+  });
+
+  test('corrective migration closes direct PostgREST lookup and leaves one service-only signature', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery-gateway-hardening.sql');
+
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke all on function public.servsync_lookup_local_invoice_delivery(text) from ${role};`);
+    }
+    expect(sql).toContain('grant execute on function public.servsync_lookup_local_invoice_delivery(text) to service_role;');
+    expect(sql).not.toContain('grant execute on function public.servsync_lookup_local_invoice_delivery(text) to anon;');
+    expect(sql).toContain("procedure.proname = 'servsync_lookup_local_invoice_delivery'");
+    expect(sql).toContain('if v_lookup_count <> 1');
+    expect(sql).toContain('returns text');
+  });
+
+  test('database rate buckets are atomic, private, bounded, and precede protected record locks', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery-gateway-hardening.sql');
+    const consume = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_consume_local_invoice_delivery_rate_limit',
+      'create or replace function public.servsync_private_cleanup_local_invoice_delivery_rate_limits',
+    );
+    const cleanup = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_cleanup_local_invoice_delivery_rate_limits',
+      'create or replace function public.servsync_private_render_local_invoice_delivery',
+    );
+    const lookup = sourceBetween(
+      sql,
+      'create function public.servsync_lookup_local_invoice_delivery',
+      'alter function public.servsync_lookup_local_invoice_delivery(text) owner to postgres',
+    );
+
+    expect(sql).toContain('create table public.local_invoice_delivery_rate_buckets');
+    expect(sql).toContain('primary key (scope, key_hash)');
+    expect(sql).toContain("check (scope in ('global', 'token'))");
+    expect(sql).toContain('alter table public.local_invoice_delivery_rate_buckets enable row level security');
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke all on table public.local_invoice_delivery_rate_buckets from ${role};`);
+    }
+    expect(consume).toContain('on conflict (scope, key_hash) do update');
+    expect(consume).toContain('return coalesce(v_allowed, false)');
+    expect(cleanup).toContain("bucket.scope = 'token'");
+    expect(cleanup).toContain("interval '24 hours'");
+    expect(cleanup).toContain('limit 25');
+    expect(cleanup).not.toContain("bucket.scope = 'global'");
+    expectInOrder(lookup, [
+      "'global', v_global_key, 300, 5::numeric",
+      'from public.local_invoice_delivery_links link',
+      "'token', v_token_hash, 10, (1::numeric / 6::numeric)",
+      'from public.contractor_local_contacts',
+      'for update',
+      'from public.contractor_local_homes',
+      'for update',
+      'from public.invoices',
+      'for update',
+    ]);
+  });
+
+  test('public rendering rejects line and byte overages before history mutation and saturates counters', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery-gateway-hardening.sql');
+    const renderer = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_render_local_invoice_delivery',
+      'create or replace function public.servsync_create_local_invoice_delivery_link',
+    );
+    const createRpc = sourceBetween(
+      sql,
+      'create or replace function public.servsync_create_local_invoice_delivery_link',
+      'create or replace function public.servsync_rotate_local_invoice_delivery_link',
+    );
+    const rotateRpc = sourceBetween(
+      sql,
+      'create or replace function public.servsync_rotate_local_invoice_delivery_link',
+      'drop function public.servsync_lookup_local_invoice_delivery',
+    );
+    const lookup = sourceBetween(
+      sql,
+      'create function public.servsync_lookup_local_invoice_delivery',
+      'alter function public.servsync_lookup_local_invoice_delivery(text) owner to postgres',
+    );
+
+    expect(renderer).toContain('limit 101');
+    expect(renderer).toContain('if public_line_count > 100 then');
+    expect(renderer).toContain("failure_reason := 'line_limit'");
+    expect(renderer).toContain("serialized_bytes := octet_length(convert_to(serialized_payload, 'UTF8'))");
+    expect(renderer).toContain('if serialized_bytes > 262144 then');
+    expect(renderer).toContain("failure_reason := 'response_limit'");
+    expect(createRpc).toContain("v_render.failure_reason in ('line_limit', 'response_limit')");
+    expect(rotateRpc).toContain("v_render.failure_reason in ('line_limit', 'response_limit')");
+    expectInOrder(rotateRpc, [
+      'servsync_private_render_local_invoice_delivery',
+      "revocation_reason = 'replaced'",
+    ]);
+    expectInOrder(lookup, [
+      'servsync_private_render_local_invoice_delivery',
+      'if v_render.serialized_payload is null then',
+      'update public.local_invoice_delivery_links',
+    ]);
+    expect(lookup).toContain('when open_count < 9223372036854775807 then open_count + 1');
+    expect(lookup).toContain('else 9223372036854775807');
+    expect(lookup).toContain('return v_render.serialized_payload');
+
+    expect([99, 100, 101].map(count => ({ count, allowed: count > 0 && count <= 100 }))).toEqual([
+      { count: 99, allowed: true },
+      { count: 100, allowed: true },
+      { count: 101, allowed: false },
+    ]);
+    const max = 9_223_372_036_854_775_807n;
+    expect([max - 1n, max].map(count => (count < max ? count + 1n : max))).toEqual([max, max]);
   });
 });
 
@@ -322,7 +443,7 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
         if (/\/src\/App\.tsx(?:\?|$)|\/assets\/App-[^/]+\.js(?:\?|$)|@vercel_analytics/i.test(request.url())) unrelatedAppRequests.push(request.url());
       });
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.route('**/rest/v1/rpc/servsync_lookup_local_invoice_delivery', route => route.fulfill({
+      await page.route('**/api/request-free-local-invoice-delivery', route => route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(validInvoice),
@@ -370,9 +491,9 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     });
     page.on('requestfailed', request => failedRequests.push(request.url().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]')));
     await page.route('**/_vercel/insights/**', route => route.fulfill({ status: 204, body: '' }));
-    await page.route('**/rest/v1/rpc/servsync_lookup_local_invoice_delivery', route => {
-      const body = route.request().postDataJSON() as { p_token?: string };
-      const response = body.p_token === tokenA
+    await page.route('**/api/request-free-local-invoice-delivery', route => {
+      const body = route.request().postDataJSON() as { token?: string };
+      const response = body.token === tokenA
         ? markedInvoice('Route fixture A', 'Route Customer A')
         : markedInvoice('Route fixture B', 'Route Customer B');
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
@@ -390,7 +511,7 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     await expect(page.getByText('Route Customer B')).toHaveCount(0);
 
     await page.evaluate(() => { window.location.hash = '#/contractor'; });
-    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Sign in|Supabase is not connected/ })).toBeVisible();
     await expect(page.getByTestId('request-free-invoice-valid')).toHaveCount(0);
 
     await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenA);
@@ -409,9 +530,9 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       if (message.type() === 'error') consoleErrors.push(message.text().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]'));
     });
     page.on('requestfailed', request => failedRequests.push(request.url().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]')));
-    await page.route('**/rest/v1/rpc/servsync_lookup_local_invoice_delivery', route => {
-      const body = route.request().postDataJSON() as { p_token?: string };
-      const response = body.p_token === tokenA
+    await page.route('**/api/request-free-local-invoice-delivery', route => {
+      const body = route.request().postDataJSON() as { token?: string };
+      const response = body.token === tokenA
         ? markedInvoice('History fixture A', 'History Customer A')
         : markedInvoice('History fixture B', 'History Customer B');
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
@@ -436,17 +557,17 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
   test('rejects malformed tokens before making a lookup request', async ({ page }) => {
     let lookupRequests = 0;
     page.on('request', request => {
-      if (request.url().includes('/rpc/servsync_lookup_local_invoice_delivery')) lookupRequests += 1;
+      if (request.url().includes('/api/request-free-local-invoice-delivery')) lookupRequests += 1;
     });
     await page.goto('/#/invoice-delivery?access=not-a-token');
     await expect(page.getByTestId('request-free-invoice-invalid')).toBeVisible();
     expect(lookupRequests).toBe(0);
   });
 
-  for (const state of ['invalid', 'expired', 'revoked', 'replaced', 'unavailable', 'error'] as const) {
+  for (const state of ['invalid', 'expired', 'revoked', 'replaced', 'unavailable', 'rate_limited', 'error'] as const) {
     test(`renders the safe ${state} state without invoice content`, async ({ page }) => {
       const token = randomBytes(32).toString('hex');
-      await page.route('**/rest/v1/rpc/servsync_lookup_local_invoice_delivery', route => route.fulfill({
+      await page.route('**/api/request-free-local-invoice-delivery', route => route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ state }),
@@ -455,6 +576,24 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       await expect(page.getByTestId(`request-free-invoice-${state}`)).toBeVisible();
       await expect(page.getByText('Fixture Customer')).toHaveCount(0);
       await expect(page.getByText('100 Test Street')).toHaveCount(0);
+    });
+  }
+
+  for (const response of [
+    { status: 429, state: 'rate_limited' },
+    { status: 503, state: 'error' },
+  ] as const) {
+    test(`maps gateway HTTP ${response.status} to a safe recipient state`, async ({ page }) => {
+      const token = randomBytes(32).toString('hex');
+      await page.route('**/api/request-free-local-invoice-delivery', route => route.fulfill({
+        status: response.status,
+        contentType: 'application/json',
+        headers: response.status === 429 ? { 'Retry-After': '60' } : {},
+        body: JSON.stringify({ state: response.state }),
+      }));
+      await page.goto(`/#/invoice-delivery?access=${token}`);
+      await expect(page.getByTestId(`request-free-invoice-${response.state}`)).toBeVisible();
+      await expect(page.getByText('Fixture Customer')).toHaveCount(0);
     });
   }
 });

@@ -7,13 +7,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 ## 2026-08-03
 
 - Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
+- Correction scope: Draft PR #369 gateway-abuse-control and public-response hardening.
+- Files changed:
+  - `api/request-free-local-invoice-delivery.ts`
+  - `servsync-request-free-local-invoice-delivery-gateway-hardening.sql`
+  - request-free invoice recipient client/view helpers under `src/features/invoices/`
+  - `src/types.ts`
+  - `package.json`, `package-lock.json`, and `tsconfig.node.json`
+  - focused request-free invoice gateway, browser, and security-catalog tests under `tests/e2e/`
+  - the four FB-003B planning documents
+- Summary of change: Replaces the recipient browser's direct anonymous PostgREST call with a same-origin Vercel Function that uses server-only Supabase configuration and the official `@vercel/firewall` entry check. A separate additive corrective migration revokes direct lookup execution from browser roles, retains service-role-only execution, adds private atomic global and per-token rate buckets, rejects public invoices above 100 lines or an exact 262,144-byte serialized envelope, and saturates link-open counts. PostgreSQL returns the exact serialized JSON text emitted by the gateway so the database and gateway byte checks measure the same response and no successful open is recorded before bounds pass.
+- Rollout status: The original migration remains byte-identical and is installed only in Sandbox. The corrective migration is not applied anywhere, the Vercel Function is not deployed, no Firewall rule is configured, and no server secret or environment variable was added. Direct PostgREST closure, live throttling, live response bounds, and gateway behavior therefore remain pending controlled Sandbox application and validation.
+- Tests/checks run: Typecheck, production build, mocked gateway and request-free delivery suites, static SQL/catalog security checks, mocked desktop/mobile recipient coverage, diff/package/documentation checks, and sensitive-value/token containment scans.
+- Backlog impact: FB-003B remains active, draft, unmerged, and blocked from rollout pending independent source review and separately authorized Sandbox corrective SQL, server-secret, Firewall, deployment, and live-validation gates.
+
+- Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
 - Starting main SHA: `410bd1554a646ee81ef9eb9d6cbe40ea7fc2ff9a`
 - Files changed:
   - `servsync-request-free-local-invoice-delivery.sql`
   - `src/App.tsx`
   - `src/appLinks.ts`
   - `src/main.tsx`
-  - `src/publicSupabaseClient.ts`
+  - request-free recipient client boundary (the temporary direct public Supabase client was later removed by the gateway correction above)
   - `src/types.ts`
   - request-free invoice delivery components/helpers under `src/features/invoices/`
   - focused request-free invoice and security-catalog coverage under `tests/e2e/`
@@ -21,7 +36,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Completed_Features.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Implements FB-003B Request-Free Local Invoice Delivery Slice 1 in repository source only. The additive migration creates a private, RLS-enabled bearer-grant table with one active grant per invoice, 256-bit one-time token generation, SHA-256 hash-only storage, expiration, rotation, revocation, and separate open history. Exact owner/admin/office management RPCs derive canonical tenant/invoice/local-customer/property context, issue the first eligible local invoice through the immutable sent lifecycle, and return raw tokens only once. A token-only anonymous lookup returns a bounded customer-safe HTML invoice DTO without changing authenticated homeowner invoice status. The contractor UI adds a short-lived one-time copy dialog and token-free history; direct sensitive hash-route loads use a non-persistent anonymous client and exclude the authenticated application and Vercel Analytics bundles while adding no-index/no-referrer metadata.
+- Summary of change: Implements FB-003B Request-Free Local Invoice Delivery Slice 1 in repository source only. The additive migration creates a private, RLS-enabled bearer-grant table with one active grant per invoice, 256-bit one-time token generation, SHA-256 hash-only storage, expiration, rotation, revocation, and separate open history. Exact owner/admin/office management RPCs derive canonical tenant/invoice/local-customer/property context, issue the first eligible local invoice through the immutable sent lifecycle, and return raw tokens only once. A token-only lookup returns a bounded customer-safe HTML invoice DTO without changing authenticated homeowner invoice status. The contractor UI adds a short-lived one-time copy dialog and token-free history; direct sensitive hash-route loads exclude the authenticated application and Vercel Analytics bundles while adding no-index/no-referrer metadata. The later correction above places lookup behind the same-origin gateway.
 - Reason for change: Contractors need a secure way to share a saved invoice with a contractor-created local customer who has not submitted a request or created/claimed a ServSync account, without exposing the broader customer profile, other properties, or other documents.
 - Tests/checks run:
   - `npm run typecheck`
@@ -32,7 +47,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `git diff --check`, documentation structure/link checks, changed-file scope review, and added-line sensitive-value/token scan
   - `npm run lint` attempted; the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup incompatibility remains separately reported
 - Known risks or follow-ups:
-  - `servsync-request-free-local-invoice-delivery.sql` was created but not applied to Sandbox, Demo, Production, or any other environment. Anonymous invoice delivery is not enabled or deployed by this task.
+  - `servsync-request-free-local-invoice-delivery.sql` was later applied only to Sandbox during a controlled gate. Its gateway-hardening correction is unapplied, so anonymous invoice delivery remains blocked from rollout and is not deployed.
   - Repository tests can validate the abuse-control integration boundary, token entropy/format rejection, and enumeration resistance, but effective gateway-level rate limiting has not been configured or proven. That is a mandatory controlled Sandbox rollout gate.
   - Slice 1 is HTML invoice viewing only. It excludes anonymous PDF download, estimates, inspection reports, claimed-account document migration, email/SMS/reminders, notifications, approvals, signatures, payments, replies, and provider delivery.
   - A pre-claim active link remains valid after claim until expiration or revocation; create/rotate then fail closed, revocation remains authorized, and this slice does not duplicate or transfer invoice ownership.
