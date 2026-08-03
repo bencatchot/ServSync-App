@@ -253,7 +253,9 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(panel).toContain('min={1}');
     expect(panel).toContain('max={90}');
     expect(panel).toContain('containDialogTabFocus(event, dialogRef.current)');
-    expect(panel).toContain('previousFocusRef.current?.focus()');
+    expect(panel).toContain('focusTarget?.focus()');
+    expect(panel).toContain('urlRef.current = url');
+    expect(panel).not.toContain('inputRef.current.value =');
     expect(panel).toContain("if (event.key === 'Escape')");
     expect(panel).toContain('event.preventDefault()');
     expect(panel).not.toMatch(/localStorage|sessionStorage|indexedDB/i);
@@ -455,6 +457,225 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       await expect(page.getByText('100 Test Street')).toHaveCount(0);
     });
   }
+});
+
+test.describe('FB-003B contractor delivery panel lifecycle', () => {
+  test('keeps history and one-time links operational through real StrictMode effect replay', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
+    const pageErrors: string[] = [];
+    const failedRequests: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+      if (message.type() === 'warning') consoleWarnings.push(message.text());
+    });
+    page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('requestfailed', request => failedRequests.push(new URL(request.url()).pathname));
+
+    await page.route('**/src/main.tsx', route => route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      body: '',
+    }));
+    await page.goto('/');
+    await page.evaluate(async () => {
+      const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
+      const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as {
+        createElement: (...args: unknown[]) => unknown;
+        StrictMode: unknown;
+      };
+      const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as {
+        createRoot: (node: HTMLElement) => { render: (node: unknown) => void; unmount: () => void };
+      }).createRoot;
+      const Panel = (await dynamicImport('/src/features/invoices/LocalInvoiceDeliveryPanel.tsx')).LocalInvoiceDeliveryPanel as (...args: unknown[]) => unknown;
+      const deliveryUrl = (await dynamicImport('/src/appLinks.ts')).requestFreeLocalInvoiceUrl as (token: string) => string;
+
+      document.body.innerHTML = '<main><div id="strict-delivery-root"></div></main>';
+      const root = createRoot(document.getElementById('strict-delivery-root') as HTMLElement);
+      const ids = {
+        initialInvoice: crypto.randomUUID(),
+        staleInvoice: crypto.randomUUID(),
+        currentInvoice: crypto.randomUUID(),
+        unmountInvoice: crypto.randomUUID(),
+        contact: crypto.randomUUID(),
+      };
+      type PendingHistory = {
+        invoiceId: string;
+        settled: boolean;
+        resolve: (value: unknown) => void;
+      };
+      const pendingHistory: PendingHistory[] = [];
+      const copiedValues: string[] = [];
+      const generatedUrls: string[] = [];
+      let currentInvoiceId = ids.initialInvoice;
+      let autoResolveHistory: unknown[] | null = null;
+      let currentLink: Record<string, unknown> | null = null;
+
+      const token = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), value => value.toString(16).padStart(2, '0')).join('');
+      const link = () => ({
+        id: crypto.randomUUID(),
+        state: 'active',
+        expires_at: '2026-09-02T12:00:00.000Z',
+        created_at: '2026-08-03T12:00:00.000Z',
+        created_by_name: 'Fixture Owner',
+        revoked_at: null,
+        revoked_by_name: null,
+        first_opened_at: null,
+        last_opened_at: null,
+        open_count: 0,
+      });
+      const deferredHistory = (invoiceId: string) => {
+        let resolve!: (value: unknown) => void;
+        const promise = new Promise(done => { resolve = done; });
+        pendingHistory.push({ invoiceId, settled: false, resolve });
+        return promise;
+      };
+      const resolveHistory = (invoiceId: string, records: unknown[]) => {
+        const request = pendingHistory.find(item => !item.settled && item.invoiceId === invoiceId);
+        if (!request) throw new Error('Missing pending history request.');
+        request.settled = true;
+        request.resolve({ data: records, error: null, status: 200 });
+      };
+      const issueLink = () => {
+        const rawToken = token();
+        const nextLink = link();
+        currentLink = nextLink;
+        generatedUrls.push(deliveryUrl(rawToken));
+        return { data: { link: nextLink, token: rawToken }, error: null, status: 200 };
+      };
+      const client = {
+        rpc(name: string, args: Record<string, unknown>) {
+          if (name === 'servsync_list_local_invoice_delivery_links') {
+            if (autoResolveHistory) {
+              const records = autoResolveHistory;
+              autoResolveHistory = null;
+              return Promise.resolve({ data: records, error: null, status: 200 });
+            }
+            return deferredHistory(String(args.p_invoice_id));
+          }
+          if (name === 'servsync_create_local_invoice_delivery_link') return Promise.resolve(issueLink());
+          if (name === 'servsync_rotate_local_invoice_delivery_link') {
+            const result = issueLink();
+            autoResolveHistory = currentLink ? [currentLink] : [];
+            return Promise.resolve(result);
+          }
+          throw new Error(`Unexpected fixture RPC: ${name}`);
+        },
+      };
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async (value: string) => { copiedValues.push(value); } },
+      });
+      window.confirm = () => true;
+
+      const render = () => root.render(React.createElement(
+        React.StrictMode,
+        null,
+        React.createElement(Panel, {
+          client,
+          invoice: {
+            id: currentInvoiceId,
+            status: 'sent',
+            line_items: [{ id: crypto.randomUUID() }],
+          },
+          localContact: {
+            id: ids.contact,
+            display_name: 'StrictMode Fixture Customer',
+            homeowner_user_id: null,
+            claimed_at: null,
+          },
+          canManage: true,
+          onInvoiceChanged: async () => undefined,
+        }),
+      ));
+      render();
+
+      const command = (name: string) => {
+        if (name === 'resolve-initial') resolveHistory(ids.initialInvoice, []);
+        if (name === 'switch-stale') { currentInvoiceId = ids.staleInvoice; render(); }
+        if (name === 'switch-current') { currentInvoiceId = ids.currentInvoice; render(); }
+        if (name === 'resolve-current') resolveHistory(ids.currentInvoice, []);
+        if (name === 'resolve-stale') resolveHistory(ids.staleInvoice, [link()]);
+        if (name === 'switch-unmount') { currentInvoiceId = ids.unmountInvoice; render(); }
+        if (name === 'unmount-and-resolve') {
+          root.unmount();
+          resolveHistory(ids.unmountInvoice, []);
+        }
+        if (name === 'url-is-current') {
+          const input = document.querySelector<HTMLInputElement>('#local-invoice-one-time-url');
+          return Boolean(input && input.value === generatedUrls.at(-1));
+        }
+        if (name === 'copied-current') return copiedValues.at(-1) === generatedUrls.at(-1);
+        if (name === 'rotated-url-is-new') {
+          return generatedUrls.length === 2 && generatedUrls[0] !== generatedUrls[1];
+        }
+        if (name === 'pending-stale') return pendingHistory.filter(item => !item.settled && item.invoiceId === ids.staleInvoice).length;
+        if (name === 'pending-current') return pendingHistory.filter(item => !item.settled && item.invoiceId === ids.currentInvoice).length;
+        if (name === 'pending-unmount') return pendingHistory.filter(item => !item.settled && item.invoiceId === ids.unmountInvoice).length;
+        return null;
+      };
+      (window as unknown as { __strictDeliveryHarness: { command: (name: string) => unknown } }).__strictDeliveryHarness = { command };
+    });
+
+    const runHarness = <T,>(command: string) => page.evaluate<T, string>(name => (
+      window as unknown as { __strictDeliveryHarness: { command: (value: string) => T } }
+    ).__strictDeliveryHarness.command(name), command);
+
+    const panelToggle = page.getByRole('button', { name: 'Secure customer link' });
+    await panelToggle.click();
+    await expect(page.getByText('Loading secure-link history...')).toBeVisible();
+    await runHarness('resolve-initial');
+    const createButton = page.getByRole('button', { name: 'Create link' });
+    await expect(createButton).toBeVisible();
+
+    await createButton.click();
+    const dialog = page.getByTestId('local-invoice-one-time-link-dialog');
+    const oneTimeInput = dialog.getByLabel('One-time link copy');
+    await expect(dialog).toBeVisible();
+    await expect(oneTimeInput).toBeFocused();
+    expect(await runHarness<boolean>('url-is-current')).toBe(true);
+    expect(await runHarness<boolean>('copied-current')).toBe(true);
+
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.getByRole('button', { name: 'Close one-time invoice link' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(oneTimeInput).toBeFocused();
+    await dialog.getByRole('button', { name: 'Copied' }).click();
+    expect(await runHarness<boolean>('copied-current')).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(panelToggle).toBeFocused();
+
+    await page.getByRole('button', { name: 'Rotate link' }).click();
+    await expect(dialog).toBeVisible();
+    await expect(oneTimeInput).toBeFocused();
+    expect(await runHarness<boolean>('url-is-current')).toBe(true);
+    expect(await runHarness<boolean>('rotated-url-is-new')).toBe(true);
+    await dialog.getByRole('button', { name: 'Close one-time invoice link' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(panelToggle).toBeFocused();
+
+    await runHarness('switch-stale');
+    await expect.poll(() => runHarness<number>('pending-stale')).toBe(1);
+    await runHarness('switch-current');
+    await expect.poll(() => runHarness<number>('pending-current')).toBe(1);
+    await runHarness('resolve-current');
+    await expect(createButton).toBeVisible();
+    await runHarness('resolve-stale');
+    await expect(createButton).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Rotate link' })).toHaveCount(0);
+
+    await runHarness('switch-unmount');
+    await expect.poll(() => runHarness<number>('pending-unmount')).toBe(1);
+    await runHarness('unmount-and-resolve');
+    await page.waitForTimeout(50);
+
+    expect(consoleErrors).toEqual([]);
+    expect(consoleWarnings).toEqual([]);
+    expect(pageErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
 });
 
 test.describe('FB-003B one-time link dialog focus containment', () => {

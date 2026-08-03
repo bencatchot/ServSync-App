@@ -40,9 +40,10 @@ function stateLabel(state: LocalInvoiceDeliveryLinkMetadata['state']) {
   return 'Revoked';
 }
 
-function OneTimeLinkDialog({ url, copiedInitially, onClose }: {
+function OneTimeLinkDialog({ url, copiedInitially, returnFocusTarget, onClose }: {
   url: string;
   copiedInitially: boolean;
+  returnFocusTarget: HTMLElement | null;
   onClose: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -63,7 +64,10 @@ function OneTimeLinkDialog({ url, copiedInitially, onClose }: {
   };
 
   useEffect(() => {
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    urlRef.current = url;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : returnFocusTarget;
     inputRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -77,10 +81,12 @@ function OneTimeLinkDialog({ url, copiedInitially, onClose }: {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       urlRef.current = '';
-      if (inputRef.current) inputRef.current.value = '';
-      previousFocusRef.current?.focus();
+      const focusTarget = previousFocusRef.current?.isConnected
+        ? previousFocusRef.current
+        : returnFocusTarget;
+      focusTarget?.focus();
     };
-  }, [onClose]);
+  }, [onClose, returnFocusTarget, url]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
@@ -161,9 +167,15 @@ export function LocalInvoiceDeliveryPanel({
   const [notice, setNotice] = useState('');
   const [oneTimeUrl, setOneTimeUrl] = useState('');
   const [copiedAutomatically, setCopiedAutomatically] = useState(false);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
   const busyRef = useRef(false);
   const oneTimeUrlRef = useRef('');
+  const historyRequestRef = useRef(0);
+  const actionRequestRef = useRef(0);
+  const contextKey = `${invoice.id}:${localContact.id}`;
+  const contextKeyRef = useRef(contextKey);
+  const panelToggleRef = useRef<HTMLButtonElement | null>(null);
+  contextKeyRef.current = contextKey;
 
   const clearOneTimeUrl = useCallback(() => {
     oneTimeUrlRef.current = '';
@@ -171,29 +183,56 @@ export function LocalInvoiceDeliveryPanel({
     setCopiedAutomatically(false);
   }, []);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    oneTimeUrlRef.current = '';
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      historyRequestRef.current += 1;
+      actionRequestRef.current += 1;
+      busyRef.current = false;
+      oneTimeUrlRef.current = '';
+    };
   }, []);
 
+  useEffect(() => {
+    historyRequestRef.current += 1;
+    actionRequestRef.current += 1;
+    busyRef.current = false;
+    setLinks([]);
+    setLoading(false);
+    setBusy(null);
+    setError('');
+    setNotice('');
+    clearOneTimeUrl();
+  }, [clearOneTimeUrl, contextKey]);
+
   const load = useCallback(async () => {
+    const requestId = ++historyRequestRef.current;
+    const requestContext = contextKey;
+    const isCurrent = () => mountedRef.current
+      && historyRequestRef.current === requestId
+      && contextKeyRef.current === requestContext;
     setLoading(true);
     setError('');
     try {
       const records = await listLocalInvoiceDeliveryLinks(client, invoice.id);
-      if (mountedRef.current) setLinks(records);
+      if (isCurrent()) setLinks(records);
     } catch (err) {
-      if (mountedRef.current) setError(readableError(err, 'Delivery-link history could not be loaded.'));
+      if (isCurrent()) setError(readableError(err, 'Delivery-link history could not be loaded.'));
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [client, invoice.id]);
+  }, [client, contextKey, invoice.id]);
 
   useEffect(() => {
     if (expanded) void load();
   }, [expanded, load]);
 
-  const showOneTimeLink = async (token: string) => {
+  const showOneTimeLink = async (token: string, requestId: number, requestContext: string) => {
+    const isCurrent = () => mountedRef.current
+      && actionRequestRef.current === requestId
+      && contextKeyRef.current === requestContext;
+    if (!isCurrent()) return false;
     const url = requestFreeLocalInvoiceUrl(token);
     let copied = false;
     try {
@@ -202,33 +241,41 @@ export function LocalInvoiceDeliveryPanel({
     } catch {
       copied = false;
     }
-    if (!mountedRef.current) return;
+    if (!isCurrent()) return false;
     oneTimeUrlRef.current = url;
     setCopiedAutomatically(copied);
     setOneTimeUrl(url);
+    return true;
   };
 
   const create = async () => {
     if (busyRef.current) return;
+    const requestId = ++actionRequestRef.current;
+    const requestContext = contextKey;
+    const isCurrent = () => mountedRef.current
+      && actionRequestRef.current === requestId
+      && contextKeyRef.current === requestContext;
     busyRef.current = true;
     setBusy('create');
     setError('');
     setNotice('');
     try {
       const result = await createLocalInvoiceDeliveryLink(client, invoice.id, expiresDays);
-      await showOneTimeLink(result.token);
+      const token = result.token;
       result.token = '';
-      if (!mountedRef.current) return;
+      if (!await showOneTimeLink(token, requestId, requestContext) || !isCurrent()) return;
       setLinks(current => [result.link, ...current.filter(link => link.id !== result.link.id)]);
       setNotice(invoice.status === 'draft'
         ? 'Invoice issued and secure link created. No email or text was sent.'
         : 'Secure link created. No email or text was sent.');
       await onInvoiceChanged();
     } catch (err) {
-      if (mountedRef.current) setError(readableError(err, 'The secure invoice link could not be created.'));
+      if (isCurrent()) setError(readableError(err, 'The secure invoice link could not be created.'));
     } finally {
-      busyRef.current = false;
-      if (mountedRef.current) setBusy(null);
+      if (actionRequestRef.current === requestId) {
+        busyRef.current = false;
+        if (isCurrent()) setBusy(null);
+      }
     }
   };
 
@@ -237,42 +284,58 @@ export function LocalInvoiceDeliveryPanel({
   const rotate = async () => {
     if (!activeLink || busyRef.current) return;
     if (!window.confirm('Rotate this secure link? The current link will stop working immediately.')) return;
+    const requestId = ++actionRequestRef.current;
+    const requestContext = contextKey;
+    const isCurrent = () => mountedRef.current
+      && actionRequestRef.current === requestId
+      && contextKeyRef.current === requestContext;
     busyRef.current = true;
     setBusy('rotate');
     setError('');
     setNotice('');
     try {
       const result = await rotateLocalInvoiceDeliveryLink(client, activeLink.id, expiresDays);
-      await showOneTimeLink(result.token);
+      const token = result.token;
       result.token = '';
-      if (!mountedRef.current) return;
+      if (!await showOneTimeLink(token, requestId, requestContext) || !isCurrent()) return;
       await load();
+      if (!isCurrent()) return;
       setNotice('Secure link rotated. The previous link is no longer active. No email or text was sent.');
     } catch (err) {
-      if (mountedRef.current) setError(readableError(err, 'The secure invoice link could not be rotated.'));
+      if (isCurrent()) setError(readableError(err, 'The secure invoice link could not be rotated.'));
     } finally {
-      busyRef.current = false;
-      if (mountedRef.current) setBusy(null);
+      if (actionRequestRef.current === requestId) {
+        busyRef.current = false;
+        if (isCurrent()) setBusy(null);
+      }
     }
   };
 
   const revoke = async () => {
     if (!activeLink || busyRef.current) return;
     if (!window.confirm('Revoke this secure link? The recipient will no longer be able to view the invoice from it.')) return;
+    const requestId = ++actionRequestRef.current;
+    const requestContext = contextKey;
+    const isCurrent = () => mountedRef.current
+      && actionRequestRef.current === requestId
+      && contextKeyRef.current === requestContext;
     busyRef.current = true;
     setBusy('revoke');
     setError('');
     setNotice('');
     try {
       await revokeLocalInvoiceDeliveryLink(client, activeLink.id);
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
       await load();
+      if (!isCurrent()) return;
       setNotice('Secure link revoked. No invoice or payment status changed.');
     } catch (err) {
-      if (mountedRef.current) setError(readableError(err, 'The secure invoice link could not be revoked.'));
+      if (isCurrent()) setError(readableError(err, 'The secure invoice link could not be revoked.'));
     } finally {
-      busyRef.current = false;
-      if (mountedRef.current) setBusy(null);
+      if (actionRequestRef.current === requestId) {
+        busyRef.current = false;
+        if (isCurrent()) setBusy(null);
+      }
     }
   };
 
@@ -285,6 +348,7 @@ export function LocalInvoiceDeliveryPanel({
   return (
     <div className="mt-3 rounded-lg border border-[#D8DEE8] bg-[#F8FAFD]" data-testid="local-invoice-delivery-panel">
       <button
+        ref={panelToggleRef}
         type="button"
         onClick={() => setExpanded(value => !value)}
         aria-expanded={expanded}
@@ -372,6 +436,7 @@ export function LocalInvoiceDeliveryPanel({
         <OneTimeLinkDialog
           url={oneTimeUrl}
           copiedInitially={copiedAutomatically}
+          returnFocusTarget={panelToggleRef.current}
           onClose={clearOneTimeUrl}
         />
       )}
