@@ -13,6 +13,7 @@ import {
   revokeLocalInvoiceDeliveryLink,
   rotateLocalInvoiceDeliveryLink,
 } from './requestFreeInvoiceDelivery';
+import { containDialogTabFocus } from './dialogFocusContainment';
 
 function readableError(error: unknown, fallback: string) {
   if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
@@ -45,6 +46,7 @@ function OneTimeLinkDialog({ url, copiedInitially, onClose }: {
   onClose: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLElement | null>(null);
   const urlRef = useRef(url);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(copiedInitially);
@@ -64,7 +66,12 @@ function OneTimeLinkDialog({ url, copiedInitially, onClose }: {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     inputRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      containDialogTabFocus(event, dialogRef.current);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -78,7 +85,9 @@ function OneTimeLinkDialog({ url, copiedInitially, onClose }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
       <section
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="local-invoice-link-title"
         aria-describedby="local-invoice-link-description"

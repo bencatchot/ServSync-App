@@ -470,7 +470,6 @@ export type RequestFreeInvoiceDeliveryState =
 export interface RequestFreeInvoiceLineItem {
   title: string;
   description: string;
-  line_type: LegacyEstimateLineType;
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
@@ -479,16 +478,11 @@ export interface RequestFreeInvoiceLineItem {
 export interface RequestFreeInvoiceDocument {
   contractor: {
     business_name: string;
-    email: string;
-    phone: string;
-    city: string;
-    state: string;
   };
   customer: {
     display_name: string;
   };
   property: {
-    nickname: string;
     address_line1: string;
     address_line2: string;
     city: string;

@@ -6,6 +6,7 @@
 --   - servsync-partial-invoicing-data-foundation.sql
 --   - servsync-structured-line-items-foundation.sql
 --   - servsync-fb020-immutable-invoice-rls.sql
+--   - servsync-contractor-team-access.sql
 --
 -- This additive foundation issues saved local invoices into the existing
 -- immutable sent lifecycle and creates revocable, expiring, document-specific
@@ -185,6 +186,24 @@ revoke all on function public.servsync_private_can_manage_local_invoice_delivery
 revoke all on function public.servsync_private_can_manage_local_invoice_delivery(uuid) from anon;
 revoke all on function public.servsync_private_can_manage_local_invoice_delivery(uuid) from authenticated;
 
+create or replace function public.servsync_private_current_local_invoice_delivery_contractor_id()
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select contractor.id
+    from public.servsync_current_contractor_profile() contractor
+   where public.servsync_private_can_manage_local_invoice_delivery(contractor.id)
+   limit 1;
+$$;
+
+alter function public.servsync_private_current_local_invoice_delivery_contractor_id() owner to postgres;
+revoke all on function public.servsync_private_current_local_invoice_delivery_contractor_id() from public;
+revoke all on function public.servsync_private_current_local_invoice_delivery_contractor_id() from anon;
+revoke all on function public.servsync_private_current_local_invoice_delivery_contractor_id() from authenticated;
+
 create or replace function public.servsync_private_local_invoice_delivery_metadata(
   p_link public.local_invoice_delivery_links
 )
@@ -228,18 +247,24 @@ stable
 as $$
 declare
   v_invoice public.invoices;
+  v_authorized_contractor_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in.';
   end if;
 
+  v_authorized_contractor_id := public.servsync_private_current_local_invoice_delivery_contractor_id();
+  if v_authorized_contractor_id is null then
+    raise exception 'Invoice delivery history is unavailable.';
+  end if;
+
   select *
     into v_invoice
     from public.invoices
-   where id = p_invoice_id;
+   where id = p_invoice_id
+     and contractor_id = v_authorized_contractor_id;
 
-  if v_invoice.id is null
-     or not public.servsync_private_can_manage_local_invoice_delivery(v_invoice.contractor_id) then
+  if v_invoice.id is null then
     raise exception 'Invoice delivery history is unavailable.';
   end if;
 
@@ -275,6 +300,7 @@ declare
   v_contact public.contractor_local_contacts;
   v_home public.contractor_local_homes;
   v_link public.local_invoice_delivery_links;
+  v_authorized_contractor_id uuid;
   v_contractor_id uuid;
   v_local_contact_id uuid;
   v_local_home_id uuid;
@@ -288,10 +314,16 @@ begin
     raise exception 'Link expiration must be between 1 and 90 days.';
   end if;
 
+  v_authorized_contractor_id := public.servsync_private_current_local_invoice_delivery_contractor_id();
+  if v_authorized_contractor_id is null then
+    raise exception 'Invoice is not eligible for local delivery.';
+  end if;
+
   select invoice.contractor_id, invoice.local_contact_id, invoice.local_home_id
     into v_contractor_id, v_local_contact_id, v_local_home_id
     from public.invoices invoice
-   where invoice.id = p_invoice_id;
+   where invoice.id = p_invoice_id
+     and invoice.contractor_id = v_authorized_contractor_id;
 
   if v_contractor_id is null or v_local_contact_id is null or v_local_home_id is null then
     raise exception 'Invoice is not eligible for local delivery.';
@@ -316,6 +348,7 @@ begin
     into v_invoice
     from public.invoices
    where id = p_invoice_id
+     and contractor_id = v_authorized_contractor_id
    for update;
 
   if v_contact.id is null
@@ -330,10 +363,6 @@ begin
      or v_home.home_id is not null
      or v_home.claimed_at is not null then
     raise exception 'Invoice is not eligible for local delivery.';
-  end if;
-
-  if not public.servsync_private_can_manage_local_invoice_delivery(v_invoice.contractor_id) then
-    raise exception 'You do not have permission to manage invoice delivery.';
   end if;
 
   if v_invoice.status not in ('draft', 'sent', 'viewed', 'paid', 'partially_paid', 'overdue') then
@@ -435,6 +464,7 @@ declare
   v_invoice public.invoices;
   v_contact public.contractor_local_contacts;
   v_home public.contractor_local_homes;
+  v_authorized_contractor_id uuid;
   v_contractor_id uuid;
   v_invoice_id uuid;
   v_local_contact_id uuid;
@@ -449,10 +479,16 @@ begin
     raise exception 'Link expiration must be between 1 and 90 days.';
   end if;
 
+  v_authorized_contractor_id := public.servsync_private_current_local_invoice_delivery_contractor_id();
+  if v_authorized_contractor_id is null then
+    raise exception 'Invoice delivery link is unavailable.';
+  end if;
+
   select link.contractor_id, link.invoice_id, link.local_contact_id, link.local_home_id
     into v_contractor_id, v_invoice_id, v_local_contact_id, v_local_home_id
     from public.local_invoice_delivery_links link
-   where link.id = p_link_id;
+   where link.id = p_link_id
+     and link.contractor_id = v_authorized_contractor_id;
 
   if v_contractor_id is null then
     raise exception 'Invoice delivery link is unavailable.';
@@ -470,12 +506,12 @@ begin
 
   select * into v_invoice
     from public.invoices
-   where id = v_invoice_id
+   where id = v_invoice_id and contractor_id = v_authorized_contractor_id
    for update;
 
   select * into v_old_link
     from public.local_invoice_delivery_links
-   where id = p_link_id
+   where id = p_link_id and contractor_id = v_authorized_contractor_id
    for update;
 
   if v_contact.id is null
@@ -496,10 +532,6 @@ begin
      or v_home.claimed_at is not null
      or v_invoice.status not in ('sent', 'viewed', 'paid', 'partially_paid', 'overdue') then
     raise exception 'Invoice delivery link is unavailable.';
-  end if;
-
-  if not public.servsync_private_can_manage_local_invoice_delivery(v_invoice.contractor_id) then
-    raise exception 'You do not have permission to manage invoice delivery.';
   end if;
 
   if v_old_link.status <> 'active' or v_old_link.expires_at <= now() then
@@ -560,6 +592,7 @@ declare
   v_invoice public.invoices;
   v_contact public.contractor_local_contacts;
   v_home public.contractor_local_homes;
+  v_authorized_contractor_id uuid;
   v_contractor_id uuid;
   v_invoice_id uuid;
   v_local_contact_id uuid;
@@ -569,10 +602,16 @@ begin
     raise exception 'You must be signed in.';
   end if;
 
+  v_authorized_contractor_id := public.servsync_private_current_local_invoice_delivery_contractor_id();
+  if v_authorized_contractor_id is null then
+    raise exception 'Invoice delivery link is unavailable.';
+  end if;
+
   select link.contractor_id, link.invoice_id, link.local_contact_id, link.local_home_id
     into v_contractor_id, v_invoice_id, v_local_contact_id, v_local_home_id
     from public.local_invoice_delivery_links link
-   where link.id = p_link_id;
+   where link.id = p_link_id
+     and link.contractor_id = v_authorized_contractor_id;
 
   if v_contractor_id is null then
     raise exception 'Invoice delivery link is unavailable.';
@@ -590,12 +629,12 @@ begin
 
   select * into v_invoice
     from public.invoices
-   where id = v_invoice_id
+   where id = v_invoice_id and contractor_id = v_authorized_contractor_id
    for update;
 
   select * into v_link
     from public.local_invoice_delivery_links
-   where id = p_link_id
+   where id = p_link_id and contractor_id = v_authorized_contractor_id
    for update;
 
   if v_contact.id is null
@@ -610,10 +649,6 @@ begin
      or v_invoice.local_contact_id is distinct from v_local_contact_id
      or v_invoice.local_home_id is distinct from v_local_home_id then
     raise exception 'Invoice delivery link is unavailable.';
-  end if;
-
-  if not public.servsync_private_can_manage_local_invoice_delivery(v_invoice.contractor_id) then
-    raise exception 'You do not have permission to manage invoice delivery.';
   end if;
 
   if v_link.status = 'active' then
@@ -732,8 +767,7 @@ begin
   select coalesce(jsonb_agg(
     jsonb_build_object(
       'title', coalesce(nullif(trim(line.line_title), ''), nullif(trim(line.description), ''), 'Invoice item'),
-      'description', coalesce(nullif(trim(line.customer_description), ''), nullif(trim(line.description), ''), ''),
-      'line_type', line.line_type,
+      'description', coalesce(nullif(trim(line.customer_description), ''), ''),
       'quantity', line.quantity,
       'unit', line.unit,
       'unit_price_cents', line.unit_price_cents
@@ -757,17 +791,12 @@ begin
     'state', 'valid',
     'invoice', jsonb_build_object(
       'contractor', jsonb_build_object(
-        'business_name', v_contractor.business_name,
-        'email', v_contractor.email,
-        'phone', v_contractor.phone,
-        'city', v_contractor.city,
-        'state', v_contractor.state
+        'business_name', v_contractor.business_name
       ),
       'customer', jsonb_build_object(
         'display_name', v_contact.display_name
       ),
       'property', jsonb_build_object(
-        'nickname', v_home.nickname,
         'address_line1', v_home.address_line1,
         'address_line2', v_home.address_line2,
         'city', v_home.city,

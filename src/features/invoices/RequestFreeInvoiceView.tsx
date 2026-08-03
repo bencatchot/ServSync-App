@@ -203,7 +203,7 @@ export function RequestFreeInvoiceView({ token }: { token: string }) {
               {invoice.line_items.map((line, index) => (
                 <div key={`${index}-${line.title}`} className="grid gap-2 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-5">
                   <div className="min-w-0">
-                    <p className="break-words font-semibold">{line.title || line.description || 'Invoice item'}</p>
+                    <p className="break-words font-semibold">{line.title || 'Invoice item'}</p>
                     {line.description && line.description !== line.title && <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[#526784]">{line.description}</p>}
                     <p className="mt-2 text-xs text-[#6B7D95]">{line.quantity} {line.unit || 'each'} · {money(line.unit_price_cents)} each</p>
                   </div>

@@ -283,6 +283,7 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_private_durable_draft_rollout_mode',
   'servsync_private_can_prepare_local_customer_claim_invites',
   'servsync_private_can_manage_local_invoice_delivery',
+  'servsync_private_current_local_invoice_delivery_contractor_id',
   'servsync_private_local_invoice_delivery_metadata',
   'servsync_record_home_access_invite_delivery_result',
 ];

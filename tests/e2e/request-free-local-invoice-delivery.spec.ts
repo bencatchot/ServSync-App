@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { containDialogTabFocus } from '../../src/features/invoices/dialogFocusContainment';
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 
@@ -75,6 +76,11 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
       'create or replace function public.servsync_private_can_manage_local_invoice_delivery',
       'create or replace function public.servsync_private_local_invoice_delivery_metadata',
     );
+    const currentContractorHelper = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_current_local_invoice_delivery_contractor_id',
+      'create or replace function public.servsync_private_local_invoice_delivery_metadata',
+    );
     const listRpc = sourceBetween(sql, 'create or replace function public.servsync_list_local_invoice_delivery_links', 'create or replace function public.servsync_create_local_invoice_delivery_link');
     const createRpc = sourceBetween(sql, 'create or replace function public.servsync_create_local_invoice_delivery_link', 'create or replace function public.servsync_rotate_local_invoice_delivery_link');
     const rotateRpc = sourceBetween(sql, 'create or replace function public.servsync_rotate_local_invoice_delivery_link', 'create or replace function public.servsync_revoke_local_invoice_delivery_link');
@@ -83,7 +89,7 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
 
     for (const rpc of [listRpc, createRpc, rotateRpc, revokeRpc]) {
       expect(rpc).toContain('auth.uid() is null');
-      expect(rpc).toContain('servsync_private_can_manage_local_invoice_delivery');
+      expect(rpc).toContain('servsync_private_current_local_invoice_delivery_contractor_id');
       expect(rpc).toContain('security definer');
       expect(rpc).toContain('set search_path = public');
     }
@@ -97,8 +103,11 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(roleHelper).toContain("member.role in ('admin', 'office')");
     expect(roleHelper).not.toMatch(/member\.role in \([^)]*(?:field_tech|viewer)/);
     expect(roleHelper).not.toContain('current_user_is_platform_admin');
+    expect(currentContractorHelper).toContain('from public.servsync_current_contractor_profile() contractor');
+    expect(currentContractorHelper).toContain('servsync_private_can_manage_local_invoice_delivery(contractor.id)');
     for (const role of ['public', 'anon', 'authenticated']) {
       expect(roleHelper).toContain(`revoke all on function public.servsync_private_can_manage_local_invoice_delivery(uuid) from ${role};`);
+      expect(currentContractorHelper).toContain(`revoke all on function public.servsync_private_current_local_invoice_delivery_contractor_id() from ${role};`);
     }
   });
 
@@ -115,16 +124,26 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(createRpc).toContain('Add at least one invoice line');
   });
 
-  test('management paths lock canonical records in one order and never trust client tenant or document substitutions', () => {
+  test('management paths authorize the current contractor before tenant-scoped resolution and canonical locks', () => {
     const sql = source('servsync-request-free-local-invoice-delivery.sql');
+    const listRpc = sourceBetween(sql, 'create or replace function public.servsync_list_local_invoice_delivery_links', 'create or replace function public.servsync_create_local_invoice_delivery_link');
     const createRpc = sourceBetween(sql, 'create or replace function public.servsync_create_local_invoice_delivery_link', 'create or replace function public.servsync_rotate_local_invoice_delivery_link');
     const rotateRpc = sourceBetween(sql, 'create or replace function public.servsync_rotate_local_invoice_delivery_link', 'create or replace function public.servsync_revoke_local_invoice_delivery_link');
+    const revokeRpc = sourceBetween(sql, 'create or replace function public.servsync_revoke_local_invoice_delivery_link', 'create or replace function public.servsync_lookup_local_invoice_delivery');
 
     expect(createRpc).not.toContain('p_contractor_id');
     expect(createRpc).not.toContain('p_local_contact_id');
     expect(createRpc).not.toContain('p_local_home_id');
     expect(rotateRpc).not.toContain('p_invoice_id');
-    for (const rpc of [createRpc, rotateRpc]) {
+    for (const rpc of [listRpc, createRpc, rotateRpc, revokeRpc]) {
+      expectInOrder(rpc, [
+        'v_authorized_contractor_id := public.servsync_private_current_local_invoice_delivery_contractor_id()',
+        'if v_authorized_contractor_id is null then',
+        'from public.',
+      ]);
+      expect(rpc).not.toContain('You do not have permission to manage invoice delivery.');
+    }
+    for (const rpc of [createRpc, rotateRpc, revokeRpc]) {
       expectInOrder(rpc, [
         'from public.contractor_local_contacts',
         'for update',
@@ -133,6 +152,7 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
         'from public.invoices',
         'for update',
       ]);
+      expect(rpc).toContain('contractor_id = v_authorized_contractor_id');
     }
     expect(createRpc).toContain("link.status = 'active'");
     expect(rotateRpc).toContain("v_old_link.status <> 'active'");
@@ -168,7 +188,7 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(lookupRpc).not.toContain('v_contact.homeowner_user_id is not null');
   });
 
-  test('public DTO excludes IDs, token material, internal notes, and private delivery metadata', () => {
+  test('public DTO uses an exact rendered allowlist and keeps legacy descriptions out of public detail', () => {
     const sql = source('servsync-request-free-local-invoice-delivery.sql');
     const lookupRpc = sourceBetween(sql, 'create or replace function public.servsync_lookup_local_invoice_delivery', "comment on table public.local_invoice_delivery_links");
     const publicResult = sourceBetween(lookupRpc, "return jsonb_build_object(\n    'state', 'valid'", 'end;\n$$;');
@@ -185,9 +205,20 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
       "'revocation_reason'",
       "'open_count'",
       "'created_by'",
+      "'email'",
+      "'phone'",
+      "'city', v_contractor.city",
+      "'state', v_contractor.state",
+      "'nickname'",
+      "'line_type'",
     ]) {
       expect(publicResult).not.toContain(forbidden);
     }
+    expect(lookupRpc).toContain("'title', coalesce(nullif(trim(line.line_title), ''), nullif(trim(line.description), ''), 'Invoice item')");
+    expect(lookupRpc).toContain("'description', coalesce(nullif(trim(line.customer_description), ''), '')");
+    expect(lookupRpc).not.toContain("'description', coalesce(nullif(trim(line.customer_description), ''), nullif(trim(line.description), ''), '')");
+    expect(lookupRpc).toContain("'contractor', jsonb_build_object(\n        'business_name', v_contractor.business_name\n      )");
+    expect(lookupRpc).toContain("'property', jsonb_build_object(\n        'address_line1', v_home.address_line1");
     expect(publicResult).toContain("'line_items', v_lines");
     expect(publicResult).toContain("'business_name', v_contractor.business_name");
     expect(publicResult).toContain("'display_name', v_contact.display_name");
@@ -205,6 +236,10 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(app.indexOf("if (route === 'invoice-delivery')")).toBeLessThan(app.indexOf('<Analytics />'));
     expect(entry).toContain("await import('./features/invoices/RequestFreeInvoiceView')");
     expect(entry).toContain("await import('./App')");
+    expect(entry).toContain("window.addEventListener('hashchange', onHashChange)");
+    expect(entry).toContain("window.removeEventListener('hashchange', onHashChange)");
+    expect(entry).toContain('root.render(null)');
+    expect(entry).toContain('<RequestFreeInvoiceView key={target.token} token={target.token} />');
     expect(entry.indexOf("await import('./features/invoices/RequestFreeInvoiceView')")).toBeLessThan(entry.indexOf("await import('./App')"));
     expect(publicClient).toContain('autoRefreshToken: false');
     expect(publicClient).toContain('detectSessionInUrl: false');
@@ -217,6 +252,10 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(panel).toContain('if (busyRef.current) return');
     expect(panel).toContain('min={1}');
     expect(panel).toContain('max={90}');
+    expect(panel).toContain('containDialogTabFocus(event, dialogRef.current)');
+    expect(panel).toContain('previousFocusRef.current?.focus()');
+    expect(panel).toContain("if (event.key === 'Escape')");
+    expect(panel).toContain('event.preventDefault()');
     expect(panel).not.toMatch(/localStorage|sessionStorage|indexedDB/i);
     expect(panel).not.toMatch(/console\.(log|info|warn|error)/);
     expect(publicView).toContain("robots.content = 'noindex, nofollow, noarchive'");
@@ -229,9 +268,9 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
   const validInvoice = {
     state: 'valid',
     invoice: {
-      contractor: { business_name: 'Fixture Plumbing', email: 'office@example.invalid', phone: '555-0100', city: 'Test City', state: 'IA' },
+      contractor: { business_name: 'Fixture Plumbing' },
       customer: { display_name: 'Fixture Customer' },
-      property: { nickname: 'Main home', address_line1: '100 Test Street', address_line2: '', city: 'Test City', state: 'IA', zip_code: '50000' },
+      property: { address_line1: '100 Test Street', address_line2: '', city: 'Test City', state: 'IA', zip_code: '50000' },
       invoice_number: 'INV-FIXTURE',
       title: 'Water heater service',
       scope: 'Customer-safe service scope.',
@@ -246,12 +285,21 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       issued_at: '2026-08-03T12:00:00.000Z',
       due_at: '2026-09-02T12:00:00.000Z',
       line_items: [
-        { title: 'Service labor', description: 'Diagnose and repair.', line_type: 'labor', quantity: 1, unit: 'service', unit_price_cents: 12500 },
-        { title: 'Price-required material', description: 'Contractor will confirm pricing.', line_type: 'material', quantity: 1, unit: 'each', unit_price_cents: null },
-        { title: 'Included adjustment', description: 'Included at no charge.', line_type: 'other', quantity: 1, unit: 'each', unit_price_cents: 0 },
+        { title: 'Service labor', description: 'Diagnose and repair.', quantity: 1, unit: 'service', unit_price_cents: 12500 },
+        { title: 'Price-required material', description: 'Contractor will confirm pricing.', quantity: 1, unit: 'each', unit_price_cents: null },
+        { title: 'Included adjustment', description: 'Included at no charge.', quantity: 1, unit: 'each', unit_price_cents: 0 },
       ],
     },
   };
+
+  const markedInvoice = (title: string, customerName: string) => ({
+    ...validInvoice,
+    invoice: {
+      ...validInvoice.invoice,
+      title,
+      customer: { display_name: customerName },
+    },
+  });
 
   for (const viewport of [
     { name: 'desktop', width: 1280, height: 720 },
@@ -310,6 +358,79 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     });
   }
 
+  test('unmounts sensitive invoice content across public, authenticated, and token route changes', async ({ page }) => {
+    const tokenA = randomBytes(32).toString('hex');
+    const tokenB = randomBytes(32).toString('hex');
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') consoleErrors.push(message.text().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]'));
+    });
+    page.on('requestfailed', request => failedRequests.push(request.url().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]')));
+    await page.route('**/_vercel/insights/**', route => route.fulfill({ status: 204, body: '' }));
+    await page.route('**/rest/v1/rpc/servsync_lookup_local_invoice_delivery', route => {
+      const body = route.request().postDataJSON() as { p_token?: string };
+      const response = body.p_token === tokenA
+        ? markedInvoice('Route fixture A', 'Route Customer A')
+        : markedInvoice('Route fixture B', 'Route Customer B');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${tokenA}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Route fixture A' })).toBeVisible();
+
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await expect(page.getByRole('heading', { level: 1, name: 'Route fixture B' })).toBeVisible();
+    await expect(page.getByText('Route Customer A')).toHaveCount(0);
+
+    await page.evaluate(() => { window.location.hash = '#/terms'; });
+    await expect(page.getByRole('heading', { level: 1, name: 'Terms of Service' })).toBeVisible();
+    await expect(page.getByText('Route Customer B')).toHaveCount(0);
+
+    await page.evaluate(() => { window.location.hash = '#/contractor'; });
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
+    await expect(page.getByTestId('request-free-invoice-valid')).toHaveCount(0);
+
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenA);
+    await expect(page.getByRole('heading', { level: 1, name: 'Route fixture A' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toHaveCount(0);
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
+
+  test('renders the correct invoice through browser Back and Forward navigation', async ({ page }) => {
+    const tokenA = randomBytes(32).toString('hex');
+    const tokenB = randomBytes(32).toString('hex');
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    page.on('console', message => {
+      if (message.type() === 'error') consoleErrors.push(message.text().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]'));
+    });
+    page.on('requestfailed', request => failedRequests.push(request.url().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]')));
+    await page.route('**/rest/v1/rpc/servsync_lookup_local_invoice_delivery', route => {
+      const body = route.request().postDataJSON() as { p_token?: string };
+      const response = body.p_token === tokenA
+        ? markedInvoice('History fixture A', 'History Customer A')
+        : markedInvoice('History fixture B', 'History Customer B');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${tokenA}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'History fixture A' })).toBeVisible();
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await expect(page.getByRole('heading', { level: 1, name: 'History fixture B' })).toBeVisible();
+
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1, name: 'History fixture A' })).toBeVisible();
+    await expect(page.getByText('History Customer B')).toHaveCount(0);
+
+    await page.goForward();
+    await expect(page.getByRole('heading', { level: 1, name: 'History fixture B' })).toBeVisible();
+    await expect(page.getByText('History Customer A')).toHaveCount(0);
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
+
   test('rejects malformed tokens before making a lookup request', async ({ page }) => {
     let lookupRequests = 0;
     page.on('request', request => {
@@ -332,6 +453,61 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       await expect(page.getByTestId(`request-free-invoice-${state}`)).toBeVisible();
       await expect(page.getByText('Fixture Customer')).toHaveCount(0);
       await expect(page.getByText('100 Test Street')).toHaveCount(0);
+    });
+  }
+});
+
+test.describe('FB-003B one-time link dialog focus containment', () => {
+  for (const viewport of [
+    { name: 'desktop', width: 1280, height: 720 },
+    { name: 'mobile', width: 390, height: 844 },
+  ]) {
+    test(`cycles keyboard focus inside the dialog at ${viewport.name} size`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.setContent(`
+        <button id="background">Background action</button>
+        <section id="dialog" role="dialog" aria-modal="true" tabindex="-1">
+          <button id="close">Close</button>
+          <input id="link" readonly value="redacted-link" />
+          <button id="copy">Copy link</button>
+          <button id="disabled" disabled>Unavailable</button>
+          <button id="done">Done</button>
+        </section>
+      `);
+      await page.evaluate(handlerSource => {
+        const handler = (0, eval)(`(${handlerSource})`) as typeof containDialogTabFocus;
+        const dialog = document.querySelector<HTMLElement>('#dialog');
+        window.addEventListener('keydown', event => handler(event, dialog));
+        document.querySelector<HTMLInputElement>('#link')?.focus();
+      }, containDialogTabFocus.toString());
+
+      await expect(page.locator('#link')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#copy')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#done')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#close')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#link')).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(page.locator('#close')).toBeFocused();
+
+      await page.locator('#background').focus();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#close')).toBeFocused();
+
+      await page.evaluate(() => {
+        for (const id of ['close', 'link', 'done']) {
+          document.querySelector<HTMLButtonElement | HTMLInputElement>(`#${id}`)!.disabled = true;
+        }
+        document.querySelector<HTMLButtonElement>('#background')?.focus();
+      });
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#copy')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('#copy')).toBeFocused();
+      await expect(page.locator('#background')).not.toBeFocused();
     });
   }
 });
