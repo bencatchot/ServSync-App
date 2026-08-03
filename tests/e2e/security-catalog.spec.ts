@@ -134,6 +134,7 @@ const CORE_PRIVATE_TABLES = [
   'estimate_payment_schedule_items',
   'invoices',
   'invoice_line_items',
+  'local_invoice_delivery_links',
   'inspections',
   'home_maintenance_log',
   'home_reminders',
@@ -201,6 +202,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
   'servsync_create_invoice_from_estimate_schedule_item',
+  'servsync_create_local_invoice_delivery_link',
   'servsync_create_project',
   'servsync_create_local_home',
 	  'servsync_create_local_customer_claim_invite',
@@ -220,6 +222,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_list_home_membership_email_invites',
 	  'servsync_list_local_customer_claim_invites',
 	  'servsync_list_local_customer_claim_invites_v2',
+  'servsync_list_local_invoice_delivery_links',
   'servsync_list_my_shared_home_address_shells',
   'servsync_list_my_shared_home_reminder_shells',
   'servsync_list_my_shared_home_shells',
@@ -252,6 +255,8 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_revoke_home_map_draft',
   'servsync_revoke_home_property_proposal',
   'servsync_revoke_local_customer_claim_invite',
+  'servsync_revoke_local_invoice_delivery_link',
+  'servsync_rotate_local_invoice_delivery_link',
   'servsync_homeowner_respond_to_service_agreement_offer',
   'servsync_send_service_agreement_offer',
   'servsync_update_local_contact_profile',
@@ -277,6 +282,8 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_private_contractor_has_durable_draft_entitlement',
   'servsync_private_durable_draft_rollout_mode',
   'servsync_private_can_prepare_local_customer_claim_invites',
+  'servsync_private_can_manage_local_invoice_delivery',
+  'servsync_private_local_invoice_delivery_metadata',
   'servsync_record_home_access_invite_delivery_result',
 ];
 
@@ -492,6 +499,50 @@ where c.relnamespace = 'public'::regnamespace
     expect(rows[0].authenticated_insert, 'authenticated should use guarded create RPCs, not direct table INSERT').toBe(false);
     expect(rows[0].authenticated_update, 'authenticated should use guarded lifecycle RPCs, not direct table UPDATE').toBe(false);
     expect(rows[0].authenticated_delete, 'authenticated should not directly DELETE claim invites').toBe(false);
+  });
+
+  test('local invoice delivery grants remain RPC-only for every browser role', () => {
+    const rows = runCatalogQuery<TablePrivilegeRow>(`
+select
+  c.relname as table_name,
+  c.oid is not null as exists,
+  has_table_privilege('public', c.oid, 'SELECT') as public_select,
+  has_table_privilege('public', c.oid, 'INSERT') as public_insert,
+  has_table_privilege('public', c.oid, 'UPDATE') as public_update,
+  has_table_privilege('public', c.oid, 'DELETE') as public_delete,
+  has_table_privilege('anon', c.oid, 'SELECT') as anon_select,
+  has_table_privilege('anon', c.oid, 'INSERT') as anon_insert,
+  has_table_privilege('anon', c.oid, 'UPDATE') as anon_update,
+  has_table_privilege('anon', c.oid, 'DELETE') as anon_delete,
+  has_table_privilege('authenticated', c.oid, 'SELECT') as authenticated_select,
+  has_table_privilege('authenticated', c.oid, 'INSERT') as authenticated_insert,
+  has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
+  has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete
+from pg_class c
+where c.relname = 'local_invoice_delivery_links'
+  and c.relnamespace = 'public'::regnamespace;
+    `);
+
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    expect(row.exists).toBe(true);
+    expect(row.public_select || row.public_insert || row.public_update || row.public_delete).toBe(false);
+    expect(row.anon_select || row.anon_insert || row.anon_update || row.anon_delete).toBe(false);
+    expect(row.authenticated_select || row.authenticated_insert || row.authenticated_update || row.authenticated_delete).toBe(false);
+  });
+
+  test('anonymous invoice delivery lookup is the only anonymous grant in its foundation', () => {
+    const rows = runCatalogQuery<RpcSignatureRow>(
+      securityDefinerRpcSignatureCatalogQuery(['servsync_lookup_local_invoice_delivery(text)']),
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].exists).toBe(true);
+    expect(rows[0].security_definer).toBe(true);
+    expect(rows[0].search_path_public).toBe(true);
+    expect(rows[0].public_execute).toBe(false);
+    expect(rows[0].anon_execute).toBe(true);
+    expect(rows[0].authenticated_execute).toBe(false);
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {

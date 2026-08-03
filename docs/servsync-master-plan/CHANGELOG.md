@@ -4,6 +4,48 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-03
+
+- Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
+- Starting main SHA: `410bd1554a646ee81ef9eb9d6cbe40ea7fc2ff9a`
+- Files changed:
+  - `servsync-request-free-local-invoice-delivery.sql`
+  - `src/App.tsx`
+  - `src/appLinks.ts`
+  - `src/main.tsx`
+  - `src/publicSupabaseClient.ts`
+  - `src/types.ts`
+  - request-free invoice delivery components/helpers under `src/features/invoices/`
+  - focused request-free invoice and security-catalog coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements FB-003B Request-Free Local Invoice Delivery Slice 1 in repository source only. The additive migration creates a private, RLS-enabled bearer-grant table with one active grant per invoice, 256-bit one-time token generation, SHA-256 hash-only storage, expiration, rotation, revocation, and separate open history. Exact owner/admin/office management RPCs derive canonical tenant/invoice/local-customer/property context, issue the first eligible local invoice through the immutable sent lifecycle, and return raw tokens only once. A token-only anonymous lookup returns a bounded customer-safe HTML invoice DTO without changing authenticated homeowner invoice status. The contractor UI adds a short-lived one-time copy dialog and token-free history; direct sensitive hash-route loads use a non-persistent anonymous client and exclude the authenticated application and Vercel Analytics bundles while adding no-index/no-referrer metadata.
+- Reason for change: Contractors need a secure way to share a saved invoice with a contractor-created local customer who has not submitted a request or created/claimed a ServSync account, without exposing the broader customer profile, other properties, or other documents.
+- Tests/checks run:
+  - `npm run typecheck`
+  - production build
+  - focused request-free invoice SQL-source, role, lifecycle, isolation, privacy, route, and one-time token-containment tests
+  - local mocked desktop 1280x720 and mobile 390x844 recipient-view tests
+  - 40 non-mutating invoice management, invoice PDF, Draft-first invoice, payment presentation, multi-invoice, and claim-token containment regressions
+  - `git diff --check`, documentation structure/link checks, changed-file scope review, and added-line sensitive-value/token scan
+  - `npm run lint` attempted; the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup incompatibility remains separately reported
+- Known risks or follow-ups:
+  - `servsync-request-free-local-invoice-delivery.sql` was created but not applied to Sandbox, Demo, Production, or any other environment. Anonymous invoice delivery is not enabled or deployed by this task.
+  - Repository tests can validate the abuse-control integration boundary, token entropy/format rejection, and enumeration resistance, but effective gateway-level rate limiting has not been configured or proven. That is a mandatory controlled Sandbox rollout gate.
+  - Slice 1 is HTML invoice viewing only. It excludes anonymous PDF download, estimates, inspection reports, claimed-account document migration, email/SMS/reminders, notifications, approvals, signatures, payments, replies, and provider delivery.
+  - A pre-claim active link remains valid after claim until expiration or revocation; create/rotate then fail closed, revocation remains authorized, and this slice does not duplicate or transfer invoice ownership.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003B records Slice 1 as repository implementation in progress while preserving all rollout gates and later delivery/document/action slices.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor/local-customer and invoice plans now record the bounded secure-link architecture, one-time token behavior, claim transition, exclusions, and unapplied/undeployed status.
+- Marketing inventory impact:
+  - MARKETING PRODUCT INVENTORY UPDATED: NO
+  - REASON: The inventory was reviewed, but the feature remains unmerged, unapplied, undeployed, and not approved for public claims.
+
 ## 2026-08-02
 
 - Branch: `codex/fb007-production-rollout-doc-closeout`

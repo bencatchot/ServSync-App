@@ -283,6 +283,8 @@ import {
   invoiceStatusLabel,
 } from './features/invoices/status';
 import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary';
+import { LocalInvoiceDeliveryPanel } from './features/invoices/LocalInvoiceDeliveryPanel';
+import { RequestFreeInvoiceView } from './features/invoices/RequestFreeInvoiceView';
 import {
   demoPresentationJobCheckpointLabel,
   demoPresentationWorkItemProgress,
@@ -7424,6 +7426,18 @@ function AppContent() {
 }
 
 export default function App() {
+  const [, setHashRevision] = useState(0);
+  useEffect(() => {
+    const onHashChange = () => setHashRevision(value => value + 1);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+  const { route, query } = currentRoute();
+
+  if (route === 'invoice-delivery') {
+    return <RequestFreeInvoiceView token={query.get('access') ?? ''} />;
+  }
+
   return (
     <>
       <AppContent />
@@ -31131,6 +31145,9 @@ function ContractorDashboard({
   const canManageDraftJobs = currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
+  const canManageLocalInvoiceDelivery = currentContractorTeamRole === 'owner'
+    || currentContractorTeamRole === 'admin'
+    || currentContractorTeamRole === 'office';
   const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
     ? 'Field techs cannot create contractor Draft Jobs in this workflow yet.'
     : currentContractorTeamRole === 'viewer'
@@ -39361,6 +39378,16 @@ function ContractorDashboard({
                                       </div>
                                     )}
                                     <InvoicePaymentSummary invoice={invoice} variant="detail" showStatus className="mt-3" />
+                                    {supabase && local && invoice.local_home_id && canManageLocalInvoiceDelivery && (
+                                      <LocalInvoiceDeliveryPanel
+                                        client={supabase}
+                                        invoice={invoice}
+                                        localContact={local}
+                                        canManage={canManageLocalInvoiceDelivery}
+                                        disabledReason={sendInvoiceCapability.disabled ? sendInvoiceCapability.reason : ''}
+                                        onInvoiceChanged={loadContractor}
+                                      />
+                                    )}
                                     <div className={`mt-3 ${mobileActionRowClass()}`}>
                                       <button
                                         type="button"
