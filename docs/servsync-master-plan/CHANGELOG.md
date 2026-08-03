@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-02
 
+- Branch: `codex/fb007-production-rollout-doc-closeout`
+- Starting main SHA: `052d13ca061653f0bfa6bad4353d2f47eb95c205`
+- Files changed:
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Records the completed Production rollout of FB-007 Draft-first Inspection Path Completion v1. PR #367 merged through the normal two-parent GitHub merge commit `052d13ca061653f0bfa6bad4353d2f47eb95c205` from reviewed head `4002fd35ad68f0be92dddd15edaecb9253b1972e`. The exact reviewed `servsync-draft-first-inspection-path-completion.sql` file (SHA-256 `f4ab79b68ebe56edd36f6c545fac08584558f6da520672e2bee74b3508f93473`) was applied to Production Supabase `uqgtheclhxqlnjpfmheq` and catalog-verified. Automatic Vercel Git integration produced Production deployment `dpl_EVyf2uB49Uq53ufzw6ZwG9n7z8Vd` from the merge commit; it reached `READY` and serves `https://servsync.app`. No manual deployment, configuration change, fixture, or business-record mutation was used for the rollout.
+- Reason for change: The implementation entry below accurately recorded the pre-rollout state when written, but the planning documents still described merge, Production SQL, deployment, and authenticated validation as pending after those gates completed.
+- Tests/checks run:
+  - documentation-only diff and changed-file scope review
+  - `git diff --check`
+  - Markdown relative-link, local-anchor, and table-shape checks
+  - FB-007 active/completed-state and rollout-identity consistency checks
+  - added-line sensitive-value scan
+- Known risks or follow-ups:
+  - Production validation covered public health, contractor-owner authentication and Jobs navigation, homeowner authentication and Documents navigation, desktop 1280x720, mobile 390x844, anonymous protected-RPC denial, homeowner contractor-management denial, clean console/network health, existing-business-count preservation, and the retained RLS/private-storage/tenant/protected-function posture.
+  - Production did not exercise finalized-report download, cross-homeowner finalized-report access, admin/office/field-tech/viewer/second-contractor roles, or mutating checklist, media, and finalization paths. Exact-head Sandbox evidence remains the validation basis for authenticated photo upload, PDF image rendering, those role and tenant boundaries, mutating lifecycle paths, and cleanup.
+  - FB-007 remains active for broader trade-specific checklist maturity, finding-to-follow-up-work conversion, reopening/correction rules, and other separately scoped inspection/checklist work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: The bounded Production slice is no longer pending, while FB-007 remains active for its explicitly deferred maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Job/inspection plan now records the completed bounded rollout and preserves an evidence-accurate distinction between Production and Sandbox validation.
+- Marketing inventory impact:
+  - MARKETING PRODUCT INVENTORY UPDATED: NO
+  - REASON: This task corrects internal rollout status only and does not broaden public capability claims.
+
 - Branch: `codex/fb007-draft-first-inspection-path-v1`
 - Starting main SHA: `4de490183de88cf0cdb381649b065d2614da6af7`
 - Files changed:
@@ -31,8 +60,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `git diff --check`, documentation structure/link checks, focused skipped-test scan, changed-file scope review, and added-line sensitive-value/token scan
   - `npm run lint` attempted; any inherited ESLint startup failure is reported separately in the PR validation record
 - Known risks or follow-ups:
-  - `servsync-draft-first-inspection-path-completion.sql` (SHA-256 `f4ab79b68ebe56edd36f6c545fac08584558f6da520672e2bee74b3508f93473`) was created but not applied to Production, Demo, Sandbox, or any other environment. Its rollout requires separate approval.
-  - Authenticated Preview validation is still required for desktop/mobile contextual starts, save/resume, launch, active checklist completion, N/A reporting, finalization visibility, and role denial before rollout.
+  - At this implementation checkpoint, `servsync-draft-first-inspection-path-completion.sql` (SHA-256 `f4ab79b68ebe56edd36f6c545fac08584558f6da520672e2bee74b3508f93473`) had been created but not applied. It was subsequently applied and verified in Sandbox and Production through separately approved rollouts, as recorded in the closeout entry above.
+  - At this implementation checkpoint, authenticated Preview validation remained pending. Exact-head Sandbox validation and the bounded authenticated Production checks subsequently completed with the distinct coverage recorded in the closeout entry above.
   - FB-007 remains active for broader trade checklist coverage, finding-to-follow-up-work conversion, reopening/correction rules, and later inspection maturity. This slice does not migrate or reinterpret legacy records.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
@@ -42,7 +71,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - REASON: The Job/Draft-first description now reflects the live all-contractors rollout and the bounded FB-007 convergence model without claiming the new migration is installed.
 - Marketing inventory impact:
   - MARKETING PRODUCT INVENTORY UPDATED: NO
-  - REASON: This is an unmerged branch with unapplied SQL and no newly validated live capability.
+  - REASON: At this implementation checkpoint, the branch was unmerged and its SQL was unapplied, so no marketing claim changed then. The later rollout closeout above remains intentionally documentation-only and does not broaden public claims.
 
 - Branch: `codex/price-book-repeat-import-reconciliation-v1`
 - Starting main SHA: `d21d3f1b6c91a136ed3336b53af1a08ac8f65a13`
