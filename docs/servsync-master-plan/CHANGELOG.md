@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-04
 
+- Branch: `codex/pr372-production-closeout`
+- Starting main SHA: `854372c8609a67d7de16dac33550762d9d750d74` (normal two-parent merge commit for PR #372)
+- Files changed:
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Records the completed merge and Production rollout of Unified Draft Customer Selection and Customer Profile Entry v1. PR #372 merged at `2026-08-04T21:31:14Z` through normal merge commit `854372c8609a67d7de16dac33550762d9d750d74`, with base parent `6221bd9935b490a797b526881551faf48a1a7623` and reviewed-head parent `6ba16656ed68441b6a02eb044590ecab1c6ac7c2`. Automatic Vercel Git deployment `dpl_3jkDZ6MKxyLZd9qCxCxi7YQGEqTY` reached Production `READY` in project `serv-sync-app-refresh` from the exact merge commit, and `https://servsync.app` plus `https://www.servsync.app` resolve to that deployment. No manual deployment, promotion, alias, environment, or configuration change occurred.
+- Live behavior: Draft creation now uses one collision-safe `Customer` selector for eligible connected and not-connected customers, with connection status shown as supporting context rather than a required first decision. The application derives the existing connected/local Draft subject internally without merging identifiers; excludes claimed local duplicates from new selection; preserves saved connected, saved local, and historical local subjects; retains explicitly authorized property context; auto-selects only one eligible property; and leaves multiple-property selection blank. Connected and not-connected profiles use one neutral `Create Draft` entry with Intended output set to `Not decided`; affected legacy profile Create Job, Create Estimate, and Create Invoice initial-entry paths are removed while downstream lifecycle transformations remain unchanged. Existing Draft gates, roles, capabilities, tenant/property authority, RLS, RPCs, and fail-closed behavior remain unchanged.
+- Validation evidence:
+  - Exact-head authenticated Sandbox Preview deployment `dpl_9BQfAjaPKLCd3ABVrwJxMkRZgDAP` used source `6ba16656ed68441b6a02eb044590ecab1c6ac7c2` and covered connected/not-connected profile handoff, the unified selector, one-property and multiple-property behavior, explicit property context, saved connected/local restoration, historical local-subject preservation, Viewer denial, desktop/mobile layout, accessibility, and console/network health. No Preview record was created, saved, edited, or deleted.
+  - Bounded read-only Production smoke confirmed `Customers` navigation, the Draft-first Jobs workspace, merged `Start New Draft` composer, exactly one accessible Customer selector, no visible Connection Status selector, `Not decided` as the initial output, mobile 390x844 without horizontal overflow, and zero browser console warnings or errors. Unsaved state was discarded and no record was created, saved, launched, edited, or deleted.
+  - The approved Production account contained zero customers, so connected-profile, not-connected-profile, property-default, and Viewer scenarios were not repeated in Production; exact-head authenticated Sandbox Preview evidence remains authoritative for those paths.
+- Known risks or follow-ups:
+  - Connected and local identifiers remain technically and persistently distinct. This rollout does not claim complete customer-model unification or customer-management role parity.
+  - Owner/admin/office/field-tech/viewer customer-management boundaries, Service Plan support for not-connected customers, external estimate/report delivery, secure guest document expansion, guest approval/signatures/payments, Demo durable-Draft provisioning, inherited ESLint startup repair, and unrelated Jobs smoke-selector cleanup remain separate work.
+  - No SQL, schema, migration, RLS, RPC, permission, Supabase data/configuration, Vercel configuration, or environment change was required for this rollout.
+- Tests/checks run: Documentation-only scope, merge/deployment identity, Markdown links and anchors, table structure, `git diff --check`, added-line sensitive-value scanning, deferred-work consistency, and forbidden application/test/SQL/package/configuration scope were verified.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the bounded unified-selector/profile-entry milestone as merged and live while keeping customer-role, Service Plan, delivery, guest-action, model-unification, Demo, lint, and smoke-selector work active or separate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Replaces the stale source-only/unmerged state with the verified Production behavior and bounded validation evidence without broadening persisted identity or authority claims.
+
 - Branch: `codex/unified-draft-customer-entry-v1`
 - Starting main SHA: `6221bd9935b490a797b526881551faf48a1a7623` (merged PR #371)
 - Files changed:
