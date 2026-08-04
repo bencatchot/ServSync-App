@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { AlertTriangle, Building2, FileText, MapPin, ShieldCheck } from 'lucide-react';
 import type {
   RequestFreeInvoiceDeliveryLookup,
   RequestFreeInvoiceDocument,
 } from '../../types';
-import { lookupRequestFreeInvoice } from './requestFreeInvoiceDelivery';
 import { invoiceStatusLabel } from './status';
 
 type ViewState =
@@ -72,10 +71,7 @@ const unavailableCopy: Record<Exclude<ViewState['status'], 'loading' | 'ready'>,
   },
 };
 
-export function RequestFreeInvoiceView({ token }: { token: string }) {
-  const [view, setView] = useState<ViewState>({ status: 'loading' });
-  const tokenRef = useRef(token);
-
+export function RequestFreeInvoiceView({ lookup }: { lookup: RequestFreeInvoiceDeliveryLookup | null }) {
   useEffect(() => {
     const previousTitle = document.title;
     const robots = document.createElement('meta');
@@ -90,7 +86,6 @@ export function RequestFreeInvoiceView({ token }: { token: string }) {
     document.head.append(robots, referrer, cacheControl);
     document.title = 'Invoice | ServSync';
     return () => {
-      tokenRef.current = '';
       robots.remove();
       referrer.remove();
       cacheControl.remove();
@@ -98,26 +93,7 @@ export function RequestFreeInvoiceView({ token }: { token: string }) {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    tokenRef.current = token;
-    const lookupToken = tokenRef.current;
-    setView({ status: 'loading' });
-    void lookupRequestFreeInvoice(lookupToken)
-      .then(result => {
-        if (!cancelled) setView(stateFromLookup(result));
-      })
-      .catch(() => {
-        if (!cancelled) setView({ status: 'error' });
-      })
-      .finally(() => {
-        tokenRef.current = '';
-      });
-    return () => {
-      cancelled = true;
-      tokenRef.current = '';
-    };
-  }, [token]);
+  const view: ViewState = lookup === null ? { status: 'loading' } : stateFromLookup(lookup);
 
   if (view.status === 'loading') {
     return (

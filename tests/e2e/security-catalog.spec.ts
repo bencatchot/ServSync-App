@@ -137,6 +137,7 @@ const CORE_PRIVATE_TABLES = [
   'invoice_line_items',
   'local_invoice_delivery_links',
   'local_invoice_delivery_rate_buckets',
+  'local_invoice_delivery_sessions',
   'inspections',
   'home_maintenance_log',
   'home_reminders',
@@ -286,10 +287,13 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_private_can_prepare_local_customer_claim_invites',
   'servsync_private_can_manage_local_invoice_delivery',
   'servsync_private_cleanup_local_invoice_delivery_rate_limits',
+  'servsync_private_cleanup_local_invoice_delivery_sessions',
   'servsync_private_consume_local_invoice_delivery_rate_limit',
   'servsync_private_current_local_invoice_delivery_contractor_id',
   'servsync_private_local_invoice_delivery_metadata',
   'servsync_private_render_local_invoice_delivery',
+  'servsync_bootstrap_local_invoice_delivery_session',
+  'servsync_lookup_local_invoice_delivery_session',
   'servsync_record_home_access_invite_delivery_result',
 ];
 
@@ -508,7 +512,7 @@ where c.relnamespace = 'public'::regnamespace
     expect(rows[0].authenticated_delete, 'authenticated should not directly DELETE claim invites').toBe(false);
   });
 
-  test('local invoice delivery and rate-limit storage remain private for every browser role', () => {
+  test('local invoice delivery, rate-limit, and recipient-session storage remain private for every browser role', () => {
     const rows = runCatalogQuery<TablePrivilegeRow>(`
 select
   c.relname as table_name,
@@ -526,12 +530,12 @@ select
   has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
   has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete
 from pg_class c
-where c.relname in ('local_invoice_delivery_links', 'local_invoice_delivery_rate_buckets')
+where c.relname in ('local_invoice_delivery_links', 'local_invoice_delivery_rate_buckets', 'local_invoice_delivery_sessions')
   and c.relnamespace = 'public'::regnamespace
 order by c.relname;
     `);
 
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(row.exists).toBe(true);
       expect(row.public_select || row.public_insert || row.public_update || row.public_delete).toBe(false);
@@ -540,19 +544,27 @@ order by c.relname;
     }
   });
 
-  test('invoice delivery lookup is callable only through the service-role gateway', () => {
+  test('invoice delivery bearer lookup is no longer callable directly and session RPCs are gateway-only', () => {
     const rows = runCatalogQuery<RpcSignatureRow>(
-      securityDefinerRpcSignatureCatalogQuery(['servsync_lookup_local_invoice_delivery(text)']),
+      securityDefinerRpcSignatureCatalogQuery([
+        'servsync_bootstrap_local_invoice_delivery_session(text,text,text)',
+        'servsync_lookup_local_invoice_delivery(text)',
+        'servsync_lookup_local_invoice_delivery_session(text)',
+      ]),
     );
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].exists).toBe(true);
-    expect(rows[0].security_definer).toBe(true);
-    expect(rows[0].search_path_public).toBe(true);
-    expect(rows[0].public_execute).toBe(false);
-    expect(rows[0].anon_execute).toBe(false);
-    expect(rows[0].authenticated_execute).toBe(false);
-    expect(rows[0].service_role_execute).toBe(true);
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.exists, `${row.signature} should exist`).toBe(true);
+      expect(row.security_definer, `${row.signature} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.signature} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.signature} should deny PUBLIC`).toBe(false);
+      expect(row.anon_execute, `${row.signature} should deny anon`).toBe(false);
+      expect(row.authenticated_execute, `${row.signature} should deny authenticated`).toBe(false);
+    }
+    expect(rows.find(row => row.signature === 'servsync_lookup_local_invoice_delivery(text)')?.service_role_execute).toBe(false);
+    expect(rows.find(row => row.signature === 'servsync_bootstrap_local_invoice_delivery_session(text,text,text)')?.service_role_execute).toBe(true);
+    expect(rows.find(row => row.signature === 'servsync_lookup_local_invoice_delivery_session(text)')?.service_role_execute).toBe(true);
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {

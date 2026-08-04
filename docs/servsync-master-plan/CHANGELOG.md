@@ -7,6 +7,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 ## 2026-08-03
 
 - Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
+- Correction scope: Draft PR #369 recipient bearer-to-session exchange and review follow-up.
+- Files changed:
+  - `servsync-request-free-local-invoice-delivery-session.sql`
+  - `api/request-free-local-invoice-delivery.ts`
+  - `src/main.tsx`, `src/App.tsx`, and request-free invoice recipient helpers under `src/features/invoices/`
+  - focused request-free invoice gateway, browser, SQL-source, and security-catalog tests under `tests/e2e/`
+  - the four FB-003B planning documents
+- Summary of change: Removes module-level retention of the request-free invoice bearer after hash-route bootstrap. The entry module synchronously replaces the token-bearing history entry before React or the application shell loads, then exchanges the bearer once through the same-origin gateway for a random 30-minute `__Host-servsync-invoice-session` cookie protected by `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, and no `Domain`. The new additive migration stores only a SHA-256 session digest, grants only the two gateway-facing session RPCs to `service_role`, revalidates the underlying link and invoice on every lookup, invalidates an established session when the local profile is claimed while allowing the still-active original link to establish a fresh session, preserves global/per-link limiting and response approval before open-history mutation, and uses bounded opportunistic cleanup. Browser refresh and navigation intentionally use `credentials: "include"` with exact `{}` session requests.
+- Rollout status: The baseline migration remains installed only in Sandbox. The gateway-hardening and recipient-session migrations are unapplied. The Vercel Function has not been deliberately deployed or runtime-validated; no authorized Firewall or server configuration exists. Normal automatic PR Preview checks may build the Preview source, but no manual or authorized runtime rollout occurred, no Vercel secret or environment variable was added or changed, and direct PostgREST closure remains source-only until the corrective SQL is applied. Live catalog, Firewall, trusted-IP, throttling, cookie, response-bound, history-ordering, and session-invalidation proof remain pending.
+- Tests/checks run: Typecheck, production build, mocked gateway boundary/session tests, static SQL/catalog checks, mocked desktop/mobile recipient navigation coverage, focused invoice/Draft/PDF/payment/multi-invoice/claim-token regressions, diff/package/documentation checks, and sensitive-value/token containment scans.
+- Backlog impact: FB-003B remains active, draft, unmerged, and blocked from rollout. Another independent source review is required before any separately authorized Sandbox SQL, configuration, Firewall, deployment, or live security validation.
+
+- Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
 - Correction scope: Draft PR #369 gateway-abuse-control and public-response hardening.
 - Files changed:
   - `api/request-free-local-invoice-delivery.ts`
@@ -17,7 +30,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - focused request-free invoice gateway, browser, and security-catalog tests under `tests/e2e/`
   - the four FB-003B planning documents
 - Summary of change: Replaces the recipient browser's direct anonymous PostgREST call with a same-origin Vercel Function that uses server-only Supabase configuration and the official `@vercel/firewall` entry check. A separate additive corrective migration revokes direct lookup execution from browser roles, retains service-role-only execution, adds private atomic global and per-token rate buckets, rejects public invoices above 100 lines or an exact 262,144-byte serialized envelope, and saturates link-open counts. PostgreSQL returns the exact serialized JSON text emitted by the gateway so the database and gateway byte checks measure the same response and no successful open is recorded before bounds pass.
-- Rollout status: The original migration remains byte-identical and is installed only in Sandbox. The corrective migration is not applied anywhere, the Vercel Function is not deployed, no Firewall rule is configured, and no server secret or environment variable was added. Direct PostgREST closure, live throttling, live response bounds, and gateway behavior therefore remain pending controlled Sandbox application and validation.
+- Rollout status: The original migration remains byte-identical and is installed only in Sandbox. The corrective migration is not applied anywhere. The Vercel Function has not been deliberately deployed or runtime-validated; no authorized Firewall or server configuration exists. Normal automatic PR Preview checks may build the Preview source, but direct PostgREST closure, live throttling, live response bounds, and gateway behavior remain pending controlled Sandbox application and validation.
 - Tests/checks run: Typecheck, production build, mocked gateway and request-free delivery suites, static SQL/catalog security checks, mocked desktop/mobile recipient coverage, diff/package/documentation checks, and sensitive-value/token containment scans.
 - Backlog impact: FB-003B remains active, draft, unmerged, and blocked from rollout pending independent source review and separately authorized Sandbox corrective SQL, server-secret, Firewall, deployment, and live-validation gates.
 
@@ -47,7 +60,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `git diff --check`, documentation structure/link checks, changed-file scope review, and added-line sensitive-value/token scan
   - `npm run lint` attempted; the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` startup incompatibility remains separately reported
 - Known risks or follow-ups:
-  - `servsync-request-free-local-invoice-delivery.sql` was later applied only to Sandbox during a controlled gate. Its gateway-hardening correction is unapplied, so anonymous invoice delivery remains blocked from rollout and is not deployed.
+  - `servsync-request-free-local-invoice-delivery.sql` was later applied only to Sandbox during a controlled gate. Its gateway-hardening and recipient-session corrections are unapplied, so anonymous invoice delivery remains blocked from rollout. The Vercel Function has not been deliberately deployed or runtime-validated; no authorized Firewall or server configuration exists.
   - Repository tests can validate the abuse-control integration boundary, token entropy/format rejection, and enumeration resistance, but effective gateway-level rate limiting has not been configured or proven. That is a mandatory controlled Sandbox rollout gate.
   - Slice 1 is HTML invoice viewing only. It excludes anonymous PDF download, estimates, inspection reports, claimed-account document migration, email/SMS/reminders, notifications, approvals, signatures, payments, replies, and provider delivery.
   - A pre-claim active link remains valid after claim until expiration or revocation; create/rotate then fail closed, revocation remains authorized, and this slice does not duplicate or transfer invoice ownership.
@@ -56,10 +69,10 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - REASON: FB-003B records Slice 1 as repository implementation in progress while preserving all rollout gates and later delivery/document/action slices.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
-  - REASON: The contractor/local-customer and invoice plans now record the bounded secure-link architecture, one-time token behavior, claim transition, exclusions, and unapplied/undeployed status.
+  - REASON: The contractor/local-customer and invoice plans now record the bounded secure-link architecture, one-time token behavior, claim transition, exclusions, and unapplied/runtime-unvalidated status.
 - Marketing inventory impact:
   - MARKETING PRODUCT INVENTORY UPDATED: NO
-  - REASON: The inventory was reviewed, but the feature remains unmerged, unapplied, undeployed, and not approved for public claims.
+  - REASON: The inventory was reviewed, but the feature remains unmerged, unapplied, without an authorized runtime rollout, and not approved for public claims.
 
 ## 2026-08-02
 

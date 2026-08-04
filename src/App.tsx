@@ -284,7 +284,6 @@ import {
 } from './features/invoices/status';
 import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary';
 import { LocalInvoiceDeliveryPanel } from './features/invoices/LocalInvoiceDeliveryPanel';
-import { RequestFreeInvoiceView } from './features/invoices/RequestFreeInvoiceView';
 import {
   demoPresentationJobCheckpointLabel,
   demoPresentationWorkItemProgress,
@@ -7432,12 +7431,6 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
-  const { route, query } = currentRoute();
-
-  if (route === 'invoice-delivery') {
-    return <RequestFreeInvoiceView token={query.get('access') ?? ''} />;
-  }
-
   return (
     <>
       <AppContent />

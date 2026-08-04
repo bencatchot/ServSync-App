@@ -240,17 +240,25 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     const entry = source('src/main.tsx');
     const links = source('src/appLinks.ts');
 
-    expect(app).toContain("if (route === 'invoice-delivery')");
-    expect(app.indexOf("if (route === 'invoice-delivery')")).toBeLessThan(app.indexOf('<Analytics />'));
+    expect(app).not.toContain("if (route === 'invoice-delivery')");
     expect(entry).toContain("await import('./features/invoices/RequestFreeInvoiceView')");
     expect(entry).toContain("await import('./App')");
+    expect(entry).toContain("window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/invoice-delivery`)");
     expect(entry).toContain("window.addEventListener('hashchange', onHashChange)");
     expect(entry).toContain("window.removeEventListener('hashchange', onHashChange)");
+    expect(entry).toContain("window.addEventListener('popstate', onPopState)");
+    expect(entry).toContain("window.removeEventListener('popstate', onPopState)");
+    expect(entry).toContain('suppressPairedHashChange');
     expect(entry).toContain('root.render(null)');
-    expect(entry).toContain('<RequestFreeInvoiceView key={target.token} token={target.token} />');
+    expect(entry).toContain('<RequestFreeInvoiceView lookup={null} />');
+    expect(entry).toContain('<RequestFreeInvoiceView lookup={lookup} />');
+    expect(entry).toContain('entry.bootstrapToken = null');
+    expect(entry).toContain('bootstrapToken = null');
+    expect(entry).not.toContain('mountedTarget');
     expect(entry.indexOf("await import('./features/invoices/RequestFreeInvoiceView')")).toBeLessThan(entry.indexOf("await import('./App')"));
     expect(publicLookup).toContain("request('/api/request-free-local-invoice-delivery'");
-    expect(publicLookup).toContain("credentials: 'omit'");
+    expect(publicLookup).toContain("credentials: 'include'");
+    expect(publicLookup).toContain("token === null ? '{}' : JSON.stringify({ token })");
     expect(publicLookup).toContain("cache: 'no-store'");
     expect(publicLookup).toContain("referrerPolicy: 'no-referrer'");
     expect(publicLookup).not.toContain("client.rpc('servsync_lookup_local_invoice_delivery'");
@@ -274,6 +282,69 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(publicView).toContain("robots.content = 'noindex, nofollow, noarchive'");
     expect(publicView).toContain("referrer.content = 'no-referrer'");
     expect(publicView).not.toContain('<Analytics');
+  });
+
+  test('session correction keeps bearer lookup private and stores only fixed-lifetime session digests', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery-session.sql');
+    const bootstrap = sourceBetween(
+      sql,
+      'create function public.servsync_bootstrap_local_invoice_delivery_session',
+      'alter function public.servsync_bootstrap_local_invoice_delivery_session(text, text, text) owner to postgres',
+    );
+    const lookup = sourceBetween(
+      sql,
+      'create function public.servsync_lookup_local_invoice_delivery_session',
+      'alter function public.servsync_lookup_local_invoice_delivery_session(text) owner to postgres',
+    );
+
+    expect(sql).toContain('create table public.local_invoice_delivery_sessions');
+    expect(sql).toContain('session_hash bytea primary key');
+    expect(sql).toContain('check (octet_length(session_hash) = 32)');
+    expect(sql).toContain("check (expires_at = created_at + interval '30 minutes')");
+    expect(sql).toContain('contact_claimed_at_at_creation timestamptz');
+    expect(sql).toContain('home_claimed_at_at_creation timestamptz');
+    expect(sql).not.toMatch(/\braw_token\b|\bsession_token\b/i);
+    expect(sql).toContain('alter table public.local_invoice_delivery_sessions enable row level security');
+    expect(sql).not.toContain('create policy');
+    for (const role of ['public', 'anon', 'authenticated', 'service_role']) {
+      expect(sql).toContain(`revoke all on table public.local_invoice_delivery_sessions from ${role};`);
+      expect(sql).toContain(`revoke all on function public.servsync_lookup_local_invoice_delivery(text) from ${role};`);
+    }
+    expect(sql).not.toMatch(/grant\s+execute\s+on\s+function\s+public\.servsync_lookup_local_invoice_delivery\(text\)/i);
+    expect(sql).toContain('grant execute on function public.servsync_bootstrap_local_invoice_delivery_session(text, text, text) to service_role;');
+    expect(sql).toContain('grant execute on function public.servsync_lookup_local_invoice_delivery_session(text) to service_role;');
+    expect(sql).not.toMatch(/grant\s+execute[\s\S]*servsync_(?:bootstrap|lookup)_local_invoice_delivery_session[\s\S]*to\s+(?:public|anon|authenticated)/i);
+    expect(bootstrap).toContain('v_session_hash := decode(lower(trim(p_session_digest))');
+    expect(bootstrap).toContain('security definer');
+    expect(bootstrap).toContain('set search_path = public');
+    expect(bootstrap).toContain('v_payload := public.servsync_lookup_local_invoice_delivery(p_token)');
+    expectInOrder(bootstrap, [
+      'delete from public.local_invoice_delivery_sessions',
+      'servsync_lookup_local_invoice_delivery(p_token)',
+      "if v_payload_state <> 'valid' then",
+      'insert into public.local_invoice_delivery_sessions',
+    ]);
+    expectInOrder(lookup, [
+      "'global', v_global_key, 300, 5::numeric",
+      'from public.local_invoice_delivery_sessions session',
+      "'token', v_link_token_hash, 10, (1::numeric / 6::numeric)",
+      'from public.contractor_local_contacts',
+      'from public.contractor_local_homes',
+      'from public.invoices',
+      'from public.local_invoice_delivery_links',
+      'from public.local_invoice_delivery_sessions',
+      'servsync_private_render_local_invoice_delivery',
+      'update public.local_invoice_delivery_links',
+    ]);
+    expect(lookup).toContain('security definer');
+    expect(lookup).toContain('set search_path = public');
+    expect(lookup).toContain("v_link.status <> 'active'");
+    expect(lookup).toContain('v_link.expires_at <= now()');
+    expect(lookup).toContain("v_invoice.status not in ('sent', 'viewed', 'paid', 'partially_paid', 'overdue')");
+    expect(lookup).toContain('when open_count < 9223372036854775807 then open_count + 1');
+    expect(lookup).toContain('v_session.contact_claimed_at_at_creation is distinct from v_contact.claimed_at');
+    expect(lookup).toContain('v_session.home_claimed_at_at_creation is distinct from v_home.claimed_at');
+    expect(sql).toContain('limit 25');
   });
 
   test('corrective migration closes direct PostgREST lookup and leaves one service-only signature', () => {
@@ -430,6 +501,9 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
   ]) {
     test(`renders a private, responsive invoice at ${viewport.name} size`, async ({ page }) => {
       const token = randomBytes(32).toString('hex');
+      const session = randomBytes(32).toString('hex');
+      const lookupBodies: Array<Record<string, unknown>> = [];
+      const entryUrlsAtLookup: string[] = [];
       const consoleErrors: string[] = [];
       const failedRequests: string[] = [];
       const analyticsRequests: string[] = [];
@@ -443,15 +517,25 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
         if (/\/src\/App\.tsx(?:\?|$)|\/assets\/App-[^/]+\.js(?:\?|$)|@vercel_analytics/i.test(request.url())) unrelatedAppRequests.push(request.url());
       });
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.route('**/api/request-free-local-invoice-delivery', route => route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(validInvoice),
-      }));
+      await page.route('**/api/request-free-local-invoice-delivery', route => {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        lookupBodies.push(body);
+        entryUrlsAtLookup.push(page.url());
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: Object.hasOwn(body, 'token') ? {
+            'Set-Cookie': `__Host-servsync-invoice-session=${session}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict`,
+          } : {},
+          body: JSON.stringify(validInvoice),
+        });
+      });
 
       await page.goto(`/#/invoice-delivery?access=${token}`);
       await expect(page.getByTestId('request-free-invoice-valid')).toBeVisible();
-      expect(new URL(page.url()).search).toBe('');
+      expect(new URL(page.url()).hash).toBe('#/invoice-delivery');
+      expect(lookupBodies[0]).toEqual({ token });
+      expect(entryUrlsAtLookup[0]).not.toContain(token);
       await expect(page.getByRole('heading', { level: 1, name: 'Water heater service' })).toBeVisible();
       await expect(page.getByText('Fixture Customer')).toBeVisible();
       await expect(page.getByText('100 Test Street')).toBeVisible();
@@ -471,9 +555,13 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
         cookie: document.cookie.includes(secret),
         historyState: JSON.stringify(history.state).includes(secret),
       }), token)).toEqual({ local: false, session: false, cookie: false, historyState: false });
+      const recipientCookie = (await page.context().cookies()).find(cookie => cookie.name === '__Host-servsync-invoice-session');
+      expect(recipientCookie).toMatchObject({ value: session, httpOnly: true, secure: true, sameSite: 'Strict' });
 
       await page.reload();
       await expect(page.getByTestId('request-free-invoice-valid')).toBeVisible();
+      expect(lookupBodies[1]).toEqual({});
+      expect(page.url()).not.toContain(token);
       expect(consoleErrors).toEqual([]);
       expect(failedRequests).toEqual([]);
       expect(analyticsRequests).toEqual([]);
@@ -491,9 +579,13 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     });
     page.on('requestfailed', request => failedRequests.push(request.url().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]')));
     await page.route('**/_vercel/insights/**', route => route.fulfill({ status: 204, body: '' }));
+    let currentToken: string | null = null;
+    const lookupBodies: Array<Record<string, unknown>> = [];
     await page.route('**/api/request-free-local-invoice-delivery', route => {
       const body = route.request().postDataJSON() as { token?: string };
-      const response = body.token === tokenA
+      lookupBodies.push(body);
+      if (body.token) currentToken = body.token;
+      const response = currentToken === tokenA
         ? markedInvoice('Route fixture A', 'Route Customer A')
         : markedInvoice('Route fixture B', 'Route Customer B');
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
@@ -501,10 +593,13 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
 
     await page.goto(`/#/invoice-delivery?access=${tokenA}`);
     await expect(page.getByRole('heading', { level: 1, name: 'Route fixture A' })).toBeVisible();
+    expect(page.url()).not.toContain(tokenA);
 
     await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await expect.poll(() => lookupBodies.length).toBe(2);
     await expect(page.getByRole('heading', { level: 1, name: 'Route fixture B' })).toBeVisible();
     await expect(page.getByText('Route Customer A')).toHaveCount(0);
+    expect(page.url()).not.toContain(tokenB);
 
     await page.evaluate(() => { window.location.hash = '#/terms'; });
     await expect(page.getByRole('heading', { level: 1, name: 'Terms of Service' })).toBeVisible();
@@ -517,11 +612,73 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenA);
     await expect(page.getByRole('heading', { level: 1, name: 'Route fixture A' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toHaveCount(0);
+    expect(lookupBodies).toEqual([{ token: tokenA }, { token: tokenB }, { token: tokenA }]);
     expect(consoleErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   });
 
-  test('renders the correct invoice through browser Back and Forward navigation', async ({ page }) => {
+  test('prevents a stale bootstrap response from replacing a newer token navigation', async ({ page }) => {
+    const tokenA = randomBytes(32).toString('hex');
+    const tokenB = randomBytes(32).toString('hex');
+    let releaseFirst!: () => void;
+    let markFirstSeen!: () => void;
+    const firstHeld = new Promise<void>(resolve => { releaseFirst = resolve; });
+    const firstSeen = new Promise<void>(resolve => { markFirstSeen = resolve; });
+    const lookupBodies: Array<Record<string, unknown>> = [];
+
+    await page.route('**/api/request-free-local-invoice-delivery', async route => {
+      const body = route.request().postDataJSON() as { token?: string };
+      lookupBodies.push(body);
+      if (body.token === tokenA) {
+        markFirstSeen();
+        await firstHeld;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(markedInvoice('Stale fixture A', 'Stale Customer A')) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(markedInvoice('Current fixture B', 'Current Customer B')) });
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${tokenA}`);
+    await firstSeen;
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await expect(page.getByRole('heading', { level: 1, name: 'Current fixture B' })).toBeVisible();
+    releaseFirst();
+    await page.waitForTimeout(100);
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Current fixture B' })).toBeVisible();
+    await expect(page.getByText('Stale Customer A')).toHaveCount(0);
+    expect(lookupBodies).toEqual([{ token: tokenA }, { token: tokenB }]);
+    expect(page.url()).not.toContain(tokenA);
+    expect(page.url()).not.toContain(tokenB);
+  });
+
+  test('uses the opaque session on refresh and shows unavailable after session expiry', async ({ page }) => {
+    const token = randomBytes(32).toString('hex');
+    const lookupBodies: Array<Record<string, unknown>> = [];
+    await page.route('**/api/request-free-local-invoice-delivery', route => {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      lookupBodies.push(body);
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: Object.hasOwn(body, 'token') ? {
+          'Set-Cookie': `__Host-servsync-invoice-session=${randomBytes(32).toString('hex')}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict`,
+        } : {
+          'Set-Cookie': '__Host-servsync-invoice-session=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Strict',
+        },
+        body: JSON.stringify(Object.hasOwn(body, 'token') ? validInvoice : { state: 'unavailable' }),
+      });
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${token}`);
+    await expect(page.getByTestId('request-free-invoice-valid')).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId('request-free-invoice-unavailable')).toBeVisible();
+    expect(lookupBodies).toEqual([{ token }, {}]);
+    expect(page.url()).not.toContain(token);
+    expect((await page.context().cookies()).find(cookie => cookie.name === '__Host-servsync-invoice-session')).toBeUndefined();
+  });
+
+  test('never restores a consumed bearer through browser Back and Forward navigation', async ({ page }) => {
     const tokenA = randomBytes(32).toString('hex');
     const tokenB = randomBytes(32).toString('hex');
     const consoleErrors: string[] = [];
@@ -530,9 +687,13 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       if (message.type() === 'error') consoleErrors.push(message.text().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]'));
     });
     page.on('requestfailed', request => failedRequests.push(request.url().replaceAll(tokenA, '[redacted]').replaceAll(tokenB, '[redacted]')));
+    let currentToken: string | null = null;
+    const lookupBodies: Array<Record<string, unknown>> = [];
     await page.route('**/api/request-free-local-invoice-delivery', route => {
       const body = route.request().postDataJSON() as { token?: string };
-      const response = body.token === tokenA
+      lookupBodies.push(body);
+      if (body.token) currentToken = body.token;
+      const response = currentToken === tokenA
         ? markedInvoice('History fixture A', 'History Customer A')
         : markedInvoice('History fixture B', 'History Customer B');
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
@@ -541,27 +702,34 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     await page.goto(`/#/invoice-delivery?access=${tokenA}`);
     await expect(page.getByRole('heading', { level: 1, name: 'History fixture A' })).toBeVisible();
     await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await expect.poll(() => lookupBodies.length).toBe(2);
     await expect(page.getByRole('heading', { level: 1, name: 'History fixture B' })).toBeVisible();
 
     await page.goBack();
-    await expect(page.getByRole('heading', { level: 1, name: 'History fixture A' })).toBeVisible();
-    await expect(page.getByText('History Customer B')).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 1, name: 'History fixture B' })).toBeVisible();
+    expect(page.url()).not.toContain(tokenA);
+    expect(page.url()).not.toContain(tokenB);
 
     await page.goForward();
     await expect(page.getByRole('heading', { level: 1, name: 'History fixture B' })).toBeVisible();
     await expect(page.getByText('History Customer A')).toHaveCount(0);
+    expect(lookupBodies).toEqual([{ token: tokenA }, { token: tokenB }, {}, {}]);
     expect(consoleErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   });
 
-  test('rejects malformed tokens before making a lookup request', async ({ page }) => {
+  test('clears malformed bearer input before delegating generic rejection to the gateway', async ({ page }) => {
     let lookupRequests = 0;
-    page.on('request', request => {
-      if (request.url().includes('/api/request-free-local-invoice-delivery')) lookupRequests += 1;
+    await page.route('**/api/request-free-local-invoice-delivery', route => {
+      lookupRequests += 1;
+      expect(route.request().postDataJSON()).toEqual({ token: 'not-a-token' });
+      expect(page.url()).not.toContain('not-a-token');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'invalid' }) });
     });
     await page.goto('/#/invoice-delivery?access=not-a-token');
     await expect(page.getByTestId('request-free-invoice-invalid')).toBeVisible();
-    expect(lookupRequests).toBe(0);
+    expect(lookupRequests).toBe(1);
+    expect(new URL(page.url()).hash).toBe('#/invoice-delivery');
   });
 
   for (const state of ['invalid', 'expired', 'revoked', 'replaced', 'unavailable', 'rate_limited', 'error'] as const) {
@@ -574,6 +742,7 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       }));
       await page.goto(`/#/invoice-delivery?access=${token}`);
       await expect(page.getByTestId(`request-free-invoice-${state}`)).toBeVisible();
+      expect(page.url()).not.toContain(token);
       await expect(page.getByText('Fixture Customer')).toHaveCount(0);
       await expect(page.getByText('100 Test Street')).toHaveCount(0);
     });
