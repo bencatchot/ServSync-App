@@ -17,7 +17,7 @@ export function homeAccessStatusPresentation(status?: string | null): StatusPres
 
 export function localClaimInviteStatusPresentation(status: LocalCustomerClaimInviteStatus | string): StatusPresentation {
   const presentations: Partial<Record<LocalCustomerClaimInviteStatus, StatusPresentation>> = {
-    pending: { label: 'Invite Pending', tone: 'warning' },
+    pending: { label: 'Invitation pending', tone: 'warning' },
     claimed: { label: 'Claimed by Homeowner', tone: 'success' },
     declined: { label: 'Invite Declined', tone: 'danger' },
     expired: { label: 'Invite Expired', tone: 'warning' },

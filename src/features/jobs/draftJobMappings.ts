@@ -253,8 +253,8 @@ export function applyDraftJobScopeResult(
 
 export function validateDraftJobComposerDraft(draft: DraftJobComposerDraft): string {
   if (!draft.title.trim()) return 'Enter a Draft Job title before saving.';
-  if (draft.subject_type === 'connected' && !draft.homeowner_user_id) return 'Choose a homeowner before saving this Draft Job.';
-  if (draft.subject_type === 'local' && !draft.local_contact_id) return 'Choose a local customer before saving this Draft Job.';
+  if (draft.subject_type === 'connected' && !draft.homeowner_user_id) return 'Choose a connected customer before saving this Draft Job.';
+  if (draft.subject_type === 'local' && !draft.local_contact_id) return 'Choose a not-connected customer before saving this Draft Job.';
   const invalidLine = draft.line_items.find(line => {
     const quantity = numericInput(line.quantity, Number.NaN);
     const unitPrice = moneyInputToCents(line.unit_price);
@@ -271,8 +271,8 @@ export function validateDraftJobComposerDraft(draft: DraftJobComposerDraft): str
 
 export function validateDraftJobComposerDraftForCreateJob(draft: DraftJobComposerDraft): string {
   if (!draft.title.trim()) return 'Enter a Draft Job title before creating the Job.';
-  if (draft.subject_type === 'connected' && !draft.homeowner_user_id) return 'Choose a homeowner before creating this Job.';
-  if (draft.subject_type === 'local' && !draft.local_contact_id) return 'Choose a local customer before creating this Job.';
+  if (draft.subject_type === 'connected' && !draft.homeowner_user_id) return 'Choose a connected customer before creating this Job.';
+  if (draft.subject_type === 'local' && !draft.local_contact_id) return 'Choose a not-connected customer before creating this Job.';
   if (draft.line_items.length === 0) return 'Add at least one scope line before creating the Job.';
   const invalidLine = draft.line_items.find(line => {
     const quantity = numericInput(line.quantity, Number.NaN);

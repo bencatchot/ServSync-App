@@ -14,8 +14,8 @@ test.describe('contractor mutating job creation', () => {
     const jobName = `E2E Test Job ${timestamp}`;
 
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
 
     const { customerName } = await createLocalE2ECustomer(page, timestamp);
     await openE2ECustomerActionPanel(page, customerName);

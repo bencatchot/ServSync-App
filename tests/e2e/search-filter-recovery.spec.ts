@@ -101,11 +101,11 @@ test.describe('Bundle 4B-1 search and filter recovery', () => {
     const financialSource = sourceBetween(contractorSource, "{(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (", "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
     const jobsSource = sourceBetween(contractorSource, "<Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'}", "{contractorJobsView === 'custom_pricing' && (");
 
-    expect(customerSource).toContain('Customers and contacts');
-    expect(customerSource).toContain('aria-label="Search customers and contacts"');
-    expect(customerSource).toContain('placeholder="Search customers, contacts, city, or address"');
+    expect(customerSource).toContain('>Customers</h2>');
+    expect(customerSource).toContain('aria-label="Search customers"');
+    expect(customerSource).toContain('placeholder="Search customers, city, or address"');
     expect(customerSource).toContain('testId="contractor-customer-filter-summary"');
-    expect(customerSource).toContain('No matching customers or contacts');
+    expect(customerSource).toContain('No matching customers');
     expect(customerSource).toContain('Clear search and show active');
     expect(customerSource).toContain('subjectMatchesSearch');
     expect(customerSource).not.toContain('placeholder="Search homeowner, city, address..."');

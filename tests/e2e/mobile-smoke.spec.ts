@@ -99,8 +99,8 @@ test.describe('mobile read-only smoke', () => {
     }
     await expect(drawer).toBeHidden();
 
-    await openMobileTab(page, /Homeowners/i, 'Homeowners');
-    await expect(main.getByPlaceholder(/Search customers, contacts, city, or address/i)).toBeVisible();
+    await openMobileTab(page, /Customers/i, 'Customers');
+    await expect(main.getByPlaceholder(/Search customers, city, or address/i)).toBeVisible();
 
     await openMobileTab(page, /Service Requests/i, 'Service Requests');
     await expect(main.getByRole('heading', { level: 2, name: /^Service requests$/i })).toBeVisible();

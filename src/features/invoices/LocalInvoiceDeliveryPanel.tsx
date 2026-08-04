@@ -361,7 +361,7 @@ export function LocalInvoiceDeliveryPanel({
       {expanded && (
         <div className="space-y-4 border-t border-[#D8DEE8] p-3">
           <p className="text-xs leading-5 text-[#526784]">
-            Create a document-specific link for this local customer. ServSync does not email or text it, and an open does not confirm delivery, receipt, acceptance, or payment.
+            Create a document-specific link for this customer. ServSync does not email or text it, and an open does not confirm delivery, receipt, acceptance, or payment.
           </p>
 
           {loading ? (

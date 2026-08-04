@@ -99,10 +99,14 @@ import {
 } from './features/estimates/status';
 import { StatusBadge } from './features/status/StatusBadge';
 import {
+  customerConnectionStatusPresentation,
   estimateStatusPresentation,
   invoiceStatusPresentation,
   jobStatusPresentation,
+  readableStatusLabel,
   requestStatusPresentation,
+  type CustomerConnectionStatus,
+  type StatusPresentation,
 } from './features/status/statusPresentation';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from './features/feedback/ActionFeedback';
 import {
@@ -6155,7 +6159,7 @@ function connectionOutreachMessage(templateId: AdminOutreachTemplateId, contract
   if (templateId === 'short_feature') {
     return {
       templateId,
-      subject: 'ServSync homeowner connection feature',
+      subject: 'ServSync customer connection feature',
       body: `Hi ${contractorName},
 
 Just wanted to make sure you're aware that ServSync works best when customers connect with you through their free homeowner profile.
@@ -6175,7 +6179,7 @@ ServSync`,
       subject: 'Quick ServSync setup tip',
       body: `Hi ${contractorName},
 
-One quick tip as you continue using ServSync: local customer records are helpful, but connected homeowner profiles give both you and the customer more value.
+One quick tip as you continue using ServSync: customer records are helpful, and connected customer accounts give both you and the customer more value.
 
 Once a homeowner connects, they can keep your reports, estimates, invoices, and service history tied to their property record. It also gives you a more professional follow-up path for future work.
 
@@ -6195,7 +6199,7 @@ I wanted to send a quick note to make sure you know about one of the more useful
 
 When your customers create their free homeowner profile and connect with you, they can keep reports, estimates, invoices, service history, and property records organized in one place. It also gives you a cleaner way to keep the relationship active after the visit.
 
-Local customer records are still useful, but connected homeowners unlock more of the shared record and reporting features.
+Customer records remain useful before a connection, while connected customer accounts unlock more shared record and reporting features.
 
 If you want, I can help you walk through the easiest way to invite customers or use your referral/invite link.
 
@@ -6391,6 +6395,14 @@ function effectiveLocalClaimInviteStatus(invite?: LocalCustomerClaimInvite | nul
     if (!Number.isNaN(expiresAt) && expiresAt <= Date.now()) return 'expired';
   }
   return invite.status;
+}
+
+function customerConnectionStatusIcon(status: CustomerConnectionStatus) {
+  if (status === 'connected') return <CheckCircle2 size={13} />;
+  if (status === 'invitation_pending') return <Mail size={13} />;
+  if (status === 'connection_request') return <MessageSquare size={13} />;
+  if (status === 'inactive') return <X size={13} />;
+  return <UserRound size={13} />;
 }
 
 function localClaimInvitePropertyIds(invite?: LocalCustomerClaimInvite | null) {
@@ -24328,7 +24340,7 @@ function ContractorDashboard({
     setNotice('');
     setError('');
     if (!invoice.homeowner_user_id) {
-      setError('Local-only invoices cannot be sent to a homeowner yet. Connect this customer to a ServSync homeowner before sending.');
+      setError('This invoice cannot be sent through the customer portal yet. Connect this customer before sending.');
       return false;
     }
     setUpdatingInvoiceId(invoice.id);
@@ -25036,7 +25048,7 @@ function ContractorDashboard({
     setNotice('');
     setError('');
     if (!estimate.homeowner_user_id) {
-      setError('This estimate is attached to a new customer. Connect the homeowner before sending it through the portal.');
+      setError('This estimate is attached to a not-connected customer. Connect the customer before sending it through the portal.');
       return;
     }
     const estimateUnpricedCount = unpricedLineCount(estimate.line_items || []);
@@ -25643,10 +25655,10 @@ function ContractorDashboard({
     const title = cleanHumanLabelText(serviceAgreementOfferDraft.title);
     if (!title) return { error: 'Enter an offer title.' };
     if (!serviceAgreementOfferDraft.template_id) return { error: 'Choose an active template before creating an offer.' };
-    if (!serviceAgreementOfferDraft.connection_id) return { error: 'Choose a connected homeowner before creating an offer.' };
+    if (!serviceAgreementOfferDraft.connection_id) return { error: 'Choose a connected customer before creating an offer.' };
     if (!serviceAgreementOfferDraft.home_id) return { error: 'Choose one explicitly shared property for this offer.' };
     const selectedConnection = connections.find(connection => connection.connection_id === serviceAgreementOfferDraft.connection_id);
-    if (!selectedConnection || selectedConnection.status !== 'active') return { error: 'Choose an active connected homeowner.' };
+    if (!selectedConnection || selectedConnection.status !== 'active') return { error: 'Choose an active connected customer.' };
     const selectedHome = connectedHomeList(selectedConnection).find(home => home.id === serviceAgreementOfferDraft.home_id);
     if (!selectedHome?.id) return { error: 'Choose one explicitly shared property for this offer.' };
     const price = parseOptionalDollarCents(serviceAgreementOfferDraft.price, 'Offer price');
@@ -28514,7 +28526,7 @@ function ContractorDashboard({
     count === null || count === undefined ? 'Visits not set' : `${count} visit${count === 1 ? '' : 's'}`;
   const serviceAgreementConnectionLabel = (connectionId: string) => {
     const connection = connections.find(item => item.connection_id === connectionId);
-    return connection?.display_name || 'Connected homeowner';
+    return connection?.display_name || 'Customer';
   };
   const serviceAgreementHomeLabel = (connectionId: string, homeId: string) => {
     const connection = connections.find(item => item.connection_id === connectionId);
@@ -28731,7 +28743,7 @@ function ContractorDashboard({
     },
     {
       label: 'Add your first customer',
-      helper: 'Create a local customer or connect with a homeowner.',
+      helper: 'Add a customer or accept a connection request.',
       complete: onboardingCustomerCount > 0,
       actionLabel: 'Add customer',
       onAction: openCustomersOnboardingWorkspace,
@@ -28759,7 +28771,7 @@ function ContractorDashboard({
     },
     {
       label: 'Invite a homeowner to ServSync',
-      helper: 'Send a local customer a claim link for their homeowner account.',
+      helper: 'Send a customer an invitation link for their ServSync account.',
       complete: localClaimInvites.length > 0,
       actionLabel: 'Invite homeowner',
       onAction: openInviteOnboardingWorkspace,
@@ -28889,7 +28901,7 @@ function ContractorDashboard({
         timeLabel: scheduleTimeLabel(date),
         sortTime: date.getTime(),
         title: event.inspection?.name || request?.title || 'Scheduled visit',
-        meta: request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer'),
+        meta: request?.homeowner_name || 'Customer',
         statusLabel: viewedContractorVisitKeys.has(contractorVisitViewedKey(event)) ? 'Viewed' : 'Scheduled',
         tone: 'sky' as const,
         onOpen: () => openVisitCalendarEventDetail(event),
@@ -29081,7 +29093,7 @@ function ContractorDashboard({
   const contractorFeedbackPageLabel = {
     overview: 'Dashboard',
     profile: 'Business Profile',
-    connections: 'Homeowners',
+    connections: 'Customers',
     requests: 'Service Requests',
     calendar: 'Calendar',
     invites: 'Invites & Referrals',
@@ -29143,8 +29155,8 @@ function ContractorDashboard({
     .filter(connection => connection.status === 'active')
     .map(connection => ({
       id: connection.homeowner_user_id,
-      label: connection.display_name || 'ServSync homeowner',
-      helper: 'Connected homeowner',
+      label: connection.display_name || 'Customer',
+      helper: 'Connected',
       properties: connectedHomeList(connection)
         .filter((home): home is ContractorConnectedHomeownerHome & { id: string } => Boolean(home.id))
         .map(home => ({
@@ -29154,8 +29166,8 @@ function ContractorDashboard({
     }));
   const draftJobLocalCustomerOptions: DraftJobCustomerOption[] = localContacts.map(contact => ({
     id: contact.id,
-    label: contact.display_name || 'Local customer',
-    helper: 'Local customer',
+    label: contact.display_name || 'Customer',
+    helper: 'Not connected',
     properties: sortedLocalHomes(contact.homes)
       .filter(home => Boolean(home.id))
       .map((home, index) => ({
@@ -29169,7 +29181,7 @@ function ContractorDashboard({
     activeDraftComposerDraft.homeowner_user_id,
     activeDraftComposerDraft.home_id,
     {
-      customer: 'Saved connected homeowner',
+      customer: 'Saved customer',
       helper: 'Saved on this Draft; not in the active selector list',
       property: 'Saved property on this Draft',
     },
@@ -29179,7 +29191,7 @@ function ContractorDashboard({
     activeDraftComposerDraft.local_contact_id,
     activeDraftComposerDraft.local_home_id,
     {
-      customer: 'Saved local customer',
+      customer: 'Saved customer',
       helper: 'Saved on this Draft; not in the current selector list',
       property: 'Saved property on this Draft',
     },
@@ -29263,7 +29275,7 @@ function ContractorDashboard({
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const jobMode: JobWorkflowMode = templateSource === 'blank' && kind === 'work_order' ? 'simple' : 'checklist';
     const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
-    return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${formatMonthYear()}`;
+    return `${starter?.name || workflowLabel} — ${contact.display_name || 'Customer'} — ${formatMonthYear()}`;
   };
   type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; scope?: string; serviceRequestId?: string; homeId?: string | null; localHomeId?: string | null; manualJobTemplateStartNotice?: string };
   const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
@@ -29398,11 +29410,11 @@ function ContractorDashboard({
   const fieldWorkSubjectLabel = (insp: Inspection) => {
     if (insp.homeowner_user_id) {
       const conn = connections.find(c => c.homeowner_user_id === insp.homeowner_user_id);
-      return conn?.display_name || 'ServSync homeowner';
+      return conn?.display_name || 'Customer';
     }
     if (insp.local_contact_id) {
       const contact = localContacts.find(c => c.id === insp.local_contact_id);
-      return contact?.display_name || 'New customer';
+      return contact?.display_name || 'Customer';
     }
     return 'Customer';
   };
@@ -30410,7 +30422,7 @@ function ContractorDashboard({
     if (!options?.skipConfirmation) {
       const confirmed = window.confirm(insp.homeowner_user_id
         ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to Home History. This cannot be undone.'
-        : 'Finalize this new customer job report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
+        : 'Finalize this customer job report? The PDF will stay with this contractor record until the customer connects a ServSync account.'
       );
       if (!confirmed) return;
     }
@@ -30495,7 +30507,7 @@ function ContractorDashboard({
       }
       setNotice(insp.homeowner_user_id
         ? actionFeedbackMessage('Report finalized', 'The final report was saved to homeowner Documents and added to Home History. It is ready to send when you choose.', 'contractor-report-finalize-feedback')
-        : actionFeedbackMessage('Report finalized', 'The final report was stored with this customer record. It has not been sent to a ServSync homeowner.', 'contractor-report-finalize-feedback')
+        : actionFeedbackMessage('Report finalized', 'The final report was stored with this customer record. It has not been sent through a connected customer account.', 'contractor-report-finalize-feedback')
       );
     } catch (err) {
       setError(actionFeedbackMessage(
@@ -30513,7 +30525,7 @@ function ContractorDashboard({
     setNotice('');
     setError('');
     if (!insp.homeowner_user_id) {
-      setError('This report is for a new customer who does not have a ServSync homeowner profile yet.');
+      setError('This report is for a not-connected customer who does not have a ServSync account yet.');
       return;
     }
     if (insp.status !== 'finalized' || !insp.report_storage_path) {
@@ -31310,13 +31322,13 @@ function ContractorDashboard({
     if (template.homeowner_user_id) {
       const connection = connections.find(candidate => candidate.homeowner_user_id === template.homeowner_user_id);
       const homeLabel = connection?.home?.nickname || connection?.home?.address_line1 || '';
-      return [connection?.display_name || 'ServSync homeowner', homeLabel].filter(Boolean).join(' · ');
+      return [connection?.display_name || 'Customer', homeLabel].filter(Boolean).join(' · ');
     }
     if (template.local_contact_id) {
       const contact = localContacts.find(candidate => candidate.id === template.local_contact_id);
       const home = contact?.homes?.find(candidate => candidate.id === template.local_home_id) ?? contact?.homes?.[0] ?? null;
       const homeLabel = home?.nickname || home?.address_line1 || '';
-      return [contact?.display_name || 'New customer', homeLabel].filter(Boolean).join(' · ');
+      return [contact?.display_name || 'Customer', homeLabel].filter(Boolean).join(' · ');
     }
     return 'Home context not available';
   };
@@ -31800,7 +31812,7 @@ function ContractorDashboard({
         setHomeownerWorkspacePropertyScope('selected');
         setLocalHomeDrafts(prev => ({ ...prev, [contact.id]: EMPTY_LOCAL_HOME_DRAFT }));
         setAddingLocalHomeContactId(null);
-        setNotice('Property added to this local customer.');
+        setNotice('Property added to this customer.');
       }
       await loadContractor();
     } catch (err) {
@@ -31847,7 +31859,7 @@ function ContractorDashboard({
 
 	    const selectedHomeIds = selectedClaimInviteHomeIdsForContact(contact);
 	    if (selectedHomeIds.length === 0) {
-	      setError('Add or select at least one unclaimed property before creating a ServSync claim invite for this local customer.');
+	      setError('Add or select at least one unclaimed property before creating a ServSync invitation for this customer.');
 	      setHomeownerWorkspacePropertyScope('selected');
 	      setHomeownerDetailTab('home');
 	      return;
@@ -32045,7 +32057,7 @@ function ContractorDashboard({
     },
     {
       id: 'homeowners',
-      label: 'Homeowners',
+      label: 'Customers',
       icon: <Users size={18} />,
       badge: contractorHomeownersBadgeCount,
       active: contractorTab === 'connections',
@@ -32065,9 +32077,9 @@ function ContractorDashboard({
       tabs={[
         { id: 'overview',     label: 'Dashboard',          icon: <LayoutDashboard size={17} />, group: 'Workspace' },
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
-        { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: contractorHomeownersBadgeCount, group: 'Homeowner Work' },
-        { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorServiceRequestsBadgeCount, group: 'Homeowner Work' },
-        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, group: 'Homeowner Work' },
+        { id: 'connections',  label: 'Customers',          icon: <Users size={17} />, badge: contractorHomeownersBadgeCount, group: 'Customer Work' },
+        { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorServiceRequestsBadgeCount, group: 'Customer Work' },
+        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, group: 'Customer Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
         { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
@@ -32640,8 +32652,8 @@ function ContractorDashboard({
                       <EmptyState
                         compact
                         icon={<Users size={16} />}
-                        title="No connected homeowners yet"
-                        body="Approved connections and local customer relationships will appear here as your ServSync network grows."
+                        title="No connected customers yet"
+                        body="Connected and not-connected customers will appear here as your ServSync network grows."
                         action={
                           <button type="button" onClick={() => setContractorTab('invites')} className={buttonClass('secondary')}>
                             Manage invites
@@ -33657,7 +33669,7 @@ function ContractorDashboard({
                         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                           <p className="text-sm font-semibold text-amber-950">Homeowner connection not loaded</p>
                           <p className="mt-1 text-xs leading-5 text-amber-800">
-                            You can still review and respond to this request here. Service visit creation will appear once this request is matched to a connected homeowner.
+                            You can still review and respond to this request here. Service visit creation will appear once this request is matched to a connected customer.
                           </p>
                         </div>
                       )}
@@ -34519,7 +34531,7 @@ function ContractorDashboard({
                         className={inputClass()}
                         value={contractorRequestSearch}
                         onChange={event => setContractorRequestSearch(event.target.value)}
-                        placeholder="Search homeowner, trade, title..."
+                        placeholder="Search customer, trade, title..."
                       />
                     </Field>
                   </div>
@@ -34917,7 +34929,7 @@ function ContractorDashboard({
               conn.home?.state,
               conn.home?.zip_code,
               conn.status,
-              'connected homeowner',
+              'connected customer',
             ].filter(Boolean).join(' '));
           }
           const homes = sortedLocalHomes(subject.contact.homes);
@@ -34926,7 +34938,7 @@ function ContractorDashboard({
             subject.contact.phone,
             subject.contact.email,
             ...homes.flatMap(home => [home.nickname, home.address_line1, home.city, home.state, home.zip_code]),
-            'new customer',
+            'not connected customer',
           ].filter(Boolean).join(' '));
         };
         const homeownerSearchTerms = normalizeText(homeownerWorkspaceSearch).split(' ').filter(Boolean);
@@ -34939,7 +34951,7 @@ function ContractorDashboard({
 	          .filter(subjectMatchesSearch)
 	          .sort((a, b) => subjectAttentionScore(b) - subjectAttentionScore(a));
 	        const visibleSubjectTotalCount = homeownerFilter === 'active' ? activeSubjects.length : inactiveSubjects.length;
-	        const customerSidebarLabels = homeownerFilter === 'inactive' ? ['View: Inactive customers and contacts'] : [];
+		        const customerSidebarLabels = homeownerFilter === 'inactive' ? ['View: Inactive customers'] : [];
 	        const allSubjects = [...activeSubjects, ...inactiveSubjects];
         const selectedSubject = allSubjects.find(s => s.id === selectedHomeownerSubjectId) ?? null;
         const showHomeownerMobileDetail = homeownerMobileDetailOpen || showLocalContactForm;
@@ -34951,7 +34963,7 @@ function ContractorDashboard({
               <div className={`${showHomeownerMobileDetail ? 'hidden md:block' : 'block'} border-b border-slate-200 bg-white md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:border-b-0 md:border-r`}>
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-semibold text-slate-800 text-sm">Customers and contacts</h2>
+                    <h2 className="font-semibold text-slate-800 text-sm">Customers</h2>
                     {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                       <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); setHomeownerMobileDetailOpen(true); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
                         <Plus size={14} /> Add
@@ -34985,8 +34997,8 @@ function ContractorDashboard({
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       value={homeownerWorkspaceSearch}
                       onChange={event => setHomeownerWorkspaceSearch(event.target.value)}
-                      aria-label="Search customers and contacts"
-                      placeholder="Search customers, contacts, city, or address"
+                      aria-label="Search customers"
+                      placeholder="Search customers, city, or address"
                     />
 	                    {homeownerWorkspaceSearch && (
 	                      <button
@@ -35020,12 +35032,12 @@ function ContractorDashboard({
 	                    <div className="p-3">
 	                      <EmptyState
 	                        compact
-	                        title={homeownerWorkspaceSearch ? 'No matching customers or contacts' : `No ${homeownerFilter} customers or contacts yet`}
-	                        body={homeownerWorkspaceSearch
-	                          ? 'Try a different search or clear it to see customers and contacts in this view.'
-	                          : homeownerFilter === 'inactive'
-	                            ? 'Inactive customers and local contacts appear here after they are archived or no longer active.'
-	                            : 'Active ServSync homeowners and local contacts will appear here when they are available.'}
+		                        title={homeownerWorkspaceSearch ? 'No matching customers' : `No ${homeownerFilter} customers yet`}
+		                        body={homeownerWorkspaceSearch
+		                          ? 'Try a different search or clear it to see customers in this view.'
+		                          : homeownerFilter === 'inactive'
+		                            ? 'Inactive customer connections appear here after they are declined or revoked.'
+		                            : 'Connected customers, not-connected customers, and connection requests appear here.'}
 	                        action={homeownerWorkspaceSearch || homeownerFilter === 'inactive' ? (
 	                          <button
 	                            type="button"
@@ -35044,7 +35056,7 @@ function ContractorDashboard({
                     const isSelected = selectedHomeownerSubjectId === subject.id;
                     let rowName = '';
                     let subtitle = '';
-                    const pills: { label: string; tone: 'emerald' | 'amber' | 'blue' | 'slate' | 'red' }[] = [];
+                    const badges: Array<StatusPresentation & { icon?: ReactNode }> = [];
                     if (subject.kind === 'connection') {
                       const perm = normalizeSharingPermissions(subject.connection.permissions);
                       const subjectRequests = serviceRequests.filter(request => request.connection_id === subject.connection.connection_id);
@@ -35054,14 +35066,16 @@ function ContractorDashboard({
                       const draftWorkOrderCount = subjectWorkOrders.filter(inspectionIsOpenJob).length;
                       const filedReportCount = subjectWorkOrders.filter(inspectionIsClosedJob).length;
                       const primaryHome = connectedHomeList(subject.connection)[0] ?? subject.connection.home;
-                      rowName = perm.share_contact ? (subject.connection.display_name || 'Homeowner') : 'Homeowner';
+                      rowName = perm.share_contact ? (subject.connection.display_name || 'Customer') : 'Customer';
                       subtitle = primaryHome?.nickname || primaryHome?.address_line1 || subject.connection.city || (perm.share_contact ? '' : 'Contact private');
-                      pills.push(subject.isActive ? { label: 'Connected', tone: 'emerald' } : { label: subject.connection.status === 'declined' ? 'Declined' : 'Revoked', tone: 'red' });
-                      if (perm.share_home_overview && connectedHomeList(subject.connection).length > 1) pills.push({ label: `${connectedHomeList(subject.connection).length} properties`, tone: 'blue' });
-                      if (followUpCount > 0) pills.push({ label: `${followUpCount} follow-up`, tone: 'amber' });
-                      if (openRequestCount > 0) pills.push({ label: `${openRequestCount} open`, tone: 'slate' });
-                      if (draftWorkOrderCount > 0) pills.push({ label: `${draftWorkOrderCount} draft`, tone: 'amber' });
-                      if (filedReportCount > 0) pills.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'slate' });
+                      const connectionStatus: CustomerConnectionStatus = subject.isActive ? 'connected' : 'inactive';
+                      badges.push({ ...customerConnectionStatusPresentation(connectionStatus), icon: customerConnectionStatusIcon(connectionStatus) });
+                      if (!subject.isActive) badges.push({ label: subject.connection.status === 'declined' ? 'Declined' : 'Revoked', tone: 'danger' });
+                      if (perm.share_home_overview && connectedHomeList(subject.connection).length > 1) badges.push({ label: `${connectedHomeList(subject.connection).length} properties`, tone: 'info' });
+                      if (followUpCount > 0) badges.push({ label: `${followUpCount} follow-up`, tone: 'warning' });
+                      if (openRequestCount > 0) badges.push({ label: `${openRequestCount} open`, tone: 'neutral' });
+                      if (draftWorkOrderCount > 0) badges.push({ label: `${draftWorkOrderCount} draft`, tone: 'warning' });
+                      if (filedReportCount > 0) badges.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'neutral' });
                     } else if (subject.kind === 'local') {
                       const subjectWorkOrders = fieldWorkForLocalContact(subject.contact.id);
                       const draftWorkOrderCount = subjectWorkOrders.filter(inspectionIsOpenJob).length;
@@ -35074,24 +35088,23 @@ function ContractorDashboard({
                       const localClaimStatus = subject.contact.homeowner_user_id || subject.contact.claimed_at
                         ? 'claimed'
                         : effectiveLocalClaimInviteStatus(latestClaimInvite);
-                      rowName = subject.contact.display_name || 'New customer';
+                      rowName = subject.contact.display_name || 'Customer';
                       const homes = sortedLocalHomes(subject.contact.homes);
                       const home = homes[0];
                       subtitle = home?.address_line1 || home?.nickname || formatPhoneNumber(subject.contact.phone) || subject.contact.email || '';
-                      pills.push(localClaimStatus
-                        ? {
-                            label: LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus],
-                            tone: localClaimStatus === 'claimed' ? 'emerald' : localClaimStatus === 'pending' ? 'amber' : localClaimStatus === 'revoked' ? 'red' : 'slate',
-                          }
-                        : { label: 'Not invited', tone: 'slate' }
-                      );
-                      if (homes.length > 1) pills.push({ label: `${homes.length} properties`, tone: 'blue' });
-                      if (draftWorkOrderCount > 0) pills.push({ label: `${draftWorkOrderCount} draft`, tone: 'amber' });
-                      if (filedReportCount > 0) pills.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'slate' });
+                      const localConnectionStatus: CustomerConnectionStatus = localClaimStatus === 'pending' ? 'invitation_pending' : 'not_connected';
+                      badges.push({ ...customerConnectionStatusPresentation(localConnectionStatus), icon: customerConnectionStatusIcon(localConnectionStatus) });
+                      if (localClaimStatus && !['pending', 'claimed'].includes(localClaimStatus)) {
+                        badges.push(localClaimInviteStatusPresentation(localClaimStatus));
+                      }
+                      if (homes.length > 1) badges.push({ label: `${homes.length} properties`, tone: 'info' });
+                      if (draftWorkOrderCount > 0) badges.push({ label: `${draftWorkOrderCount} draft`, tone: 'warning' });
+                      if (filedReportCount > 0) badges.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'neutral' });
                     } else {
-                      rowName = 'New connection request';
+                      rowName = subject.request.contact_summary?.display_name || 'Customer';
                       subtitle = `Requested ${formatDateTime(subject.request.created_at)}`;
-                      pills.push({ label: 'Pending', tone: 'amber' });
+                      const requestStatus: CustomerConnectionStatus = 'connection_request';
+                      badges.push({ ...customerConnectionStatusPresentation(requestStatus), icon: customerConnectionStatusIcon(requestStatus) });
                     }
                     return (
                       <button
@@ -35123,10 +35136,7 @@ function ContractorDashboard({
                         <p className={`font-medium text-sm ${isSelected ? 'text-blue-700' : 'text-slate-800'}`}>{rowName}</p>
                         <p className="text-slate-400 text-xs mt-0.5 truncate">{subtitle || '—'}</p>
                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                          {pills.map((p, idx) => {
-                            const style = p.tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : p.tone === 'amber' ? 'bg-amber-50 text-amber-700' : p.tone === 'blue' ? 'bg-blue-50 text-blue-700' : p.tone === 'red' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600';
-                            return <span key={idx} className={`text-xs px-2 py-0.5 rounded-full ${style}`}>{p.label}</span>;
-                          })}
+                          {badges.map((badge, idx) => <StatusBadge key={`${badge.label}-${idx}`} {...badge} />)}
                         </div>
                       </button>
                     );
@@ -35201,8 +35211,8 @@ function ContractorDashboard({
                       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-3">
                         <Users size={22} />
                       </div>
-                      <p className="text-sm font-semibold text-slate-700">Pick a homeowner from the list</p>
-                      <p className="mt-2 text-xs text-slate-500">Select someone on the left to see their profile, home details, job history, service requests, and schedule.</p>
+                      <p className="text-sm font-semibold text-slate-700">Pick a customer from the list</p>
+                      <p className="mt-2 text-xs text-slate-500">Select a customer on the left to see profile, property, job, request, and schedule details.</p>
                     </div>
                   </div>
                 ) : selectedSubject.kind === 'request' ? (
@@ -35218,25 +35228,29 @@ function ContractorDashboard({
                         <div className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Pending connection request</p>
-                              <h3 className="mt-2 text-lg font-bold text-slate-950">A homeowner is waiting for your approval</h3>
+                              <StatusBadge
+                                {...customerConnectionStatusPresentation('connection_request')}
+                                icon={customerConnectionStatusIcon('connection_request')}
+                                size="md"
+                              />
+                              <h3 className="mt-2 text-lg font-bold text-slate-950">A customer is waiting for your approval</h3>
                               <p className="mt-2 text-sm text-slate-700">
                                 Requested {formatDateTime(reqSubject.created_at)} from {connectionSourceLabel(reqSubject.source).toLowerCase()}.
                                 Review what they chose to share before accepting.
                               </p>
                             </div>
-                            <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">{reqSubject.status}</span>
+                            <StatusBadge label={reqSubject.status === 'pending' ? 'Pending review' : readableStatusLabel(reqSubject.status)} tone="warning" />
                           </div>
 
                           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                            <SharedField label="Homeowner" value={contactSummary.display_name || 'Homeowner'} allowed />
+                            <SharedField label="Customer" value={contactSummary.display_name || 'Customer'} allowed />
                             <SharedField label="Phone" value={contactSummary.phone} allowed={reqSubject.share_contact} />
                             <SharedField label="Location" value={contactLocation} allowed={reqSubject.share_contact} />
                             <SharedField label="Photos / media" value="Deferred" allowed={false} />
                           </div>
 
                           <div className="mt-5 rounded-xl border border-amber-200 bg-white/80 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Homeowner message</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Customer message</p>
                             <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
                               {requestMessage || 'No message included.'}
                             </p>
@@ -35334,7 +35348,7 @@ function ContractorDashboard({
                       return address && address !== primary ? `${primary} — ${address}` : primary;
                     };
                     const primaryConnectedHome = selectedWorkspaceHome ?? connectedHomes[0] ?? conn?.home ?? null;
-                    const headerName = conn ? (perm?.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer?.display_name || 'New customer');
+                    const headerName = conn ? (perm?.share_contact ? (conn.display_name || 'Customer') : 'Customer') : (localCustomer?.display_name || 'Customer');
                     const localHome = selectedWorkspaceLocalHome ?? localHomes[0] ?? null;
                     const localHeaderAddress = localHomes.length > 1 && homeownerWorkspacePropertyScope === 'all'
                       ? `${localHomes.length} properties on file`
@@ -35372,6 +35386,10 @@ function ContractorDashboard({
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
+                    const customerConnectionStatus: CustomerConnectionStatus = conn
+                      ? conn.status === 'active' ? 'connected' : 'inactive'
+                      : localClaimStatus === 'pending' ? 'invitation_pending' : 'not_connected';
+                    const customerConnectionPresentation = customerConnectionStatusPresentation(customerConnectionStatus);
                     const preparedLocalClaimInviteLink = preparedLocalClaimInviteQr && latestLocalClaimInvite && preparedLocalClaimInviteQr.inviteId === latestLocalClaimInvite.id
                       ? localCustomerClaimInviteUrl(preparedLocalClaimInviteQr.token)
                       : '';
@@ -35423,7 +35441,7 @@ function ContractorDashboard({
                     const localPropertySelectionRequired = Boolean(!isConn && localHomes.length > 1 && !workspaceNewRecordLocalHomeId);
                     const requireLocalPropertyForNewRecord = () => {
                       if (!localPropertySelectionRequired) return false;
-                      setError('Choose a property before creating a record for this multi-property local customer.');
+                      setError('Choose a property before creating a record for this customer.');
                       setHomeownerWorkspacePropertyScope('selected');
                       setHomeownerDetailTab('home');
                       return true;
@@ -35706,7 +35724,7 @@ function ContractorDashboard({
                       {
                         label: isConn ? 'Home profile' : 'Customer profile',
                         value: isConn && conn?.home ? 'Shared' : localHome ? 'Saved' : 'Basic',
-                        helper: isConn ? 'Contact and home details' : 'New customer details',
+                        helper: 'Customer and property details',
                         icon: <Home size={16} />,
                         tone: 'slate',
                         onClick: () => setHomeownerDetailTab(isConn ? 'home' : 'profile'),
@@ -35725,7 +35743,7 @@ function ContractorDashboard({
                       return (
                         <div className="space-y-3">
                           {homes.length === 0 ? (
-                            <EmptyState text="No property details on file for this local customer." />
+                            <EmptyState text="No property details on file for this customer." />
                           ) : (
                             <div className="grid gap-3">
                               {homes.map((home, index) => {
@@ -35871,7 +35889,7 @@ function ContractorDashboard({
                                   <div>
                                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Local property</p>
                                     <h3 id="edit-local-property-title" className="mt-1 text-lg font-bold text-slate-950">Edit property</h3>
-                                    <p className="mt-1 text-sm text-slate-500">Updates stay on this contractor-created local customer record.</p>
+                                    <p className="mt-1 text-sm text-slate-500">Updates stay on this contractor-managed customer record.</p>
                                   </div>
                                   <button
                                     type="button"
@@ -35951,7 +35969,7 @@ function ContractorDashboard({
                               <div className="min-w-0">
                                 <p className="text-sm font-bold text-blue-950">Property suggestions</p>
                                 <p className="mt-1 text-xs leading-5 text-blue-800">
-                                  Suggest a property for this connected homeowner to review. Suggestions do not create homeowner properties, share access, or become available for jobs, estimates, invoices, reports, or Home History until the homeowner accepts and shares the property.
+                                  Suggest a property for this connected customer to review. Suggestions do not create customer properties, share access, or become available for jobs, estimates, invoices, reports, or Home History until the customer accepts and shares the property.
                                 </p>
                               </div>
                               {!SERVSYNC_DEMO_PRESENTATION_MODE && (
@@ -36129,7 +36147,14 @@ function ContractorDashboard({
                         <div className="bg-white border-b border-slate-200 px-6 py-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <h2 className="font-bold text-slate-950 text-xl">{headerName}</h2>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h2 className="font-bold text-slate-950 text-xl">{headerName}</h2>
+                                <StatusBadge
+                                  {...customerConnectionPresentation}
+                                  icon={customerConnectionStatusIcon(customerConnectionStatus)}
+                                  size="md"
+                                />
+                              </div>
                               <p className="mt-1 text-sm text-slate-500">{headerAddress || (conn ? 'Address not shared' : 'No address on file')}</p>
                               {headerCity && <p className="text-xs text-slate-400">{headerCity}</p>}
                             </div>
@@ -36503,13 +36528,16 @@ function ContractorDashboard({
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   {conn && perm && (
                                     <>
-                                      <SharedField label="Homeowner name" value={conn.display_name} allowed={perm.share_contact} />
+                                      <SharedField label="Customer name" value={conn.display_name} allowed={perm.share_contact} />
                                       <SharedField label="Phone" value={formatPhoneNumber(conn.phone)} allowed={perm.share_contact} />
                                       <SharedField label="City" value={conn.city} allowed={perm.share_contact} />
                                       <SharedField label="State" value={conn.state} allowed={perm.share_contact} />
                                       <div>
                                         <p className="text-xs text-slate-400 font-medium mb-0.5">Status</p>
-                                        <p className="text-sm text-slate-800 font-medium capitalize">{conn.status}</p>
+                                        <StatusBadge
+                                          {...customerConnectionPresentation}
+                                          icon={customerConnectionStatusIcon(customerConnectionStatus)}
+                                        />
                                       </div>
                                       <div>
                                         <p className="text-xs text-slate-400 font-medium mb-0.5">Original source</p>
@@ -36524,13 +36552,16 @@ function ContractorDashboard({
                                       <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
                                       <div>
                                         <p className="text-xs text-slate-400 font-medium mb-0.5">Status</p>
-                                        <p className="text-sm text-slate-800 font-medium">{localClaimStatus ? LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus] : 'Not invited'}</p>
+                                        <StatusBadge
+                                          {...customerConnectionPresentation}
+                                          icon={customerConnectionStatusIcon(customerConnectionStatus)}
+                                        />
                                       </div>
                                       {editingLocalCustomerProfileId === localCustomer.id && (
                                         <div role="dialog" aria-modal="true" aria-labelledby="edit-local-customer-profile-title" className="sm:col-span-2 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
                                           <div className="flex items-start justify-between gap-3">
                                             <div>
-                                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Local customer profile</p>
+                                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Customer profile</p>
                                               <h4 id="edit-local-customer-profile-title" className="mt-1 text-lg font-bold text-slate-950">Edit customer</h4>
                                               <p className="mt-1 text-xs leading-5 text-slate-600">
                                                 These contractor-only customer details can be edited until the homeowner claims the profile. Updating name, phone, or email revokes any pending claim invite so the old link cannot use stale copied details.
@@ -36610,7 +36641,7 @@ function ContractorDashboard({
 
 	                                        {localCustomerIsClaimed ? (
 	                                          <p className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
-	                                            This local customer has been claimed by a homeowner account.
+	                                            This customer record has been claimed by a homeowner account.
 	                                          </p>
 	                                        ) : latestLocalClaimInvite && localClaimStatus === 'pending' ? (
 	                                          <div className="mt-4 space-y-3">
@@ -36820,7 +36851,7 @@ function ContractorDashboard({
                                         }
                                       }}
                                       className={buttonClass('secondary')}
-                                      title={localCustomerIsClaimed ? 'This local customer has already claimed their homeowner account.' : undefined}
+                                      title={localCustomerIsClaimed ? 'This customer has already claimed their homeowner account.' : undefined}
                                     >
                                       {localCustomerIsClaimed
                                         ? 'Claimed'
@@ -38080,10 +38111,10 @@ function ContractorDashboard({
                     >
                       <option value="">All customers</option>
                       {connections.filter(c => c.status === 'active').map(c => (
-                        <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                        <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Customer'} — Connected</option>
                       ))}
                       {localContacts.map(contact => (
-                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Customer'} — Not connected</option>
                       ))}
                     </select>
                   </div>
@@ -38328,10 +38359,10 @@ function ContractorDashboard({
                             >
                               <option value="">Choose customer...</option>
                               {connections.filter(c => c.status === 'active').map(c => (
-                                <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                                <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Customer'} — Connected</option>
                               ))}
                               {localContacts.map(contact => (
-                                <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                                <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Customer'} — Not connected</option>
                               ))}
                             </select>
                           </Field>
@@ -38426,7 +38457,7 @@ function ContractorDashboard({
                         ) : null}
 
                         {!selectedJobsCustomerName && !(sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen) && (
-                          <Notice tone="info" text={contractorFinancialRecordKind === 'estimates' ? 'Choose a connected homeowner or new customer before creating an estimate.' : 'Choose a connected homeowner or new customer before creating an invoice.'} />
+                          <Notice tone="info" text={contractorFinancialRecordKind === 'estimates' ? 'Choose a customer before creating an estimate.' : 'Choose a customer before creating an invoice.'} />
                         )}
                         {readOnlyContractorActionReason && (
                           <Notice tone="info" text={readOnlyContractorActionReason} />
@@ -38832,7 +38863,7 @@ function ContractorDashboard({
 
                         {!invoiceDraftCanSendToHomeowner && (
                           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                            Save this invoice as a draft now. Connect this customer to a ServSync homeowner before sending it through the portal.
+                            Save this invoice as a draft now. Connect this customer before sending it through the customer portal.
                           </p>
                         )}
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -39159,10 +39190,10 @@ function ContractorDashboard({
                               >
                                 <option value="">All customers</option>
                                 {connections.filter(c => c.status === 'active').map(c => (
-                                  <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                                  <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Customer'} — Connected</option>
                                 ))}
                                 {localContacts.map(contact => (
-                                  <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                                  <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Customer'} — Not connected</option>
                                 ))}
                               </select>
                             </Field>
@@ -39297,7 +39328,7 @@ function ContractorDashboard({
                             <EmptyState
                               icon={<Receipt size={18} />}
                               title="No estimates yet"
-                              body="Create estimate drafts for connected homeowners or local customers, then send them when they are ready."
+                              body="Create estimate drafts for customers, then send them when they are ready and the customer is connected."
                             />
                           ) : !showingEstimates && invoiceRecordsForView.length === 0 && !invoiceFilterActive ? (
                             <EmptyState
@@ -39421,7 +39452,7 @@ function ContractorDashboard({
                                       <div className="mt-3 space-y-2">
                                         {!invoice.homeowner_user_id && (
                                           <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
-                                            Connect this customer to a ServSync homeowner before sending the invoice through the portal.
+                                            Connect this customer before sending the invoice through the customer portal.
                                           </p>
                                         )}
                                         <div className={mobileActionRowClass()}>
@@ -39793,10 +39824,10 @@ function ContractorDashboard({
                               >
                                 <option value="">All customers</option>
                                 {connections.filter(c => c.status === 'active').map(c => (
-                                  <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                                  <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Customer'} — Connected</option>
                                 ))}
                                 {localContacts.map(contact => (
-                                  <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                                  <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Customer'} — Not connected</option>
                                 ))}
                               </select>
                             </Field>
@@ -40227,7 +40258,7 @@ function ContractorDashboard({
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
                           <div>
                             <p className="text-sm font-bold text-slate-950">Draft an offer</p>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">Start from an active template, then choose one connected homeowner and one explicitly shared property.</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Start from an active template, then choose one connected customer and one explicitly shared property.</p>
                           </div>
                           <DraftNotice
                             title="Draft service plan"
@@ -40258,7 +40289,7 @@ function ContractorDashboard({
                                 ))}
                               </select>
                             </Field>
-                            <Field label="Connected homeowner">
+                            <Field label="Connected customer">
                               <select
                                 className={inputClass()}
                                 value={serviceAgreementOfferDraft.connection_id}
@@ -40272,7 +40303,7 @@ function ContractorDashboard({
                                   }));
                                 }}
                               >
-                                <option value="">Choose connected homeowner...</option>
+                                <option value="">Choose connected customer...</option>
                                 {serviceAgreementEligibleConnections.map(connection => (
                                   <option key={connection.connection_id} value={connection.connection_id}>
                                     {connection.display_name || 'Homeowner'} · {connectedHomeList(connection).filter(home => Boolean(home.id)).length} shared propert{connectedHomeList(connection).filter(home => Boolean(home.id)).length === 1 ? 'y' : 'ies'}
@@ -41285,10 +41316,10 @@ function ContractorDashboard({
                     >
                       <option value="connected:">Select customer...</option>
                       {connections.filter(c => c.status === 'active').map(c => (
-                        <option key={c.homeowner_user_id} value={`connected:${c.homeowner_user_id}`}>{c.display_name} — ServSync homeowner</option>
+                        <option key={c.homeowner_user_id} value={`connected:${c.homeowner_user_id}`}>{c.display_name} — Connected</option>
                       ))}
                       {localContacts.map(contact => (
-                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name} — New customer</option>
+                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name} — Not connected</option>
                       ))}
                     </select>
                     <button
@@ -41439,7 +41470,7 @@ function ContractorDashboard({
                   <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">New customer</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Customer</p>
                         <p className="mt-1 text-sm text-blue-900">Save the customer once, then this job can be tied to them.</p>
                       </div>
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
@@ -41633,7 +41664,7 @@ function ContractorDashboard({
                       </label>
                     ) : (
                       <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
-                        Calendar sharing is available for connected homeowner requests. This scheduled visit will stay on your contractor calendar.
+                        Calendar sharing is available for connected customer requests. This scheduled visit will stay on your contractor calendar.
                       </p>
                     )
                   )}
@@ -43139,11 +43170,11 @@ function ContractorDashboard({
                   const reportSendHelperText = activeInspection.status !== 'finalized'
                     ? 'Finalize the report before sending it.'
                     : !activeInspection.homeowner_user_id
-                      ? 'This report can be filed locally, but it cannot be sent until the customer has a ServSync homeowner profile.'
+                      ? 'This report can be filed with the customer record, but it cannot be sent until the customer connects a ServSync account.'
                       : 'Send the report to the homeowner and close the linked request when applicable.';
                   const finalizeReportHelperText = activeInspection.status === 'draft'
                     ? inspectionClosedForReview
-                      ? 'Finalize saves and files the PDF. For connected homeowners, it becomes available in Documents and Home History and creates an in-app notification.'
+                      ? 'Finalize saves and files the PDF. For connected customers, it becomes available in Documents and Home History and creates an in-app notification.'
                       : 'Close the job for review before finalizing the report.'
                     : 'Report PDF has been filed to Documents.';
                   return (
@@ -43626,7 +43657,7 @@ function ContractorDashboard({
                                 : inspectionHasUnansweredPrompts(activeInspection.rooms_with_findings ?? [])
                                   ? 'Complete every checklist prompt before sending the report.'
                                 : !activeInspection.homeowner_user_id
-                                  ? 'This report belongs to a new customer who does not have a ServSync homeowner profile yet.'
+                                  ? 'This report belongs to a not-connected customer who does not have a ServSync account yet.'
                                   : 'Send the report and close the linked service request'
                             }
                             onClick={() => void sendInspectionReportToHomeowner(activeInspection)}
@@ -43676,7 +43707,7 @@ function ContractorDashboard({
                         )}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="text-[11px] leading-relaxed text-slate-400 px-1">
-                          Finalize saves and files the PDF. Connected homeowners can then view it in Documents and Home History and receive an in-app notification. Complete job & send closes the linked request and sends the completion notice.
+                          Finalize saves and files the PDF. Connected customers can then view it in Documents and Home History and receive an in-app notification. Complete job & send closes the linked request and sends the completion notice.
                         </p>}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
@@ -50000,7 +50031,7 @@ function VisitCalendarEventDetail({
   const canShareWithHomeowner = Boolean(event.service_request_id && event.homeowner_user_id);
   const scheduledAt = new Date(event.scheduled_at);
   const title = inspection?.name || request?.title || 'Scheduled service visit';
-  const subject = request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer');
+  const subject = request?.homeowner_name || 'Customer';
   const visitPresentation = visitEventStatusPresentation(event.status);
   const responsePresentation = visitHomeownerResponsePresentation(event.homeowner_response_status);
 
@@ -50112,7 +50143,7 @@ function VisitCalendarEventDetail({
                 <span>Share calendar invite with homeowner</span>
               </label>
             ) : (
-              <p className="mt-1 text-sm text-slate-500">Calendar sharing is available for connected homeowner jobs.</p>
+              <p className="mt-1 text-sm text-slate-500">Calendar sharing is available for connected customer jobs.</p>
             )}
           </div>
 
@@ -50368,7 +50399,7 @@ function CalendarView({
       const date = new Date(visitEvent.scheduled_at);
       const inspection = visitEvent.inspection;
       const title = inspection?.name || request?.title || 'Service visit';
-      const subject = request?.homeowner_name || (visitEvent.local_contact_id ? 'Local customer' : 'Customer');
+      const subject = request?.homeowner_name || 'Customer';
       const presentation = visitCalendarPresentation(visitEvent);
       return (
         <button

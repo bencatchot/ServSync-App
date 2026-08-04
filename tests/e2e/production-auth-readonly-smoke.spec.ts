@@ -208,9 +208,9 @@ test.describe('production authenticated read-only smoke', () => {
       await openSidebarTab(page, /^Dashboard\b/i);
       await expectActiveHeading(page, /^Dashboard$/i);
 
-      await openSidebarTab(page, /Homeowners/i);
-      await expectActiveHeading(page, /^Homeowners$/i);
-      await expect(main.getByRole('textbox', { name: /^Search customers and contacts$/i })).toBeVisible();
+      await openSidebarTab(page, /Customers/i);
+      await expectActiveHeading(page, /^Customers$/i);
+      await expect(main.getByRole('textbox', { name: /^Search customers$/i })).toBeVisible();
 
       await openSidebarTab(page, /Service Requests/i);
       await expectActiveHeading(page, /^Service Requests$/i);

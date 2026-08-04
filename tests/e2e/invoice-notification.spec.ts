@@ -38,7 +38,7 @@ async function waitForInvoiceDraftSave(main: Locator, saveInvoiceButton: Locator
 // (the shared helper filters on that, which no longer holds once connected).
 async function openCustomerByName(page: Page, customerName: string) {
   const main = page.getByRole('main');
-  const search = main.getByPlaceholder(/Search homeowner, city, address/i);
+  const search = main.getByPlaceholder(/Search customers, city, or address/i);
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill(customerName);
   const result = main.getByRole('button').filter({ hasText: customerName }).first();
@@ -62,8 +62,8 @@ test.describe('invoice_sent in-app notification', () => {
 
     // ---- Phase 1: contractor creates a local customer + a claim invite ----
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
     await waitForContractorWorkspaceReady(page);
 
     const { customerName } = await createLocalE2ECustomer(page, ts);
@@ -95,7 +95,7 @@ test.describe('invoice_sent in-app notification', () => {
 
     // ---- Phase 3: contractor creates + SENDS the invoice ----
     await page.reload();
-    await openSidebarTab(page, /Homeowners/i);
+    await openSidebarTab(page, /Customers/i);
     await waitForContractorWorkspaceReady(page);
     await openCustomerByName(page, customerName);
     await openE2ECustomerActionPanel(page, customerName);

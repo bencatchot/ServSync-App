@@ -357,10 +357,10 @@ test.describe('connected-homeowner property proposal RPC foundation', () => {
     const homeownerVisibleNote = `Sandbox-only homeowner-visible proposal note ${timestamp}.`;
 
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
 
-    await expect(main.getByPlaceholder(/Search homeowner, city, address/i)).toBeVisible();
+    await expect(main.getByPlaceholder(/Search customers, city, or address/i)).toBeVisible();
     const connectedHomeownerRow = main.getByRole('button').filter({ hasText: /Connected/i }).first();
     await expect(connectedHomeownerRow).toBeVisible({ timeout: 30_000 });
     await connectedHomeownerRow.click();
@@ -405,8 +405,8 @@ test.describe('connected-homeowner property proposal RPC foundation', () => {
     await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
     await expect(main.getByText(new RegExp(escapeRegExp(proposedLabel), 'i'))).toHaveCount(0);
 
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
     const reopenedConnectedHomeownerRow = main.getByRole('button').filter({ hasText: /Connected/i }).first();
     await expect(reopenedConnectedHomeownerRow).toBeVisible();
     await reopenedConnectedHomeownerRow.click();

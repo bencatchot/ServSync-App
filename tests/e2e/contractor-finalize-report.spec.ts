@@ -22,8 +22,8 @@ test.describe('contractor mutating report finalization', () => {
     const recommendedAction = `E2E follow-up action ${timestamp}: inspect and repair exterior trim.`;
 
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
     await waitForContractorWorkspaceReady(page);
 
     const { customerName } = await createLocalE2ECustomer(page, timestamp);

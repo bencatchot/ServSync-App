@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-04
 
+- Branch: `codex/customer-terminology-status-v1`
+- Starting main SHA: `5341f2f8ee843ce3e8ff697e5d4716e9160ecd05`
+- Files changed:
+  - contractor-facing customer, Draft, selector, status, and secure-invoice copy in `src/App.tsx` and focused feature modules under `src/features/`
+  - focused contractor navigation, customer-status, Draft, estimate/invoice, claim, and responsive test coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Normalizes the contractor-facing application around one visible `Customer` category while preserving the existing connected-homeowner and contractor-local-contact subject models. Contractor desktop/mobile navigation and the combined workspace now use `Customers`; rows and detail surfaces present `Connected`, `Not connected`, `Invitation pending`, `Connection request`, or `Inactive` through the shared text-and-icon `StatusBadge`; Draft and financial selectors show connection state separately from the customer name; and active helper, empty-state, report, calendar, property, and request copy no longer presents connected and contractor-created records as different customer types. Homeowner-role, ownership, permission, claim, route, database, RPC, and historical terminology remains unchanged where it is technically meaningful.
+- Reason for change: The existing combined customer workspace already manages connected customers, contractor-created customers, and inbound requests in one place, but mixed `Homeowner`, `Local customer`, and `New customer` labels made connection state look like separate customer categories.
+- Tests/checks run: TypeScript, production build, focused customer terminology/status source coverage, contractor desktop/mobile navigation, Draft persistence and subject mapping, customer filtering, estimate/invoice PDF actions, invoice guest-delivery regressions, claim/invitation regressions, responsive browser coverage, diff checks, and sensitive-value scans.
+- Known risks or follow-ups:
+  - The existing Draft architecture still uses a small visible connection-status selector before the customer selector because connected and local options remain separate internal arrays. Removing that control entirely requires a later unified-selector behavior slice.
+  - Customer creation/direct local-contact access and newer helper-backed profile/property operations do not yet have proven team-role parity. This terminology slice makes no authorization or permission change and does not claim parity.
+  - No SQL, schema, RLS, RPC, permission, subject-model, claim, delivery, environment, data, or deployment change is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the terminology/status implementation checkpoint and preserves customer role-parity and unified-selector behavior as separate follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Establishes `Customer` as the contractor-facing category and connection as status without changing the homeowner role or internal relationship models.
+
 - Branch: `codex/fb003b-production-rollout-closeout`
 - Starting main SHA: `bb471e2d62cd70abcdd66cb57582e660e97af1cd`
 - Files changed:

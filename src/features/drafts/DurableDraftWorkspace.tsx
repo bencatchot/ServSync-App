@@ -1652,7 +1652,7 @@ export function DurableDraftWorkspace({
     form.homeowner_user_id,
     form.home_id,
     {
-      customer: canonical?.draft.subjectDisplayNameSnapshot || 'Saved connected homeowner',
+      customer: canonical?.draft.subjectDisplayNameSnapshot || 'Saved customer',
       helper: 'Saved on this Draft; not in the active selector list',
       property: canonical?.draft.propertyDisplaySnapshot || 'Saved property on this Draft',
     },
@@ -1662,7 +1662,7 @@ export function DurableDraftWorkspace({
     form.local_contact_id,
     form.local_home_id,
     {
-      customer: canonical?.draft.subjectDisplayNameSnapshot || 'Saved local customer',
+      customer: canonical?.draft.subjectDisplayNameSnapshot || 'Saved customer',
       helper: 'Saved on this Draft; not in the current selector list',
       property: canonical?.draft.propertyDisplaySnapshot || 'Saved property on this Draft',
     },
