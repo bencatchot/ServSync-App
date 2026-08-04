@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-04
 
+- Branch: `codex/unified-draft-customer-entry-v1`
+- Starting main SHA: `6221bd9935b490a797b526881551faf48a1a7623` (merged PR #371)
+- Files changed:
+  - unified Draft customer option and subject-mapping logic under `src/features/drafts/`
+  - durable/shared and gated legacy Draft composer wiring under `src/features/drafts/`, `src/features/jobs/`, and `src/App.tsx`
+  - focused unified-selector, saved-Draft, customer-profile entry, launch, checklist, Price Book, and responsive coverage under `tests/e2e/`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements Unified Draft Customer Selection and Customer Profile Entry v1 in repository source. Both active Draft composers now present one collision-safe `Customer` selector containing eligible connected and not-connected customers with `Connected`, `Not connected`, or `Invitation pending` context. Selection derives the existing canonical connected/local subject fields atomically, preserves saved historical subjects through a same-type fallback, clears stale request/property/checklist context, auto-selects only one eligible property, and leaves multiple-property selection explicit. Connected and eligible not-connected customer profiles now route initial Job, Estimate, Invoice, checklist, empty-state, and financial-tab creation through one neutral `Create Draft` action with no preselected output; transformations of existing records remain unchanged.
+- Reason for change: PR #371 established one contractor-facing Customer vocabulary but intentionally retained a visible connection-status decision and split customer option arrays. This follow-up removes that user decision while preserving the established internal subject, authorization, property-sharing, persistence, and launch boundaries.
+- Tests/checks run: TypeScript and the production build passed. Focused unified-selector, terminology, persistence, profile-entry, and desktop/mobile rendering coverage passed 34/34. The complete mocked durable launch/navigation/workspace, FB-007 checklist, and FB-024 Price Book regression set passed 290/290; documentation foundation checks passed 7/7. Six credentialed mutation files compiled and listed 18 tests, while their 9 mutation cases were not executed because this repository-only task supplied no authorized Sandbox project reference or credentials. Repository-wide lint remains blocked by the inherited ESLint 9 `allowShortCircuit` startup incompatibility; focused changed-source lint with only that broken rule disabled reported no errors, with two inherited durable-workspace hook warnings.
+- Known risks or follow-ups:
+  - This is source and Preview work only; it is not merged or manually deployed.
+  - Existing database/RPC subject fields remain intentionally split between connected-homeowner and local-contact records. No SQL, RLS, RPC, permission, entitlement, role-matrix, claim, customer-merge, or environment change is included.
+  - Customer-management team-role parity, broader customer-model unification, Service Plan parity, guest approval/signature/payment, and additional external document delivery remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the approved unified-selector/profile-entry implementation checkpoint while retaining separate customer-role and broader workflow follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Updates the contractor Customer workflow to derive connection category inside the Draft UI without changing canonical persisted identity.
+
 - Branch: `codex/customer-terminology-status-v1`
 - Starting main SHA: `5341f2f8ee843ce3e8ff697e5d4716e9160ecd05`
 - Files changed:

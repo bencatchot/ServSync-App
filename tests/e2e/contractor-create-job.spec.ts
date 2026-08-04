@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
-import { createLocalE2ECustomer, escapeRegExp, openE2ECustomerActionPanel, timestampForRecord } from './helpers/customers';
+import { createLocalE2ECustomer, escapeRegExp, launchCustomerProfileDraft, openE2ECustomerActionPanel, timestampForRecord } from './helpers/customers';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
 
 test.describe('contractor mutating job creation', () => {
@@ -20,24 +20,12 @@ test.describe('contractor mutating job creation', () => {
     const { customerName } = await createLocalE2ECustomer(page, timestamp);
     await openE2ECustomerActionPanel(page, customerName);
 
-    await main.getByRole('button', { name: /^Create job\b/i }).click();
-    await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
-    await expect(main.getByRole('combobox', { name: /Customer/i })).toContainText(customerName);
-
-    await main.getByRole('button', { name: /Service Job/i }).click();
-    await main.getByLabel(/^Job name$/i).fill(jobName);
-    await main.getByLabel(/^Scope \/ description$/i).fill('E2E safe service job created by Playwright. No report, estimate, invoice, upload, or payment action should be performed.');
-    await expect(main.getByLabel(/^Job name$/i)).toHaveValue(jobName);
-
-    const createJobResponsePromise = page.waitForResponse(
-      response => response.url().includes('/rpc/servsync_create_field_work'),
-      { timeout: 10_000 },
-    );
-
-    await main.getByRole('button', { name: /^Create job$/i }).click();
-    const createJobResponse = await createJobResponsePromise;
-    expect(createJobResponse.ok()).toBeTruthy();
+    await launchCustomerProfileDraft(page, {
+      customerName,
+      output: 'job',
+      title: jobName,
+      scope: 'E2E safe service job created by Playwright. No report, estimate, invoice, upload, or payment action should be performed.',
+    });
 
     await expect(main.getByRole('heading', { level: 2, name: new RegExp(escapeRegExp(jobName), 'i') })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByRole('button', { name: /Back to Jobs/i })).toBeVisible();

@@ -207,9 +207,9 @@ test.describe('contractor mutating customer creation', () => {
     await expect(main.getByRole('button', { name: new RegExp(`${escapeRegExp(editedSecondProperty)}[\\s\\S]*Selected`, 'i') })).toBeVisible();
     await main.getByRole('button', { name: /\bJobs\b.*(?:Create work for this customer|Items in progress)/i }).click();
     await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
-    await main.getByRole('button', { name: /^Create job\b/i }).click();
-    await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
-    await expect(main.getByText(new RegExp(`Selected property: ${escapeRegExp(editedSecondProperty)}`, 'i'))).toBeVisible();
+    await main.getByRole('button', { name: /^Create Draft\b/i }).click();
+    await expect(main.getByTestId('shared-draft-composer')).toBeVisible();
+    await expect(main.getByRole('combobox', { name: /^Property$/i }).locator('option:checked')).toHaveText(editedSecondProperty);
 
     const contractorClient = await signInAs('contractor');
     const otherContractorClient = await signInAs('contractorB');

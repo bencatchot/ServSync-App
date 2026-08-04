@@ -4,6 +4,7 @@ import { captureMajorConsoleErrors } from './helpers/console';
 import {
   createLocalE2ECustomer,
   escapeRegExp,
+  launchCustomerProfileDraft,
   openE2ECustomerActionPanel,
   timestampForRecord,
   waitForContractorWorkspaceReady,
@@ -29,26 +30,13 @@ test.describe('contractor mutating report finalization', () => {
     const { customerName } = await createLocalE2ECustomer(page, timestamp);
     await openE2ECustomerActionPanel(page, customerName);
 
-    await main.getByRole('button', { name: /^Create job\b/i }).click();
-    await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
-    await expect(main.getByRole('combobox', { name: /Customer/i })).toContainText(customerName);
-
-    await main.getByRole('button', { name: /Checklist \/ Report Job/i }).click();
-    const starterTemplateSelect = main.locator('select:has(option[value="starter:starter-general-maintenance-field-work"])');
-    await expect(starterTemplateSelect).toBeVisible();
-    await starterTemplateSelect.selectOption('starter:starter-general-maintenance-field-work');
-    await main.getByLabel(/^Job name$/i).fill(jobName);
-    await expect(main.getByLabel(/^Job name$/i)).toHaveValue(jobName);
-
-    const createJobResponsePromise = page.waitForResponse(
-      response => response.url().includes('/rpc/servsync_create_field_work'),
-      { timeout: 10_000 },
-    );
-
-    await main.getByRole('button', { name: /^Create job$/i }).click();
-    const createJobResponse = await createJobResponsePromise;
-    expect(createJobResponse.ok()).toBeTruthy();
+    await launchCustomerProfileDraft(page, {
+      customerName,
+      output: 'job',
+      title: jobName,
+      scope: 'E2E checklist report created from the customer Draft-first entry.',
+      checklist: true,
+    });
 
     await expect(main.getByRole('heading', { level: 2, name: new RegExp(escapeRegExp(jobName), 'i') })).toBeVisible({ timeout: 30_000 });
     await expect(

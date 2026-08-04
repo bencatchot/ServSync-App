@@ -79,8 +79,7 @@ async function installComposerHarness(page: Page) {
     const root = createRoot(document.getElementById('draft-price-book-root') as HTMLElement);
     const render = () => root.render(React.createElement(ContractorDraftComposer, {
       draft: state.draft,
-      connectedOptions: [],
-      localOptions: [],
+      customerOptions: [],
       checklistOptions: [],
       savedWorkTemplates: [],
       priceBookItems: state.items,

@@ -87,9 +87,13 @@ async function installChecklistComposerHarness(page: Page) {
         title: 'Exterior inspection',
       }),
     };
-    const connectedOptions = [{
-      id: 'homeowner-1',
+    const customerOptions = [{
+      key: 'connected:homeowner-1',
+      subjectType: 'connected',
+      customerId: 'homeowner-1',
       label: 'Demo homeowner',
+      status: 'connected',
+      statusLabel: 'Connected',
       properties: [
         { id: 'home-1', label: 'Primary home' },
         { id: 'home-2', label: 'Rental home' },
@@ -105,8 +109,7 @@ async function installChecklistComposerHarness(page: Page) {
     const root = createRoot(document.getElementById('fb007-composer-root') as HTMLElement);
     const render = () => root.render(React.createElement(ContractorDraftComposer, {
       draft: state.draft,
-      connectedOptions,
-      localOptions: [],
+      customerOptions,
       checklistOptions,
       canSave: true,
       saving: false,

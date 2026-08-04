@@ -416,7 +416,7 @@ async function installHarness(page: Page, options: {
       client: state.client, mode: state.mode, target: state.target,
       capabilities: { contractorId: state.contractorId, canReadDrafts: true, canPersistDraft: true, canImportLegacyDraft: true, canLaunchEstimate: true, canLaunchJob: true, canLaunchInvoice: false },
       launchEnabled: state.launchEnabled, onRefreshCapabilities: async () => ({ contractorId: state.contractorId, canReadDrafts: true, canPersistDraft: true, canImportLegacyDraft: true, canLaunchEstimate: true, canLaunchJob: true, canLaunchInvoice: false }),
-      legacyDrafts: [], connectedOptions: [{ id: ids.homeowner, label: 'Customer', properties: [{ id: ids.home, label: 'Home' }] }], localOptions: [], customerLabel: () => '', propertyLabel: () => '', onStartNew: () => undefined,
+      legacyDrafts: [], customerOptions: [{ key: `connected:${ids.homeowner}`, subjectType: 'connected', customerId: ids.homeowner, label: 'Customer', status: 'connected', statusLabel: 'Connected', properties: [{ id: ids.home, label: 'Home' }] }], customerLabel: () => '', propertyLabel: () => '', onStartNew: () => undefined,
       onOpenTarget: (target: Record<string, unknown>) => { state.target = target; render(); },
       onBack: () => { state.backCount += 1; state.mode = 'list'; state.target = null; render(); },
       onLoadOutput: (type: OutputType, id: string) => { const next = deferred(); calls.push({ kind: 'output', name: type, args: id, settled: false, resolve: next.resolve, reject: next.reject }); return next.promise; },

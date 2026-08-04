@@ -7,23 +7,19 @@ import type { WorkComposerLineDraft } from '../work-composer/types';
 import { createWorkComposerLineDraft, workComposerDraftFinancialBreakdown } from '../work-composer/workComposerDrafts';
 import type { DraftJobComposerDraft } from './draftJobMappings';
 import { draftJobTotalsRows } from './draftJobMappings';
+import {
+  applyDraftCustomerSelection,
+  clearDraftCustomerSelection,
+  draftCustomerOptionLabel,
+  selectedDraftCustomerKey,
+  type DraftCustomerOption,
+} from '../drafts/draftCustomerOptions';
 
-export type DraftJobPropertyOption = {
-  id: string;
-  label: string;
-};
-
-export type DraftJobCustomerOption = {
-  id: string;
-  label: string;
-  helper?: string;
-  properties: DraftJobPropertyOption[];
-};
+export type { DraftCustomerOption as DraftJobCustomerOption } from '../drafts/draftCustomerOptions';
 
 type DraftJobComposerProps = {
   draft: DraftJobComposerDraft;
-  connectedOptions: DraftJobCustomerOption[];
-  localOptions: DraftJobCustomerOption[];
+  customerOptions: DraftCustomerOption[];
   currentDraftId?: string | null;
   canSave: boolean;
   canCreateJob: boolean;
@@ -53,8 +49,7 @@ function composerField(label: string, children: React.ReactNode) {
 
 export function DraftJobComposer({
   draft,
-  connectedOptions,
-  localOptions,
+  customerOptions,
   currentDraftId,
   canSave,
   canCreateJob,
@@ -69,9 +64,8 @@ export function DraftJobComposer({
   onRemovePersistedLine,
 }: DraftJobComposerProps) {
   const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(() => new Set());
-  const customerOptions = draft.subject_type === 'connected' ? connectedOptions : localOptions;
-  const selectedCustomerId = draft.subject_type === 'connected' ? draft.homeowner_user_id : draft.local_contact_id;
-  const selectedCustomer = customerOptions.find(option => option.id === selectedCustomerId) ?? null;
+  const selectedCustomerKey = selectedDraftCustomerKey(draft);
+  const selectedCustomer = customerOptions.find(option => option.key === selectedCustomerKey) ?? null;
   const selectedPropertyId = draft.subject_type === 'connected' ? draft.home_id : draft.local_home_id;
   const totals = workComposerDraftFinancialBreakdown(draft);
   const subjectTypeLocked = Boolean(currentDraftId);
@@ -127,45 +121,22 @@ export function DraftJobComposer({
 
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        {composerField('Connection status', (
-          <select
-            className={fieldClass()}
-            value={draft.subject_type}
-            disabled={subjectTypeLocked}
-            onChange={event => onChange({
-              ...draft,
-              subject_type: event.target.value as DraftJobComposerDraft['subject_type'],
-              homeowner_user_id: '',
-              home_id: '',
-              local_contact_id: '',
-              local_home_id: '',
-              service_request_id: '',
-            })}
-          >
-            <option value="connected">Connected</option>
-            <option value="local">Not connected</option>
-          </select>
-        ))}
+      <div className="grid gap-3 md:grid-cols-2">
         {composerField('Customer', (
           <select
+            data-testid="draft-job-customer"
             className={fieldClass()}
-            value={selectedCustomerId}
+            value={selectedCustomerKey}
             onChange={event => {
-              const option = customerOptions.find(item => item.id === event.target.value) ?? null;
-              onChange({
-                ...draft,
-                homeowner_user_id: draft.subject_type === 'connected' ? event.target.value : '',
-                home_id: draft.subject_type === 'connected' ? option?.properties[0]?.id ?? '' : '',
-                local_contact_id: draft.subject_type === 'local' ? event.target.value : '',
-                local_home_id: draft.subject_type === 'local' ? option?.properties[0]?.id ?? '' : '',
-                service_request_id: draft.subject_type === 'connected' ? draft.service_request_id : '',
-              });
+              const option = customerOptions.find(item => item.key === event.target.value) ?? null;
+              onChange(option
+                ? applyDraftCustomerSelection(draft, option)
+                : clearDraftCustomerSelection(draft));
             }}
           >
             <option value="">Choose customer...</option>
             {customerOptions.map(option => (
-              <option key={option.id} value={option.id}>{option.helper ? `${option.label} — ${option.helper}` : option.label}</option>
+              <option key={option.key} value={option.key}>{draftCustomerOptionLabel(option)}</option>
             ))}
           </select>
         ))}
@@ -189,7 +160,7 @@ export function DraftJobComposer({
       </div>
       {subjectTypeLocked ? (
         <p className="text-xs font-medium text-slate-500">
-          Connection status is fixed after the first save so retries update the same Draft Job safely.
+          This saved Draft keeps its original customer connection category so retries update the same Draft Job safely.
         </p>
       ) : null}
 

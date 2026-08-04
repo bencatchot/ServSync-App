@@ -172,6 +172,13 @@ import type { DurableDraftCompatibilityCapabilities } from './features/drafts/du
 import {
   sharedDraftComposerDraftFromDraftJob,
 } from './features/drafts/draftComposerMappings';
+import {
+  applyDraftCustomerSelection,
+  buildDraftCustomerOptions,
+  draftCustomerOptionKey,
+  draftCustomerOptionsWithSavedSelection,
+  type DraftCustomerOption,
+} from './features/drafts/draftCustomerOptions';
 import type { DraftIntendedOutput } from './features/drafts/draftComposerTypes';
 import { SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED } from './features/drafts/sharedDraftComposerAvailability';
 import { WorkComposerLineItemRow } from './features/work-composer/WorkComposerLineItemRow';
@@ -228,7 +235,7 @@ import {
   inspectionJobStatusLabel,
   OPEN_JOB_STATUSES,
 } from './features/jobs/status';
-import { DraftJobComposer, type DraftJobCustomerOption } from './features/jobs/DraftJobComposer';
+import { DraftJobComposer } from './features/jobs/DraftJobComposer';
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
@@ -258,7 +265,6 @@ import {
   draftJobCreateJobFailureFeedback,
   draftJobComposerDraftFromRecords,
   draftJobMetadataPayload,
-  draftJobOptionsWithSavedSelection,
   draftJobSaveFailureFeedback,
   draftJobScopePayload,
   validateDraftJobComposerDraft,
@@ -29151,48 +29157,43 @@ function ContractorDashboard({
   const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId));
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
   const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
-  const draftJobConnectedCustomerOptions: DraftJobCustomerOption[] = connections
-    .filter(connection => connection.status === 'active')
-    .map(connection => ({
-      id: connection.homeowner_user_id,
+  const draftCustomerOptions: DraftCustomerOption[] = buildDraftCustomerOptions({
+    contractorId: contractor?.id ?? '',
+    connectedCustomers: connections.map(connection => ({
+      contractorId: contractor?.id ?? '',
+      customerId: connection.homeowner_user_id,
       label: connection.display_name || 'Customer',
-      helper: 'Connected',
+      connectionStatus: connection.status,
       properties: connectedHomeList(connection)
         .filter((home): home is ContractorConnectedHomeownerHome & { id: string } => Boolean(home.id))
         .map(home => ({
           id: home.id,
           label: [home.nickname || home.address_line1 || 'Shared property', [home.city, home.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '),
         })),
-    }));
-  const draftJobLocalCustomerOptions: DraftJobCustomerOption[] = localContacts.map(contact => ({
-    id: contact.id,
-    label: contact.display_name || 'Customer',
-    helper: 'Not connected',
-    properties: sortedLocalHomes(contact.homes)
-      .filter(home => Boolean(home.id))
-      .map((home, index) => ({
-        id: home.id,
-        label: localHomeOptionLabel(home, index),
-      })),
-  }));
+    })),
+    localCustomers: localContacts.map(contact => ({
+      contractorId: contact.contractor_id,
+      customerId: contact.id,
+      label: contact.display_name || 'Customer',
+      claimed: localCustomerProfileIsClaimed(contact),
+      invitationPending: localClaimInvites.some(invite => (
+        invite.local_contact_id === contact.id && effectiveLocalClaimInviteStatus(invite) === 'pending'
+      )),
+      properties: sortedLocalHomes(contact.homes)
+        .filter(home => Boolean(home.id))
+        .map((home, index) => ({
+          id: home.id,
+          label: localHomeOptionLabel(home, index),
+        })),
+    })),
+  });
   const activeDraftComposerDraft = draftJobDraft;
-  const draftJobConnectedOptionsForComposer = draftJobOptionsWithSavedSelection<DraftJobCustomerOption>(
-    draftJobConnectedCustomerOptions,
-    activeDraftComposerDraft.homeowner_user_id,
-    activeDraftComposerDraft.home_id,
+  const draftCustomerOptionsForLegacyComposer = draftCustomerOptionsWithSavedSelection(
+    draftCustomerOptions,
+    activeDraftComposerDraft,
+    Boolean(activeDraftJobId),
     {
       customer: 'Saved customer',
-      helper: 'Saved on this Draft; not in the active selector list',
-      property: 'Saved property on this Draft',
-    },
-  );
-  const draftJobLocalOptionsForComposer = draftJobOptionsWithSavedSelection<DraftJobCustomerOption>(
-    draftJobLocalCustomerOptions,
-    activeDraftComposerDraft.local_contact_id,
-    activeDraftComposerDraft.local_home_id,
-    {
-      customer: 'Saved customer',
-      helper: 'Saved on this Draft; not in the current selector list',
       property: 'Saved property on this Draft',
     },
   );
@@ -29476,14 +29477,16 @@ function ContractorDashboard({
       setContractorJobsViewAndScroll('overview');
       return;
     }
-    const nextDraft = createBlankDraftJobComposerDraft({
-      subject_type: selectedJobsLocalContact ? 'local' : 'connected',
-      homeowner_user_id: selectedJobsConnection?.homeowner_user_id ?? '',
-      home_id: selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? '' : '',
-      local_contact_id: selectedJobsLocalContact?.id ?? '',
-      local_home_id: selectedJobsLocalContact ? singleLocalHomeId(selectedJobsLocalContact) : '',
-      ...overrides,
-    });
+    const contextualCustomerKey = selectedJobsConnection
+      ? draftCustomerOptionKey('connected', selectedJobsConnection.homeowner_user_id)
+      : selectedJobsLocalContact
+        ? draftCustomerOptionKey('local', selectedJobsLocalContact.id)
+        : '';
+    const contextualCustomer = draftCustomerOptions.find(option => option.key === contextualCustomerKey) ?? null;
+    const contextualDraft = contextualCustomer
+      ? applyDraftCustomerSelection(createBlankDraftJobComposerDraft(), contextualCustomer)
+      : createBlankDraftJobComposerDraft();
+    const nextDraft = createBlankDraftJobComposerDraft({ ...contextualDraft, ...overrides });
     if (sharedDraftComposerEnabled) {
       if (!durableDraftCapabilities.canPersistDraft) {
         setError('You do not have access to save contractor Drafts.');
@@ -29527,6 +29530,44 @@ function ContractorDashboard({
       notes: '',
       line_items: [],
     }, options);
+  };
+
+  const startCustomerProfileDraft = (
+    subjectType: 'connected' | 'local',
+    customerId: string,
+    explicitPropertyId = '',
+  ) => {
+    if (durableDraftCohortSafeHold) {
+      setError(durableDraftCohortHoldText);
+      return;
+    }
+    if (sharedDraftComposerEnabled) {
+      if (durableDraftCapabilityLoading) {
+        setError('Draft access is still loading. Try again in a moment.');
+        return;
+      }
+      if (durableDraftCapabilityError || !effectiveDurableDraftCapabilities.canPersistDraft) {
+        setError(durableDraftCapabilityError || 'You do not have access to save contractor Drafts.');
+        return;
+      }
+    } else if (!canManageDraftJobs) {
+      setError(draftJobRoleDeniedReason);
+      return;
+    }
+
+    const customer = draftCustomerOptions.find(option => (
+      option.key === draftCustomerOptionKey(subjectType, customerId)
+    )) ?? null;
+    if (!customer) {
+      setError('This customer is not available for a new Draft. Refresh the customer workspace and try again.');
+      return;
+    }
+
+    setJobsCustomerFilterSubjectId(subjectType === 'connected' ? customerId : `local:${customerId}`);
+    startDraftJobComposer(
+      applyDraftCustomerSelection(createBlankDraftJobComposerDraft(), customer, explicitPropertyId),
+      { intendedOutput: null },
+    );
   };
 
   const startDraftFirstEstimateComposer = () => {
@@ -35386,6 +35427,20 @@ function ContractorDashboard({
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
+                    const customerProfileDraftAvailable = Boolean(conn || (localCustomer && !localCustomerIsClaimed));
+                    const customerProfileDraftDisabled = durableDraftCohortSafeHold
+                      || (sharedDraftComposerEnabled
+                        ? durableDraftCapabilityLoading
+                          || Boolean(durableDraftCapabilityError)
+                          || !effectiveDurableDraftCapabilities.canPersistDraft
+                        : !canManageDraftJobs);
+                    const openCustomerProfileDraft = () => {
+                      if (conn) {
+                        startCustomerProfileDraft('connected', conn.homeowner_user_id, workspaceNewRecordHomeId);
+                      } else if (localCustomer && !localCustomerIsClaimed) {
+                        startCustomerProfileDraft('local', localCustomer.id, workspaceNewRecordLocalHomeId);
+                      }
+                    };
                     const customerConnectionStatus: CustomerConnectionStatus = conn
                       ? conn.status === 'active' ? 'connected' : 'inactive'
                       : localClaimStatus === 'pending' ? 'invitation_pending' : 'not_connected';
@@ -35603,6 +35658,9 @@ function ContractorDashboard({
                     const nextOpenRequest = activeReqs[0] ?? null;
                     const nextDraftWorkOrder = workOrderRecords.find(inspectionIsOpenJob) ?? null;
                     const nextAppointmentRequest = upcomingAppts[0] ?? null;
+                    const hasCustomerProfileNextAction = Boolean(
+                      nextFollowUpRequest || nextOpenRequest || nextDraftWorkOrder || nextAppointmentRequest,
+                    );
                     const presentationCurrentJob = activeJobRecords[0] ?? workOrderRecords[0] ?? inspectionRecords[0] ?? null;
                     const presentationCurrentJobItems = presentationCurrentJob ? workItemsForJob(presentationCurrentJob.id) : [];
                     const presentationCurrentJobCompletedCount = presentationCurrentJobItems.filter(item => item.completion_status === 'completed').length;
@@ -36307,7 +36365,7 @@ function ContractorDashboard({
                                             ? 'Continue the draft job'
                                             : nextAppointmentRequest
                                               ? 'Review the next appointment'
-                                              : 'Create a job when you are ready'}
+                                              : 'Create a Draft when you are ready'}
                                     </h3>
                                     <p className="mt-1 text-sm text-slate-500">
                                       {nextFollowUpRequest
@@ -36323,6 +36381,7 @@ function ContractorDashboard({
                                   </div>
                                   <button
                                     type="button"
+                                    disabled={!hasCustomerProfileNextAction && (!customerProfileDraftAvailable || customerProfileDraftDisabled)}
                                     onClick={() => {
                                       if (nextFollowUpRequest || nextOpenRequest) {
                                         openContractorRequestInRequestsTab((nextFollowUpRequest ?? nextOpenRequest)!);
@@ -36330,16 +36389,14 @@ function ContractorDashboard({
                                         openInspection(nextDraftWorkOrder, { stayInHomeownerWorkspace: true });
                                       } else if (nextAppointmentRequest) {
                                         setHomeownerDetailTab('schedule');
-                                      } else if (conn) {
-                                        beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
-                                      } else if (localCustomer && !requireLocalPropertyForNewRecord()) {
-                                        beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      } else if (customerProfileDraftAvailable) {
+                                        openCustomerProfileDraft();
                                       }
                                     }}
                                     className={buttonClass('primary')}
                                   >
                                     <ArrowRight size={15} />
-                                    Open next step
+                                    {hasCustomerProfileNextAction ? 'Open next step' : 'Create Draft'}
                                   </button>
                                 </div>
                               </div>
@@ -36879,56 +36936,19 @@ function ContractorDashboard({
                                   ))}
                                 </div>
 
-                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (
-                                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && customerProfileDraftAvailable && (
+                                  <div className="mt-4">
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
-                                        else if (localCustomer && !requireLocalPropertyForNewRecord()) beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                      }}
-                                      className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
+                                      onClick={openCustomerProfileDraft}
+                                      disabled={customerProfileDraftDisabled}
+                                      className="w-full rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-sm"
                                     >
-                                      <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
-                                      <p className="mt-2 text-sm font-bold">Create job</p>
-                                      <p className="mt-1 text-xs text-blue-700">Service job or checklist report workflow</p>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={createEstimateCapability.disabled}
-                                      onClick={() => {
-                                        if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                        if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                        beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                      }}
-                                      title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
-                                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
-                                      <p className="mt-2 text-sm font-bold">Create estimate</p>
-                                      <p className="mt-1 text-xs text-slate-500">Draft pricing before work begins</p>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={createInvoiceCapability.disabled}
-                                      onClick={() => {
-                                        if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                        if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                        beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                      }}
-                                      title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
-                                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
-                                      <p className="mt-2 text-sm font-bold">Create invoice</p>
-                                      <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
+                                      <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><FileText size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create Draft</p>
+                                      <p className="mt-1 text-xs text-blue-700">Plan an estimate, job, or invoice</p>
                                     </button>
                                   </div>
-                                )}
-                                {!estimateComposerOpen && (createEstimateCapability.disabled || createInvoiceCapability.disabled) && (
-                                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                                    {createEstimateCapability.reason || createInvoiceCapability.reason}
-                                  </p>
                                 )}
 
                                 <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -37187,19 +37207,14 @@ function ContractorDashboard({
                                     <h3 className="font-bold text-slate-950">Checklist reports</h3>
                                     <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed report{inspectionFinalCount === 1 ? '' : 's'}</p>
                                   </div>
-                                  {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
+                                  {!SERVSYNC_DEMO_PRESENTATION_MODE && customerProfileDraftAvailable && <button
                                     type="button"
-                                    onClick={() => {
-                                      if (isConn && conn) {
-                                        beginFieldWorkForHomeowner(conn, { workflowKind: 'inspection', homeId: workspaceNewRecordHomeId || undefined });
-                                      } else if (localCustomer && !requireLocalPropertyForNewRecord()) {
-                                        beginFieldWorkForLocalContact(localCustomer, { workflowKind: 'inspection', localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                      }
-                                    }}
+                                    onClick={openCustomerProfileDraft}
+                                    disabled={customerProfileDraftDisabled}
                                     className={buttonClass('primary')}
                                   >
                                     <Plus size={14} />
-                                    Create checklist report
+                                    Create Draft
                                   </button>}
                                 </div>
                                 {inspectionRecords.length === 0 ? (
@@ -37245,36 +37260,17 @@ function ContractorDashboard({
                                         : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
-                                  {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (
+                                  {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && customerProfileDraftAvailable && (
                                   <div className="flex flex-wrap gap-2">
-                                    {isInvoiceWorkspaceTab ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                          beginInvoiceDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer', { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                        }}
-                                        className={buttonClass('primary')}
-                                      >
-                                        <Receipt size={14} />
-                                        Create invoice
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                          beginEstimateDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer', {
-                                            homeId: workspaceNewRecordHomeId || undefined,
-                                            localHomeId: workspaceNewRecordLocalHomeId || undefined,
-                                          });
-                                        }}
-                                        className={buttonClass('primary')}
-                                      >
-                                        <Plus size={14} />
-                                        Create estimate
-                                      </button>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={openCustomerProfileDraft}
+                                      disabled={customerProfileDraftDisabled}
+                                      className={buttonClass('primary')}
+                                    >
+                                      <Plus size={14} />
+                                      Create Draft
+                                    </button>
                                   </div>
                                   )}
                                 </div>
@@ -38056,8 +38052,7 @@ function ContractorDashboard({
                     capabilityLoading={durableDraftCapabilityLoading}
                     capabilityError={durableDraftCapabilityError}
                     legacyDrafts={composerDraftJobs}
-                    connectedOptions={draftJobConnectedOptionsForComposer}
-                    localOptions={draftJobLocalOptionsForComposer}
+                    customerOptions={draftCustomerOptions}
                     checklistOptions={draftChecklistSourceOptions}
                     savedWorkTemplates={estimateTemplates}
                     priceBookItems={contractorPriceBookItems}
@@ -41154,8 +41149,7 @@ function ContractorDashboard({
                   capabilityError={durableDraftCapabilityError}
                   target={durableDraftOpenTarget}
                   legacyDrafts={composerDraftJobs}
-                  connectedOptions={draftJobConnectedOptionsForComposer}
-                  localOptions={draftJobLocalOptionsForComposer}
+                  customerOptions={draftCustomerOptions}
                   checklistOptions={draftChecklistSourceOptions}
                   savedWorkTemplates={estimateTemplates}
                   priceBookItems={contractorPriceBookItems}
@@ -41180,8 +41174,7 @@ function ContractorDashboard({
                 <>
                   <DraftJobComposer
                     draft={draftJobDraft}
-                    connectedOptions={draftJobConnectedOptionsForComposer}
-                    localOptions={draftJobLocalOptionsForComposer}
+                    customerOptions={draftCustomerOptionsForLegacyComposer}
                     currentDraftId={activeDraftJobId}
                     canSave={canManageDraftJobs && !savingDraftJob && !creatingJobFromDraft}
                     canCreateJob={canManageDraftJobs && !savingDraftJob && !creatingJobFromDraft}

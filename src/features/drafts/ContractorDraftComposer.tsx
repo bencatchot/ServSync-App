@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
-import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
 import { DraftPriceBookPicker } from '../price-book/DraftPriceBookPicker';
 import type { PriceBookLoadState } from '../price-book/priceBookView';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
@@ -22,11 +21,17 @@ import {
   type SavedWorkTemplateApplyMode,
 } from './savedWorkTemplateDraftIntegration';
 import type { ContractorPriceBookItem, EstimateLaborMode, EstimateTemplate } from '../../types';
+import {
+  applyDraftCustomerSelection,
+  clearDraftCustomerSelection,
+  draftCustomerOptionLabel,
+  selectedDraftCustomerKey,
+  type DraftCustomerOption,
+} from './draftCustomerOptions';
 
 type ContractorDraftComposerProps = {
   draft: SharedDraftComposerDraft;
-  connectedOptions: DraftJobCustomerOption[];
-  localOptions: DraftJobCustomerOption[];
+  customerOptions: DraftCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
   savedWorkTemplates?: EstimateTemplate[];
   priceBookItems?: ContractorPriceBookItem[];
@@ -72,8 +77,7 @@ function formatDraftLaborHours(value: number) {
 
 export function ContractorDraftComposer({
   draft,
-  connectedOptions,
-  localOptions,
+  customerOptions,
   checklistOptions = [],
   savedWorkTemplates = [],
   priceBookItems = [],
@@ -105,9 +109,8 @@ export function ContractorDraftComposer({
   const [templateFeedback, setTemplateFeedback] = useState<{ tone: ActionFeedbackTone; title: string; body: string } | null>(null);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
   const templateApplyResetTimer = useRef<number | null>(null);
-  const customerOptions = draft.subject_type === 'connected' ? connectedOptions : localOptions;
-  const selectedCustomerId = draft.subject_type === 'connected' ? draft.homeowner_user_id : draft.local_contact_id;
-  const selectedCustomer = customerOptions.find(option => option.id === selectedCustomerId) ?? null;
+  const selectedCustomerKey = selectedDraftCustomerKey(draft);
+  const selectedCustomer = customerOptions.find(option => option.key === selectedCustomerKey) ?? null;
   const selectedPropertyId = draft.subject_type === 'connected' ? draft.home_id : draft.local_home_id;
   const totals = workComposerDraftFinancialBreakdown(draft);
   const subjectTypeLocked = Boolean(currentDraftId);
@@ -326,47 +329,22 @@ export function ContractorDraftComposer({
         )}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        {composerField('Connection status', (
-          <select
-            data-testid="durable-draft-customer-type"
-            className={fieldClass()}
-            value={draft.subject_type}
-            disabled={subjectTypeLocked}
-            onChange={event => updateDraftSubject({
-              ...draft,
-              subject_type: event.target.value as SharedDraftComposerDraft['subject_type'],
-              homeowner_user_id: '',
-              home_id: '',
-              local_contact_id: '',
-              local_home_id: '',
-              service_request_id: '',
-            })}
-          >
-            <option value="connected">Connected</option>
-            <option value="local">Not connected</option>
-          </select>
-        ))}
+      <div className="grid gap-3 md:grid-cols-2">
         {composerField('Customer', (
           <select
             data-testid="durable-draft-customer"
             className={fieldClass()}
-            value={selectedCustomerId}
+            value={selectedCustomerKey}
             onChange={event => {
-              const option = customerOptions.find(item => item.id === event.target.value) ?? null;
-              updateDraftSubject({
-                ...draft,
-                homeowner_user_id: draft.subject_type === 'connected' ? event.target.value : '',
-                home_id: draft.subject_type === 'connected' ? option?.properties[0]?.id ?? '' : '',
-                local_contact_id: draft.subject_type === 'local' ? event.target.value : '',
-                local_home_id: draft.subject_type === 'local' ? option?.properties[0]?.id ?? '' : '',
-                service_request_id: '',
-              });
+              const option = customerOptions.find(item => item.key === event.target.value) ?? null;
+              updateDraftSubject(option
+                ? applyDraftCustomerSelection(draft, option)
+                : clearDraftCustomerSelection(draft));
             }}
           >
             <option value="">Choose customer...</option>
             {customerOptions.map(option => (
-              <option key={option.id} value={option.id}>{option.helper ? `${option.label} — ${option.helper}` : option.label}</option>
+              <option key={option.key} value={option.key}>{draftCustomerOptionLabel(option)}</option>
             ))}
           </select>
         ))}
@@ -392,7 +370,7 @@ export function ContractorDraftComposer({
       </div>
       {subjectTypeLocked ? (
         <p className="text-xs font-medium text-slate-500">
-          Connection status is fixed after the first save so retries update the same Draft safely.
+          This saved Draft keeps its original customer connection category so retries update the same Draft safely.
         </p>
       ) : null}
 
