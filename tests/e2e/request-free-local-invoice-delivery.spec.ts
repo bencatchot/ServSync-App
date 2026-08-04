@@ -254,6 +254,10 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(entry).toContain('<RequestFreeInvoiceView lookup={lookup} />');
     expect(entry).toContain('entry.bootstrapToken = null');
     expect(entry).toContain('bootstrapToken = null');
+    expect(entry).toContain('previousRequest.controller.abort()');
+    expect(entry).toContain('await previousRequest.settled');
+    expect(entry).toContain('lookupRequestFreeInvoice(bootstrapToken, { signal: controller.signal })');
+    expect(publicLookup).toContain('signal: options.signal');
     expect(entry).not.toContain('mountedTarget');
     expect(entry.indexOf("await import('./features/invoices/RequestFreeInvoiceView')")).toBeLessThan(entry.indexOf("await import('./App')"));
     expect(publicLookup).toContain("request('/api/request-free-local-invoice-delivery'");
@@ -319,10 +323,11 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(bootstrap).toContain('set search_path = public');
     expect(bootstrap).toContain('v_payload := public.servsync_lookup_local_invoice_delivery(p_token)');
     expectInOrder(bootstrap, [
-      'delete from public.local_invoice_delivery_sessions',
       'servsync_lookup_local_invoice_delivery(p_token)',
       "if v_payload_state <> 'valid' then",
+      'delete from public.local_invoice_delivery_sessions',
       'insert into public.local_invoice_delivery_sessions',
+      'servsync_private_cleanup_local_invoice_delivery_sessions()',
     ]);
     expectInOrder(lookup, [
       "'global', v_global_key, 300, 5::numeric",
@@ -344,7 +349,91 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(lookup).toContain('when open_count < 9223372036854775807 then open_count + 1');
     expect(lookup).toContain('v_session.contact_claimed_at_at_creation is distinct from v_contact.claimed_at');
     expect(lookup).toContain('v_session.home_claimed_at_at_creation is distinct from v_home.claimed_at');
+    expect(sql).toContain('for update skip locked');
     expect(sql).toContain('limit 25');
+    expect(bootstrap).not.toContain('random()');
+    expect(lookup).not.toContain('servsync_private_cleanup_local_invoice_delivery_sessions()');
+  });
+
+  test('bootstrap and session lookup use an acyclic canonical lock model', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery-session.sql');
+    const bootstrap = sourceBetween(
+      sql,
+      'create function public.servsync_bootstrap_local_invoice_delivery_session',
+      'alter function public.servsync_bootstrap_local_invoice_delivery_session(text, text, text) owner to postgres',
+    );
+    const lookup = sourceBetween(
+      sql,
+      'create function public.servsync_lookup_local_invoice_delivery_session',
+      'alter function public.servsync_lookup_local_invoice_delivery_session(text) owner to postgres',
+    );
+    expectInOrder(bootstrap, [
+      'servsync_lookup_local_invoice_delivery(p_token)',
+      "if v_payload_state <> 'valid' then",
+      'delete from public.local_invoice_delivery_sessions',
+    ]);
+    expectInOrder(lookup, [
+      "'global', v_global_key, 300, 5::numeric",
+      "'token', v_link_token_hash, 10, (1::numeric / 6::numeric)",
+      'from public.contractor_local_contacts',
+      'from public.contractor_local_homes',
+      'from public.invoices',
+      'from public.local_invoice_delivery_links',
+      'from public.local_invoice_delivery_sessions',
+    ]);
+
+    const canonicalOrder = ['global', 'token', 'contact', 'home', 'invoice', 'link', 'session'];
+    const edges = new Set<string>();
+    for (const path of [canonicalOrder, canonicalOrder]) {
+      for (let index = 0; index < path.length - 1; index += 1) {
+        edges.add(`${path[index]}->${path[index + 1]}`);
+      }
+    }
+    for (const edge of edges) {
+      const [from, to] = edge.split('->');
+      expect(edges.has(`${to}->${from}`), `lock graph must not invert ${from} and ${to}`).toBe(false);
+    }
+  });
+
+  test('deterministic cleanup has sustained capacity above session creation', () => {
+    const sql = source('servsync-request-free-local-invoice-delivery-session.sql');
+    const cleanup = sourceBetween(
+      sql,
+      'create function public.servsync_private_cleanup_local_invoice_delivery_sessions',
+      'alter function public.servsync_private_cleanup_local_invoice_delivery_sessions() owner to postgres',
+    );
+    const batchMatch = cleanup.match(/limit\s+(\d+)/i);
+    expect(batchMatch).not.toBeNull();
+    const cleanupCapacity = Number(batchMatch?.[1]);
+    expect(cleanupCapacity).toBeGreaterThan(1);
+    expect(cleanup).toContain('where session.expires_at <= clock_timestamp()');
+    expect(cleanup).toContain('for update skip locked');
+    expect(cleanup).not.toContain('when others');
+
+    const expirations: number[] = [];
+    let maximumExpiredBacklog = 0;
+    let maximumEndOfMinuteBacklog = 0;
+    for (let minute = 0; minute < 180; minute += 1) {
+      for (let created = 0; created < 300; created += 1) {
+        expirations.push(minute + 30);
+        let removed = 0;
+        for (let index = expirations.length - 1; index >= 0 && removed < cleanupCapacity; index -= 1) {
+          if (expirations[index] <= minute) {
+            expirations.splice(index, 1);
+            removed += 1;
+          }
+        }
+        const expiredBacklog = expirations.filter(expiresAt => expiresAt <= minute).length;
+        maximumExpiredBacklog = Math.max(maximumExpiredBacklog, expiredBacklog);
+      }
+      maximumEndOfMinuteBacklog = Math.max(
+        maximumEndOfMinuteBacklog,
+        expirations.filter(expiresAt => expiresAt <= minute).length,
+      );
+    }
+    expect(maximumExpiredBacklog).toBeLessThanOrEqual(300 - cleanupCapacity);
+    expect(maximumEndOfMinuteBacklog).toBe(0);
+    expect(expirations.every(expiresAt => expiresAt > 179)).toBe(true);
   });
 
   test('corrective migration closes direct PostgREST lookup and leaves one service-only signature', () => {
@@ -617,38 +706,209 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
     expect(failedRequests).toEqual([]);
   });
 
-  test('prevents a stale bootstrap response from replacing a newer token navigation', async ({ page }) => {
+  test('cancels a delayed bootstrap before a newer cookie-mutating request can commit', async ({ page }) => {
     const tokenA = randomBytes(32).toString('hex');
     const tokenB = randomBytes(32).toString('hex');
+    const sessionA = randomBytes(32).toString('hex');
+    const sessionB = randomBytes(32).toString('hex');
     let releaseFirst!: () => void;
     let markFirstSeen!: () => void;
+    let markSecondSeen!: () => void;
     const firstHeld = new Promise<void>(resolve => { releaseFirst = resolve; });
     const firstSeen = new Promise<void>(resolve => { markFirstSeen = resolve; });
-    const lookupBodies: Array<Record<string, unknown>> = [];
+    const secondSeen = new Promise<void>(resolve => { markSecondSeen = resolve; });
+    const requestKinds: string[] = [];
 
     await page.route('**/api/request-free-local-invoice-delivery', async route => {
       const body = route.request().postDataJSON() as { token?: string };
-      lookupBodies.push(body);
       if (body.token === tokenA) {
+        requestKinds.push('A');
         markFirstSeen();
         await firstHeld;
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(markedInvoice('Stale fixture A', 'Stale Customer A')) });
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'Set-Cookie': `__Host-servsync-invoice-session=${sessionA}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict` },
+          body: JSON.stringify(markedInvoice('Stale fixture A', 'Stale Customer A')),
+        }).catch(() => undefined);
+        return;
       }
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(markedInvoice('Current fixture B', 'Current Customer B')) });
+      expect(body.token === tokenB).toBe(true);
+      requestKinds.push('B');
+      markSecondSeen();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Set-Cookie': `__Host-servsync-invoice-session=${sessionB}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict` },
+        body: JSON.stringify(markedInvoice('Current fixture B', 'Current Customer B')),
+      });
     });
 
     await page.goto(`/#/invoice-delivery?access=${tokenA}`);
     await firstSeen;
     await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await secondSeen;
     await expect(page.getByRole('heading', { level: 1, name: 'Current fixture B' })).toBeVisible();
     releaseFirst();
     await page.waitForTimeout(100);
 
     await expect(page.getByRole('heading', { level: 1, name: 'Current fixture B' })).toBeVisible();
     await expect(page.getByText('Stale Customer A')).toHaveCount(0);
-    expect(lookupBodies).toEqual([{ token: tokenA }, { token: tokenB }]);
+    expect(requestKinds).toEqual(['A', 'B']);
+    const recipientCookie = (await page.context().cookies()).find(cookie => cookie.name === '__Host-servsync-invoice-session');
+    expect(recipientCookie?.value === sessionB).toBe(true);
+    expect(recipientCookie?.value === sessionA).toBe(false);
     expect(page.url()).not.toContain(tokenA);
     expect(page.url()).not.toContain(tokenB);
+  });
+
+  test('prevents a delayed failed bootstrap from expiring a newer bootstrap cookie', async ({ page }) => {
+    const tokenA = randomBytes(32).toString('hex');
+    const tokenB = randomBytes(32).toString('hex');
+    const sessionB = randomBytes(32).toString('hex');
+    let releaseFirst!: () => void;
+    let markFirstSeen!: () => void;
+    let markSecondSeen!: () => void;
+    const firstHeld = new Promise<void>(resolve => { releaseFirst = resolve; });
+    const firstSeen = new Promise<void>(resolve => { markFirstSeen = resolve; });
+    const secondSeen = new Promise<void>(resolve => { markSecondSeen = resolve; });
+
+    await page.route('**/api/request-free-local-invoice-delivery', async route => {
+      const body = route.request().postDataJSON() as { token?: string };
+      if (body.token === tokenA) {
+        markFirstSeen();
+        await firstHeld;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'Set-Cookie': '__Host-servsync-invoice-session=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Strict' },
+          body: JSON.stringify({ state: 'unavailable' }),
+        }).catch(() => undefined);
+        return;
+      }
+      expect(body.token === tokenB).toBe(true);
+      markSecondSeen();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Set-Cookie': `__Host-servsync-invoice-session=${sessionB}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict` },
+        body: JSON.stringify(markedInvoice('Current bootstrap fixture B', 'Current Bootstrap Customer B')),
+      });
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${tokenA}`);
+    await firstSeen;
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await secondSeen;
+    await expect(page.getByRole('heading', { level: 1, name: 'Current bootstrap fixture B' })).toBeVisible();
+    releaseFirst();
+    await page.waitForTimeout(100);
+
+    const recipientCookie = (await page.context().cookies()).find(cookie => cookie.name === '__Host-servsync-invoice-session');
+    expect(recipientCookie?.value === sessionB).toBe(true);
+    await expect(page.getByRole('heading', { level: 1, name: 'Current bootstrap fixture B' })).toBeVisible();
+  });
+
+  test('prevents a delayed unavailable session response from deleting a newer bootstrap cookie', async ({ page }) => {
+    const tokenA = randomBytes(32).toString('hex');
+    const tokenB = randomBytes(32).toString('hex');
+    const sessionA = randomBytes(32).toString('hex');
+    const sessionB = randomBytes(32).toString('hex');
+
+    let releaseSession!: () => void;
+    let markSessionSeen!: () => void;
+    let markBootstrapSeen!: () => void;
+    const sessionHeld = new Promise<void>(resolve => { releaseSession = resolve; });
+    const sessionSeen = new Promise<void>(resolve => { markSessionSeen = resolve; });
+    const bootstrapSeen = new Promise<void>(resolve => { markBootstrapSeen = resolve; });
+
+    await page.route('**/api/request-free-local-invoice-delivery', async route => {
+      const body = route.request().postDataJSON() as { token?: string };
+      if (!body.token) {
+        markSessionSeen();
+        await sessionHeld;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'Set-Cookie': '__Host-servsync-invoice-session=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Strict' },
+          body: JSON.stringify({ state: 'unavailable' }),
+        }).catch(() => undefined);
+        return;
+      }
+      if (body.token === tokenA) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'Set-Cookie': `__Host-servsync-invoice-session=${sessionA}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict` },
+          body: JSON.stringify(markedInvoice('Prior session fixture A', 'Prior Session Customer A')),
+        });
+        return;
+      }
+      expect(body.token === tokenB).toBe(true);
+      markBootstrapSeen();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Set-Cookie': `__Host-servsync-invoice-session=${sessionB}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict` },
+        body: JSON.stringify(markedInvoice('Current session fixture B', 'Current Session Customer B')),
+      });
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${tokenA}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Prior session fixture A' })).toBeVisible();
+    await page.reload();
+    await sessionSeen;
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokenB);
+    await bootstrapSeen;
+    await expect(page.getByRole('heading', { level: 1, name: 'Current session fixture B' })).toBeVisible();
+    releaseSession();
+    await page.waitForTimeout(100);
+
+    const recipientCookie = (await page.context().cookies()).find(cookie => cookie.name === '__Host-servsync-invoice-session');
+    expect(recipientCookie?.value === sessionB).toBe(true);
+    expect(recipientCookie?.value === sessionA).toBe(false);
+  });
+
+  test('keeps only token C current across A to B to C navigation with delayed cancelled responses', async ({ page }) => {
+    const tokens = [randomBytes(32).toString('hex'), randomBytes(32).toString('hex'), randomBytes(32).toString('hex')];
+    const sessions = [randomBytes(32).toString('hex'), randomBytes(32).toString('hex'), randomBytes(32).toString('hex')];
+    const releases: Array<() => void> = [];
+    const seenResolvers: Array<() => void> = [];
+    const held = [0, 1].map(index => new Promise<void>(resolve => { releases[index] = resolve; }));
+    const seen = [0, 1, 2].map(index => new Promise<void>(resolve => { seenResolvers[index] = resolve; }));
+    const requestOrder: number[] = [];
+
+    await page.route('**/api/request-free-local-invoice-delivery', async route => {
+      const body = route.request().postDataJSON() as { token?: string };
+      const index = tokens.findIndex(token => token === body.token);
+      expect(index).toBeGreaterThanOrEqual(0);
+      requestOrder.push(index);
+      seenResolvers[index]();
+      if (index < 2) await held[index];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Set-Cookie': `__Host-servsync-invoice-session=${sessions[index]}; Max-Age=1800; Path=/; Secure; HttpOnly; SameSite=Strict` },
+        body: JSON.stringify(markedInvoice(`Navigation fixture ${index}`, `Navigation Customer ${index}`)),
+      }).catch(() => undefined);
+    });
+
+    await page.goto(`/#/invoice-delivery?access=${tokens[0]}`);
+    await seen[0];
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokens[1]);
+    await seen[1];
+    await page.evaluate(token => { window.location.hash = `#/invoice-delivery?access=${token}`; }, tokens[2]);
+    await seen[2];
+    await expect(page.getByRole('heading', { level: 1, name: 'Navigation fixture 2' })).toBeVisible();
+    releases[1]();
+    releases[0]();
+    await page.waitForTimeout(100);
+
+    expect(requestOrder).toEqual([0, 1, 2]);
+    const recipientCookie = (await page.context().cookies()).find(cookie => cookie.name === '__Host-servsync-invoice-session');
+    expect(recipientCookie?.value === sessions[2]).toBe(true);
+    expect(sessions.slice(0, 2).some(value => value === recipientCookie?.value)).toBe(false);
+    expect(tokens.some(token => page.url().includes(token))).toBe(false);
   });
 
   test('uses the opaque session on refresh and shows unavailable after session expiry', async ({ page }) => {

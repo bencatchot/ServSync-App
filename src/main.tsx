@@ -12,6 +12,7 @@ let mountedKind: EntryRequest['kind'] | null = null;
 let renderRevision = 0;
 let suppressPairedHashChange = false;
 let suppressionTimer: number | null = null;
+let activeInvoiceRequest: { controller: AbortController; settled: Promise<void> } | null = null;
 
 function consumeEntryRequest(): EntryRequest {
   const rawHash = window.location.hash.replace(/^#\/?/, '');
@@ -25,6 +26,32 @@ function consumeEntryRequest(): EntryRequest {
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/invoice-delivery`);
   }
   return { kind: 'invoice', bootstrapToken };
+}
+
+async function runInvoiceRequest(bootstrapToken: string | null, revision: number) {
+  const previousRequest = activeInvoiceRequest;
+  if (previousRequest) {
+    previousRequest.controller.abort();
+    await previousRequest.settled;
+  }
+  if (revision !== renderRevision) return null;
+
+  const controller = new AbortController();
+  let settleRequest!: () => void;
+  const request = {
+    controller,
+    settled: new Promise<void>(resolve => { settleRequest = resolve; }),
+  };
+  activeInvoiceRequest = request;
+
+  try {
+    const { lookupRequestFreeInvoice } = await import('./features/invoices/requestFreeInvoiceDelivery');
+    if (revision !== renderRevision) return null;
+    return await lookupRequestFreeInvoice(bootstrapToken, { signal: controller.signal });
+  } finally {
+    settleRequest();
+    if (activeInvoiceRequest === request) activeInvoiceRequest = null;
+  }
 }
 
 async function renderInvoice(entry: Extract<EntryRequest, { kind: 'invoice' }>, revision: number) {
@@ -42,9 +69,11 @@ async function renderInvoice(entry: Extract<EntryRequest, { kind: 'invoice' }>, 
   entry.bootstrapToken = null;
   let lookup: RequestFreeInvoiceDeliveryLookup;
   try {
-    const { lookupRequestFreeInvoice } = await import('./features/invoices/requestFreeInvoiceDelivery');
-    lookup = await lookupRequestFreeInvoice(bootstrapToken);
-  } catch {
+    const result = await runInvoiceRequest(bootstrapToken, revision);
+    if (result === null) return;
+    lookup = result;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     lookup = { state: 'error' };
   } finally {
     bootstrapToken = null;
@@ -64,6 +93,13 @@ async function renderEntry(entry: EntryRequest, force = false) {
   const revision = ++renderRevision;
   mountedKind = null;
   root.render(null);
+
+  const previousRequest = activeInvoiceRequest;
+  if (previousRequest) {
+    previousRequest.controller.abort();
+    await previousRequest.settled;
+  }
+  if (revision !== renderRevision) return;
 
   if (entry.kind === 'invoice') {
     await renderInvoice(entry, revision);
@@ -111,6 +147,7 @@ function start() {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     renderRevision += 1;
+    activeInvoiceRequest?.controller.abort();
     window.removeEventListener('hashchange', onHashChange);
     window.removeEventListener('popstate', onPopState);
     if (suppressionTimer !== null) window.clearTimeout(suppressionTimer);

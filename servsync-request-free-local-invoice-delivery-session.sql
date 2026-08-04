@@ -89,6 +89,7 @@ begin
       from public.local_invoice_delivery_sessions session
      where session.expires_at <= clock_timestamp()
      order by session.expires_at, session.session_hash
+     for update skip locked
      limit 25
   )
   delete from public.local_invoice_delivery_sessions session
@@ -97,9 +98,6 @@ begin
 
   get diagnostics v_deleted = row_count;
   return v_deleted;
-exception
-  when others then
-    return 0;
 end;
 $$;
 
@@ -150,16 +148,16 @@ begin
     else decode(lower(trim(p_previous_session_digest)), 'hex')
   end;
 
-  if v_previous_session_hash is not null then
-    delete from public.local_invoice_delivery_sessions
-     where session_hash = v_previous_session_hash;
-  end if;
-
   v_payload := public.servsync_lookup_local_invoice_delivery(p_token);
   v_payload_state := v_payload::jsonb ->> 'state';
 
   if v_payload_state <> 'valid' then
     return v_payload;
+  end if;
+
+  if v_previous_session_hash is not null then
+    delete from public.local_invoice_delivery_sessions
+     where session_hash = v_previous_session_hash;
   end if;
 
   v_token_hash := extensions.digest(lower(trim(p_token)), 'sha256');
@@ -204,9 +202,7 @@ begin
     v_home_claimed_at
   );
 
-  if random() < 0.02 then
-    perform public.servsync_private_cleanup_local_invoice_delivery_sessions();
-  end if;
+  perform public.servsync_private_cleanup_local_invoice_delivery_sessions();
 
   return v_payload;
 end;
@@ -282,10 +278,6 @@ begin
     'token', v_link_token_hash, 10, (1::numeric / 6::numeric)
   ) then
     return jsonb_build_object('state', 'rate_limited')::text;
-  end if;
-
-  if random() < 0.02 then
-    perform public.servsync_private_cleanup_local_invoice_delivery_sessions();
   end if;
 
   select * into v_contact

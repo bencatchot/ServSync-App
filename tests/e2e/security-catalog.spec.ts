@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { requireValidationTarget } from './helpers/validationTarget';
 
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+
 type CatalogResponse<T> = {
   rows?: T[];
 };
@@ -565,6 +567,60 @@ order by c.relname;
     expect(rows.find(row => row.signature === 'servsync_lookup_local_invoice_delivery(text)')?.service_role_execute).toBe(false);
     expect(rows.find(row => row.signature === 'servsync_bootstrap_local_invoice_delivery_session(text,text,text)')?.service_role_execute).toBe(true);
     expect(rows.find(row => row.signature === 'servsync_lookup_local_invoice_delivery_session(text)')?.service_role_execute).toBe(true);
+  });
+
+  test('concurrent recipient lookup and session replacement complete without a deadlock', async ({ browser }) => {
+    test.skip(
+      process.env.SERVSYNC_RUN_REQUEST_FREE_SESSION_CONCURRENCY !== '1',
+      'Requires a separately authorized Sandbox gateway run with a fresh ephemeral delivery bearer.',
+    );
+    const bearer = process.env.SERVSYNC_REQUEST_FREE_INVOICE_CONCURRENCY_TOKEN?.trim() ?? '';
+    if (!/^[0-9a-f]{64}$/.test(bearer)) {
+      throw new Error('A fresh ephemeral request-free invoice concurrency bearer is required.');
+    }
+    const { appUrl } = requireValidationTarget({ requireAppUrl: true, requireSupabaseEnv: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await page.goto(`${appUrl}/#/invoice-delivery`);
+      const bootstrap = await page.evaluate(async token => {
+        const response = await fetch('/api/request-free-local-invoice-delivery', {
+          method: 'POST',
+          body: JSON.stringify({ token }),
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(8_000),
+        });
+        const payload = await response.json() as { state?: string };
+        return { status: response.status, state: payload.state };
+      }, bearer);
+      expect(bootstrap).toEqual({ status: 200, state: 'valid' });
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const result = await page.evaluate(async token => {
+          const request = (body: string) => fetch('/api/request-free-local-invoice-delivery', {
+            method: 'POST',
+            body,
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(8_000),
+          }).then(async response => ({
+            status: response.status,
+            state: ((await response.json()) as { state?: string }).state,
+          }));
+          const [lookup, replacement] = await Promise.all([
+            request('{}'),
+            request(JSON.stringify({ token })),
+          ]);
+          return { lookup, replacement };
+        }, bearer);
+        expect(result.replacement).toEqual({ status: 200, state: 'valid' });
+        expect(result.lookup.status).toBe(200);
+        expect(['valid', 'unavailable']).toContain(result.lookup.state);
+      }
+    } finally {
+      await context.close();
+    }
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {

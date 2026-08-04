@@ -100,19 +100,32 @@ function sessionCookie(value = SESSION) {
   return `${REQUEST_FREE_INVOICE_SESSION_COOKIE}=${value}`;
 }
 
+function expectExpiredSessionCookie(response: Response) {
+  const cookie = response.headers.get('set-cookie') ?? '';
+  expect(cookie).toContain(`${REQUEST_FREE_INVOICE_SESSION_COOKIE}=`);
+  expect(cookie).toContain('Max-Age=0');
+  expect(cookie).toContain('Path=/');
+  expect(cookie).toContain('Secure');
+  expect(cookie).toContain('HttpOnly');
+  expect(cookie).toContain('SameSite=Strict');
+  expect(cookie).not.toContain('Domain=');
+}
+
 test.describe('FB-003B same-origin invoice delivery gateway', () => {
   test('accepts only POST, JSON, and the two exact request schemas', async () => {
     const fixture = handlerFixture();
     const getResponse = await fixture.handler(new Request('https://servsync.example/api/request-free-local-invoice-delivery'));
     expect(getResponse.status).toBe(405);
     expect(getResponse.headers.get('allow')).toBe('POST');
+    expectExpiredSessionCookie(getResponse);
 
     const wrongContentType = await fixture.handler(new Request('https://servsync.example/api/request-free-local-invoice-delivery', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ token: TOKEN }),
     }));
-    expect(wrongContentType.status).toBe(400);
+    expect(wrongContentType.status).toBe(415);
+    expectExpiredSessionCookie(wrongContentType);
 
     for (const body of [
       JSON.stringify({ token: 'not-a-token' }),
@@ -123,7 +136,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
     ]) {
       const response = await fixture.handler(request(body));
       expect(response.status).toBe(400);
-      expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+      expectExpiredSessionCookie(response);
     }
 
     const bootstrap = await fixture.handler(request(JSON.stringify({ token: TOKEN })));
@@ -159,6 +172,9 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
     expect(overLimit.status).toBe(413);
     expect(declaredOverLimit.status).toBe(413);
     expect(underDeclared.status).toBe(413);
+    expectExpiredSessionCookie(overLimit);
+    expectExpiredSessionCookie(declaredOverLimit);
+    expectExpiredSessionCookie(underDeclared);
     expect(fixture.bootstrapCalls).toHaveLength(4);
   });
 
@@ -181,6 +197,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
 
     const response = await fixture.handler(oversizedRequest);
     expect(response.status).toBe(413);
+    expectExpiredSessionCookie(response);
     expect(fixture.bootstrapCalls).toEqual([]);
     expect(fixture.sessionCalls).toEqual([]);
   });
@@ -205,6 +222,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
       const fixture = handlerFixture(options);
       const response = await fixture.handler(request(JSON.stringify({ token: TOKEN })));
       expect(response.status).toBe(503);
+      expectExpiredSessionCookie(response);
       expect(await response.json()).toEqual({ state: 'error' });
       expect(fixture.bootstrapCalls).toEqual([]);
       expect(fixture.sessionCalls).toEqual([]);
@@ -218,6 +236,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
     expect(response.status).toBe(429);
     expect(response.headers.get('retry-after')).toBe('60');
     expect(response.headers.get('cache-control')).toBe('no-store, private');
+    expectExpiredSessionCookie(response);
     expect(await response.json()).toEqual({ state: 'rate_limited' });
     expect(fixture.bootstrapCalls).toEqual([]);
     expect(fixture.sessionCalls).toEqual([]);
@@ -255,7 +274,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    expectExpiredSessionCookie(response);
     expect(fixture.bootstrapCalls[0].previousDigest).toBe(createHash('sha256').update(previousSession).digest('hex'));
     expect(fixture.sessionCalls).toEqual([]);
   });
@@ -264,7 +283,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
     const missing = handlerFixture();
     const missingResponse = await missing.handler(request('{}'));
     expect(missingResponse.status).toBe(200);
-    expect(missingResponse.headers.get('set-cookie')).toContain('Max-Age=0');
+    expectExpiredSessionCookie(missingResponse);
     expect(missing.sessionCalls).toEqual([]);
 
     const malformed = handlerFixture();
@@ -272,7 +291,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
       headers: { Cookie: sessionCookie('not-a-session') },
     }));
     expect(malformedResponse.status).toBe(200);
-    expect(malformedResponse.headers.get('set-cookie')).toContain('Max-Age=0');
+    expectExpiredSessionCookie(malformedResponse);
     expect(malformed.sessionCalls).toEqual([]);
 
     const unavailable = handlerFixture({ session: async () => JSON.stringify({ state: 'unavailable' }) });
@@ -280,7 +299,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
       headers: { Cookie: sessionCookie() },
     }));
     expect(unavailableResponse.status).toBe(200);
-    expect(unavailableResponse.headers.get('set-cookie')).toContain('Max-Age=0');
+    expectExpiredSessionCookie(unavailableResponse);
   });
 
   test('preserves a valid session cookie and exact serialized response on refresh lookup', async () => {
@@ -295,13 +314,29 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
     expect(fixture.sessionCalls).toEqual([createHash('sha256').update(SESSION).digest('hex')]);
   });
 
-  test('maps database defense-in-depth throttling to generic 429 without expiring the session', async () => {
-    const fixture = handlerFixture({ session: async () => JSON.stringify({ state: 'rate_limited' }) });
+  test('maps database defense-in-depth throttling to generic 429 and expires the prior session', async () => {
+    const serialized = JSON.stringify({ state: 'rate_limited' });
+    const fixture = handlerFixture({ session: async () => serialized });
     const response = await fixture.handler(request('{}', { headers: { Cookie: sessionCookie() } }));
 
     expect(response.status).toBe(429);
     expect(response.headers.get('retry-after')).toBe('60');
-    expect(response.headers.get('set-cookie')).toBeNull();
+    expectExpiredSessionCookie(response);
+    expect(await response.text()).toBe(serialized);
+  });
+
+  test('expires the prior cookie when protected bootstrap or session execution fails', async () => {
+    const bootstrap = handlerFixture({ bootstrap: async () => { throw new Error('fixture bootstrap failure'); } });
+    const bootstrapResponse = await bootstrap.handler(request(JSON.stringify({ token: TOKEN }), {
+      headers: { Cookie: sessionCookie('c'.repeat(64)) },
+    }));
+    expect(bootstrapResponse.status).toBe(503);
+    expectExpiredSessionCookie(bootstrapResponse);
+
+    const session = handlerFixture({ session: async () => { throw new Error('fixture session failure'); } });
+    const sessionResponse = await session.handler(request('{}', { headers: { Cookie: sessionCookie() } }));
+    expect(sessionResponse.status).toBe(503);
+    expectExpiredSessionCookie(sessionResponse);
   });
 
   for (const bytes of [262_143, 262_144, 262_145]) {
@@ -310,6 +345,7 @@ test.describe('FB-003B same-origin invoice delivery gateway', () => {
       const response = await fixture.handler(request(JSON.stringify({ token: TOKEN })));
       expect(response.status).toBe(bytes <= MAX_PUBLIC_RESPONSE_BYTES ? 200 : 503);
       expect(response.headers.get('cache-control')).toBe('no-store, private');
+      if (bytes > MAX_PUBLIC_RESPONSE_BYTES) expectExpiredSessionCookie(response);
     });
   }
 

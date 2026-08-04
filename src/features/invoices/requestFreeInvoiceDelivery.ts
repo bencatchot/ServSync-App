@@ -67,7 +67,11 @@ export async function revokeLocalInvoiceDeliveryLink(client: SupabaseClient, lin
   return requireResult<LocalInvoiceDeliveryLinkMetadata>(data, 'ServSync did not confirm the link revocation.');
 }
 
-export async function lookupRequestFreeInvoice(token: string | null, request: typeof fetch = fetch) {
+export async function lookupRequestFreeInvoice(
+  token: string | null,
+  options: { request?: typeof fetch; signal?: AbortSignal } = {},
+) {
+  const request = options.request ?? fetch;
   const response = await request('/api/request-free-local-invoice-delivery', {
     method: 'POST',
     body: token === null ? '{}' : JSON.stringify({ token }),
@@ -75,6 +79,7 @@ export async function lookupRequestFreeInvoice(token: string | null, request: ty
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     referrerPolicy: 'no-referrer',
+    signal: options.signal,
   });
   if (response.status === 429) {
     return { state: 'rate_limited' } satisfies RequestFreeInvoiceDeliveryLookup;

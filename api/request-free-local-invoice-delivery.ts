@@ -59,14 +59,21 @@ function expiredSessionCookie() {
   return `${REQUEST_FREE_INVOICE_SESSION_COOKIE}=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Secure; HttpOnly; SameSite=Strict`;
 }
 
-function safeResponse(
+function failureResponse(
   state: Exclude<SafeState, 'valid'>,
   status: number,
   extraHeaders?: HeadersInit,
 ) {
   return new Response(JSON.stringify({ state }), {
     status,
-    headers: { ...responseHeaders, ...extraHeaders },
+    headers: { ...responseHeaders, ...extraHeaders, 'Set-Cookie': expiredSessionCookie() },
+  });
+}
+
+function serializedFailureResponse(serialized: string, status: number, extraHeaders?: HeadersInit) {
+  return new Response(serialized, {
+    status,
+    headers: { ...responseHeaders, ...extraHeaders, 'Set-Cookie': expiredSessionCookie() },
   });
 }
 
@@ -220,37 +227,37 @@ export function createRequestFreeInvoiceDeliveryHandler(
 ) {
   return async function handler(request: Request) {
     if (request.method !== 'POST') {
-      return safeResponse('error', 405, { Allow: 'POST' });
+      return failureResponse('error', 405, { Allow: 'POST' });
     }
 
     let rateLimit: RateLimitResult;
     try {
       rateLimit = await dependencies.checkEntryRateLimit(request);
     } catch {
-      return safeResponse('error', 503);
+      return failureResponse('error', 503);
     }
-    if (rateLimit.configurationError) return safeResponse('error', 503);
-    if (rateLimit.rateLimited) return safeResponse('rate_limited', 429, { 'Retry-After': '60' });
+    if (rateLimit.configurationError) return failureResponse('error', 503);
+    if (rateLimit.rateLimited) return failureResponse('rate_limited', 429, { 'Retry-After': '60' });
 
     const contentType = request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
-    if (contentType !== 'application/json') return safeResponse('invalid', 400);
+    if (contentType !== 'application/json') return failureResponse('invalid', 415);
 
     let body: string;
     try {
       body = await readBoundedBody(request);
     } catch (error) {
-      if (error instanceof RequestTooLargeError) return safeResponse('invalid', 413);
-      return safeResponse('invalid', 400);
+      if (error instanceof RequestTooLargeError) return failureResponse('invalid', 413);
+      return failureResponse('invalid', 400);
     }
 
     const mode = parseRequestMode(body);
     if (!mode) {
-      return safeResponse('invalid', 400, { 'Set-Cookie': expiredSessionCookie() });
+      return failureResponse('invalid', 400);
     }
 
     const existingSessionIdentifier = sessionIdentifierFromRequest(request);
     if (mode.kind === 'session' && !existingSessionIdentifier) {
-      return safeResponse('unavailable', 200, { 'Set-Cookie': expiredSessionCookie() });
+      return failureResponse('unavailable', 200);
     }
 
     let newSessionIdentifier = '';
@@ -268,17 +275,14 @@ export function createRequestFreeInvoiceDeliveryHandler(
         : await dependencies.lookupInvoiceSession(sessionDigest(existingSessionIdentifier!));
 
       const state = safeLookupState(serialized);
-      if (!state) return safeResponse('error', 503);
+      if (!state) return failureResponse('error', 503);
       if (new TextEncoder().encode(serialized).byteLength > MAX_PUBLIC_RESPONSE_BYTES) {
-        return safeResponse('error', 503);
+        return failureResponse('error', 503);
       }
       if (state === 'rate_limited') {
-        return new Response(serialized, {
-          status: 429,
-          headers: { ...responseHeaders, 'Retry-After': '60' },
-        });
+        return serializedFailureResponse(serialized, 429, { 'Retry-After': '60' });
       }
-      if (state === 'error') return safeResponse('error', 503);
+      if (state === 'error') return serializedFailureResponse(serialized, 503);
 
       const cookie = mode.kind === 'bootstrap' && state === 'valid'
         ? activeSessionCookie(newSessionIdentifier)
@@ -290,7 +294,7 @@ export function createRequestFreeInvoiceDeliveryHandler(
         headers: cookie ? { ...responseHeaders, 'Set-Cookie': cookie } : responseHeaders,
       });
     } catch {
-      return safeResponse('error', 503, mode.kind === 'bootstrap' ? { 'Set-Cookie': expiredSessionCookie() } : undefined);
+      return failureResponse('error', 503);
     } finally {
       newSessionIdentifier = '';
     }
