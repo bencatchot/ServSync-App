@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
 import type { ContractorPriceBookItem, Estimate, EstimateTemplate, Inspection, Invoice } from '../../types';
-import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
-import { draftJobOptionsWithSavedSelection } from '../jobs/draftJobMappings';
 import { isComposerDraftJob } from '../jobs/jobRecordSelectors';
 import { ContractorDraftComposer } from './ContractorDraftComposer';
 import {
@@ -75,6 +73,11 @@ import {
 import { validateDurableDraftLoadedOutput } from './durableDraftOutputValidation';
 import type { DraftChecklistSourceOption } from './checklistDraftScope';
 import type { PriceBookLoadState } from '../price-book/priceBookView';
+import {
+  draftCustomerOptionsWithSavedSelection,
+  selectedDraftCustomerKey,
+  type DraftCustomerOption,
+} from './draftCustomerOptions';
 
 type DurableDraftWorkspaceProps = {
   client: DurableDraftSupabaseClient;
@@ -84,8 +87,7 @@ type DurableDraftWorkspaceProps = {
   capabilityError?: string;
   target?: DurableDraftOpenTarget | null;
   legacyDrafts: Inspection[];
-  connectedOptions: DraftJobCustomerOption[];
-  localOptions: DraftJobCustomerOption[];
+  customerOptions: DraftCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
   savedWorkTemplates?: EstimateTemplate[];
   priceBookItems?: ContractorPriceBookItem[];
@@ -270,8 +272,7 @@ export function DurableDraftWorkspace({
   capabilityError = '',
   target = null,
   legacyDrafts,
-  connectedOptions,
-  localOptions,
+  customerOptions,
   checklistOptions = [],
   savedWorkTemplates = [],
   priceBookItems = [],
@@ -1647,23 +1648,12 @@ export function DurableDraftWorkspace({
     );
   }
 
-  const connectedOptionsWithSavedSelection = draftJobOptionsWithSavedSelection(
-    connectedOptions,
-    form.homeowner_user_id,
-    form.home_id,
+  const customerOptionsWithSavedSelection = draftCustomerOptionsWithSavedSelection(
+    customerOptions,
+    form,
+    Boolean(canonical?.draft.draftId),
     {
       customer: canonical?.draft.subjectDisplayNameSnapshot || 'Saved customer',
-      helper: 'Saved on this Draft; not in the active selector list',
-      property: canonical?.draft.propertyDisplaySnapshot || 'Saved property on this Draft',
-    },
-  );
-  const localOptionsWithSavedSelection = draftJobOptionsWithSavedSelection(
-    localOptions,
-    form.local_contact_id,
-    form.local_home_id,
-    {
-      customer: canonical?.draft.subjectDisplayNameSnapshot || 'Saved customer',
-      helper: 'Saved on this Draft; not in the current selector list',
       property: canonical?.draft.propertyDisplaySnapshot || 'Saved property on this Draft',
     },
   );
@@ -1690,10 +1680,8 @@ export function DurableDraftWorkspace({
       : launchState.phase === 'lifecycle_unavailable' || launchState.phase === 'reconciliation_failed'
         ? launchState.message
         : '';
-  const selectedOptions = form.subject_type === 'connected' ? connectedOptionsWithSavedSelection : localOptionsWithSavedSelection;
-  const selectedCustomerId = form.subject_type === 'connected' ? form.homeowner_user_id : form.local_contact_id;
   const selectedPropertyId = form.subject_type === 'connected' ? form.home_id : form.local_home_id;
-  const confirmationCustomer = selectedOptions.find(option => option.id === selectedCustomerId);
+  const confirmationCustomer = customerOptionsWithSavedSelection.find(option => option.key === selectedDraftCustomerKey(form));
   const confirmationProperty = confirmationCustomer?.properties.find(property => property.id === selectedPropertyId);
 
   return (
@@ -1702,8 +1690,7 @@ export function DurableDraftWorkspace({
       <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : launchState.phase === 'preparing' ? 'Preparing launch protection' : launchState.phase === 'launching' ? `Creating ${outputFamilyLabel(outputType)}` : launchState.phase === 'reconciling_consumed' || launchState.phase === 'reconciling_lifecycle' ? 'Refreshing canonical Draft status' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
       <ContractorDraftComposer
         draft={form}
-        connectedOptions={connectedOptionsWithSavedSelection}
-        localOptions={localOptionsWithSavedSelection}
+        customerOptions={customerOptionsWithSavedSelection}
         checklistOptions={checklistOptions}
         savedWorkTemplates={savedWorkTemplates}
         priceBookItems={priceBookItems}

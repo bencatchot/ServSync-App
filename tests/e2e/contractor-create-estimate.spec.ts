@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
@@ -6,6 +6,7 @@ import { captureMajorConsoleErrors } from './helpers/console';
 import {
   createLocalE2ECustomer,
   escapeRegExp,
+  launchCustomerProfileDraft,
   openE2ECustomerActionPanel,
   timestampForRecord,
   waitForContractorWorkspaceReady,
@@ -23,19 +24,6 @@ function sourceBetween(source: string, start: string, end: string) {
   const endIndex = source.indexOf(end, startIndex + start.length);
   expect(endIndex, `Expected to find source end marker: ${end}`).toBeGreaterThan(startIndex);
   return source.slice(startIndex, endIndex);
-}
-
-async function waitForEstimateDraftSave(main: Locator, saveEstimateButton: Locator) {
-  const saveError = main.getByText(
-    /Unable to save estimate|Add at least one line item|Add a .* title|contractor profile is still loading|ServSync is still connecting/i,
-  ).first();
-
-  await Promise.race([
-    saveEstimateButton.waitFor({ state: 'hidden', timeout: 30_000 }),
-    saveError.waitFor({ state: 'visible', timeout: 30_000 }).then(async () => {
-      throw new Error(`Estimate draft save failed: ${(await saveError.textContent())?.trim() || 'unknown error'}`);
-    }),
-  ]);
 }
 
 test.describe('contractor estimate creation UI structure', () => {
@@ -254,56 +242,12 @@ test.describe('contractor mutating estimate creation', () => {
     const { customerName } = await createLocalE2ECustomer(page, timestamp);
     await openE2ECustomerActionPanel(page, customerName);
 
-    await main.getByRole('button', { name: /^Create estimate\b/i }).click();
-    await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByText(/^Estimate draft$/i)).toBeVisible();
-    await expect(main.getByText(/Creating estimate for:/i)).toBeVisible();
-    await expect(main.getByText(customerName, { exact: true })).toBeVisible();
-    await expect(main.getByTestId('estimate-start-choice')).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Build blank estimate\b/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Choose estimate template\b/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Build draft estimator\b/i })).toBeVisible();
-    await main.getByRole('button', { name: /^Build blank estimate\b/i }).click();
-    await expect(main.getByRole('button', { name: /^Back to estimate options$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Discard draft$/i }).first()).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Create new customer$/i })).toHaveCount(0);
-    await expect(main.getByRole('button', { name: /^Create estimate$/i })).toHaveCount(0);
-    await expect(main.getByRole('button', { name: /^Create invoice$/i })).toHaveCount(0);
-    await expect(main.getByTestId('estimate-line-empty-state')).toBeVisible();
-    await expect(main.getByRole('textbox', { name: /^Estimate line item 1 description$/i })).toHaveCount(0);
-    await expect(main.getByRole('button', { name: /^Add blank line$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Add saved item$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Add from Price Book$/i })).toHaveCount(0);
-
-    await main.getByRole('button', { name: /^Add blank line$/i }).click();
-    const lineDescriptionField = main.getByRole('textbox', { name: /^Estimate line item 1 description$/i });
-    await expect(lineDescriptionField).toBeVisible();
-    await expect(lineDescriptionField).toBeFocused();
-    const addBlankLineButton = main.getByRole('button', { name: /^Add blank line$/i });
-    const lineBox = await lineDescriptionField.boundingBox();
-    const addBox = await addBlankLineButton.boundingBox();
-    expect(lineBox, 'line item description should have a visible bounding box').not.toBeNull();
-    expect(addBox, 'add controls should have a visible bounding box').not.toBeNull();
-    expect(addBox!.y).toBeGreaterThan(lineBox!.y);
-
-    const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
-    const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
-    const lineQuantityField = main.getByRole('spinbutton', { name: /^Estimate line item 1 quantity$/i });
-    const lineUnitPriceField = main.getByRole('textbox', { name: /^Estimate line item 1 unit price$/i });
-
-    await estimateTitleField.fill(estimateTitle);
-    await scopeField.fill('E2E safe estimate draft created by Playwright. No follow-up document, report, upload, or homeowner send action should be performed.');
-    await lineDescriptionField.fill(estimateTitle);
-    await lineQuantityField.fill('1');
-    await lineUnitPriceField.fill('123');
-
-    await expect(estimateTitleField).toHaveValue(estimateTitle);
-    await expect(lineDescriptionField).toHaveValue(estimateTitle);
-
-    const saveEstimateButton = main.getByRole('button', { name: /^Save estimate draft$/i });
-    await expect(saveEstimateButton).toBeEnabled();
-    await saveEstimateButton.click();
-    await waitForEstimateDraftSave(main, saveEstimateButton);
+    await launchCustomerProfileDraft(page, {
+      customerName,
+      output: 'estimate',
+      title: estimateTitle,
+      scope: 'E2E safe estimate draft created by Playwright. No follow-up document, report, upload, or homeowner send action should be performed.',
+    });
 
     await expect(main.getByRole('heading', { name: /^Open Estimates$/i })).toBeVisible();
     await expect(main.getByText(estimateTitle, { exact: true })).toBeVisible({ timeout: 30_000 });

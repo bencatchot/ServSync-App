@@ -106,11 +106,10 @@ async function installWorkspaceHarness(page: Page) {
       onRefreshCapabilities: async () => capabilities(),
       target: state.target,
       legacyDrafts: state.legacyDrafts,
-      connectedOptions: [
-        { id: ids.homeownerA, label: 'Customer A', properties: [{ id: ids.homeA, label: 'Home A' }] },
-        { id: ids.homeownerB, label: 'Customer B', properties: [{ id: ids.homeB, label: 'Home B' }, { id: ids.homeBSecondary, label: 'Home B Secondary' }] },
+      customerOptions: [
+        { key: `connected:${ids.homeownerA}`, subjectType: 'connected', customerId: ids.homeownerA, label: 'Customer A', status: 'connected', statusLabel: 'Connected', properties: [{ id: ids.homeA, label: 'Home A' }] },
+        { key: `connected:${ids.homeownerB}`, subjectType: 'connected', customerId: ids.homeownerB, label: 'Customer B', status: 'connected', statusLabel: 'Connected', properties: [{ id: ids.homeB, label: 'Home B' }, { id: ids.homeBSecondary, label: 'Home B Secondary' }] },
       ],
-      localOptions: [],
       customerLabel: () => 'Legacy customer',
       propertyLabel: () => 'Legacy home',
       onStartNew: () => {
@@ -385,7 +384,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await installWorkspaceHarness(page);
     await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Request-backed')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await page.getByTestId('durable-draft-customer').selectOption(HOMEOWNER_B);
+    await page.getByTestId('durable-draft-customer').selectOption(`connected:${HOMEOWNER_B}`);
     await page.getByRole('button', { name: 'Save Draft' }).click();
     let calls = await page.evaluate(() => window.__durableHarness.calls());
     expect(calls.find(call => call.name === 'servsync_save_work_draft')?.args).toMatchObject({ p_metadata: { service_request_id: null } });

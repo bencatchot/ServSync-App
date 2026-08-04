@@ -81,7 +81,8 @@ test.describe('contractor selected-homeowner estimates tile', () => {
       'const renderBuildEstimateDraftPanel =',
     );
 
-    expect(selectedCustomerEstimatePanelSource).toContain('Create estimate');
+    expect(selectedCustomerEstimatePanelSource).toContain('Create Draft');
+    expect(selectedCustomerEstimatePanelSource).toContain('openCustomerProfileDraft');
     expect(selectedCustomerEstimatePanelSource).toContain('activeDocumentRecords.length === 0');
     expect(selectedCustomerEstimatePanelSource).toContain('selectedDocumentSection.estimates.map(estimate =>');
     expect(selectedCustomerEstimatePanelSource).toContain('noSubjectEstimateCopy');

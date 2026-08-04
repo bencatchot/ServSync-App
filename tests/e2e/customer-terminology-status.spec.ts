@@ -43,24 +43,22 @@ test.describe('contractor customer terminology and connection status', () => {
     expect(workspace).not.toContain('const pills:');
   });
 
-  test('Draft selectors show connection status while preserving internal subjects', () => {
+  test('Draft selectors derive connection status while preserving internal subjects', () => {
     const app = read('src/App.tsx');
     const durableComposer = read('src/features/drafts/ContractorDraftComposer.tsx');
     const legacyComposer = read('src/features/jobs/DraftJobComposer.tsx');
     const mappings = read('src/features/jobs/draftJobMappings.ts');
 
     for (const composer of [durableComposer, legacyComposer]) {
-      expect(composer).toContain("composerField('Connection status'");
-      expect(composer).toContain('<option value="connected">Connected</option>');
-      expect(composer).toContain('<option value="local">Not connected</option>');
-      expect(composer).toContain('option.helper ? `${option.label} — ${option.helper}` : option.label');
-      expect(composer).toContain("draft.subject_type === 'connected'");
-      expect(composer).toContain('homeowner_user_id');
-      expect(composer).toContain('local_contact_id');
+      expect(composer).toContain("composerField('Customer'");
+      expect(composer).toContain('draftCustomerOptionLabel(option)');
+      expect(composer).toContain('applyDraftCustomerSelection(draft, option)');
+      expect(composer).not.toContain("composerField('Connection status'");
     }
 
-    expect(app).toContain("helper: 'Connected'");
-    expect(app).toContain("helper: 'Not connected'");
+    expect(app).toContain('buildDraftCustomerOptions({');
+    expect(app).toContain("draftCustomerOptionKey('connected'");
+    expect(app).toContain("draftCustomerOptionKey('local'");
     expect(mappings).toContain("p_homeowner_user_id: connected ? draft.homeowner_user_id || null : null");
     expect(mappings).toContain("p_local_contact_id: connected ? null : draft.local_contact_id || null");
   });

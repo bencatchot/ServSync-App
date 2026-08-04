@@ -71,7 +71,54 @@ export async function openE2ECustomerActionPanel(page: Page, customerName: strin
   await main.getByRole('button', { name: /\bJobs\b.*(?:Create work for this customer|Items in progress)/i }).click();
 
   await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
-  await expect(main.getByRole('button', { name: /^Create job\b/i })).toBeVisible();
-  await expect(main.getByRole('button', { name: /^Create estimate\b/i })).toBeVisible();
-  await expect(main.getByRole('button', { name: /^Create invoice\b/i })).toBeVisible();
+  await expect(main.getByRole('button', { name: /^Create Draft\b/i })).toBeVisible();
+  await expect(main.getByRole('button', { name: /^Create job\b/i })).toHaveCount(0);
+  await expect(main.getByRole('button', { name: /^Create estimate\b/i })).toHaveCount(0);
+  await expect(main.getByRole('button', { name: /^Create invoice\b/i })).toHaveCount(0);
+}
+
+export async function openCustomerProfileDraft(page: Page, customerName: string) {
+  const main = page.getByRole('main');
+  await main.getByRole('button', { name: /^Create Draft\b/i }).click();
+  await expect(main.getByTestId('shared-draft-composer')).toBeVisible();
+  await expect(main.getByRole('combobox', { name: /^Customer$/i })).toContainText(customerName);
+}
+
+export async function launchCustomerProfileDraft(page: Page, options: {
+  customerName: string;
+  output: 'estimate' | 'job' | 'invoice';
+  title: string;
+  scope: string;
+  checklist?: boolean;
+}) {
+  const main = page.getByRole('main');
+  await openCustomerProfileDraft(page, options.customerName);
+
+  if (options.checklist) {
+    await main.getByTestId('durable-draft-work-format').selectOption('inspection_checklist');
+    const checklistSource = main.getByTestId('durable-draft-checklist-source');
+    await expect(checklistSource).toBeVisible();
+    await checklistSource.selectOption({ index: 1 });
+  } else {
+    const outcomeLabel = options.output === 'invoice' ? 'Draft Invoice' : options.output === 'estimate' ? 'Estimate' : 'Job';
+    await main.getByRole('radio', { name: outcomeLabel }).check({ force: true });
+    await main.getByTestId('durable-draft-add-line').click();
+    const itemLabel = options.output === 'estimate' ? 'draft estimate' : options.output === 'invoice' ? 'invoice' : 'draft';
+    await main.getByRole('textbox', { name: new RegExp(`^${itemLabel} line item 1 description$`, 'i') }).fill(options.title);
+    await main.getByRole('spinbutton', { name: new RegExp(`^${itemLabel} line item 1 quantity$`, 'i') }).fill('1');
+    await main.getByRole('textbox', { name: new RegExp(`^${itemLabel} line item 1 unit price$`, 'i') }).fill('123');
+  }
+
+  await main.getByLabel(/^Draft title$/i).fill(options.title);
+  await main.getByLabel(/^Scope \/ description$/i).fill(options.scope);
+  const outputLabel = options.output === 'invoice' ? 'Draft Invoice' : options.output === 'estimate' ? 'Estimate' : 'Job';
+  await main.getByTestId('durable-draft-create-output').click();
+  const dialog = page.getByRole('dialog', { name: `Create ${outputLabel}?` });
+  await expect(dialog).toBeVisible();
+  const launchResponse = page.waitForResponse(
+    response => response.url().includes('/rpc/servsync_launch_work_draft'),
+    { timeout: 30_000 },
+  );
+  await dialog.getByRole('button', { name: `Create ${outputLabel}` }).click();
+  expect((await launchResponse).ok()).toBeTruthy();
 }

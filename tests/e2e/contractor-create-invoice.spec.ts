@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
@@ -6,6 +6,7 @@ import { captureMajorConsoleErrors } from './helpers/console';
 import {
   createLocalE2ECustomer,
   escapeRegExp,
+  launchCustomerProfileDraft,
   openE2ECustomerActionPanel,
   timestampForRecord,
   waitForContractorWorkspaceReady,
@@ -21,19 +22,6 @@ function sourceBetween(source: string, start: string, end: string) {
   const endIndex = source.indexOf(end, startIndex + start.length);
   expect(endIndex, `Expected to find source end marker: ${end}`).toBeGreaterThan(startIndex);
   return source.slice(startIndex, endIndex);
-}
-
-async function waitForInvoiceDraftSave(main: Locator, saveInvoiceButton: Locator) {
-  const saveError = main.getByText(
-    /Unable to save invoice draft|Add at least one line item|Add an invoice title|contractor profile is still loading|ServSync is still connecting/i,
-  ).first();
-
-  await Promise.race([
-    saveInvoiceButton.waitFor({ state: 'hidden', timeout: 30_000 }),
-    saveError.waitFor({ state: 'visible', timeout: 30_000 }).then(async () => {
-      throw new Error(`Invoice draft save failed: ${(await saveError.textContent())?.trim() || 'unknown error'}`);
-    }),
-  ]);
 }
 
 test.describe('contractor estimate-to-invoice draft source', () => {
@@ -207,34 +195,12 @@ test.describe('contractor mutating invoice creation', () => {
     const { customerName } = await createLocalE2ECustomer(page, timestamp);
     await openE2ECustomerActionPanel(page, customerName);
 
-    await main.getByRole('button', { name: /^Create invoice\b/i }).click();
-    await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { name: /^Invoice draft$/i })).toBeVisible();
-    await expect(
-      main.locator('p').filter({
-        hasText: new RegExp(`^(?:Creating invoice for:\\s*)?${escapeRegExp(customerName)}(?:\\s*·.*)?$`, 'i'),
-      }).first(),
-    ).toBeVisible();
-
-    const invoiceTitleField = main.getByRole('textbox', { name: /^Invoice title$/i });
-    const scopeField = main.getByRole('textbox', { name: /^(Invoice scope|Scope)$/i });
-    const lineDescriptionField = main.getByRole('textbox', { name: /^(Invoice line item 1 description|Description)$/i });
-    const lineQuantityField = main.getByRole('spinbutton', { name: /^(Invoice line item 1 quantity|Qty)$/i });
-    const lineUnitPriceField = main.getByRole('textbox', { name: /^(Invoice line item 1 unit price|Unit price)$/i });
-
-    await invoiceTitleField.fill(invoiceTitle);
-    await scopeField.fill('E2E safe invoice draft created by Playwright. No send, payment, report, upload, or status change should be performed.');
-    await lineDescriptionField.fill(invoiceTitle);
-    await lineQuantityField.fill('1');
-    await lineUnitPriceField.fill('123');
-
-    await expect(invoiceTitleField).toHaveValue(invoiceTitle);
-    await expect(lineDescriptionField).toHaveValue(invoiceTitle);
-
-    const saveInvoiceButton = main.getByRole('button', { name: /^Save draft invoice$/i });
-    await expect(saveInvoiceButton).toBeEnabled();
-    await saveInvoiceButton.click();
-    await waitForInvoiceDraftSave(main, saveInvoiceButton);
+    await launchCustomerProfileDraft(page, {
+      customerName,
+      output: 'invoice',
+      title: invoiceTitle,
+      scope: 'E2E safe invoice draft created by Playwright. No send, payment, report, upload, or status change should be performed.',
+    });
 
     await expect(main.getByRole('heading', { name: /^Open Invoices$/i })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^Saved invoice draft$/i })).toBeVisible();

@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-04
 
-Last reconciled against `origin/main` at `5341f2f8ee843ce3e8ff697e5d4716e9160ecd05` (merged PR #370).
+Last reconciled against `origin/main` at `6221bd9935b490a797b526881551faf48a1a7623` (merged PR #371).
 
 ## Purpose
 
@@ -35,7 +35,8 @@ Current repository evidence through PR #370 shows these relevant states:
 - PR #366 merged Price Book Repeat-Import Reconciliation v1; migration SHA-256 `7dac1b3c7fd62240d9d05e498a3db0af39fe93549c375ca8262f941cbb6d14a3` was applied and verified in Sandbox and Production. Guarded rollback mutation remains a separate future slice.
 - PR #367 merged Draft-first Inspection Path Completion v1. Its reviewed migration (SHA-256 `f4ab79b68ebe56edd36f6c545fac08584558f6da520672e2bee74b3508f93473`) was applied and catalog-verified in Production, and automatic deployment `dpl_EVyf2uB49Uq53ufzw6ZwG9n7z8Vd` reached `READY` from merge commit `052d13ca061653f0bfa6bad4353d2f47eb95c205`. Bounded Production validation passed for public health, contractor-owner Jobs access, homeowner Documents access, desktop/mobile layout, selected denials, runtime health, and data/security preservation. Exact-head Sandbox evidence remains authoritative for mutating inspection/checklist, media/PDF, broader role, cross-tenant, and cleanup paths not exercised in Production.
 - PR #369 merged Request-Free Local Invoice Delivery Slice 1 through commit `bb471e2d62cd70abcdd66cb57582e660e97af1cd`. Its three reviewed migrations, server-only Production Supabase configuration, same-origin gateway, and IP-keyed 100-request/60-second Firewall rule are installed in Production. Deployment `dpl_7JKiCdPfCN8XKdMBVUyxKFv5AvKU` reached `READY`, `https://servsync.app` returned HTTP 200, and controlled Production validation passed 9/9 plus the bounded issuance, denial, recipient-session, concurrency, rotation/revocation, request/response-limit, throttling, and cleanup checks recorded in the changelog.
-- Contractor customer terminology/status cleanup is in progress on `codex/customer-terminology-status-v1`. The source-only slice presents one contractor-facing `Customer` category with explicit connection status while preserving existing subject models and behavior; it is not merged or deployed.
+- PR #371 merged the contractor Customer terminology/status foundation through commit `6221bd9935b490a797b526881551faf48a1a7623`: contractor navigation and the combined workspace use one `Customer` category, while connection remains visible status and canonical connected/local subject models remain unchanged.
+- Unified Draft Customer Selection and Customer Profile Entry v1 is in source implementation on `codex/unified-draft-customer-entry-v1`. It removes the visible connection-status decision from both Draft composers, derives the existing canonical subject from one collision-safe customer option, applies safe property defaults, preserves saved historical subjects, and routes customer-profile initial work through neutral `Create Draft`. It is not merged or manually deployed.
 - Draft-first Work is now the standard Production Jobs experience for authorized contractor contexts. Production serves main SHA `052d13ca061653f0bfa6bad4353d2f47eb95c205`, all three global gates are enabled, and the server rollout mode is `all_contractors`; the original all-contractors public smoke passed 7/7, and subsequent bounded authenticated Production checks confirmed the Draft-first Jobs landing on desktop and mobile. This does not broaden output-specific permissions or prove mutating Production save/launch paths for every role.
 - Provider-neutral foundations for accounting, payments, communication, delivery, Demo Mode, Project Collaboration, and operations readiness are foundations only unless a later entry explicitly says the user-facing capability is live.
 
@@ -46,7 +47,7 @@ Important guardrails:
 - Do not claim push notifications, email/SMS reminders, provider delivery, or automated invitation delivery are live unless a later approved rollout says so.
 - Do not claim Home Access invite email delivery is live; production delivery remains disabled unless later enabled by an approved gate.
 - Do not claim customer-management role parity. Existing customer creation/direct local-contact access and newer helper-backed profile/property operations need a separate authorization audit and approved permission decision.
-- Do not remove the Draft connection-status selector until a later unified-selector slice can preserve subject mapping, stale-selection protection, save/resume behavior, and property context without ambiguity.
+- Any unified Draft customer selector must preserve canonical subject mapping, same-type saved-Draft fallback, stale-selection protection, authorized property scope, save/resume behavior, Draft gates, and the existing role matrix without merging customer records.
 - Do not claim automatic recurring reminders, native iOS/Android apps, full external calendar sync, broad public marketplace lead generation, paid rankings, advanced analytics, dispatch/routing, background checks, license verification, insurance verification, or formal compliance certification.
 
 ## Status Definitions

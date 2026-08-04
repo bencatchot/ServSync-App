@@ -1,9 +1,10 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
 import {
   createLocalE2ECustomer,
   escapeRegExp,
+  launchCustomerProfileDraft,
   openE2ECustomerActionPanel,
   timestampForRecord,
   waitForContractorWorkspaceReady,
@@ -20,18 +21,6 @@ function appContextOptions() {
       ? { 'x-vercel-protection-bypass': bypass, 'x-vercel-set-bypass-cookie': 'true' }
       : undefined,
   };
-}
-
-async function waitForInvoiceDraftSave(main: Locator, saveInvoiceButton: Locator) {
-  const saveError = main
-    .getByText(/Unable to save invoice draft|Add at least one line item|Add an invoice title/i)
-    .first();
-  await Promise.race([
-    saveInvoiceButton.waitFor({ state: 'hidden', timeout: 30_000 }),
-    saveError.waitFor({ state: 'visible', timeout: 30_000 }).then(async () => {
-      throw new Error(`Invoice draft save failed: ${(await saveError.textContent())?.trim() || 'unknown error'}`);
-    }),
-  ]);
 }
 
 // Open a contractor customer by name without depending on "Not invited" status
@@ -99,20 +88,12 @@ test.describe('invoice_sent in-app notification', () => {
     await waitForContractorWorkspaceReady(page);
     await openCustomerByName(page, customerName);
     await openE2ECustomerActionPanel(page, customerName);
-    await main.getByRole('button', { name: /^Create invoice\b/i }).click();
-    await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { name: /^Invoice draft$/i })).toBeVisible();
-
-    await main.getByRole('textbox', { name: /^Invoice title$/i }).fill(invoiceTitle);
-    await main.getByRole('textbox', { name: /^(Invoice scope|Scope)$/i }).fill('E2E invoice for invoice_sent notification test.');
-    await main.getByRole('textbox', { name: /^(Invoice line item 1 description|Description)$/i }).fill(invoiceTitle);
-    await main.getByRole('spinbutton', { name: /^(Invoice line item 1 quantity|Qty)$/i }).fill('1');
-    await main.getByRole('textbox', { name: /^(Invoice line item 1 unit price|Unit price)$/i }).fill('150');
-
-    const saveInvoiceButton = main.getByRole('button', { name: /^Save draft invoice$/i });
-    await expect(saveInvoiceButton).toBeEnabled();
-    await saveInvoiceButton.click();
-    await waitForInvoiceDraftSave(main, saveInvoiceButton);
+    await launchCustomerProfileDraft(page, {
+      customerName,
+      output: 'invoice',
+      title: invoiceTitle,
+      scope: 'E2E invoice for invoice_sent notification test.',
+    });
 
     await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
     await expect(main.getByText(invoiceTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
