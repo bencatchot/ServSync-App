@@ -277,6 +277,8 @@ test.describe('unified Draft UI wiring', () => {
     const profile = app.slice(profileStart, profileEnd > profileStart ? profileEnd : undefined);
 
     expect(app).toContain('const startCustomerProfileDraft = (');
+    expect(app).toContain("if (!DRAFT_JOB_UI_ENABLED) {\n      setError('Draft creation is not available in this environment.');");
+    expect(app).toContain('const customerProfileDraftDisabled = !DRAFT_JOB_UI_ENABLED');
     expect(app).toContain('{ intendedOutput: null }');
     expect(profile).toContain('Plan an estimate, job, or invoice');
     expect(profile).toContain('openCustomerProfileDraft');

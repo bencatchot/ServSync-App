@@ -29537,6 +29537,10 @@ function ContractorDashboard({
     customerId: string,
     explicitPropertyId = '',
   ) => {
+    if (!DRAFT_JOB_UI_ENABLED) {
+      setError('Draft creation is not available in this environment.');
+      return;
+    }
     if (durableDraftCohortSafeHold) {
       setError(durableDraftCohortHoldText);
       return;
@@ -35428,7 +35432,8 @@ function ContractorDashboard({
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
                     const customerProfileDraftAvailable = Boolean(conn || (localCustomer && !localCustomerIsClaimed));
-                    const customerProfileDraftDisabled = durableDraftCohortSafeHold
+                    const customerProfileDraftDisabled = !DRAFT_JOB_UI_ENABLED
+                      || durableDraftCohortSafeHold
                       || (sharedDraftComposerEnabled
                         ? durableDraftCapabilityLoading
                           || Boolean(durableDraftCapabilityError)
