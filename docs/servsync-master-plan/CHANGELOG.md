@@ -4,6 +4,26 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-04
+
+- Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
+- Validation scope: PR #369 controlled Sandbox SQL, gateway, Firewall, deployment, and capped live validation after the independent source review passed at head `f1191f76bef525f3b76aabbd8102af635e3c8f87`.
+- Sandbox changes:
+  - Confirmed `servsync-request-free-local-invoice-delivery.sql` (SHA-256 `244b3a9275862f6c855a360970d74b4b42b581aca36f26c7fb7adf82001fe8b4`) was already installed in Sandbox `zpzdkoaubyjtsomccxya`; it was not reapplied.
+  - Applied `servsync-request-free-local-invoice-delivery-gateway-hardening.sql` (SHA-256 `a9822d63302812f08c9e968555bee39188994fef3b8ec40c2b9a7c2ab2d76bd1`) and then `servsync-request-free-local-invoice-delivery-session.sql` (SHA-256 `33356ec93eaf4c8b415fa44008a49cf378de02356da3c109b6a529e67341901d`) through fail-fast transactions.
+  - Configured only the dedicated Sandbox Vercel project `servsync-app-development` with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` for its Sandbox production target. No values are recorded here.
+  - Published one IP-keyed fixed-window Firewall rule for SDK ID `request-free-local-invoice-delivery`, capped at 100 requests per 60 seconds with the rate-limit/429 action.
+  - Deliberately deployed the clean audited checkout to dedicated Sandbox deployment `dpl_7aNcLLQ9frcfkFDh7b7xTvBejw37`; it reached `READY` and serves `https://servsync-app-development.vercel.app`. The manual Sandbox deployment was launched from exact local head `f1191f76bef525f3b76aabbd8102af635e3c8f87`; Vercel does not attach Git-source metadata to this CLI deployment.
+- Validation results:
+  - Catalog/security checks passed across all 24 cases: 23 passed in the full catalog run and the separately gated live bearer concurrency case passed afterward.
+  - Owner, admin, and office link-management authority passed; field tech, viewer, homeowner, anonymous, and second-contractor attempts failed closed.
+  - Desktop 1280x720 and mobile 390x844 recipient flows passed with synchronous bearer removal, fixed 30-minute protected cookie attributes, refresh/session use, token-free storage/history, private-field exclusion, no page overflow, and zero console, failed-request, or Analytics activity.
+  - Rotation and revocation invalidated existing recipient sessions immediately. Live request-body limits passed at 1,023/1,024/1,025 bytes, and the published Firewall returned 429 with `Retry-After: 60` within the capped 100-request window.
+  - Live SQL/gateway boundaries passed for 99/100/101 invoice lines, 262,143/262,144/262,145 serialized UTF-8 bytes, saturated bigint open counters, concurrent lookup/session replacement, and deterministic expired-session cleanup from 30 to 5 to 0 without deleting valid sessions.
+  - Every tagged contact, local home, invoice, line, link, session, and validation limiter row was removed. Original Sandbox counts returned to 83 invoices, 299 local contacts, and 320 local homes; delivery links, recipient sessions, rate buckets, and tagged fixtures returned to zero.
+- Rollout status: PR #369 remains open, draft, unmerged, and unavailable in Demo or Production. Sandbox validation is complete; the next gate is a separate merge-readiness review. No Production or Demo SQL, data, Vercel project, configuration, Firewall, or deployment was accessed or changed.
+- Backlog impact: FB-003B remains active. Slice 1 is Sandbox-validated but not merged or Production-ready; anonymous PDFs, estimate/report delivery, claimed-account transition, provider channels, reminders, and approval/payment/reply actions remain future work.
+
 ## 2026-08-03
 
 - Branch: `codex/fb003b-request-free-local-invoice-delivery-v1`
