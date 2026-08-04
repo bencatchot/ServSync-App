@@ -443,6 +443,74 @@ export interface Invoice {
   backlog_items?: InvoiceBacklogItem[];
 }
 
+export type LocalInvoiceDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
+
+export interface LocalInvoiceDeliveryLinkMetadata {
+  id: string;
+  state: LocalInvoiceDeliveryLinkState;
+  created_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  first_opened_at: string | null;
+  last_opened_at: string | null;
+  open_count: number;
+  created_by_name: string;
+  revoked_by_name: string;
+}
+
+export type RequestFreeInvoiceDeliveryState =
+  | 'valid'
+  | 'invalid'
+  | 'expired'
+  | 'revoked'
+  | 'replaced'
+  | 'unavailable'
+  | 'rate_limited'
+  | 'error';
+
+export interface RequestFreeInvoiceLineItem {
+  title: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price_cents: number | null;
+}
+
+export interface RequestFreeInvoiceDocument {
+  contractor: {
+    business_name: string;
+  };
+  customer: {
+    display_name: string;
+  };
+  property: {
+    address_line1: string;
+    address_line2: string;
+    city: string;
+    state: string;
+    zip_code: string;
+  };
+  invoice_number: string;
+  title: string;
+  scope: string;
+  notes: string;
+  terms: string;
+  status: Exclude<InvoiceStatus, 'draft' | 'void'>;
+  subtotal_cents: number;
+  tax_cents: number;
+  discount_cents: number;
+  total_cents: number;
+  amount_paid_cents: number;
+  issued_at: string | null;
+  due_at: string | null;
+  line_items: RequestFreeInvoiceLineItem[];
+}
+
+export interface RequestFreeInvoiceDeliveryLookup {
+  state: RequestFreeInvoiceDeliveryState;
+  invoice?: RequestFreeInvoiceDocument;
+}
+
 export interface ExternalObjectMapping {
   id: string;
   provider: string;

@@ -1,8 +1,8 @@
 # ServSync Completed Features
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
-Last reconciled against `origin/main` at `052d13ca061653f0bfa6bad4353d2f47eb95c205` (merged PR #367).
+Last reconciled against `origin/main` at `410bd1554a646ee81ef9eb9d6cbe40ea7fc2ff9a` (merged PR #368).
 
 ## Purpose
 

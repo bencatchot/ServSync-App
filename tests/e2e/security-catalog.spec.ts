@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { requireValidationTarget } from './helpers/validationTarget';
 
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+
 type CatalogResponse<T> = {
   rows?: T[];
 };
@@ -31,6 +33,7 @@ type RpcSignatureRow = {
   public_execute: boolean | null;
   anon_execute: boolean | null;
   authenticated_execute: boolean | null;
+  service_role_execute: boolean | null;
 };
 
 type BucketRow = {
@@ -134,6 +137,9 @@ const CORE_PRIVATE_TABLES = [
   'estimate_payment_schedule_items',
   'invoices',
   'invoice_line_items',
+  'local_invoice_delivery_links',
+  'local_invoice_delivery_rate_buckets',
+  'local_invoice_delivery_sessions',
   'inspections',
   'home_maintenance_log',
   'home_reminders',
@@ -201,6 +207,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
   'servsync_create_invoice_from_estimate_schedule_item',
+  'servsync_create_local_invoice_delivery_link',
   'servsync_create_project',
   'servsync_create_local_home',
 	  'servsync_create_local_customer_claim_invite',
@@ -220,6 +227,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_list_home_membership_email_invites',
 	  'servsync_list_local_customer_claim_invites',
 	  'servsync_list_local_customer_claim_invites_v2',
+  'servsync_list_local_invoice_delivery_links',
   'servsync_list_my_shared_home_address_shells',
   'servsync_list_my_shared_home_reminder_shells',
   'servsync_list_my_shared_home_shells',
@@ -252,6 +260,8 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_revoke_home_map_draft',
   'servsync_revoke_home_property_proposal',
   'servsync_revoke_local_customer_claim_invite',
+  'servsync_revoke_local_invoice_delivery_link',
+  'servsync_rotate_local_invoice_delivery_link',
   'servsync_homeowner_respond_to_service_agreement_offer',
   'servsync_send_service_agreement_offer',
   'servsync_update_local_contact_profile',
@@ -277,6 +287,15 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_private_contractor_has_durable_draft_entitlement',
   'servsync_private_durable_draft_rollout_mode',
   'servsync_private_can_prepare_local_customer_claim_invites',
+  'servsync_private_can_manage_local_invoice_delivery',
+  'servsync_private_cleanup_local_invoice_delivery_rate_limits',
+  'servsync_private_cleanup_local_invoice_delivery_sessions',
+  'servsync_private_consume_local_invoice_delivery_rate_limit',
+  'servsync_private_current_local_invoice_delivery_contractor_id',
+  'servsync_private_local_invoice_delivery_metadata',
+  'servsync_private_render_local_invoice_delivery',
+  'servsync_bootstrap_local_invoice_delivery_session',
+  'servsync_lookup_local_invoice_delivery_session',
   'servsync_record_home_access_invite_delivery_result',
 ];
 
@@ -366,7 +385,8 @@ select
       and acl.privilege_type = 'EXECUTE'
   ) as public_execute,
   has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
-  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute
+  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute,
+  has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_execute
 from expected e
 left join pg_proc p
   on p.oid = e.signature::regprocedure
@@ -492,6 +512,115 @@ where c.relnamespace = 'public'::regnamespace
     expect(rows[0].authenticated_insert, 'authenticated should use guarded create RPCs, not direct table INSERT').toBe(false);
     expect(rows[0].authenticated_update, 'authenticated should use guarded lifecycle RPCs, not direct table UPDATE').toBe(false);
     expect(rows[0].authenticated_delete, 'authenticated should not directly DELETE claim invites').toBe(false);
+  });
+
+  test('local invoice delivery, rate-limit, and recipient-session storage remain private for every browser role', () => {
+    const rows = runCatalogQuery<TablePrivilegeRow>(`
+select
+  c.relname as table_name,
+  c.oid is not null as exists,
+  has_table_privilege('public', c.oid, 'SELECT') as public_select,
+  has_table_privilege('public', c.oid, 'INSERT') as public_insert,
+  has_table_privilege('public', c.oid, 'UPDATE') as public_update,
+  has_table_privilege('public', c.oid, 'DELETE') as public_delete,
+  has_table_privilege('anon', c.oid, 'SELECT') as anon_select,
+  has_table_privilege('anon', c.oid, 'INSERT') as anon_insert,
+  has_table_privilege('anon', c.oid, 'UPDATE') as anon_update,
+  has_table_privilege('anon', c.oid, 'DELETE') as anon_delete,
+  has_table_privilege('authenticated', c.oid, 'SELECT') as authenticated_select,
+  has_table_privilege('authenticated', c.oid, 'INSERT') as authenticated_insert,
+  has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
+  has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete
+from pg_class c
+where c.relname in ('local_invoice_delivery_links', 'local_invoice_delivery_rate_buckets', 'local_invoice_delivery_sessions')
+  and c.relnamespace = 'public'::regnamespace
+order by c.relname;
+    `);
+
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.exists).toBe(true);
+      expect(row.public_select || row.public_insert || row.public_update || row.public_delete).toBe(false);
+      expect(row.anon_select || row.anon_insert || row.anon_update || row.anon_delete).toBe(false);
+      expect(row.authenticated_select || row.authenticated_insert || row.authenticated_update || row.authenticated_delete).toBe(false);
+    }
+  });
+
+  test('invoice delivery bearer lookup is no longer callable directly and session RPCs are gateway-only', () => {
+    const rows = runCatalogQuery<RpcSignatureRow>(
+      securityDefinerRpcSignatureCatalogQuery([
+        'servsync_bootstrap_local_invoice_delivery_session(text,text,text)',
+        'servsync_lookup_local_invoice_delivery(text)',
+        'servsync_lookup_local_invoice_delivery_session(text)',
+      ]),
+    );
+
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.exists, `${row.signature} should exist`).toBe(true);
+      expect(row.security_definer, `${row.signature} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.signature} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.signature} should deny PUBLIC`).toBe(false);
+      expect(row.anon_execute, `${row.signature} should deny anon`).toBe(false);
+      expect(row.authenticated_execute, `${row.signature} should deny authenticated`).toBe(false);
+    }
+    expect(rows.find(row => row.signature === 'servsync_lookup_local_invoice_delivery(text)')?.service_role_execute).toBe(false);
+    expect(rows.find(row => row.signature === 'servsync_bootstrap_local_invoice_delivery_session(text,text,text)')?.service_role_execute).toBe(true);
+    expect(rows.find(row => row.signature === 'servsync_lookup_local_invoice_delivery_session(text)')?.service_role_execute).toBe(true);
+  });
+
+  test('concurrent recipient lookup and session replacement complete without a deadlock', async ({ browser }) => {
+    test.skip(
+      process.env.SERVSYNC_RUN_REQUEST_FREE_SESSION_CONCURRENCY !== '1',
+      'Requires a separately authorized Sandbox gateway run with a fresh ephemeral delivery bearer.',
+    );
+    const bearer = process.env.SERVSYNC_REQUEST_FREE_INVOICE_CONCURRENCY_TOKEN?.trim() ?? '';
+    if (!/^[0-9a-f]{64}$/.test(bearer)) {
+      throw new Error('A fresh ephemeral request-free invoice concurrency bearer is required.');
+    }
+    const { appUrl } = requireValidationTarget({ requireAppUrl: true, requireSupabaseEnv: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await page.goto(`${appUrl}/#/invoice-delivery`);
+      const bootstrap = await page.evaluate(async token => {
+        const response = await fetch('/api/request-free-local-invoice-delivery', {
+          method: 'POST',
+          body: JSON.stringify({ token }),
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(8_000),
+        });
+        const payload = await response.json() as { state?: string };
+        return { status: response.status, state: payload.state };
+      }, bearer);
+      expect(bootstrap).toEqual({ status: 200, state: 'valid' });
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const result = await page.evaluate(async token => {
+          const request = (body: string) => fetch('/api/request-free-local-invoice-delivery', {
+            method: 'POST',
+            body,
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(8_000),
+          }).then(async response => ({
+            status: response.status,
+            state: ((await response.json()) as { state?: string }).state,
+          }));
+          const [lookup, replacement] = await Promise.all([
+            request('{}'),
+            request(JSON.stringify({ token })),
+          ]);
+          return { lookup, replacement };
+        }, bearer);
+        expect(result.replacement).toEqual({ status: 200, state: 'valid' });
+        expect(result.lookup.status).toBe(200);
+        expect(['valid', 'unavailable']).toContain(result.lookup.state);
+      }
+    } finally {
+      await context.close();
+    }
   });
 
   test('foundation tables stay read-only for browser roles where expected', () => {

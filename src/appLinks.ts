@@ -11,6 +11,7 @@ export const APP_ROUTE_NAMES = [
   'acceptable-use',
   'contractor-agreement',
   'trust-safety',
+  'invoice-delivery',
 ] as const;
 
 export type AppRouteName = typeof APP_ROUTE_NAMES[number];
@@ -68,4 +69,8 @@ export function contractorTeamInviteUrl(code: string, location?: AppLocationLike
 
 export function contractorProfileUrl(slug: string, location?: AppLocationLike) {
   return appRouteUrl('profile', { slug }, location);
+}
+
+export function requestFreeLocalInvoiceUrl(token: string, location?: AppLocationLike) {
+  return appRouteUrl('invoice-delivery', { access: token }, location);
 }
