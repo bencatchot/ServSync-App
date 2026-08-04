@@ -33,9 +33,9 @@ test.describe('contractor read-only smoke', () => {
     await expectActiveTabHeading(page, /^Dashboard$/i);
     await expect(main.getByText(/Contractor command center/i)).toBeVisible();
 
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
-    await expect(main.getByPlaceholder(/Search homeowner, city, address/i)).toBeVisible();
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
+    await expect(main.getByPlaceholder(/Search customers, city, or address/i)).toBeVisible();
 
     await openSidebarTab(page, /Service Requests/i);
     await expectActiveTabHeading(page, /^Service Requests$/i);

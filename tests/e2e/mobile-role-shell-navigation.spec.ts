@@ -29,7 +29,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
       '  return (\n    <SidebarLayout\n      brand={{ name: contractorDraft.business_name',
     );
 
-    expect(labelsFrom(navSource)).toEqual(['Discover', 'Jobs', 'Dashboard', 'Homeowners', 'More']);
+    expect(labelsFrom(navSource)).toEqual(['Discover', 'Jobs', 'Dashboard', 'Customers', 'More']);
     expect(labelsFrom(navSource)).not.toContain('Money');
     expect(labelsFrom(navSource)).not.toContain('Messages');
     expect(navSource).toContain("id: 'discover'");

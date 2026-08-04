@@ -388,7 +388,7 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(composerSource).toContain('Save Draft');
     expect(composerSource).toContain('Create Job');
     expect(composerSource).toContain('data-testid="draft-job-create-job-button"');
-    expect(composerSource).toContain('Customer type is fixed after the first save');
+    expect(composerSource).toContain('Connection status is fixed after the first save');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Invoice');
   });

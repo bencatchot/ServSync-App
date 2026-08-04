@@ -128,7 +128,7 @@ export function DraftJobComposer({
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
 
       <div className="grid gap-3 lg:grid-cols-3">
-        {composerField('Customer type', (
+        {composerField('Connection status', (
           <select
             className={fieldClass()}
             value={draft.subject_type}
@@ -143,8 +143,8 @@ export function DraftJobComposer({
               service_request_id: '',
             })}
           >
-            <option value="connected">Connected homeowner</option>
-            <option value="local">Local customer</option>
+            <option value="connected">Connected</option>
+            <option value="local">Not connected</option>
           </select>
         ))}
         {composerField('Customer', (
@@ -165,7 +165,7 @@ export function DraftJobComposer({
           >
             <option value="">Choose customer...</option>
             {customerOptions.map(option => (
-              <option key={option.id} value={option.id}>{option.label}</option>
+              <option key={option.id} value={option.id}>{option.helper ? `${option.label} — ${option.helper}` : option.label}</option>
             ))}
           </select>
         ))}
@@ -189,7 +189,7 @@ export function DraftJobComposer({
       </div>
       {subjectTypeLocked ? (
         <p className="text-xs font-medium text-slate-500">
-          Customer type is fixed after the first save so retries update the same Draft Job safely.
+          Connection status is fixed after the first save so retries update the same Draft Job safely.
         </p>
       ) : null}
 

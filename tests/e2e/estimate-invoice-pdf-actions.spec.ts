@@ -279,7 +279,7 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     expect(financialListSource).toContain('previewInvoicePdf(invoice');
     expect(financialListSource).toContain('downloadInvoicePdf(invoice');
     expect(financialListSource).toContain("!invoice.homeowner_user_id");
-    expect(financialListSource).toContain('Connect this customer to a ServSync homeowner before sending the invoice through the portal.');
+    expect(financialListSource).toContain('Connect this customer before sending the invoice through the customer portal.');
     expect(financialListSource).toContain('disabled={updatingInvoiceId === invoice.id || !invoice.homeowner_user_id}');
   });
 

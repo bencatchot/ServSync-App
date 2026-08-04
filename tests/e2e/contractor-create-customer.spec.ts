@@ -52,8 +52,8 @@ test.describe('contractor mutating customer creation', () => {
     const customerEmail = `e2e-customer-${timestamp}@example.com`;
 
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
 
     await main.getByRole('button', { name: /^Add$/i }).click();
     await expect(main.getByRole('heading', { name: /^Add new customer$/i })).toBeVisible();
@@ -82,7 +82,7 @@ test.describe('contractor mutating customer creation', () => {
       .waitForResponse(response => response.url().includes('/rpc/servsync_create_local_contact'), { timeout: 10_000 })
       .catch(() => null);
 
-    const search = main.getByPlaceholder(/Search homeowner, city, address/i);
+    const search = main.getByPlaceholder(/Search customers, city, or address/i);
     const customerResult = main.getByRole('button', { name: new RegExp(escapeRegExp(customerName), 'i') });
     const saveError = main.getByText(/Unable to save new customer|Enter a customer name before saving/i);
     const saveButton = main.getByRole('button', { name: /^Save new customer$/i });
@@ -125,8 +125,8 @@ test.describe('contractor mutating customer creation', () => {
     const secondProperty = `Guest E2E Property ${timestamp}`;
 
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
 
     await main.getByRole('button', { name: /^Add$/i }).click();
     await expect(main.getByRole('heading', { name: /^Add new customer$/i })).toBeVisible();
@@ -147,7 +147,7 @@ test.describe('contractor mutating customer creation', () => {
     const createContactResponse = await createContactResponsePromise;
     expect(createContactResponse.ok()).toBeTruthy();
 
-    const search = main.getByPlaceholder(/Search homeowner, city, address/i);
+    const search = main.getByPlaceholder(/Search customers, city, or address/i);
     await expect(search).toBeVisible();
     await search.fill(customerName);
     const customerResult = main.getByRole('button').filter({ hasText: customerName }).first();
@@ -306,8 +306,8 @@ test.describe('contractor mutating customer creation', () => {
     const editedCustomerPhone = '(555) 010-9090';
 
     await loginAs(page, 'contractor');
-    await openSidebarTab(page, /Homeowners/i);
-    await expectActiveTabHeading(page, /^Homeowners$/i);
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
 
     await main.getByRole('button', { name: /^Add$/i }).click();
     await expect(main.getByRole('heading', { name: /^Add new customer$/i })).toBeVisible();
@@ -328,7 +328,7 @@ test.describe('contractor mutating customer creation', () => {
     const createContactResponse = await createContactResponsePromise;
     expect(createContactResponse.ok()).toBeTruthy();
 
-    const search = main.getByPlaceholder(/Search homeowner, city, address/i);
+    const search = main.getByPlaceholder(/Search customers, city, or address/i);
     await expect(search).toBeVisible();
     await search.fill(customerName);
     const customerResult = main.getByRole('button').filter({ hasText: customerName }).first();

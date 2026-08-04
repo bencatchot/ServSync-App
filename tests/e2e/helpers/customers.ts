@@ -50,7 +50,7 @@ export async function createLocalE2ECustomer(page: Page, timestamp: string) {
 
 export async function openE2ECustomerDetail(page: Page, customerName: string) {
   const main = page.getByRole('main');
-  const search = main.getByPlaceholder(/Search homeowner, city, address/i);
+  const search = main.getByPlaceholder(/Search customers, city, or address/i);
   const customerResult = main
     .getByRole('button')
     .filter({ hasText: customerName })

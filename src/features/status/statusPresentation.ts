@@ -7,6 +7,13 @@ export interface StatusPresentation {
   tone: StatusTone;
 }
 
+export type CustomerConnectionStatus =
+  | 'connected'
+  | 'not_connected'
+  | 'invitation_pending'
+  | 'connection_request'
+  | 'inactive';
+
 const STATUS_TONE_CLASSES: Record<StatusTone, string> = {
   neutral: 'border-slate-200 bg-slate-50 text-slate-700',
   info: 'border-blue-200 bg-blue-50 text-blue-700',
@@ -29,6 +36,17 @@ export function readableStatusLabel(value?: string | null) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, match => match.toUpperCase());
+}
+
+export function customerConnectionStatusPresentation(status: CustomerConnectionStatus): StatusPresentation {
+  const presentations: Record<CustomerConnectionStatus, StatusPresentation> = {
+    connected: { label: 'Connected', tone: 'success' },
+    not_connected: { label: 'Not connected', tone: 'neutral' },
+    invitation_pending: { label: 'Invitation pending', tone: 'warning' },
+    connection_request: { label: 'Connection request', tone: 'info' },
+    inactive: { label: 'Inactive', tone: 'muted' },
+  };
+  return presentations[status];
 }
 
 export function estimateStatusPresentation(status: EstimateStatus | string): StatusPresentation {
