@@ -146,6 +146,7 @@ import {
 import {
   localCustomerDirectoryFailureState,
   localCustomerSummaryFromFullContact,
+  normalizeCreatedLocalCustomer,
   normalizeLocalCustomerManagementDetail,
   normalizeLocalCustomerSummaries,
   type LocalCustomerDirectoryLoadState,
@@ -28760,7 +28761,7 @@ function ContractorDashboard({
     setInspectionView('list');
   };
   const canManageContractorCustomers = canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id);
-  const canCreateContractorLocalCustomers = canCreateContractorLocalCustomersUi(contractorDraft, profile.id);
+  const canCreateContractorLocalCustomers = canCreateContractorLocalCustomersUi(contractorDraft, teamAccess, profile.id);
   const selectedLocalCustomerSummaryId = selectedHomeownerSubjectId?.startsWith('local:')
     ? selectedHomeownerSubjectId.slice('local:'.length)
     : '';
@@ -31715,7 +31716,11 @@ function ContractorDashboard({
   }) => {
     if (!supabase) return;
     if (!canCreateContractorLocalCustomers) {
-      setError('Only the contractor owner can add a customer in this workflow.');
+      setError('Only the contractor owner, admin, or office role can add a customer in this workflow.');
+      return;
+    }
+    if (!contractorDraft.id) {
+      setError('Customer creation is unavailable until the contractor workspace finishes loading.');
       return;
     }
     if (!localContactDraft.display_name.trim()) {
@@ -31745,8 +31750,8 @@ function ContractorDashboard({
       });
       if (createError) throw createError;
 
-      const created = data as { contact?: ContractorLocalContact; home?: ContractorLocalHome } | null;
-      if (created?.contact) {
+      const created = normalizeCreatedLocalCustomer(data, contractorDraft.id);
+      if (created.contact) {
         const contactWithHome: ContractorLocalContact = {
           ...created.contact,
           homes: created.home ? [created.home] : [],

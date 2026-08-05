@@ -120,6 +120,43 @@ export function normalizeLocalCustomerManagementDetail(payload: unknown, contrac
   };
 }
 
+export function normalizeCreatedLocalCustomer(payload: unknown, contractorId: string) {
+  const row = asObject(payload);
+  const contact = asObject(row?.contact);
+  const home = asObject(row?.home);
+  const contactId = text(contact?.id);
+  if (
+    !row
+    || !contact
+    || !home
+    || !contractorId
+    || !contactId
+    || text(contact.contractor_id) !== contractorId
+    || text(home.contractor_id) !== contractorId
+    || text(home.local_contact_id) !== contactId
+    || !text(home.id)
+  ) {
+    throw new Error('Created local customer response was invalid.');
+  }
+
+  const createdContact: ContractorLocalContact = {
+    id: contactId,
+    contractor_id: contractorId,
+    homeowner_user_id: null,
+    display_name: text(contact.display_name) || 'Customer',
+    phone: text(contact.phone),
+    email: text(contact.email),
+    notes: text(contact.notes),
+    claimed_at: null,
+    created_at: text(contact.created_at),
+    updated_at: text(contact.updated_at),
+  };
+  const createdHome = detailHome(home, contractorId, contactId);
+  if (!createdHome) throw new Error('Created local customer response was invalid.');
+
+  return { contact: createdContact, home: createdHome };
+}
+
 export function localCustomerSummaryFromFullContact(contact: ContractorLocalContact): ContractorLocalContact {
   return normalizeLocalCustomerSummaries([{
     id: contact.id,

@@ -208,6 +208,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
   'servsync_create_invoice_from_estimate_schedule_item',
+  'servsync_create_local_contact',
   'servsync_create_local_invoice_delivery_link',
   'servsync_create_project',
   'servsync_create_local_home',

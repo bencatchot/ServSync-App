@@ -53,11 +53,12 @@ test.describe('customer management edit boundary', () => {
     expect(canManageContractorCustomersUi(contractor, teamAccess('admin-user', 'admin'), 'unrelated-user')).toBe(false);
     expect(canManageContractorCustomersUi(contractor, null, '')).toBe(false);
 
-    expect(canCreateContractorLocalCustomersUi(contractor, 'owner-user')).toBe(true);
-    expect(canCreateContractorLocalCustomersUi(contractor, 'admin-user')).toBe(false);
-    expect(canCreateContractorLocalCustomersUi(contractor, 'office-user')).toBe(false);
-    expect(canCreateContractorLocalCustomersUi(contractor, 'field-user')).toBe(false);
-    expect(canCreateContractorLocalCustomersUi(contractor, 'viewer-user')).toBe(false);
+    expect(canCreateContractorLocalCustomersUi(contractor, null, 'owner-user')).toBe(true);
+    expect(canCreateContractorLocalCustomersUi(contractor, teamAccess('admin-user', 'admin'), 'admin-user')).toBe(true);
+    expect(canCreateContractorLocalCustomersUi(contractor, teamAccess('office-user', 'office'), 'office-user')).toBe(true);
+    expect(canCreateContractorLocalCustomersUi(contractor, teamAccess('field-user', 'field_tech'), 'field-user')).toBe(false);
+    expect(canCreateContractorLocalCustomersUi(contractor, teamAccess('viewer-user', 'viewer'), 'viewer-user')).toBe(false);
+    expect(canCreateContractorLocalCustomersUi(contractor, teamAccess('disabled-admin', 'admin', 'disabled'), 'disabled-admin')).toBe(false);
   });
 
   test('SQL helper derives owner/admin/office authority and fails closed for every other caller', () => {
@@ -146,7 +147,7 @@ test.describe('customer management edit boundary', () => {
     expect(sql).toContain('commit;');
   });
 
-  test('App hides local identity/property controls outside management roles and keeps creation owner-only', () => {
+  test('App hides local identity/property controls outside management roles and shares creation with managers', () => {
     const app = source('src/App.tsx');
     const customerWorkspace = sourceBetween(
       app,
@@ -160,7 +161,7 @@ test.describe('customer management edit boundary', () => {
     );
 
     expect(app).toContain('canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id)');
-    expect(app).toContain('canCreateContractorLocalCustomersUi(contractorDraft, profile.id)');
+    expect(app).toContain('canCreateContractorLocalCustomersUi(contractorDraft, teamAccess, profile.id)');
     expect(customerWorkspace).toContain('!SERVSYNC_DEMO_PRESENTATION_MODE && canCreateContractorLocalCustomers');
     expect(customerWorkspace).toContain('localCustomer && !localCustomerIsClaimed && localCustomerManagementDetailReady');
     expect(customerWorkspace).toContain('isAdding && localCustomerManagementDetailReady');

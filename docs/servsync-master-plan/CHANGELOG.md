@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/admin-office-customer-creation-parity-v1`
+- Starting main SHA: `18fdb53abf5e505e239d93ad9d12bd939dacbe9f`
+- Files changed:
+  - `servsync-admin-office-customer-creation-parity.sql`
+  - `src/App.tsx`
+  - `src/features/customers/customerManagementPermissions.ts`
+  - `src/features/customers/localCustomerDirectory.ts`
+  - focused customer-creation, role-probe, UI, customer-management, and security-catalog tests under `tests/e2e/`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Admin/Office Customer Creation Parity v1 in repository source. The additive migration replaces only `servsync_create_local_contact`, derives the active contractor from the authenticated session, reuses the existing customer-management helper, and atomically creates one contractor-managed customer plus its initial property for owner, active Admin, or active Office callers. Field Technician, Viewer, inactive/removed users, homeowners, anonymous callers, and attempts to supply a contractor/parent identifier fail closed. The RPC now returns an explicit customer/property DTO instead of raw table rows, and the client validates contractor, customer, and property bindings before adding the result to local state. All existing Customers, Estimate, Job, and onboarding creation controls now share the same Owner/Admin/Office UI capability. Draft and Job authority, PR #374 mutation restrictions, PR #376 role-shaped reads, connected-homeowner ownership, claim/invitation behavior, and multi-property behavior remain unchanged.
+- Migration status: Exact migration `servsync-admin-office-customer-creation-parity.sql` (SHA-256 `ce3fc2b8e79bab14790c27577e66d2e7d6c0a27cd4c1cf1ffe8856877531b78b`) was applied only to Sandbox project `zpzdkoaubyjtsomccxya` on `2026-08-05` at `17:27:55Z`. The deployed RPC matched the committed migration, remained owned by `postgres`, used `SECURITY DEFINER` with fixed `search_path=public`, retained only the intended execution grants, and introduced no RLS or direct-table privilege change. Sandbox is temporarily ahead of main for PR #378 validation. Demo and Production remain untouched; no environment, configuration, or manual deployment change occurred.
+- Tests/checks run: The final scoped local-directory, customer-management, terminology, claim, unified-Draft, estimate-creation, desktop, and mobile group passed 49/49. TypeScript and the Production build passed. The authenticated Sandbox matrix confirmed Owner, active Admin, and active Office creation success plus Field Technician, Viewer, inactive, removed, homeowner, anonymous, unauthenticated, and cross-tenant denial. Customer and initial-property creation remained paired and transactional, created customers appeared through the controlled PR #376 directory, and exact-head Admin desktop plus Office mobile creation-to-Draft handoff passed without horizontal overflow, material console errors, or failed requests. The security catalog passed 23 checks with one separately gated skip; effective Draft/claim/invitation regression evidence passed 71 unique assertions. Temporary customers, homes, Drafts, sessions, and membership state were removed or restored, with final counts restored to 299 local contacts, 320 local homes, 13 claim invitations, and 5 team members. Full ESLint remains blocked by the unchanged ESLint 9 `allowShortCircuit` startup incompatibility; focused lint with only that broken rule disabled found no new changed-file errors. The obsolete PR #317 documentation assertion is unchanged from the starting main baseline and does not touch this slice.
+- Known risks or follow-ups:
+  - PR #378 remains draft and unmerged. Sandbox application and validation are complete, but the feature is not live in Production or Demo. A controlled Production migration-first rollout, exact-PR reverification, normal merge authorization, automatic deployment monitoring, and bounded Production validation remain separately pending.
+  - Archive/restore lifecycle, direct-table privilege cleanup, Demo migration disposition, broader customer-model unification, the inherited non-owner appointment-window 401, and inherited ESLint 9 startup repair remain separate work. Full customer-management maturity is not complete.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the bounded creation-parity implementation as source-only while keeping rollout and broader customer-management maturity active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Aligns the approved role model and rollout boundary without claiming that the migration is applied, deployed, or live.
+
 - Branch: `codex/pr376-production-rollout-doc-closeout`
 - Starting main SHA: `fac9da09316e9ecc52649d9a181e7251a6efe421` (normal two-parent merge commit for PR #376)
 - Files changed:
