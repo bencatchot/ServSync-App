@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/pr376-production-rollout-doc-closeout`
+- Starting main SHA: `fac9da09316e9ecc52649d9a181e7251a6efe421` (normal two-parent merge commit for PR #376)
+- Files changed:
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Records the completed Production rollout of Contractor Local Customer Read/List Parity v1. PR #376 merged through normal GitHub merge commit `fac9da09316e9ecc52649d9a181e7251a6efe421`, with base parent `753a0d25db3c282a0dd86d3001aa1ae4217e6d48` and reviewed-head parent `49c89689e8b05404e4635a7e55efd7510ff485c1`. The exact committed migration `servsync-contractor-local-customer-read-list-parity.sql` (SHA-256 `0b90e4548ceec24e7bdd96a12ad9951f74b7ffc064f222a2f41b0e2ce109f41f`) was applied successfully to Production Supabase `uqgtheclhxqlnjpfmheq` from `2026-08-05T15:52:19Z` through `2026-08-05T15:52:28Z` before merge.
+- Production security and preservation: All three Production functions matched the audited definitions, remained owned by `postgres`, used `SECURITY DEFINER` with fixed `search_path=public`, and retained only the intended execution grants. `PUBLIC` and `anon` remained denied, no unexpected overload or deployed drift appeared, and no RLS policy, direct-table privilege, customer/property/invitation data, environment variable, or project configuration changed. Controlled RPC boundaries replaced the browser wildcard local-customer query, with distinct loading, empty, unavailable, failure, retry, and stale-state handling. PR #374 mutation restrictions remain authoritative, claimed local snapshots remain excluded from the local directory, and connected-customer sharing, Draft, property-selection, claim, and output-authority behavior remains unchanged.
+- Production deployment: Automatic Vercel Git deployment `dpl_H5hrgfw1evUtGbMJR5Rvtj6zG5QP` reached Production `READY` in project `serv-sync-app-refresh` from merge commit `fac9da09316e9ecc52649d9a181e7251a6efe421`. `https://servsync.app` and `https://www.servsync.app` returned HTTP 200. Automatic Demo source deployment `dpl_CHNtsMaJNn3CUj3gi2AfCKLboj1u` was created from the merge commit, but the migration was not applied to Demo and Demo database support is not claimed. No manual deployment, promotion, retry, alias, environment, or configuration change occurred.
+- Validation boundary: Full authenticated role and redaction behavior was established in Sandbox: owner/admin/office receive eligible directory and management detail; field tech receives redacted operational summaries without contact, private-note, invitation, claim, token, or customer/property mutation authority; Viewer receives only work-linked customers and exact referenced properties. Production independently verified exact function correspondence, ownership, security settings, grants, and preservation. Bounded authenticated Production validation passed for the contractor Owner and homeowner accounts; existing local customers and management detail loaded on Owner desktop/mobile Customers views, no horizontal overflow appeared, and console, failed-request, and HTTP-error counts were zero. No Production customer/property fixture or mutation was created. Field-tech and Viewer Production scenarios were not repeated because approved Production credentials were unavailable.
+- Tests/checks run: Verified merge identity and two-parent topology, migration filename and SHA-256, Production function fingerprints/ownership/`SECURITY DEFINER`/search path/grants, absence of overload and catalog drift, before/after customer/property/invitation preservation fingerprints, automatic Production deployment identity/source/`READY` state, Demo source-deployment identity, both Production aliases at HTTP 200, authenticated read-only Production smoke 2/2, bounded Owner desktop/mobile Customers behavior, three-document scope, stale rollout wording, Markdown relative links/anchors/tables, `git diff --check`, added-line sensitive-value scan, and final clean-worktree state.
+- Known risks or follow-ups:
+  - Production Field-tech and Viewer UI behavior was not repeated because approved credentials were unavailable; exact deployed-function correspondence and completed authenticated Sandbox role validation remain the evidence basis.
+  - Admin/Office customer creation parity, archive/restore lifecycle, direct-table privilege cleanup, Demo migration disposition, broader customer-model maturity, the inherited non-owner appointment-window 401, and inherited ESLint 9 startup incompatibility remain separate active work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Replaces the draft/Sandbox-only PR #376 status with the merged and Production-active read/list boundary while retaining the remaining creation, archive, privilege, Demo, and customer-model work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the exact Production migration, security correspondence, automatic deployment, bounded validation evidence, and limitations without claiming complete customer-model unification or Demo support.
+
 - Branch: `codex/contractor-local-customer-read-list-parity-v1`
 - Starting main SHA: `753a0d25db3c282a0dd86d3001aa1ae4217e6d48`
 - Files changed:
