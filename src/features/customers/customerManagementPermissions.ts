@@ -18,7 +18,8 @@ export function canManageContractorCustomersUi(
 
 export function canCreateContractorLocalCustomersUi(
   contractor: ContractorOwner | null | undefined,
+  teamAccess: ContractorTeamAccess | null | undefined,
   profileId: string,
 ) {
-  return Boolean(contractor && profileId && contractor.owner_user_id === profileId);
+  return canManageContractorCustomersUi(contractor, teamAccess, profileId);
 }

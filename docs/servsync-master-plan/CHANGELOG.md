@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/admin-office-customer-creation-parity-v1`
+- Starting main SHA: `18fdb53abf5e505e239d93ad9d12bd939dacbe9f`
+- Files changed:
+  - `servsync-admin-office-customer-creation-parity.sql`
+  - `src/App.tsx`
+  - `src/features/customers/customerManagementPermissions.ts`
+  - `src/features/customers/localCustomerDirectory.ts`
+  - focused customer-creation, role-probe, UI, customer-management, and security-catalog tests under `tests/e2e/`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Admin/Office Customer Creation Parity v1 in repository source. The additive migration replaces only `servsync_create_local_contact`, derives the active contractor from the authenticated session, reuses the existing customer-management helper, and atomically creates one contractor-managed customer plus its initial property for owner, active Admin, or active Office callers. Field Technician, Viewer, inactive/removed users, homeowners, anonymous callers, and attempts to supply a contractor/parent identifier fail closed. The RPC now returns an explicit customer/property DTO instead of raw table rows, and the client validates contractor, customer, and property bindings before adding the result to local state. All existing Customers, Estimate, Job, and onboarding creation controls now share the same Owner/Admin/Office UI capability. Draft and Job authority, PR #374 mutation restrictions, PR #376 role-shaped reads, connected-homeowner ownership, claim/invitation behavior, and multi-property behavior remain unchanged.
+- Migration status: `servsync-admin-office-customer-creation-parity.sql` has SHA-256 `ce3fc2b8e79bab14790c27577e66d2e7d6c0a27cd4c1cf1ffe8856877531b78b`. It is committed source only and has not been applied to Sandbox, Demo, or Production. No Supabase, Vercel, environment, data, deployment, or configuration operation occurred in this implementation task.
+- Tests/checks run: The final scoped local-directory, customer-management, terminology, claim, unified-Draft, estimate-creation, desktop, and mobile group passed 49/49. TypeScript and the Production build passed. The new three-test authenticated role/security probe, five-test desktop/mobile role UI packet, and 24-test security catalog compile/list successfully for a later authorized Sandbox run. Full ESLint remains blocked by the unchanged ESLint 9 `allowShortCircuit` startup incompatibility; focused lint with only that broken rule disabled found no new changed-file errors. A separate broad run surfaced six unrelated guided-estimate assertions that are already stale on the starting main baseline and do not touch this slice.
+- Known risks or follow-ups:
+  - The migration is unapplied and the feature is not live. Independent source review must precede a separately authorized Sandbox migration, catalog/grant check, authenticated role matrix, exact-head Preview validation, cleanup, and merge-readiness review.
+  - Archive/restore lifecycle, direct-table privilege cleanup, Demo migration disposition, broader customer-model unification, the inherited non-owner appointment-window 401, and inherited ESLint 9 startup repair remain separate work. Full customer-management maturity is not complete.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the bounded creation-parity implementation as source-only while keeping rollout and broader customer-management maturity active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Aligns the approved role model and rollout boundary without claiming that the migration is applied, deployed, or live.
+
 - Branch: `codex/pr376-production-rollout-doc-closeout`
 - Starting main SHA: `fac9da09316e9ecc52649d9a181e7251a6efe421` (normal two-parent merge commit for PR #376)
 - Files changed:
