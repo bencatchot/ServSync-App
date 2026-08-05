@@ -36422,7 +36422,7 @@ function ContractorDashboard({
                               <div className="flex flex-wrap items-end justify-between gap-3">
                                 <div className="min-w-0">
                                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property context</p>
-                                  <p className="mt-1 text-sm font-bold text-slate-950">
+                                  <p className="mt-1 break-words text-sm font-bold text-slate-950">
                                     Working on: {workspacePropertyContext}
                                   </p>
                                   {homeownerWorkspacePropertyScope === 'unassigned' && (
