@@ -103,6 +103,10 @@ type LocalCustomerTablePrivilegeRow = ReviewGrantRow & {
   service_role_insert: boolean;
   service_role_update: boolean;
   service_role_delete: boolean;
+  service_role_truncate: boolean;
+  service_role_trigger: boolean;
+  service_role_references: boolean;
+  service_role_explicit_column_grants: number;
 };
 
 type ReviewRpcGrantRow = RpcRow & {
@@ -563,9 +567,21 @@ select
   has_table_privilege('service_role', c.oid, 'INSERT') as service_role_insert,
   has_table_privilege('service_role', c.oid, 'UPDATE') as service_role_update,
   has_table_privilege('service_role', c.oid, 'DELETE') as service_role_delete,
+  has_table_privilege('service_role', c.oid, 'TRUNCATE') as service_role_truncate,
+  has_table_privilege('service_role', c.oid, 'TRIGGER') as service_role_trigger,
+  has_table_privilege('service_role', c.oid, 'REFERENCES') as service_role_references,
   (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'PUBLIC') as public_column_grants,
   (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'anon') as anon_column_grants,
-  (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'authenticated') as authenticated_column_grants
+  (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'authenticated') as authenticated_column_grants,
+  (
+    select count(*)::integer
+      from pg_attribute a
+      cross join lateral aclexplode(a.attacl) acl
+     where a.attrelid = c.oid
+       and a.attnum > 0
+       and not a.attisdropped
+       and acl.grantee = 'service_role'::regrole
+  ) as service_role_explicit_column_grants
 from pg_class c
 where c.relnamespace = 'public'::regnamespace
   and c.relname in ('contractor_local_contacts', 'contractor_local_homes')
@@ -595,6 +611,12 @@ order by c.relname;
         row.service_role_update,
         row.service_role_delete,
       ]).toEqual([true, true, true, true]);
+      expect([
+        row.service_role_truncate,
+        row.service_role_trigger,
+        row.service_role_references,
+      ]).toEqual([false, false, false]);
+      expect(row.service_role_explicit_column_grants).toBe(0);
     }
   });
 

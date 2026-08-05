@@ -12,8 +12,10 @@ test.describe('contractor-local customer direct-table privilege cleanup source',
         expect(migration).toContain(`revoke all privileges on table public.${table} from ${role};`);
       }
     }
-    expect(migration).toContain("array['PUBLIC', 'anon', 'authenticated']");
+    expect(migration).toContain("array['PUBLIC', 'anon', 'authenticated', 'service_role']");
     expect(migration).toContain('revoke all privileges (%s) on table public.%I from %s');
+    expect(migration).toContain('revoke all privileges on table public.contractor_local_contacts from service_role;');
+    expect(migration).toContain('revoke all privileges on table public.contractor_local_homes from service_role;');
     expect(migration.match(/^grant .+;$/gm)).toEqual([
       'grant select, insert, update, delete on table public.contractor_local_contacts to service_role;',
       'grant select, insert, update, delete on table public.contractor_local_homes to service_role;',
@@ -21,6 +23,14 @@ test.describe('contractor-local customer direct-table privilege cleanup source',
     expect(migration).not.toMatch(/\b(create|alter|drop)\s+policy\b/i);
     expect(migration).not.toMatch(/\balter\s+table\b/i);
     expect(migration).not.toMatch(/\bcreate\s+(?:or\s+replace\s+)?function\b/i);
+  });
+
+  test('post-validates exact browser denial, service-role CRUD, and removal of explicit column ACLs', () => {
+    expect(migration).toContain("array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']");
+    expect(migration).toContain("array['TRUNCATE', 'REFERENCES', 'TRIGGER']");
+    expect(migration).toContain("has_table_privilege('service_role', format('public.%I', v_table_name), v_privilege)");
+    expect(migration).toContain('cross join lateral aclexplode(a.attacl) acl');
+    expect(migration).toContain("array['PUBLIC', 'anon', 'authenticated', 'service_role']");
   });
 
   test('fails closed unless the tables, RLS, trusted operator access, and controlled RPCs exist', () => {

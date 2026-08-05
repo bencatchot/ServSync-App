@@ -55,13 +55,12 @@ $$;
 revoke all privileges on table public.contractor_local_contacts from public;
 revoke all privileges on table public.contractor_local_contacts from anon;
 revoke all privileges on table public.contractor_local_contacts from authenticated;
+revoke all privileges on table public.contractor_local_contacts from service_role;
 
 revoke all privileges on table public.contractor_local_homes from public;
 revoke all privileges on table public.contractor_local_homes from anon;
 revoke all privileges on table public.contractor_local_homes from authenticated;
-
-grant select, insert, update, delete on table public.contractor_local_contacts to service_role;
-grant select, insert, update, delete on table public.contractor_local_homes to service_role;
+revoke all privileges on table public.contractor_local_homes from service_role;
 
 -- Table ACL revocation does not remove independently granted column ACLs.
 do $$
@@ -82,13 +81,66 @@ begin
       raise exception 'Contractor-local customer column inventory is unavailable.';
     end if;
 
-    foreach v_role_name in array array['PUBLIC', 'anon', 'authenticated'] loop
+    foreach v_role_name in array array['PUBLIC', 'anon', 'authenticated', 'service_role'] loop
       execute format(
         'revoke all privileges (%s) on table public.%I from %s',
         v_columns,
         v_table_name,
         v_role_name
       );
+    end loop;
+  end loop;
+end;
+$$;
+
+grant select, insert, update, delete on table public.contractor_local_contacts to service_role;
+grant select, insert, update, delete on table public.contractor_local_homes to service_role;
+
+do $$
+declare
+  v_table_name text;
+  v_role_name text;
+  v_privilege text;
+  v_role_oid oid;
+begin
+  foreach v_table_name in array array['contractor_local_contacts', 'contractor_local_homes'] loop
+    foreach v_role_name in array array['public', 'anon', 'authenticated'] loop
+      foreach v_privilege in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'] loop
+        if has_table_privilege(v_role_name, format('public.%I', v_table_name), v_privilege) then
+          raise exception 'Browser-role table privilege cleanup failed.';
+        end if;
+      end loop;
+    end loop;
+
+    foreach v_privilege in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
+      if not has_table_privilege('service_role', format('public.%I', v_table_name), v_privilege) then
+        raise exception 'Trusted operator CRUD preservation failed.';
+      end if;
+    end loop;
+
+    foreach v_privilege in array array['TRUNCATE', 'REFERENCES', 'TRIGGER'] loop
+      if has_table_privilege('service_role', format('public.%I', v_table_name), v_privilege) then
+        raise exception 'Trusted operator privilege minimization failed.';
+      end if;
+    end loop;
+
+    foreach v_role_name in array array['PUBLIC', 'anon', 'authenticated', 'service_role'] loop
+      v_role_oid := case
+        when v_role_name = 'PUBLIC' then 0
+        else (select r.oid from pg_roles r where r.rolname = v_role_name)
+      end;
+
+      if v_role_oid is null or exists (
+        select 1
+          from pg_attribute a
+          cross join lateral aclexplode(a.attacl) acl
+         where a.attrelid = format('public.%I', v_table_name)::regclass
+           and a.attnum > 0
+           and not a.attisdropped
+           and acl.grantee = v_role_oid
+      ) then
+        raise exception 'Contractor-local customer column privilege cleanup failed.';
+      end if;
     end loop;
   end loop;
 end;
