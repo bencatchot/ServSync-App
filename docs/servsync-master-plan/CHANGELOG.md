@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/contractor-local-customer-property-archive-restore-v1`
+- Starting main SHA: `145cb56b1629e867967e36ce15f2900e6c63e8ef`
+- Files changed:
+  - `servsync-contractor-local-customer-property-archive-restore.sql`
+  - `src/App.tsx`
+  - `src/features/customers/localCustomerArchive.ts`
+  - `src/features/customers/localCustomerDirectory.ts`
+  - `src/types.ts`
+  - `tests/e2e/contractor-local-customer-property-archive-restore-role-probes.spec.ts`
+  - `tests/e2e/contractor-local-customer-property-archive-restore.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Contractor-Local Customer and Property Archive/Restore v1 in repository source. The additive migration (SHA-256 `35676e280e52445578d157a6deb7cc2b988b1a4d8c41ff5bf253f9b4303d2cc5`) adds reversible archive metadata, a private append-only lifecycle-event table, manager-only impact/archive/restore RPCs, active-only and archived-directory reads, redacted work-linked historical context, and canonical assignment guards. Owner, active Admin, and active Office may manage the lifecycle; Field Technician, Viewer, inactive/removed members, homeowners, anonymous callers, and cross-tenant callers fail closed. Claimed or mapped local records remain outside this lifecycle.
+- Lifecycle behavior: Archiving does not cancel, close, void, pay, complete, delete, or rewrite existing work. Customer archive makes the customer and its otherwise-active properties unavailable for new work without rewriting each property's archive state, and transactionally revokes pending claim invitations without reviving them on restore. Property archive is independent; restoring a customer does not restore independently archived properties, and property restore is denied while its parent remains archived. Existing work retains stable IDs and authorized historical labels, while every new-assignment path is guarded against archived subjects.
+- UI and privacy: The Customers workspace adds manager-only Active, Archived, and Inactive views; customer and property archive/restore controls; an impact-confirmation surface; archived status/date treatment; and mobile stacking. Ordinary active lists and new-work selectors exclude archived records and clear stale selections. Historical context remains work-linked and role-shaped, with no lower-role contact details, private notes, claim/invitation data, tokens, or lifecycle actor IDs.
+- Tests/checks run: TypeScript passed. The focused archive/security and customer-workflow regression group passed 50/50; four authenticated Sandbox role/lifecycle probes compile/list but were not executed because no environment operation was authorized. Full ESLint remains blocked by the inherited ESLint 9 `allowShortCircuit` startup incompatibility, with the relevant configuration and package files unchanged from the starting SHA. Production build, documentation validation, final sensitive-value scans, and exact branch checks are recorded in the draft PR evidence.
+- Known risks or follow-ups:
+  - The migration is repository source only and has not been applied to Sandbox, Demo, or Production. No lifecycle behavior is live until a separately authorized migration-first rollout and exact-head Preview validation complete.
+  - Live catalog, role, claim/archive race, archive/new-work race, invitation revocation, desktop/mobile authenticated behavior, and fixture-preservation proof remain mandatory Sandbox gates.
+  - Connected-customer organizational archive, hard deletion/retention, bulk archive, Demo migration disposition, broader PostgreSQL default-ACL policy, broader customer-model consolidation, Service Plan parity, external delivery/guest actions, the non-owner appointment-window 401, and inherited ESLint repair remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the implemented repository foundation and keeps rollout plus every excluded lifecycle/customer-model item active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the bounded contractor-local lifecycle architecture, permissions, historical-context and assignment guarantees, and unapplied rollout state.
+
 - Branch: `codex/pr380-production-rollout-doc-closeout`
 - Starting main SHA: `e8767c8bf795f46eb7fbb76aa98a8d0d14bc3f46` (normal two-parent merge commit for PR #380)
 - Files changed:
