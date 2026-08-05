@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/contractor-local-customer-read-list-parity-v1`
+- Starting main SHA: `753a0d25db3c282a0dd86d3001aa1ae4217e6d48`
+- Files changed:
+  - `servsync-contractor-local-customer-read-list-parity.sql`
+  - `src/App.tsx`
+  - `src/features/customers/localCustomerDirectory.ts`
+  - focused read/list, role-probe, customer-management, terminology, Draft, claim, and security-catalog tests under `tests/e2e/`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Contractor Local Customer Read/List Parity v1 in repository source. An additive, fixed-search-path RPC boundary derives the active contractor and team role from the authenticated session, returns data-minimized local-customer/property summaries to authorized work roles, limits Viewer summaries to exact local subjects already linked to readable Draft, Job, estimate, or invoice records, and exposes separate tenant-scoped management detail only to owner/admin/office. The frontend replaces its direct local-contact list query with this boundary, keeps phone, email, customer notes, property notes, and management-only fields out of ordinary summary state, preserves PR #374 mutation controls, clears stale rows across load/auth transitions, and distinguishes loading, genuine empty, unauthorized, temporary failure, and retry states. Independent Preview validation also corrected long customer/property labels so the profile, claim-property, property-card, and selected-property context layouts remain contained at 390px.
+- Reason for change: PR #374 separated customer/profile/property mutation from general Job authority but intentionally left ordinary contractor-local reads owner-only. This slice closes that reachability gap without broadening direct table RLS or grants, merging connected and local identities, or expanding mutation authority.
+- Tests/checks run: TypeScript and the Production build passed. The broad local read/list, PR #374 permission, terminology, unified Draft, FB-007 checklist, local profile, multi-property claim, durable Draft, estimate/invoice/PDF, and request-free delivery regression group passed 468/468 executable checks across source and desktop/mobile harness runs. Independent Sandbox validation then passed the authenticated role-probe suite 3/3 and the security catalog 23 passed with one unrelated gated skip. Exact-head desktop/mobile Preview validation passed for owner, admin, office, field tech, and Viewer, including manager-control gating, Owner-only creation, Viewer exact-property restriction, loading/error/retry behavior, stale-row clearing, connected-row preservation during local failure, 390px containment, and zero console/page errors. Final TypeScript, Production build, focused 8/8 correction coverage, SQL/static security, documentation, sensitive-value, and scope checks passed.
+- Known risks or follow-ups:
+  - The exact additive migration `servsync-contractor-local-customer-read-list-parity.sql` (SHA-256 `0b90e4548ceec24e7bdd96a12ad9951f74b7ffc064f222a2f41b0e2ce109f41f`) was applied successfully to Sandbox project `zpzdkoaubyjtsomccxya` from `2026-08-05T14:40:03Z` through `2026-08-05T14:40:05Z`. All three functions are owned by `postgres`, use `SECURITY DEFINER` with fixed `search_path=public`, retain only their intended execution grants, and showed no unexpected drift. Sandbox is temporarily ahead of main for PR #376 validation; Demo and Production were untouched, and no environment, provider, or configuration change occurred.
+  - PR #376 remains open, draft, and unmerged. Merge-readiness review, merge authorization, and any controlled Production SQL/runtime rollout remain separate gates; the frontend intentionally fails clearly if the RPC boundary is unavailable.
+  - Legacy direct-table privileges remain for staged rollback compatibility and require a later dedicated cleanup. Admin/Office creation parity, archive/restore lifecycle, Demo disposition, broader customer-model unification, the inherited non-owner appointment-window 401, and inherited ESLint 9 startup incompatibility remain separate.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the successful Sandbox-only read/list rollout and exact-head validation while keeping merge/Production rollout and every deferred creation/archive/privilege/model slice active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Documents the role-shaped read architecture and verified Sandbox-only rollout without claiming complete customer-management parity, merge, or Production behavior.
+
 - Branch: `codex/pr374-production-closeout`
 - Starting main SHA: `015e731b52c64168ceba5caa04669b2bc5fb798d` (normal two-parent merge commit for PR #374)
 - Files changed:

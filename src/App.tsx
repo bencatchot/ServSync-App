@@ -143,6 +143,13 @@ import {
   canCreateContractorLocalCustomersUi,
   canManageContractorCustomersUi,
 } from './features/customers/customerManagementPermissions';
+import {
+  localCustomerDirectoryFailureState,
+  localCustomerSummaryFromFullContact,
+  normalizeLocalCustomerManagementDetail,
+  normalizeLocalCustomerSummaries,
+  type LocalCustomerDirectoryLoadState,
+} from './features/customers/localCustomerDirectory';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { useDurableDraftSummary } from './features/drafts/useDurableDraftSummary';
 import {
@@ -21708,6 +21715,13 @@ function ContractorDashboard({
   const [creatingJobFromCalendarEventKey, setCreatingJobFromCalendarEventKey] = useState<string | null>(null);
   const [visitCalendarEventBusy, setVisitCalendarEventBusy] = useState(false);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
+  const [localCustomerDirectoryLoadState, setLocalCustomerDirectoryLoadState] = useState<LocalCustomerDirectoryLoadState>('idle');
+  const [localCustomerDirectoryLoadError, setLocalCustomerDirectoryLoadError] = useState('');
+  const localCustomerDirectoryRequestIdRef = useRef(0);
+  const [localCustomerManagementDetail, setLocalCustomerManagementDetail] = useState<ContractorLocalContact | null>(null);
+  const [localCustomerManagementDetailState, setLocalCustomerManagementDetailState] = useState<LocalCustomerDirectoryLoadState>('idle');
+  const [localCustomerManagementDetailError, setLocalCustomerManagementDetailError] = useState('');
+  const localCustomerManagementDetailRequestIdRef = useRef(0);
   const [localClaimInvites, setLocalClaimInvites] = useState<LocalCustomerClaimInvite[]>([]);
   const [creatingLocalClaimInviteId, setCreatingLocalClaimInviteId] = useState<string | null>(null);
   const [revokingLocalClaimInviteId, setRevokingLocalClaimInviteId] = useState<string | null>(null);
@@ -22423,6 +22437,14 @@ function ContractorDashboard({
 
   const loadContractor = useCallback(async () => {
     if (!supabase) return;
+    const localCustomerDirectoryRequestId = ++localCustomerDirectoryRequestIdRef.current;
+    localCustomerManagementDetailRequestIdRef.current += 1;
+    setLocalContacts([]);
+    setLocalCustomerDirectoryLoadState('loading');
+    setLocalCustomerDirectoryLoadError('');
+    setLocalCustomerManagementDetail(null);
+    setLocalCustomerManagementDetailState('idle');
+    setLocalCustomerManagementDetailError('');
     setLoading(true);
     setError('');
     setContractorPriceBookLoadState('loading');
@@ -22520,6 +22542,7 @@ function ContractorDashboard({
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
+        const loadedCanManageCustomers = canManageContractorCustomersUi(loadedContractor, loadedTeamAccess, profile.id);
         const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
@@ -22549,14 +22572,12 @@ function ContractorDashboard({
             .select('*')
             .eq('contractor_id', loadedContractor.id)
             .order('occurrence_starts_at', { ascending: true }),
-          supabase
-            .from('contractor_local_contacts')
-            .select('*, homes:contractor_local_homes(*)')
-            .eq('contractor_id', loadedContractor.id)
-            .order('created_at', { ascending: false }),
-	          supabase.rpc('servsync_list_local_customer_claim_invites_v2', {
-	            p_contractor_id: loadedContractor.id,
-	          }),
+          supabase.rpc('servsync_list_local_customer_summaries'),
+	          loadedCanManageCustomers
+	            ? supabase.rpc('servsync_list_local_customer_claim_invites_v2', {
+	                p_contractor_id: loadedContractor.id,
+	              })
+	            : Promise.resolve({ data: [], error: null }),
           supabase
             .from('estimates')
             .select(ESTIMATE_WITH_LINES_SELECT)
@@ -22604,7 +22625,23 @@ function ContractorDashboard({
         else setCalendarEventJobLinks([]);
         if (!calendarEventOccurrenceExclusionsRes.error) setCalendarEventOccurrenceExclusions((calendarEventOccurrenceExclusionsRes.data || []) as ContractorCalendarEventOccurrenceExclusion[]);
         else setCalendarEventOccurrenceExclusions([]);
-        if (!localContactsRes.error) setLocalContacts((localContactsRes.data || []) as ContractorLocalContact[]);
+	        if (localCustomerDirectoryRequestId === localCustomerDirectoryRequestIdRef.current) {
+	          if (localContactsRes.error) {
+	            setLocalContacts([]);
+	            setLocalCustomerDirectoryLoadState(localCustomerDirectoryFailureState(localContactsRes.error));
+	            setLocalCustomerDirectoryLoadError(readableError(localContactsRes.error, 'Contractor-created customers could not be loaded.'));
+	          } else {
+	            try {
+	              setLocalContacts(normalizeLocalCustomerSummaries(localContactsRes.data, loadedContractor.id));
+	              setLocalCustomerDirectoryLoadState('ready');
+	              setLocalCustomerDirectoryLoadError('');
+	            } catch (localCustomerError) {
+	              setLocalContacts([]);
+	              setLocalCustomerDirectoryLoadState('error');
+	              setLocalCustomerDirectoryLoadError(readableError(localCustomerError, 'Contractor-created customers could not be loaded safely.'));
+	            }
+	          }
+	        }
         if (!localClaimInvitesRes.error) setLocalClaimInvites((localClaimInvitesRes.data || []) as LocalCustomerClaimInvite[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
@@ -22645,6 +22682,8 @@ function ContractorDashboard({
         setCalendarEventJobLinks([]);
         setCalendarEventOccurrenceExclusions([]);
         setLocalContacts([]);
+        setLocalCustomerDirectoryLoadState('ready');
+        setLocalCustomerDirectoryLoadError('');
         setLocalClaimInvites([]);
         setSavedEstimateCharges([]);
         setContractorPriceBookItems([]);
@@ -22655,6 +22694,11 @@ function ContractorDashboard({
         setJobWorkItemsByJobId({});
       }
     } catch (err) {
+      if (localCustomerDirectoryRequestId === localCustomerDirectoryRequestIdRef.current) {
+        setLocalContacts([]);
+        setLocalCustomerDirectoryLoadState('error');
+        setLocalCustomerDirectoryLoadError('The contractor workspace did not finish loading. Try again.');
+      }
       setError(readableError(err, 'Unable to load contractor workspace.'));
       setContractorPriceBookLoadState('error');
       setContractorPriceBookLoadError('The contractor workspace did not finish loading. Try again.');
@@ -22665,6 +22709,10 @@ function ContractorDashboard({
 
   useEffect(() => {
     void loadContractor();
+    return () => {
+      localCustomerDirectoryRequestIdRef.current += 1;
+      localCustomerManagementDetailRequestIdRef.current += 1;
+    };
   }, [loadContractor]);
 
   useEffect(() => {
@@ -28713,6 +28761,61 @@ function ContractorDashboard({
   };
   const canManageContractorCustomers = canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id);
   const canCreateContractorLocalCustomers = canCreateContractorLocalCustomersUi(contractorDraft, profile.id);
+  const selectedLocalCustomerSummaryId = selectedHomeownerSubjectId?.startsWith('local:')
+    ? selectedHomeownerSubjectId.slice('local:'.length)
+    : '';
+  const selectedLocalCustomerSummary = selectedLocalCustomerSummaryId
+    ? localContacts.find(contact => contact.id === selectedLocalCustomerSummaryId) ?? null
+    : null;
+  const loadSelectedLocalCustomerManagementDetail = useCallback(async () => {
+    const contactId = selectedLocalCustomerSummary?.id ?? '';
+    const contractorId = contractor?.id ?? '';
+    if (!supabase || !canManageContractorCustomers || !contactId || !contractorId || localCustomerDirectoryLoadState !== 'ready') {
+      localCustomerManagementDetailRequestIdRef.current += 1;
+      setLocalCustomerManagementDetail(null);
+      setLocalCustomerManagementDetailState('idle');
+      setLocalCustomerManagementDetailError('');
+      return;
+    }
+
+    const requestId = ++localCustomerManagementDetailRequestIdRef.current;
+    setLocalCustomerManagementDetail(null);
+    setLocalCustomerManagementDetailState('loading');
+    setLocalCustomerManagementDetailError('');
+    const { data, error: detailError } = await supabase.rpc('servsync_get_local_customer_management_detail', {
+      p_local_contact_id: contactId,
+    });
+    if (requestId !== localCustomerManagementDetailRequestIdRef.current) return;
+    if (detailError) {
+      setLocalCustomerManagementDetail(null);
+      setLocalCustomerManagementDetailState(localCustomerDirectoryFailureState(detailError));
+      setLocalCustomerManagementDetailError(readableError(detailError, 'Customer management details could not be loaded.'));
+      return;
+    }
+    try {
+      const detail = normalizeLocalCustomerManagementDetail(data, contractorId);
+      if (detail.id !== contactId) throw new Error('Local customer detail did not match the selected customer.');
+      setLocalCustomerManagementDetail(detail);
+      setLocalCustomerManagementDetailState('ready');
+      setLocalCustomerManagementDetailError('');
+    } catch (detailResponseError) {
+      setLocalCustomerManagementDetail(null);
+      setLocalCustomerManagementDetailState('error');
+      setLocalCustomerManagementDetailError(readableError(detailResponseError, 'Customer management details could not be loaded safely.'));
+    }
+  }, [
+    canManageContractorCustomers,
+    contractor?.id,
+    localCustomerDirectoryLoadState,
+    selectedLocalCustomerSummary?.id,
+  ]);
+
+  useEffect(() => {
+    void loadSelectedLocalCustomerManagementDetail();
+    return () => {
+      localCustomerManagementDetailRequestIdRef.current += 1;
+    };
+  }, [loadSelectedLocalCustomerManagementDetail]);
   const openCustomersOnboardingWorkspace = () => {
     setContractorTab('connections');
     setHomeownerFilter('active');
@@ -31648,7 +31751,7 @@ function ContractorDashboard({
           ...created.contact,
           homes: created.home ? [created.home] : [],
         };
-        setLocalContacts(prev => [contactWithHome, ...prev]);
+	        setLocalContacts(prev => [localCustomerSummaryFromFullContact(contactWithHome), ...prev]);
         if (options?.onCreated) {
           options.onCreated({ contact: contactWithHome, home: created.home ?? null });
         } else if (autoStart) {
@@ -31748,10 +31851,13 @@ function ContractorDashboard({
 
       const updatedContact = data as (ContractorLocalContact & { revoked_pending_claim_invite_count?: number }) | null;
       if (updatedContact?.id) {
-        setLocalContacts(prev => prev.map(item => item.id === updatedContact.id
-          ? { ...item, ...updatedContact, homes: item.homes ?? [] }
-          : item
-        ));
+	        setLocalContacts(prev => prev.map(item => item.id === updatedContact.id
+	          ? { ...item, display_name: updatedContact.display_name }
+	          : item
+	        ));
+	        setLocalCustomerManagementDetail(current => current?.id === updatedContact.id
+	          ? { ...current, ...updatedContact, homes: current.homes ?? [] }
+	          : current);
         if ((updatedContact.revoked_pending_claim_invite_count ?? 0) > 0) {
           const nowIso = new Date().toISOString();
           setLocalClaimInvites(prev => prev.map(invite => (
@@ -31837,15 +31943,18 @@ function ContractorDashboard({
 
       const updatedHome = data as ContractorLocalHome | null;
       if (updatedHome?.id) {
-        setLocalContacts(prev => prev.map(item => item.id === contact.id
-          ? {
-              ...item,
-              homes: sortedLocalHomes((item.homes ?? []).map(candidate => (
-                candidate.id === updatedHome.id ? updatedHome : candidate
-              ))),
-            }
-          : item
-        ));
+	        setLocalContacts(prev => prev.map(item => item.id === contact.id
+	          ? localCustomerSummaryFromFullContact({
+	              ...item,
+	              homes: sortedLocalHomes((item.homes ?? []).map(candidate => (
+	                candidate.id === updatedHome.id ? updatedHome : candidate
+	              ))),
+	            })
+	          : item
+	        ));
+	        setLocalCustomerManagementDetail(current => current?.id === contact.id
+	          ? { ...current, homes: sortedLocalHomes((current.homes ?? []).map(candidate => candidate.id === updatedHome.id ? updatedHome : candidate)) }
+	          : current);
         setSelectedHomeownerWorkspaceLocalHomeId(updatedHome.id);
         setHomeownerWorkspacePropertyScope('selected');
         closeEditLocalHomeForm();
@@ -31888,10 +31997,13 @@ function ContractorDashboard({
 
       const createdHome = data as ContractorLocalHome | null;
       if (createdHome?.id) {
-        setLocalContacts(prev => prev.map(item => item.id === contact.id
-          ? { ...item, homes: sortedLocalHomes([...(item.homes ?? []), createdHome]) }
-          : item
-        ));
+	        setLocalContacts(prev => prev.map(item => item.id === contact.id
+	          ? localCustomerSummaryFromFullContact({ ...item, homes: sortedLocalHomes([...(item.homes ?? []), createdHome]) })
+	          : item
+	        ));
+	        setLocalCustomerManagementDetail(current => current?.id === contact.id
+	          ? { ...current, homes: sortedLocalHomes([...(current.homes ?? []), createdHome]) }
+	          : current);
         setSelectedHomeownerWorkspaceLocalHomeId(createdHome.id);
         setHomeownerWorkspacePropertyScope('selected');
         setLocalHomeDrafts(prev => ({ ...prev, [contact.id]: EMPTY_LOCAL_HOME_DRAFT }));
@@ -32246,6 +32358,19 @@ function ContractorDashboard({
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+      {contractorTab !== 'connections' && (localCustomerDirectoryLoadState === 'error' || localCustomerDirectoryLoadState === 'unauthorized') && (
+        <section className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4" data-testid="local-customer-directory-workflow-error">
+          <p className="text-sm font-semibold text-red-800">
+            {localCustomerDirectoryLoadState === 'unauthorized'
+              ? 'Contractor-created customer context is unavailable for this account.'
+              : 'Contractor-created customer context could not be loaded.'}
+          </p>
+          <p className="mt-1 text-xs text-red-700">Connected customer data remains available. Retry before choosing a contractor-created customer or relying on local-customer labels.</p>
+          <button type="button" onClick={() => void loadContractor()} className={`${buttonClass('secondary')} mt-3`}>
+            Try again
+          </button>
+        </section>
+      )}
 
       {showInitialContractorProfileSetupPrompt && (
         <section className="mb-4 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
@@ -35017,11 +35142,9 @@ function ContractorDashboard({
             ].filter(Boolean).join(' '));
           }
           const homes = sortedLocalHomes(subject.contact.homes);
-          return normalizeText([
-            subject.contact.display_name,
-            subject.contact.phone,
-            subject.contact.email,
-            ...homes.flatMap(home => [home.nickname, home.address_line1, home.city, home.state, home.zip_code]),
+	          return normalizeText([
+	            subject.contact.display_name,
+	            ...homes.flatMap(home => [home.nickname, home.address_line1, home.city, home.state, home.zip_code]),
             'not connected customer',
           ].filter(Boolean).join(' '));
         };
@@ -35112,7 +35235,27 @@ function ContractorDashboard({
 	                  )}
 	                </div>
 	                <div className="divide-y divide-slate-100 md:max-h-[calc(100vh-17rem)] md:overflow-y-auto">
-	                  {visibleSubjects.length === 0 ? (
+	                  {localCustomerDirectoryLoadState === 'loading' && (
+	                    <div className="p-3" data-testid="local-customer-directory-loading">
+	                      <Notice tone="info" text="Loading contractor-created customers..." />
+	                    </div>
+	                  )}
+	                  {(localCustomerDirectoryLoadState === 'error' || localCustomerDirectoryLoadState === 'unauthorized') && (
+	                    <div className="p-3" data-testid="local-customer-directory-error">
+	                      <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+	                        <p className="text-sm font-semibold text-red-800">
+	                          {localCustomerDirectoryLoadState === 'unauthorized'
+	                            ? 'Contractor-created customers are unavailable for this account.'
+	                            : 'Contractor-created customers could not be loaded.'}
+	                        </p>
+	                        <p className="mt-1 text-xs text-red-700">{localCustomerDirectoryLoadError || 'Try loading the contractor workspace again.'}</p>
+	                        <button type="button" onClick={() => void loadContractor()} className={`${buttonClass('secondary')} mt-3`}>
+	                          Try again
+	                        </button>
+	                      </div>
+	                    </div>
+	                  )}
+	                  {visibleSubjects.length === 0 && localCustomerDirectoryLoadState === 'ready' ? (
 	                    <div className="p-3">
 	                      <EmptyState
 	                        compact
@@ -35397,12 +35540,21 @@ function ContractorDashboard({
                   })()
                 ) : (
                   (() => {
-                    const isConn = selectedSubject.kind === 'connection';
-                    const conn = isConn ? selectedSubject.connection : null;
-                    const selectedLocalCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
-                    const localCustomer = selectedLocalCustomer
-                      ? localContacts.find(contact => contact.id === selectedLocalCustomer.id) ?? selectedLocalCustomer
-                      : null;
+	                    const isConn = selectedSubject.kind === 'connection';
+	                    const conn = isConn ? selectedSubject.connection : null;
+	                    const selectedLocalCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
+	                    const localCustomerSummary = selectedLocalCustomer
+	                      ? localContacts.find(contact => contact.id === selectedLocalCustomer.id) ?? selectedLocalCustomer
+	                      : null;
+	                    const localCustomerManagementDetailReady = Boolean(
+	                      canManageContractorCustomers
+	                        && localCustomerSummary
+	                        && localCustomerManagementDetailState === 'ready'
+	                        && localCustomerManagementDetail?.id === localCustomerSummary.id,
+	                    );
+	                    const localCustomer = localCustomerManagementDetailReady
+	                      ? localCustomerManagementDetail
+	                      : localCustomerSummary;
                     const perm = conn ? normalizeSharingPermissions(conn.permissions) : null;
                     const connectedHomes = conn ? connectedHomeList(conn) : [];
                     const localHomes = localCustomer ? sortedLocalHomes(localCustomer.homes) : [];
@@ -35847,7 +35999,7 @@ function ContractorDashboard({
                           {homes.length === 0 ? (
                             <EmptyState text="No property details on file for this customer." />
                           ) : (
-                            <div className="grid gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                               {homes.map((home, index) => {
                                 const address = compactAddressLabel(home);
                                 const claimed = Boolean(home.home_id || home.claimed_at);
@@ -35879,7 +36031,7 @@ function ContractorDashboard({
                                           </span>
                                         </div>
                                       </div>
-                                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div><p className="text-xs text-slate-400 font-medium mb-0.5">City</p><p className="text-sm text-slate-800 font-medium">{[home.city, home.state].filter(Boolean).join(', ') || '—'}</p></div>
                                         <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{home.zip_code || '—'}</p></div>
                                       </div>
@@ -35896,7 +36048,7 @@ function ContractorDashboard({
                                       ) : (
                                         <p className="text-xs text-slate-500">Contractor-local property details.</p>
                                       )}
-                                      {canManageContractorCustomers && (
+	                                      {localCustomerManagementDetailReady && (
                                         <button
                                           type="button"
                                           onClick={() => openEditLocalHomeForm(localCustomer, home)}
@@ -35913,7 +36065,7 @@ function ContractorDashboard({
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-2">
-                            {canManageContractorCustomers && (
+	                            {localCustomerManagementDetailReady && (
                               <button
                                 type="button"
                                 onClick={() => openAddLocalHomeForm(localCustomer)}
@@ -35927,7 +36079,7 @@ function ContractorDashboard({
                               <p className="text-xs text-slate-500">Select a property before starting property-specific work.</p>
                             )}
                           </div>
-                          {isAdding && canManageContractorCustomers && (
+	                          {isAdding && localCustomerManagementDetailReady && (
                             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                                 <div>
@@ -35988,7 +36140,7 @@ function ContractorDashboard({
                               </div>
                             </div>
                           )}
-                          {editingLocalHome && canManageContractorCustomers && (
+	                          {editingLocalHome && localCustomerManagementDetailReady && (
                             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="edit-local-property-title">
                               <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-5 shadow-xl sm:max-w-3xl sm:rounded-2xl">
                                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -36253,8 +36405,8 @@ function ContractorDashboard({
                         <div className="bg-white border-b border-slate-200 px-6 py-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h2 className="font-bold text-slate-950 text-xl">{headerName}</h2>
+                              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <h2 className="min-w-0 break-words font-bold text-slate-950 text-xl">{headerName}</h2>
                                 <StatusBadge
                                   {...customerConnectionPresentation}
                                   icon={customerConnectionStatusIcon(customerConnectionStatus)}
@@ -36270,7 +36422,7 @@ function ContractorDashboard({
                               <div className="flex flex-wrap items-end justify-between gap-3">
                                 <div className="min-w-0">
                                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property context</p>
-                                  <p className="mt-1 text-sm font-bold text-slate-950">
+                                  <p className="mt-1 break-words text-sm font-bold text-slate-950">
                                     Working on: {workspacePropertyContext}
                                   </p>
                                   {homeownerWorkspacePropertyScope === 'unassigned' && (
@@ -36609,16 +36761,26 @@ function ContractorDashboard({
                             </div>
                           )}
 
-                          {activeTabId === 'profile' && (
-                            <div className="space-y-4 max-w-3xl">
-                              {renderDemoPresentationCurrentJobSummary()}
-                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+	                          {activeTabId === 'profile' && (
+	                            <div className="space-y-4 max-w-3xl">
+	                              {renderDemoPresentationCurrentJobSummary()}
+	                              {!isConn && canManageContractorCustomers && localCustomerManagementDetailState === 'loading' && (
+	                                <Notice tone="info" text="Loading customer management details..." />
+	                              )}
+	                              {!isConn && canManageContractorCustomers && (localCustomerManagementDetailState === 'error' || localCustomerManagementDetailState === 'unauthorized') && (
+	                                <div className="rounded-xl border border-red-200 bg-red-50 p-4" data-testid="local-customer-management-detail-error">
+	                                  <p className="text-sm font-semibold text-red-800">Customer management details could not be loaded.</p>
+	                                  <p className="mt-1 text-xs text-red-700">{localCustomerManagementDetailError || 'Try loading this customer again.'}</p>
+	                                  <button type="button" onClick={() => void loadSelectedLocalCustomerManagementDetail()} className={`${buttonClass('secondary')} mt-3`}>Try again</button>
+	                                </div>
+	                              )}
+	                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
                                     <Home size={18} className="text-blue-700" />
                                     <h3 className="font-bold text-slate-950">Profile</h3>
                                   </div>
-                                  {localCustomer && !localCustomerIsClaimed && canManageContractorCustomers && (
+	                                  {localCustomer && !localCustomerIsClaimed && localCustomerManagementDetailReady && (
                                     <button
                                       type="button"
                                       onClick={() => openEditLocalCustomerProfileForm(localCustomer)}
@@ -36630,7 +36792,7 @@ function ContractorDashboard({
                                     </button>
                                   )}
                                 </div>
-                                <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                   {conn && perm && (
                                     <>
                                       <SharedField label="Customer name" value={conn.display_name} allowed={perm.share_contact} />
@@ -36650,11 +36812,19 @@ function ContractorDashboard({
                                       </div>
                                     </>
                                   )}
-                                  {localCustomer && (
-                                    <>
-                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
-                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{formatPhoneNumber(localCustomer.phone) || '—'}</p></div>
-                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
+	                                  {localCustomer && (
+	                                    <>
+	                                      <div className="min-w-0"><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="break-words text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
+	                                      {localCustomerManagementDetailReady ? (
+	                                        <>
+	                                          <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{formatPhoneNumber(localCustomer.phone) || '—'}</p></div>
+	                                          <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
+	                                        </>
+	                                      ) : (
+	                                        <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+	                                          Contact details and private notes are limited to the contractor owner, admin, and office roles.
+	                                        </div>
+	                                      )}
                                       <div>
                                         <p className="text-xs text-slate-400 font-medium mb-0.5">Status</p>
                                         <StatusBadge
@@ -36662,7 +36832,7 @@ function ContractorDashboard({
                                           icon={customerConnectionStatusIcon(customerConnectionStatus)}
                                         />
                                       </div>
-                                      {editingLocalCustomerProfileId === localCustomer.id && canManageContractorCustomers && (
+	                                      {editingLocalCustomerProfileId === localCustomer.id && localCustomerManagementDetailReady && (
                                         <div role="dialog" aria-modal="true" aria-labelledby="edit-local-customer-profile-title" className="sm:col-span-2 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
                                           <div className="flex items-start justify-between gap-3">
                                             <div>
@@ -36756,7 +36926,7 @@ function ContractorDashboard({
 	                                                This invite covers {latestLocalClaimInvitePropertyCount || 0} selected {latestLocalClaimInvitePropertyCount === 1 ? 'property' : 'properties'}. Later property changes are not automatically included. ServSync does not email or text this invite.
 	                                              </p>
 	                                              {claimInviteEligibleLocalHomes.length > 0 && (
-	                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                                                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
 	                                                  {claimInviteEligibleLocalHomes.map((home, index) => (
 	                                                    <div key={home.id} className={`rounded-lg border px-3 py-2 text-xs ${latestLocalClaimInvitePropertyIds.has(home.id) ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
 	                                                      <p className="font-semibold">{home.nickname || `Property ${index + 1}`}</p>
@@ -36815,7 +36985,7 @@ function ContractorDashboard({
 	                                                <p className="mt-1 text-xs text-slate-600">
 	                                                  The invite will claim only the checked properties. New properties added later need a separate invite.
 	                                                </p>
-	                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                                                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
 	                                                  {claimInviteEligibleLocalHomes.map((home, index) => {
 	                                                    const checked = selectedClaimInviteHomeIds.includes(home.id);
 	                                                    return (
@@ -36826,8 +36996,8 @@ function ContractorDashboard({
 	                                                          onChange={() => toggleLocalClaimInviteHomeSelection(localCustomer!, home.id)}
 	                                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
 	                                                        />
-	                                                        <span>
-	                                                          <span className="block font-semibold">{home.nickname || `Property ${index + 1}`}</span>
+	                                                        <span className="min-w-0">
+	                                                          <span className="block break-words font-semibold">{home.nickname || `Property ${index + 1}`}</span>
 	                                                          <span className="mt-1 block">{home.address_line1 || 'No address on file'}</span>
 	                                                        </span>
 	                                                      </label>

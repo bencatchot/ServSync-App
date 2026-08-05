@@ -162,9 +162,11 @@ test.describe('customer management edit boundary', () => {
     expect(app).toContain('canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id)');
     expect(app).toContain('canCreateContractorLocalCustomersUi(contractorDraft, profile.id)');
     expect(customerWorkspace).toContain('!SERVSYNC_DEMO_PRESENTATION_MODE && canCreateContractorLocalCustomers');
-    expect(customerWorkspace).toContain('localCustomer && !localCustomerIsClaimed && canManageContractorCustomers');
-    expect(customerWorkspace).toContain('isAdding && canManageContractorCustomers');
-    expect(customerWorkspace).toContain('editingLocalHome && canManageContractorCustomers');
+    expect(customerWorkspace).toContain('localCustomer && !localCustomerIsClaimed && localCustomerManagementDetailReady');
+    expect(customerWorkspace).toContain('isAdding && localCustomerManagementDetailReady');
+    expect(customerWorkspace).toContain('editingLocalHome && localCustomerManagementDetailReady');
+    expect(customerWorkspace).toContain('canManageContractorCustomers');
+    expect(customerWorkspace).toContain("localCustomerManagementDetailState === 'ready'");
     expect(mutationHandlers).toContain('if (!canCreateContractorLocalCustomers)');
     expect(mutationHandlers).toContain('if (!canManageContractorCustomers)');
     expect(app).toContain("currentContractorTeamRole === 'field_tech'");
