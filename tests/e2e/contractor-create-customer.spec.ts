@@ -4,6 +4,11 @@ import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth'
 import { captureMajorConsoleErrors } from './helpers/console';
 import { credentialsFor } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+import {
+  deleteLocalCustomerFixtures,
+  setLocalContactClaimedAt,
+  setLocalHomeClaimedAt,
+} from './helpers/sandboxLocalCustomerOperator';
 
 const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 type CredentialKey = Parameters<typeof credentialsFor>[0];
@@ -42,6 +47,12 @@ function escapeRegExp(value: string) {
 }
 
 test.describe('contractor mutating customer creation', () => {
+  const createdContactIds: string[] = [];
+
+  test.afterAll(async () => {
+    await deleteLocalCustomerFixtures(createdContactIds);
+  });
+
   test('creates a clearly named local E2E customer', async ({ page }, testInfo) => {
     requireApprovedSandboxForMutation();
 
@@ -96,6 +107,9 @@ test.describe('contractor mutating customer creation', () => {
     if (!createContactResponse.ok()) {
       throw new Error(`Local customer create RPC failed with HTTP ${createContactResponse.status()}`);
     }
+    const created = await createContactResponse.json() as { contact?: { id?: string } };
+    expect(created.contact?.id).toBeTruthy();
+    createdContactIds.push(created.contact!.id!);
 
     await expect(search).toBeVisible();
     await search.fill(customerName);
@@ -146,6 +160,10 @@ test.describe('contractor mutating customer creation', () => {
     await main.getByRole('button', { name: /^Save new customer$/i }).click();
     const createContactResponse = await createContactResponsePromise;
     expect(createContactResponse.ok()).toBeTruthy();
+    const created = await createContactResponse.json() as { contact?: { id?: string } };
+    expect(created.contact?.id).toBeTruthy();
+    const createdContactId = created.contact!.id!;
+    createdContactIds.push(createdContactId);
 
     const search = main.getByPlaceholder(/Search customers, city, or address/i);
     await expect(search).toBeVisible();
@@ -220,21 +238,21 @@ test.describe('contractor mutating customer creation', () => {
       });
     } else {
       try {
-        const { data: createdContact, error: lookupError } = await contractorClient
-          .from('contractor_local_contacts')
-          .select('id')
-          .eq('email', customerEmail)
-          .maybeSingle();
+        const { data: createdContact, error: lookupError } = await contractorClient.rpc(
+          'servsync_get_local_customer_management_detail',
+          { p_local_contact_id: createdContactId },
+        );
         expect(lookupError).toBeNull();
         expect(createdContact?.id).toBeTruthy();
 
-        const { data: editedHome, error: editedHomeLookupError } = await contractorClient
-          .from('contractor_local_homes')
-          .select('id, nickname, address_line1, city, state, zip_code, notes')
-          .eq('local_contact_id', createdContact!.id)
-          .eq('nickname', editedSecondProperty)
-          .maybeSingle();
-        expect(editedHomeLookupError).toBeNull();
+        const editedHome = (createdContact.homes as Array<{
+          id: string;
+          nickname: string;
+          address_line1: string;
+          city: string;
+          zip_code: string;
+          notes: string;
+        }>).find(home => home.nickname === editedSecondProperty);
         expect(editedHome?.id, 'Edited local property should remain queryable with one stable id').toBeTruthy();
         expect(editedHome?.address_line1).toBe('222 Updated Guest Avenue');
         expect(editedHome?.city).toBe('Updatedville');
@@ -265,11 +283,7 @@ test.describe('contractor mutating customer creation', () => {
         });
         expect(deniedUpdateError, 'Unrelated contractor must not edit another contractor local property').toBeTruthy();
 
-        const { error: markClaimedError } = await contractorClient
-          .from('contractor_local_homes')
-          .update({ claimed_at: new Date().toISOString() })
-          .eq('id', editedHome!.id);
-        expect(markClaimedError).toBeNull();
+        await setLocalHomeClaimedAt(editedHome!.id, new Date().toISOString());
 
         const { error: claimedUpdateError } = await contractorClient.rpc('servsync_update_local_home', {
           p_local_home_id: editedHome!.id,
@@ -327,6 +341,10 @@ test.describe('contractor mutating customer creation', () => {
     await main.getByRole('button', { name: /^Save new customer$/i }).click();
     const createContactResponse = await createContactResponsePromise;
     expect(createContactResponse.ok()).toBeTruthy();
+    const created = await createContactResponse.json() as { contact?: { id?: string } };
+    expect(created.contact?.id).toBeTruthy();
+    const createdContactId = created.contact!.id!;
+    createdContactIds.push(createdContactId);
 
     const search = main.getByPlaceholder(/Search customers, city, or address/i);
     await expect(search).toBeVisible();
@@ -377,11 +395,10 @@ test.describe('contractor mutating customer creation', () => {
       });
     } else {
       try {
-        const { data: editedContact, error: lookupError } = await contractorClient
-          .from('contractor_local_contacts')
-          .select('id, contractor_id, display_name, phone, email, notes')
-          .eq('email', editedCustomerEmail)
-          .maybeSingle();
+        const { data: editedContact, error: lookupError } = await contractorClient.rpc(
+          'servsync_get_local_customer_management_detail',
+          { p_local_contact_id: createdContactId },
+        );
         expect(lookupError).toBeNull();
         expect(editedContact?.id).toBeTruthy();
         expect(editedContact?.display_name).toBe(editedCustomerName);
@@ -406,11 +423,7 @@ test.describe('contractor mutating customer creation', () => {
         });
         expect(deniedUpdateError, 'Unrelated contractor must not edit another contractor local customer profile').toBeTruthy();
 
-        const { error: markClaimedError } = await contractorClient
-          .from('contractor_local_contacts')
-          .update({ claimed_at: new Date().toISOString() })
-          .eq('id', editedContact!.id);
-        expect(markClaimedError).toBeNull();
+        await setLocalContactClaimedAt(editedContact!.id, new Date().toISOString());
 
         const { error: claimedUpdateError } = await contractorClient.rpc('servsync_update_local_contact_profile', {
           p_local_contact_id: editedContact!.id,

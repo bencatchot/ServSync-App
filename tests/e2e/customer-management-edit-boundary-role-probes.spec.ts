@@ -3,6 +3,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import { requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+import {
+  deleteLocalCustomerFixtures,
+  setLocalHomeClaimedAt,
+} from './helpers/sandboxLocalCustomerOperator';
 
 const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
@@ -157,9 +161,7 @@ test.describe('customer management edit boundary Sandbox role probes', () => {
   });
 
   test.afterAll(async () => {
-    if (owner?.client && contactId) {
-      await owner.client.from('contractor_local_contacts').delete().eq('id', contactId);
-    }
+    await deleteLocalCustomerFixtures(contactId ? [contactId] : []);
     await Promise.all(
       [owner, admin, office, fieldTech, viewer, disabled, contractorB]
         .filter(Boolean)
@@ -209,11 +211,14 @@ test.describe('customer management edit boundary Sandbox role probes', () => {
 
   test('preserves claimed-record mutation denial', async () => {
     const claimedAt = new Date().toISOString();
-    expect((await owner.client.from('contractor_local_homes').update({ claimed_at: claimedAt }).eq('id', homeId)).error).toBeNull();
-    expect((await updateProperty(owner, homeId, 'Claimed update')).error?.message)
-      .toContain('homeowner-controlled after claim');
-    expect((await updateCustomer(owner, contactId, 'Claimed customer update')).error?.message)
-      .toContain('homeowner-controlled after claim');
-    expect((await owner.client.from('contractor_local_homes').update({ claimed_at: null }).eq('id', homeId)).error).toBeNull();
+    await setLocalHomeClaimedAt(homeId, claimedAt);
+    try {
+      expect((await updateProperty(owner, homeId, 'Claimed update')).error?.message)
+        .toContain('homeowner-controlled after claim');
+      expect((await updateCustomer(owner, contactId, 'Claimed customer update')).error?.message)
+        .toContain('homeowner-controlled after claim');
+    } finally {
+      await setLocalHomeClaimedAt(homeId, null);
+    }
   });
 });
