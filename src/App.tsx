@@ -139,6 +139,10 @@ import {
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
+import {
+  canCreateContractorLocalCustomersUi,
+  canManageContractorCustomersUi,
+} from './features/customers/customerManagementPermissions';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { useDurableDraftSummary } from './features/drafts/useDurableDraftSummary';
 import {
@@ -28707,10 +28711,12 @@ function ContractorDashboard({
     setContractorJobsView('new_financial');
     setInspectionView('list');
   };
+  const canManageContractorCustomers = canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id);
+  const canCreateContractorLocalCustomers = canCreateContractorLocalCustomersUi(contractorDraft, profile.id);
   const openCustomersOnboardingWorkspace = () => {
     setContractorTab('connections');
     setHomeownerFilter('active');
-    if (onboardingCustomerCount === 0) {
+    if (onboardingCustomerCount === 0 && canCreateContractorLocalCustomers) {
       setShowLocalContactForm(true);
       setHomeownerMobileDetailOpen(true);
     }
@@ -28723,9 +28729,11 @@ function ContractorDashboard({
     if (inviteTarget) {
       setSelectedHomeownerSubjectId(`local:${inviteTarget.id}`);
       setHomeownerMobileDetailOpen(true);
-    } else {
+    } else if (canCreateContractorLocalCustomers) {
       setShowLocalContactForm(true);
       setHomeownerMobileDetailOpen(true);
+    } else {
+      setNotice('Ask the contractor owner to add a customer before preparing an invitation.');
     }
   };
   const openReportOnboardingWorkspace = () => {
@@ -28748,10 +28756,12 @@ function ContractorDashboard({
       onAction: () => setContractorTab('profile'),
     },
     {
-      label: 'Add your first customer',
-      helper: 'Add a customer or accept a connection request.',
+      label: canCreateContractorLocalCustomers ? 'Add your first customer' : 'Review your customers',
+      helper: canCreateContractorLocalCustomers
+        ? 'Add a customer or accept a connection request.'
+        : 'Review connected customers and accepted connection requests.',
       complete: onboardingCustomerCount > 0,
-      actionLabel: 'Add customer',
+      actionLabel: canCreateContractorLocalCustomers ? 'Add customer' : 'View customers',
       onAction: openCustomersOnboardingWorkspace,
     },
     {
@@ -31141,6 +31151,17 @@ function ContractorDashboard({
   const canManageServiceAgreements = userCanManageServiceAgreementUi(contractorDraft, teamAccess, profile.id);
   const canSubmitContractorReferral = userCanSubmitContractorReferralUi(contractorDraft, teamAccess, profile.id);
   const canPrepareLocalCustomerClaimInvites = userCanPrepareLocalCustomerClaimInvitesUi(contractorDraft, teamAccess, profile.id);
+  useEffect(() => {
+    if (!canCreateContractorLocalCustomers) {
+      setShowLocalContactForm(false);
+      setEstimateCustomerCreateOpen(false);
+    }
+    if (!canManageContractorCustomers) {
+      setAddingLocalHomeContactId(null);
+      setEditingLocalHome(null);
+      setEditingLocalCustomerProfileId(null);
+    }
+  }, [canCreateContractorLocalCustomers, canManageContractorCustomers]);
   const clearPreparedLocalClaimInviteQr = useCallback(() => {
     localClaimInviteQrRequestIdRef.current += 1;
     setPreparedLocalClaimInviteQr(null);
@@ -31590,6 +31611,10 @@ function ContractorDashboard({
     successNotice?: string;
   }) => {
     if (!supabase) return;
+    if (!canCreateContractorLocalCustomers) {
+      setError('Only the contractor owner can add a customer in this workflow.');
+      return;
+    }
     if (!localContactDraft.display_name.trim()) {
       setError('Enter a customer name before saving a new customer.');
       return;
@@ -31647,6 +31672,7 @@ function ContractorDashboard({
   };
 
   const openEstimateCustomerCreate = () => {
+    if (!canCreateContractorLocalCustomers) return;
     resetLocalContactDraft();
     setError('');
     setNotice('');
@@ -31681,7 +31707,7 @@ function ContractorDashboard({
   };
 
   const openEditLocalCustomerProfileForm = (contact: ContractorLocalContact) => {
-    if (localCustomerProfileIsClaimed(contact)) return;
+    if (!canManageContractorCustomers || localCustomerProfileIsClaimed(contact)) return;
     setEditingLocalCustomerProfileId(contact.id);
     setEditingLocalCustomerProfileDraft(localCustomerProfileEditDraftFromContact(contact));
     setHomeownerDetailTab('profile');
@@ -31694,6 +31720,10 @@ function ContractorDashboard({
 
   const saveLocalCustomerProfileEdit = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
+    if (!canManageContractorCustomers) {
+      setError('Only the contractor owner, admin, or office role can edit customer details.');
+      return;
+    }
     if (localCustomerProfileIsClaimed(contact)) {
       setError('This customer is linked to a homeowner profile. Customer details are homeowner-controlled after claim.');
       return;
@@ -31747,6 +31777,7 @@ function ContractorDashboard({
   };
 
   const openAddLocalHomeForm = (contact: ContractorLocalContact) => {
+    if (!canManageContractorCustomers) return;
     setAddingLocalHomeContactId(contact.id);
     setLocalHomeDrafts(prev => ({
       ...prev,
@@ -31763,7 +31794,7 @@ function ContractorDashboard({
   };
 
   const openEditLocalHomeForm = (contact: ContractorLocalContact, home: ContractorLocalHome) => {
-    if (home.home_id || home.claimed_at) return;
+    if (!canManageContractorCustomers || home.home_id || home.claimed_at) return;
     setEditingLocalHome({ contactId: contact.id, homeId: home.id });
     setEditingLocalHomeDraft(localHomeDraftFromHome(home));
     setHomeownerDetailTab('home');
@@ -31776,6 +31807,10 @@ function ContractorDashboard({
 
   const saveLocalHomeEdit = async (contact: ContractorLocalContact, home: ContractorLocalHome) => {
     if (!supabase) return;
+    if (!canManageContractorCustomers) {
+      setError('Only the contractor owner, admin, or office role can edit customer properties.');
+      return;
+    }
     if (home.home_id || home.claimed_at) {
       setError('This property is linked to a homeowner profile. Property details are homeowner-controlled after claim.');
       return;
@@ -31824,8 +31859,12 @@ function ContractorDashboard({
     }
   };
 
-	  const createLocalHome = async (contact: ContractorLocalContact) => {
+  const createLocalHome = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
+    if (!canManageContractorCustomers) {
+      setError('Only the contractor owner, admin, or office role can add customer properties.');
+      return;
+    }
     const draft = localHomeDrafts[contact.id] ?? EMPTY_LOCAL_HOME_DRAFT;
     if (!draft.nickname.trim() && !draft.address_line1.trim()) {
       setError('Enter a property label or street address before adding another property.');
@@ -34999,7 +35038,7 @@ function ContractorDashboard({
 		        const customerSidebarLabels = homeownerFilter === 'inactive' ? ['View: Inactive customers'] : [];
 	        const allSubjects = [...activeSubjects, ...inactiveSubjects];
         const selectedSubject = allSubjects.find(s => s.id === selectedHomeownerSubjectId) ?? null;
-        const showHomeownerMobileDetail = homeownerMobileDetailOpen || showLocalContactForm;
+        const showHomeownerMobileDetail = homeownerMobileDetailOpen || (showLocalContactForm && canCreateContractorLocalCustomers);
 
         return (
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -35009,7 +35048,7 @@ function ContractorDashboard({
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-slate-800 text-sm">Customers</h2>
-                    {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+                    {!SERVSYNC_DEMO_PRESENTATION_MODE && canCreateContractorLocalCustomers && (
                       <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); setHomeownerMobileDetailOpen(true); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
                         <Plus size={14} /> Add
                       </button>
@@ -35205,7 +35244,7 @@ function ContractorDashboard({
                     </button>
                   </div>
                 )}
-                {showLocalContactForm ? (
+                {showLocalContactForm && canCreateContractorLocalCustomers ? (
                   <div className="p-4 sm:p-6">
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5 max-w-3xl mx-auto">
                       <div className="flex items-start justify-between gap-3">
@@ -35857,14 +35896,16 @@ function ContractorDashboard({
                                       ) : (
                                         <p className="text-xs text-slate-500">Contractor-local property details.</p>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditLocalHomeForm(localCustomer, home)}
-                                        disabled={claimed || isEditingThisHome}
-                                        className={buttonClass(claimed ? 'secondary' : 'secondary')}
-                                      >
-                                        {isEditingThisHome ? 'Editing...' : 'Edit property'}
-                                      </button>
+                                      {canManageContractorCustomers && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditLocalHomeForm(localCustomer, home)}
+                                          disabled={claimed || isEditingThisHome}
+                                          className={buttonClass('secondary')}
+                                        >
+                                          {isEditingThisHome ? 'Editing...' : 'Edit property'}
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -35872,19 +35913,21 @@ function ContractorDashboard({
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openAddLocalHomeForm(localCustomer)}
-                              className={buttonClass('secondary')}
-                            >
-                              <Plus size={14} />
-                              Add property
-                            </button>
+                            {canManageContractorCustomers && (
+                              <button
+                                type="button"
+                                onClick={() => openAddLocalHomeForm(localCustomer)}
+                                className={buttonClass('secondary')}
+                              >
+                                <Plus size={14} />
+                                Add property
+                              </button>
+                            )}
                             {homes.length > 1 && (
                               <p className="text-xs text-slate-500">Select a property before starting property-specific work.</p>
                             )}
                           </div>
-                          {isAdding && (
+                          {isAdding && canManageContractorCustomers && (
                             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                                 <div>
@@ -35945,7 +35988,7 @@ function ContractorDashboard({
                               </div>
                             </div>
                           )}
-                          {editingLocalHome && (
+                          {editingLocalHome && canManageContractorCustomers && (
                             <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="edit-local-property-title">
                               <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-5 shadow-xl sm:max-w-3xl sm:rounded-2xl">
                                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -36575,7 +36618,7 @@ function ContractorDashboard({
                                     <Home size={18} className="text-blue-700" />
                                     <h3 className="font-bold text-slate-950">Profile</h3>
                                   </div>
-                                  {localCustomer && !localCustomerIsClaimed && (
+                                  {localCustomer && !localCustomerIsClaimed && canManageContractorCustomers && (
                                     <button
                                       type="button"
                                       onClick={() => openEditLocalCustomerProfileForm(localCustomer)}
@@ -36619,7 +36662,7 @@ function ContractorDashboard({
                                           icon={customerConnectionStatusIcon(customerConnectionStatus)}
                                         />
                                       </div>
-                                      {editingLocalCustomerProfileId === localCustomer.id && (
+                                      {editingLocalCustomerProfileId === localCustomer.id && canManageContractorCustomers && (
                                         <div role="dialog" aria-modal="true" aria-labelledby="edit-local-customer-profile-title" className="sm:col-span-2 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
                                           <div className="flex items-start justify-between gap-3">
                                             <div>
@@ -38366,7 +38409,7 @@ function ContractorDashboard({
                               ))}
                             </select>
                           </Field>
-                          {contractorFinancialRecordKind === 'estimates' && (
+                          {contractorFinancialRecordKind === 'estimates' && canCreateContractorLocalCustomers && (
                             <button
                               type="button"
                               onClick={openEstimateCustomerCreate}
@@ -38463,7 +38506,7 @@ function ContractorDashboard({
                           <Notice tone="info" text={readOnlyContractorActionReason} />
                         )}
 
-                        {estimateCustomerCreateOpen && (
+                        {estimateCustomerCreateOpen && canCreateContractorLocalCustomers && (
                           <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                               <div>
@@ -40033,7 +40076,7 @@ function ContractorDashboard({
                 </Card>
               )}
 
-              {showLocalContactForm && (
+              {showLocalContactForm && canCreateContractorLocalCustomers && (
               <Card title="Add new customer" icon={<UserRound size={18} />}>
                   <div className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-3">
@@ -41320,14 +41363,16 @@ function ContractorDashboard({
                         <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name} — Not connected</option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => setShowLocalContactForm(true)}
-                      className={buttonClass('secondary')}
-                    >
-                      <Plus size={15} />
-                      Add new customer
-                    </button>
+                    {canCreateContractorLocalCustomers && (
+                      <button
+                        type="button"
+                        onClick={() => setShowLocalContactForm(true)}
+                        className={buttonClass('secondary')}
+                      >
+                        <Plus size={15} />
+                        Add new customer
+                      </button>
+                    )}
                   </div>
                 </Field>
                 {(() => {
@@ -41464,7 +41509,7 @@ function ContractorDashboard({
                     </Field>
                   );
                 })()}
-                {showLocalContactForm && (
+                {showLocalContactForm && canCreateContractorLocalCustomers && (
                   <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div>

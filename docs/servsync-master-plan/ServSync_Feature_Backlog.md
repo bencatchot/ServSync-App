@@ -46,7 +46,7 @@ Important guardrails:
 - Do not claim QuickBooks/accounting sync, OAuth accounting connection, or production export delivery is live.
 - Do not claim push notifications, email/SMS reminders, provider delivery, or automated invitation delivery are live unless a later approved rollout says so.
 - Do not claim Home Access invite email delivery is live; production delivery remains disabled unless later enabled by an approved gate.
-- Do not claim customer-management role parity. Existing customer creation/direct local-contact access and newer helper-backed profile/property operations need a separate authorization audit and approved permission decision.
+- Do not claim full customer-management role parity. Customer Management Edit Boundary Correction v1 is implemented in repository source only: the proposed additive migration separates local customer/profile/property mutation from Job authority and limits those writes to owner/admin/office, but it is unapplied and unvalidated in any environment. Local-customer read/list parity, admin/office creation parity, archive lifecycle, direct-table privilege cleanup, and broader customer-model unification remain separate approved-workflow gates.
 - Any unified Draft customer selector must preserve canonical subject mapping, same-type saved-Draft fallback, stale-selection protection, authorized property scope, save/resume behavior, Draft gates, and the existing role matrix without merging customer records.
 - Do not claim automatic recurring reminders, native iOS/Android apps, full external calendar sync, broad public marketplace lead generation, paid rankings, advanced analytics, dispatch/routing, background checks, license verification, insurance verification, or formal compliance certification.
 

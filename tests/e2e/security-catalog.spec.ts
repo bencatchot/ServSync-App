@@ -189,6 +189,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'current_user_has_contractor_entitlement',
   'current_user_can_approve_home_work',
   'current_user_can_manage_contractor_billing',
+  'current_user_can_manage_contractor_customers',
   'current_user_can_manage_contractor_schedule',
   'current_user_can_manage_service_agreements',
   'current_user_can_submit_contractor_referrals',

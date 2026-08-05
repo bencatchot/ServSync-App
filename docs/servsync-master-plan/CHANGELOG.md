@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-04
 
+- Branch: `codex/customer-management-edit-boundary-v1`
+- Starting main SHA: `0ef544516a6826a6c670bafe9d391b198a1da66e`
+- Files changed:
+  - `servsync-customer-management-edit-boundary.sql`
+  - `src/App.tsx`
+  - `src/features/customers/customerManagementPermissions.ts`
+  - focused customer-management authorization, UI, profile/property, and security-catalog tests under `tests/e2e/`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Customer Management Edit Boundary Correction v1 in repository source. A dedicated fixed-search-path helper limits contractor-created customer identity and property mutation to the contractor owner or active admin/office members. The canonical local profile update, local property creation, and local property update RPC definitions now authorize and tenant-scope supplied records before locking, return the same unavailable response for foreign and unknown identifiers, retain claimed-record and stale-invite protections, and no longer inherit field-tech Job-write authority. Matching UI capability helpers hide customer/property edit controls from field tech/viewer roles and keep local-customer creation owner-only until its separate parity slice.
+- Reason for change: The role-parity audit confirmed that local profile/property mutation reused operational Job-write authority, allowing a field technician with a known identifier to alter customer identity, private notes, or property addresses before broader read/list parity could safely expose local customer identifiers.
+- Tests/checks run: TypeScript passed. Focused customer-management edit-boundary and existing local-profile source coverage passed 10/10; three separately gated credentialed Sandbox role probes compiled and were skipped because this repository-only task did not apply SQL or authorize environment access. Production build, focused regressions, SQL/static checks, documentation checks, diff/scope checks, and sensitive-value scans are recorded in the PR validation summary.
+- Known risks or follow-ups:
+  - The additive migration was created but not applied to Sandbox, Demo, Production, or any other environment. Runtime owner/admin/office allow and field-tech/viewer/inactive/cross-tenant denial remain a separately authorized SQL-and-Sandbox validation gate.
+  - Local-customer ordinary reads and creation remain owner-only. Read/list parity, admin/office creation parity, archive lifecycle, direct-table privilege cleanup, and broader customer-model unification remain separate work.
+  - Draft, Job, estimate, invoice, inspection, calendar, connected-property proposal, connected homeowner ownership/sharing, invitation, claim, and token-containment behavior are intentionally unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the source-only edit-boundary checkpoint while keeping full customer-management role parity and every deferred read/create/archive/model slice active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Documents the approved separation between customer identity/property management and operational Job authority without claiming rollout.
+
 - Branch: `codex/pr372-production-closeout`
 - Starting main SHA: `854372c8609a67d7de16dac33550762d9d750d74` (normal two-parent merge commit for PR #372)
 - Files changed:
