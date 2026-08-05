@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/pr380-production-rollout-doc-closeout`
+- Starting main SHA: `e8767c8bf795f46eb7fbb76aa98a8d0d14bc3f46` (normal two-parent merge commit for PR #380)
+- Files changed:
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Records the completed Production rollout of Contractor-Local Customer Direct-Table Privilege Cleanup v1. PR #380 merged through normal GitHub merge commit `e8767c8bf795f46eb7fbb76aa98a8d0d14bc3f46`, with base parent `e1d79edc83c80296905ada7080fa9ad729ac9f84` and reviewed-head parent `6de5a38e074ba9135bb09888a1753f4f543325b8`. The exact migration `servsync-contractor-local-customer-direct-table-privilege-cleanup.sql` (SHA-256 `c01332b1422c136cdb6fed5d580c7deacf5cf49ac1debfaf02be06f7e3a5cf64`) was applied successfully to Production Supabase `uqgtheclhxqlnjpfmheq` from `2026-08-05T20:46:34Z` through `2026-08-05T20:46:36Z` before merge.
+- Production privilege and preservation result: On both `contractor_local_contacts` and `contractor_local_homes`, `PUBLIC`, `anon`, and `authenticated` retain no table-level or column-level privileges. Trusted `service_role` retains only `SELECT`, `INSERT`, `UPDATE`, and `DELETE`; it does not retain `TRUNCATE`, `REFERENCES`, `TRIGGER`, or another unintended table privilege. `postgres` ownership, RLS, existing policies, controlled RPC definitions and grants, default ACLs, schema, columns, constraints, indexes, and business data remained unchanged. No archive, restore, deletion, or cleanup RPC was added.
+- Production security outcome: Owner and every other browser role can no longer directly select, insert, update, or delete contractor-local customer or property rows, so raw phone, email, notes, linkage fields, and claim-state columns are no longer directly available through these tables to browser roles. Supported behavior continues through the existing controlled directory, management-detail, creation, profile/property update, claim, invitation, Draft, Job, estimate, invoice, inspection, and calendar boundaries. PR #374 mutation restrictions, PR #376 role-shaped reads, and PR #378 Owner/Admin/Office creation parity remain intact. This migration hardens only the two named existing tables and does not automatically protect future sensitive tables.
+- Production validation: Anonymous direct CRUD denial passed 8/8, and authenticated Owner direct CRUD denial passed 8/8. Controlled Owner profile, directory, management-detail, and invitation-list RPC checks passed. The authenticated Production read-only smoke passed 2/2 for homeowner navigation and contractor Owner Customers/Jobs navigation. No Production customer, property, invitation, or work data changed. Production Field Technician and Viewer UI paths were not repeated because approved credentials were unavailable; exact Production ACL verification and completed authenticated Sandbox role validation remain the evidence basis for those roles.
+- Production deployment: Automatic Vercel Git deployment `dpl_EYunKyFyZP7oJumj9E3o4gfER1fd` reached Production `READY` in project `serv-sync-app-refresh` from merge commit `e8767c8bf795f46eb7fbb76aa98a8d0d14bc3f46`. `https://servsync.app` and `https://www.servsync.app` returned HTTP 200. Automatic Demo source deployment `dpl_oUtbS5W8uvAUq6fhZewECknCkhxs` was created from the merge commit, but the privilege-cleanup migration was not applied to Demo and Demo database support is not claimed. No manual deployment, promotion, retry, environment, data, or configuration change occurred.
+- Tests/checks run: Verified PR #380 merge identity and two-parent topology, migration filename and SHA-256, final Production table/column privilege matrix, table ownership/RLS/policy preservation, controlled function/grant and default-ACL preservation, schema/constraint/index and business-data preservation, anonymous and Owner direct-denial probes, controlled Owner RPC checks, authenticated Production read-only smoke 2/2, automatic Production and Demo source-deployment identities/source/`READY` states, both Production aliases at HTTP 200, three-document scope, stale rollout wording, Markdown relative links/anchors/tables, `git diff --check`, added-line sensitive-value scan, and final clean-worktree state.
+- Known risks or follow-ups:
+  - Production Field Technician and Viewer UI paths were not repeated because approved credentials were unavailable; exact Production ACL verification and completed Sandbox role validation remain the evidence basis.
+  - Customer archive/restore lifecycle, Demo customer-management migration disposition, broader PostgreSQL default-ACL policy, broader customer-model maturity, the inherited non-owner appointment-window 401, and inherited ESLint 9 startup repair remain separate active work. Future sensitive tables still require explicit least-privilege ACL design.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Replaces the draft/Sandbox-only privilege-cleanup status with the merged and Production-active two-table boundary while retaining lifecycle, Demo, default-ACL, and broader customer-model work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the exact Production privilege matrix, preservation evidence, automatic deployment, bounded validation, and limitations without claiming Demo support or automatic protection for future tables.
+
 - Branch: `codex/contractor-local-customer-direct-table-privilege-cleanup-v1`
 - Starting main SHA: `e1d79edc83c80296905ada7080fa9ad729ac9f84`
 - Files changed:
