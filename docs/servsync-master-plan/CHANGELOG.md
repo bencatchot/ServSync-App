@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/contractor-local-customer-direct-table-privilege-cleanup-v1`
+- Starting main SHA: `e1d79edc83c80296905ada7080fa9ad729ac9f84`
+- Files changed:
+  - `servsync-contractor-local-customer-direct-table-privilege-cleanup.sql`
+  - focused contractor-local customer creation, management, isolation, privilege, security-catalog, and Sandbox operator tests under `tests/e2e/`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Contractor-Local Customer Direct-Table Privilege Cleanup v1 in repository source. The additive migration (SHA-256 `b119b19a5c5fbecc09bb39bff0a3589ef82dc603b6f6419e88e8c352d211eb70`) fails closed unless both local-customer tables are owned by `postgres`, retain RLS, preserve trusted `service_role` CRUD, and have the established controlled directory, detail, creation, profile-edit, property-create, property-edit, claim, and invitation RPC boundaries. It then revokes all table-level and column-level privileges on `contractor_local_contacts` and `contractor_local_homes` from `PUBLIC`, `anon`, and `authenticated`, while explicitly retaining only trusted service-role CRUD for controlled validation setup and cleanup. It does not change table definitions, RLS, policies, RPCs, claims, invitations, customer/property data, or supported product behavior.
+- Test-tooling boundary: Supported browser and authenticated test behavior now uses the controlled RPCs. Cross-user coverage reads local-customer IDs through `servsync_list_local_customer_summaries`; creation and edit coverage validates records through `servsync_get_local_customer_management_detail`. Direct fixture deletion and claim-state setup are centralized in a server-only helper that requires the exact dedicated Sandbox target plus a non-`VITE_` service-role credential. A separate gated Sandbox probe directly verifies that owner, admin, office, field tech, viewer, inactive, removed, cross-tenant contractor, homeowner, and anonymous clients cannot select, insert, update, or delete either table.
+- Tests/checks run: TypeScript passed. Focused static privilege/source tests, SQL/catalog compilation, Production build, package-lock consistency, documentation checks, sensitive-value scans, and final scope/clean-tree review are recorded in the draft PR. Live catalog and role probes remain intentionally gated until a separately authorized Sandbox SQL application.
+- Known risks or follow-ups:
+  - The migration has not been applied to Sandbox, Demo, or Production. Existing deployed direct privileges remain unchanged until a separately authorized migration-first rollout validates exact table/column ACLs, service-role preservation, RPC behavior, role denial, claims, invitations, Draft/workflows, and fixture cleanup in Sandbox.
+  - Owner direct delete is intentionally removed and no archive/delete RPC is added. Archive/restore remains a separate product-lifecycle decision. Demo migration disposition, broader customer-model maturity, the inherited non-owner appointment-window 401, and inherited ESLint 9 startup repair remain separate active work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Moves direct-table privilege cleanup from an unaudited follow-up to an implemented-but-unapplied gated rollout while preserving every separate lifecycle and customer-model item.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the RPC-only application boundary, trusted operator exception, and separately authorized Sandbox/Production rollout sequence without claiming deployed privilege removal.
+
 - Branch: `codex/pr378-production-rollout-doc-closeout`
 - Starting main SHA: `b31a3360cf95a61bda2eedca4d9943e2970cf728` (normal two-parent merge commit for PR #378)
 - Files changed:

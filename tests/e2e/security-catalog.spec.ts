@@ -93,6 +93,18 @@ type ReviewGrantRow = TablePrivilegeRow & {
   authenticated_references: boolean | null;
 };
 
+type LocalCustomerTablePrivilegeRow = ReviewGrantRow & {
+  table_owner: string;
+  rls_enabled: boolean;
+  public_column_grants: number;
+  anon_column_grants: number;
+  authenticated_column_grants: number;
+  service_role_select: boolean;
+  service_role_insert: boolean;
+  service_role_update: boolean;
+  service_role_delete: boolean;
+};
+
 type ReviewRpcGrantRow = RpcRow & {
   authenticated_execute_all: boolean | null;
 };
@@ -517,6 +529,73 @@ where c.relnamespace = 'public'::regnamespace
     expect(rows[0].authenticated_insert, 'authenticated should use guarded create RPCs, not direct table INSERT').toBe(false);
     expect(rows[0].authenticated_update, 'authenticated should use guarded lifecycle RPCs, not direct table UPDATE').toBe(false);
     expect(rows[0].authenticated_delete, 'authenticated should not directly DELETE claim invites').toBe(false);
+  });
+
+  test('contractor-local customer tables deny every browser ACL while preserving trusted operator access', () => {
+    const rows = runCatalogQuery<LocalCustomerTablePrivilegeRow>(`
+select
+  c.relname as table_name,
+  c.oid is not null as exists,
+  pg_get_userbyid(c.relowner) as table_owner,
+  c.relrowsecurity as rls_enabled,
+  has_table_privilege('public', c.oid, 'SELECT') as public_select,
+  has_table_privilege('public', c.oid, 'INSERT') as public_insert,
+  has_table_privilege('public', c.oid, 'UPDATE') as public_update,
+  has_table_privilege('public', c.oid, 'DELETE') as public_delete,
+  has_table_privilege('public', c.oid, 'TRUNCATE') as public_truncate,
+  has_table_privilege('public', c.oid, 'TRIGGER') as public_trigger,
+  has_table_privilege('public', c.oid, 'REFERENCES') as public_references,
+  has_table_privilege('anon', c.oid, 'SELECT') as anon_select,
+  has_table_privilege('anon', c.oid, 'INSERT') as anon_insert,
+  has_table_privilege('anon', c.oid, 'UPDATE') as anon_update,
+  has_table_privilege('anon', c.oid, 'DELETE') as anon_delete,
+  has_table_privilege('anon', c.oid, 'TRUNCATE') as anon_truncate,
+  has_table_privilege('anon', c.oid, 'TRIGGER') as anon_trigger,
+  has_table_privilege('anon', c.oid, 'REFERENCES') as anon_references,
+  has_table_privilege('authenticated', c.oid, 'SELECT') as authenticated_select,
+  has_table_privilege('authenticated', c.oid, 'INSERT') as authenticated_insert,
+  has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
+  has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete,
+  has_table_privilege('authenticated', c.oid, 'TRUNCATE') as authenticated_truncate,
+  has_table_privilege('authenticated', c.oid, 'TRIGGER') as authenticated_trigger,
+  has_table_privilege('authenticated', c.oid, 'REFERENCES') as authenticated_references,
+  has_table_privilege('service_role', c.oid, 'SELECT') as service_role_select,
+  has_table_privilege('service_role', c.oid, 'INSERT') as service_role_insert,
+  has_table_privilege('service_role', c.oid, 'UPDATE') as service_role_update,
+  has_table_privilege('service_role', c.oid, 'DELETE') as service_role_delete,
+  (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'PUBLIC') as public_column_grants,
+  (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'anon') as anon_column_grants,
+  (select count(*)::integer from information_schema.column_privileges p where p.table_schema = 'public' and p.table_name = c.relname and p.grantee = 'authenticated') as authenticated_column_grants
+from pg_class c
+where c.relnamespace = 'public'::regnamespace
+  and c.relname in ('contractor_local_contacts', 'contractor_local_homes')
+  and c.relkind in ('r', 'p')
+order by c.relname;
+    `);
+
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.exists).toBe(true);
+      expect(row.table_owner).toBe('postgres');
+      expect(row.rls_enabled).toBe(true);
+      expect([
+        row.public_select, row.public_insert, row.public_update, row.public_delete,
+        row.public_truncate, row.public_trigger, row.public_references,
+        row.anon_select, row.anon_insert, row.anon_update, row.anon_delete,
+        row.anon_truncate, row.anon_trigger, row.anon_references,
+        row.authenticated_select, row.authenticated_insert, row.authenticated_update, row.authenticated_delete,
+        row.authenticated_truncate, row.authenticated_trigger, row.authenticated_references,
+      ]).toEqual(Array(21).fill(false));
+      expect(row.public_column_grants).toBe(0);
+      expect(row.anon_column_grants).toBe(0);
+      expect(row.authenticated_column_grants).toBe(0);
+      expect([
+        row.service_role_select,
+        row.service_role_insert,
+        row.service_role_update,
+        row.service_role_delete,
+      ]).toEqual([true, true, true, true]);
+    }
   });
 
   test('local invoice delivery, rate-limit, and recipient-session storage remain private for every browser role', () => {

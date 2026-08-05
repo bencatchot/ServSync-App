@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+import { deleteLocalCustomerFixtures } from './helpers/sandboxLocalCustomerOperator';
 import { requireValidationTarget } from './helpers/validationTarget';
 
 const PROBE_ENABLED = process.env.ADMIN_OFFICE_CUSTOMER_CREATION_PARITY_PROBES === 'true';
@@ -86,26 +87,7 @@ test.describe('Admin/Office customer creation parity Sandbox role probes', () =>
   });
 
   test.afterAll(async () => {
-    if (accounts.owner && createdContactIds.length > 0) {
-      const { error } = await accounts.owner
-        .from('contractor_local_contacts')
-        .delete()
-        .in('id', createdContactIds);
-      expect(error, 'Owner cleanup should remove every created contact and cascaded initial property').toBeNull();
-      const { data: survivors, error: survivorError } = await accounts.owner
-        .from('contractor_local_contacts')
-        .select('id')
-        .in('id', createdContactIds);
-      expect(survivorError).toBeNull();
-      expect(survivors).toEqual([]);
-    }
-    if (accounts.contractorB && contractorBCreatedContactIds.length > 0) {
-      const { error } = await accounts.contractorB
-        .from('contractor_local_contacts')
-        .delete()
-        .in('id', contractorBCreatedContactIds);
-      expect(error, 'Contractor B cleanup should remove every unexpected created row').toBeNull();
-    }
+    await deleteLocalCustomerFixtures([...createdContactIds, ...contractorBCreatedContactIds]);
     await Promise.all(Object.values(accounts).map(client => client.auth.signOut().catch(() => undefined)));
   });
 
@@ -158,11 +140,8 @@ test.describe('Admin/Office customer creation parity Sandbox role probes', () =>
     expect(result.error, 'A caller-supplied contractor identifier must not match an RPC signature').toBeTruthy();
     expect(result.data).toBeNull();
 
-    const { data: ownerRows, error: ownerLookupError } = await accounts.owner
-      .from('contractor_local_contacts')
-      .select('id')
-      .eq('display_name', `${tag} customer`);
+    const { data: ownerRows, error: ownerLookupError } = await accounts.owner.rpc('servsync_list_local_customer_summaries');
     expect(ownerLookupError).toBeNull();
-    expect(ownerRows).toEqual([]);
+    expect((ownerRows as Array<{ display_name: string }>).some(row => row.display_name === `${tag} customer`)).toBe(false);
   });
 });

@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
 import { captureMajorConsoleErrors } from './helpers/console';
 import { requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+import { deleteLocalCustomerFixtures } from './helpers/sandboxLocalCustomerOperator';
 import { requireValidationTarget } from './helpers/validationTarget';
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
@@ -71,17 +71,7 @@ test.describe('Admin/Office customer creation parity Preview UI', () => {
 
   test.afterAll(async () => {
     if (!UI_ENABLED || createdContactIds.length === 0) return;
-    const owner = createClient(requiredEnv('VITE_SUPABASE_URL'), requiredEnv('VITE_SUPABASE_ANON_KEY'), {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { error: signInError } = await owner.auth.signInWithPassword({
-      email: requiredEnv('TEST_CONTRACTOR_EMAIL'),
-      password: requiredEnv('TEST_CONTRACTOR_PASSWORD'),
-    });
-    expect(signInError).toBeNull();
-    const { error: cleanupError } = await owner.from('contractor_local_contacts').delete().in('id', createdContactIds);
-    expect(cleanupError).toBeNull();
-    await owner.auth.signOut();
+    await deleteLocalCustomerFixtures(createdContactIds);
   });
 
   test('Owner retains customer creation controls', async ({ page }, testInfo) => {

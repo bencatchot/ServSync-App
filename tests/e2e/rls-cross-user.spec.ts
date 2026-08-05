@@ -113,6 +113,14 @@ async function contractorProfileId(client: SupabaseClient, businessName: RegExp 
   return profile!.id as string;
 }
 
+async function localCustomerSummaryIds(client: SupabaseClient, label: string): Promise<string[]> {
+  const { data, error } = await client.rpc('servsync_list_local_customer_summaries');
+  expect(error, `${label} controlled local-customer directory should not error`).toBeNull();
+  const ids = ((data || []) as Array<{ id?: string }>).map(row => row.id).filter((id): id is string => Boolean(id));
+  expect(ids.length, `${label} should have at least one prepared local customer`).toBeGreaterThan(0);
+  return ids;
+}
+
 test.describe('sandbox RLS cross-user boundaries', () => {
   test.beforeAll(() => {
     requireApprovedSandboxForMutation();
@@ -172,18 +180,8 @@ test.describe('sandbox RLS cross-user boundaries', () => {
 
       const contractorAId = await contractorProfileId(contractorA.client, /Prevention Pros/i, 'Contractor A');
       const contractorBId = await contractorProfileId(contractorB.client, 'RLS QA Contractor B', 'Contractor B');
-      const contractorALocalContactId = await firstId(
-        contractorA.client,
-        'contractor_local_contacts',
-        'Contractor A local contact',
-        query => query.eq('contractor_id', contractorAId),
-      );
-      const contractorBLocalContactId = await firstId(
-        contractorB.client,
-        'contractor_local_contacts',
-        'Contractor B local contact',
-        query => query.ilike('display_name', `${RLS_QA_PREFIX}%Local Customer`),
-      );
+      const contractorALocalContactIds = await localCustomerSummaryIds(contractorA.client, 'Contractor A');
+      const contractorBLocalContactIds = await localCustomerSummaryIds(contractorB.client, 'Contractor B');
       const contractorBCalendarEventId = await firstId(
         contractorB.client,
         'contractor_calendar_events',
@@ -211,10 +209,8 @@ test.describe('sandbox RLS cross-user boundaries', () => {
       await assertVisibleCount(homeownerA.client, 'home_reminders', 'Homeowner A should not see Homeowner B reminders', query => query.eq('id', homeownerBReminderId), 0);
       await assertVisibleCount(homeownerB.client, 'home_reminders', 'Homeowner B should not see Homeowner A reminders', query => query.eq('id', homeownerAReminderId), 0);
 
-      await assertVisibleCount(contractorA.client, 'contractor_local_contacts', 'Contractor A should see own local contact', query => query.eq('id', contractorALocalContactId), 1);
-      await assertVisibleCount(contractorB.client, 'contractor_local_contacts', 'Contractor B should see own local contact', query => query.eq('id', contractorBLocalContactId), 1);
-      await assertVisibleCount(contractorA.client, 'contractor_local_contacts', 'Contractor A should not see Contractor B local contact', query => query.eq('id', contractorBLocalContactId), 0);
-      await assertVisibleCount(contractorB.client, 'contractor_local_contacts', 'Contractor B should not see Contractor A local contact', query => query.eq('id', contractorALocalContactId), 0);
+      expect(contractorALocalContactIds.some(id => contractorBLocalContactIds.includes(id))).toBe(false);
+      expect(contractorBLocalContactIds.some(id => contractorALocalContactIds.includes(id))).toBe(false);
       await assertVisibleCount(contractorA.client, 'contractor_calendar_events', 'Contractor A should not see Contractor B calendar event', query => query.eq('id', contractorBCalendarEventId), 0);
       await assertVisibleCount(contractorA.client, 'inspection_templates', 'Contractor A should not see Contractor B template', query => query.eq('id', contractorBTemplateId), 0);
 
