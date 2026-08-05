@@ -16,19 +16,20 @@ function sourceBetween(haystack: string, start: string, end: string) {
 
 test.describe('local customer profile edit source checks', () => {
   test('SQL edits only unclaimed contractor-owned local customer profile fields', () => {
-    const sql = source('servsync-local-customer-profile-edit.sql');
+    const sql = source('servsync-customer-management-edit-boundary.sql');
     const rpc = sourceBetween(
       sql,
       'create or replace function public.servsync_update_local_contact_profile',
-      'revoke execute on function public.servsync_update_local_contact_profile',
+      'create or replace function public.servsync_create_local_home',
     );
 
     expect(rpc).toContain('security definer');
     expect(rpc).toContain('set search_path = public');
-    expect(rpc).toContain('where id = p_local_contact_id');
-    expect(rpc).toContain('for update');
-    expect(rpc).toContain('current_user_can_write_contractor_jobs(v_contact.contractor_id)');
-    expect(rpc).toContain('current_user_is_platform_admin()');
+    expect(rpc).toContain('where contact.id = p_local_contact_id');
+    expect(rpc).toContain('current_user_can_manage_contractor_customers(contact.contractor_id)');
+    expect(rpc).toContain('for update of contact');
+    expect(rpc).toContain("raise exception 'Local customer is unavailable.'");
+    expect(rpc).not.toContain('current_user_can_write_contractor_jobs');
     expect(rpc).toContain('v_contact.homeowner_user_id is not null');
     expect(rpc).toContain('v_contact.claimed_at is not null');
     expect(rpc).toContain('home.home_id is not null or home.claimed_at is not null');
@@ -44,11 +45,11 @@ test.describe('local customer profile edit source checks', () => {
   });
 
   test('SQL revokes stale pending claim invites when copied profile fields change', () => {
-    const sql = source('servsync-local-customer-profile-edit.sql');
+    const sql = source('servsync-customer-management-edit-boundary.sql');
     const rpc = sourceBetween(
       sql,
       'create or replace function public.servsync_update_local_contact_profile',
-      'revoke execute on function public.servsync_update_local_contact_profile',
+      'create or replace function public.servsync_create_local_home',
     );
 
     expect(rpc).toContain('v_public_claim_fields_changed');
@@ -70,10 +71,11 @@ test.describe('local customer profile edit source checks', () => {
   });
 
   test('SQL exposes only the intended authenticated RPC grant', () => {
-    const sql = source('servsync-local-customer-profile-edit.sql');
+    const sql = source('servsync-customer-management-edit-boundary.sql');
 
-    expect(sql).toContain('revoke execute on function public.servsync_update_local_contact_profile(uuid, text, text, text, text) from public;');
-    expect(sql).toContain('revoke execute on function public.servsync_update_local_contact_profile(uuid, text, text, text, text) from anon;');
+    expect(sql).toContain('revoke all on function public.servsync_update_local_contact_profile(uuid, text, text, text, text) from public;');
+    expect(sql).toContain('revoke all on function public.servsync_update_local_contact_profile(uuid, text, text, text, text) from anon;');
+    expect(sql).toContain('revoke all on function public.servsync_update_local_contact_profile(uuid, text, text, text, text) from authenticated;');
     expect(sql).toContain('grant execute on function public.servsync_update_local_contact_profile(uuid, text, text, text, text) to authenticated;');
     expect(sql).toContain("notify pgrst, 'reload schema'");
     expect(sql).toContain('begin;');
