@@ -36405,8 +36405,8 @@ function ContractorDashboard({
                         <div className="bg-white border-b border-slate-200 px-6 py-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h2 className="font-bold text-slate-950 text-xl">{headerName}</h2>
+                              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <h2 className="min-w-0 break-words font-bold text-slate-950 text-xl">{headerName}</h2>
                                 <StatusBadge
                                   {...customerConnectionPresentation}
                                   icon={customerConnectionStatusIcon(customerConnectionStatus)}
@@ -36814,7 +36814,7 @@ function ContractorDashboard({
                                   )}
 	                                  {localCustomer && (
 	                                    <>
-	                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
+	                                      <div className="min-w-0"><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="break-words text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
 	                                      {localCustomerManagementDetailReady ? (
 	                                        <>
 	                                          <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{formatPhoneNumber(localCustomer.phone) || '—'}</p></div>
