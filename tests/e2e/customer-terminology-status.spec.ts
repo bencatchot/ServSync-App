@@ -74,6 +74,6 @@ test.describe('contractor customer terminology and connection status', () => {
     expect(app).toContain("brand={{ name: 'ServSync', subtitle: 'Homeowner Portal' }}");
     expect(app).toContain("{profile.role === 'homeowner' && <HomeownerDashboard");
     expect(app).toContain("supabase.rpc('servsync_contractor_connected_homeowners')");
-    expect(app).toContain(".from('contractor_local_contacts')");
+    expect(app).toContain("supabase.rpc('servsync_list_local_customer_summaries')");
   });
 });
