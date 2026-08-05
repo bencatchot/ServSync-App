@@ -195,5 +195,8 @@ test.describe('contractor local customer read/list parity', () => {
     expect(app).toContain('<h2 className="min-w-0 break-words font-bold text-slate-950 text-xl">{headerName}</h2>');
     expect(app).toContain('<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">');
     expect(app).toContain('<p className="break-words text-sm text-slate-800 font-medium">{localCustomer.display_name');
+    expect(app).toContain('<div className="grid grid-cols-1 gap-3">');
+    expect(app).toContain('<div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">');
+    expect(app).toContain('<span className="block break-words font-semibold">{home.nickname');
   });
 });

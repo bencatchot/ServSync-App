@@ -35999,7 +35999,7 @@ function ContractorDashboard({
                           {homes.length === 0 ? (
                             <EmptyState text="No property details on file for this customer." />
                           ) : (
-                            <div className="grid gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                               {homes.map((home, index) => {
                                 const address = compactAddressLabel(home);
                                 const claimed = Boolean(home.home_id || home.claimed_at);
@@ -36031,7 +36031,7 @@ function ContractorDashboard({
                                           </span>
                                         </div>
                                       </div>
-                                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div><p className="text-xs text-slate-400 font-medium mb-0.5">City</p><p className="text-sm text-slate-800 font-medium">{[home.city, home.state].filter(Boolean).join(', ') || '—'}</p></div>
                                         <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{home.zip_code || '—'}</p></div>
                                       </div>
@@ -36926,7 +36926,7 @@ function ContractorDashboard({
 	                                                This invite covers {latestLocalClaimInvitePropertyCount || 0} selected {latestLocalClaimInvitePropertyCount === 1 ? 'property' : 'properties'}. Later property changes are not automatically included. ServSync does not email or text this invite.
 	                                              </p>
 	                                              {claimInviteEligibleLocalHomes.length > 0 && (
-	                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                                                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
 	                                                  {claimInviteEligibleLocalHomes.map((home, index) => (
 	                                                    <div key={home.id} className={`rounded-lg border px-3 py-2 text-xs ${latestLocalClaimInvitePropertyIds.has(home.id) ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
 	                                                      <p className="font-semibold">{home.nickname || `Property ${index + 1}`}</p>
@@ -36985,7 +36985,7 @@ function ContractorDashboard({
 	                                                <p className="mt-1 text-xs text-slate-600">
 	                                                  The invite will claim only the checked properties. New properties added later need a separate invite.
 	                                                </p>
-	                                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                                                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
 	                                                  {claimInviteEligibleLocalHomes.map((home, index) => {
 	                                                    const checked = selectedClaimInviteHomeIds.includes(home.id);
 	                                                    return (
@@ -36996,8 +36996,8 @@ function ContractorDashboard({
 	                                                          onChange={() => toggleLocalClaimInviteHomeSelection(localCustomer!, home.id)}
 	                                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
 	                                                        />
-	                                                        <span>
-	                                                          <span className="block font-semibold">{home.nickname || `Property ${index + 1}`}</span>
+	                                                        <span className="min-w-0">
+	                                                          <span className="block break-words font-semibold">{home.nickname || `Property ${index + 1}`}</span>
 	                                                          <span className="mt-1 block">{home.address_line1 || 'No address on file'}</span>
 	                                                        </span>
 	                                                      </label>
