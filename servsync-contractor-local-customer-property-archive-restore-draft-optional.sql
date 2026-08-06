@@ -14,6 +14,7 @@ begin;
 do $$
 declare
   v_projects regclass := to_regclass('public.projects');
+  v_draft_relation_count integer;
 begin
   if to_regclass('public.contractor_local_contacts') is null
      or to_regclass('public.contractor_local_homes') is null
@@ -83,12 +84,65 @@ begin
   if to_regprocedure('public.servsync_current_contractor_profile()') is null
      or to_regprocedure('public.current_user_can_manage_contractor_customers(uuid)') is null
      or to_regprocedure('public.servsync_private_local_customer_read_context()') is null
+     or to_regprocedure('public.servsync_private_assert_canonical_customer_draft_foundation()') is null
      or to_regprocedure('public.servsync_private_customer_draft_foundation_available()') is null
      or to_regprocedure('public.servsync_private_local_customer_has_readable_work(uuid,uuid,uuid)') is null then
     raise exception 'Missing required contractor customer-management boundaries.';
   end if;
 
-  perform public.servsync_private_customer_draft_foundation_available();
+  if exists (
+    select 1
+      from (values
+        ('servsync_private_assert_canonical_customer_draft_foundation', 'public.servsync_private_assert_canonical_customer_draft_foundation()', 'void'),
+        ('servsync_private_customer_draft_foundation_available', 'public.servsync_private_customer_draft_foundation_available()', 'boolean'),
+        ('servsync_private_local_customer_has_readable_work', 'public.servsync_private_local_customer_has_readable_work(uuid,uuid,uuid)', 'boolean')
+      ) expected_function(function_name, signature, return_type)
+      left join pg_proc procedure_row on procedure_row.oid = to_regprocedure(expected_function.signature)
+      left join pg_roles owner_role on owner_role.oid = procedure_row.proowner
+     where procedure_row.oid is null
+        or (
+          select count(*)
+            from pg_proc overload
+            join pg_namespace namespace on namespace.oid = overload.pronamespace
+           where namespace.nspname = 'public'
+             and overload.proname = expected_function.function_name
+        ) <> 1
+        or owner_role.rolname <> 'postgres'
+        or not procedure_row.prosecdef
+        or coalesce(procedure_row.proconfig, '{}'::text[]) <> array['search_path=public']::text[]
+        or procedure_row.prorettype <> expected_function.return_type::regtype
+        or has_function_privilege('public', procedure_row.oid, 'EXECUTE')
+        or has_function_privilege('anon', procedure_row.oid, 'EXECUTE')
+        or has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')
+        or exists (
+          select 1
+            from aclexplode(coalesce(procedure_row.proacl, acldefault('f', procedure_row.proowner))) function_acl
+           where function_acl.privilege_type = 'EXECUTE'
+             and function_acl.grantee <> procedure_row.proowner
+        )
+  ) then
+    raise exception 'Missing required contractor customer-management boundaries.';
+  end if;
+
+  select count(*)
+    into v_draft_relation_count
+    from (values
+      (to_regclass('public.contractor_work_drafts')),
+      (to_regclass('public.contractor_work_draft_items')),
+      (to_regclass('public.contractor_work_draft_launches'))
+    ) draft_relation(oid)
+   where oid is not null;
+
+  if v_draft_relation_count not in (0, 3) then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  elsif v_draft_relation_count = 3 then
+    perform public.servsync_private_assert_canonical_customer_draft_foundation();
+    if not public.servsync_private_customer_draft_foundation_available() then
+      raise exception 'Durable Draft foundation is incomplete or incompatible.';
+    end if;
+  elsif public.servsync_private_customer_draft_foundation_available() then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
 end;
 $$;
 

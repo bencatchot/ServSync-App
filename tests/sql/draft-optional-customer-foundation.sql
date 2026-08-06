@@ -179,6 +179,37 @@ as $$
   );
 $$;
 
+create or replace function public.current_user_can_access_contractor(p_contractor_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+      from public.contractor_profiles contractor
+     where contractor.id = p_contractor_id
+       and contractor.owner_user_id = auth.uid()
+  ) or exists (
+    select 1
+      from public.contractor_team_members member
+     where member.contractor_id = p_contractor_id
+       and member.user_id = auth.uid()
+       and member.status = 'active'
+  );
+$$;
+
+create or replace function public.current_user_is_platform_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select false;
+$$;
+
 create function public.servsync_update_local_contact_profile(uuid, text, text, text, text)
 returns jsonb language sql as $$ select '{}'::jsonb $$;
 create function public.servsync_create_local_home(uuid, text, text, text, text, text, text, text)
@@ -208,11 +239,47 @@ returns jsonb language sql as $$ select '{}'::jsonb $$;
 grant select, insert, update, delete on public.contractor_local_contacts to service_role;
 grant select, insert, update, delete on public.contractor_local_homes to service_role;
 
-insert into auth.users(id) values ('10000000-0000-0000-0000-000000000001');
-insert into public.contractor_profiles(id, owner_user_id)
-values ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001');
+insert into auth.users(id) values
+  ('10000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000002'),
+  ('10000000-0000-0000-0000-000000000003'),
+  ('10000000-0000-0000-0000-000000000004'),
+  ('10000000-0000-0000-0000-000000000005'),
+  ('10000000-0000-0000-0000-000000000006'),
+  ('10000000-0000-0000-0000-000000000007'),
+  ('10000000-0000-0000-0000-000000000008');
+
+insert into public.contractor_profiles(id, owner_user_id) values
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
+  ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000007');
+
+insert into public.contractor_team_members(contractor_id, user_id, role, status) values
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', 'admin', 'active'),
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'office', 'active'),
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000004', 'field_tech', 'active'),
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000005', 'viewer', 'active'),
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000006', 'admin', 'inactive'),
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000008', 'office', 'removed');
+
 insert into public.contractor_local_contacts(id, contractor_id, display_name)
 values ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Compatibility Customer');
+insert into public.contractor_local_contacts(id, contractor_id, display_name, phone, email, notes) values
+  (
+    '30000000-0000-0000-0000-000000000002',
+    '20000000-0000-0000-0000-000000000001',
+    'No Work Customer',
+    '555-0002',
+    'private@example.invalid',
+    'private note'
+  ),
+  (
+    '30000000-0000-0000-0000-000000000003',
+    '20000000-0000-0000-0000-000000000002',
+    'Foreign Customer',
+    '555-0003',
+    'foreign@example.invalid',
+    'foreign note'
+  );
 insert into public.contractor_local_homes(id, contractor_id, local_contact_id, nickname, address_line1)
 values (
   '40000000-0000-0000-0000-000000000001',
@@ -220,6 +287,31 @@ values (
   '30000000-0000-0000-0000-000000000001',
   'Main',
   '1 Compatibility Way'
+);
+insert into public.contractor_local_homes(id, contractor_id, local_contact_id, nickname, address_line1) values
+  (
+    '40000000-0000-0000-0000-000000000002',
+    '20000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000002',
+    'No Work',
+    '2 Compatibility Way'
+  ),
+  (
+    '40000000-0000-0000-0000-000000000003',
+    '20000000-0000-0000-0000-000000000002',
+    '30000000-0000-0000-0000-000000000003',
+    'Foreign',
+    '3 Compatibility Way'
+  );
+
+insert into public.inspections(id, contractor_id, local_contact_id, local_home_id, job_type, job_status)
+values (
+  '70000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  '30000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000001',
+  'Compatibility Job',
+  'scheduled'
 );
 insert into public.contractor_local_customer_claim_invites(
   id, contractor_id, local_contact_id, local_home_id, status
