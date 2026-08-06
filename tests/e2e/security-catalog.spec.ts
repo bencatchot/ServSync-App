@@ -193,6 +193,9 @@ const CORE_PRIVATE_TABLES = [
   'home_document_upload_events',
   'external_object_mappings',
   'integration_outbox_events',
+];
+
+const PROJECT_COLLABORATION_PRIVATE_TABLES = [
   'projects',
   'project_parties',
   'project_party_memberships',
@@ -227,7 +230,6 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_create_invoice_from_estimate_schedule_item',
   'servsync_create_local_contact',
   'servsync_create_local_invoice_delivery_link',
-  'servsync_create_project',
   'servsync_create_local_home',
 	  'servsync_create_local_customer_claim_invite',
 	  'servsync_create_local_customer_claim_invite_v2',
@@ -294,14 +296,18 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_send_service_agreement_offer',
   'servsync_update_local_contact_profile',
   'servsync_update_local_home',
-  'servsync_update_project',
-  'servsync_attach_job_to_project',
   'servsync_update_connection_shared_properties',
   'servsync_update_service_agreement_template',
   'servsync_upsert_home_map_draft_room',
   'servsync_update_job_work_item',
   'servsync_validate_manual_home_document_upload',
   'servsync_void_invoice',
+];
+
+const PROJECT_COLLABORATION_BROWSER_RPCS = [
+  'servsync_create_project',
+  'servsync_update_project',
+  'servsync_attach_job_to_project',
 ];
 
 const CLAIM_LIFECYCLE_RPC_SIGNATURES = [
@@ -326,13 +332,16 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
 	  'servsync_private_guard_local_home_lifecycle',
 	  'servsync_private_guard_local_work_assignment',
 	  'servsync_private_guard_local_claim_assignment',
-	  'servsync_private_guard_local_project_assignment',
 	  'servsync_private_guard_local_output_assignment',
   'servsync_private_local_invoice_delivery_metadata',
   'servsync_private_render_local_invoice_delivery',
   'servsync_bootstrap_local_invoice_delivery_session',
   'servsync_lookup_local_invoice_delivery_session',
   'servsync_record_home_access_invite_delivery_result',
+];
+
+const PROJECT_COLLABORATION_INTERNAL_RPCS = [
+  'servsync_private_guard_local_project_assignment',
 ];
 
 const ADMIN_ONLY_SECURITY_DEFINER_RPCS = [
@@ -449,6 +458,40 @@ function runCatalogQuery<T>(sql: string): T[] {
   return parsed.rows ?? [];
 }
 
+function projectCollaborationInstalled(): boolean {
+  const rows = runCatalogQuery<RlsRow>(`
+with expected(table_name) as (
+  values ${sqlValues(PROJECT_COLLABORATION_PRIVATE_TABLES)}
+)
+select
+  e.table_name,
+  c.oid is not null as exists,
+  c.relrowsecurity as rls_enabled
+from expected e
+left join pg_class c
+  on c.relname = e.table_name
+ and c.relnamespace = 'public'::regnamespace
+ and c.relkind in ('r', 'p')
+order by e.table_name;
+  `);
+
+  expect(rows, 'Project Collaboration catalog rows should match expected table count').toHaveLength(
+    PROJECT_COLLABORATION_PRIVATE_TABLES.length,
+  );
+  const existingRows = rows.filter(row => row.exists);
+  if (existingRows.length === 0) {
+    return false;
+  }
+
+  expect(existingRows, 'Project Collaboration must be fully absent or fully installed').toHaveLength(
+    PROJECT_COLLABORATION_PRIVATE_TABLES.length,
+  );
+  for (const row of existingRows) {
+    expect(row.rls_enabled, `${row.table_name} should have RLS enabled`).toBe(true);
+  }
+  return true;
+}
+
 test.describe('security catalog checks', () => {
   test('core private tables have RLS enabled in the linked validation target', () => {
     const rows = runCatalogQuery<RlsRow>(`
@@ -474,13 +517,21 @@ order by e.table_name;
     }
   });
 
+  test('optional Project Collaboration foundation is either fully absent or fully RLS-protected', () => {
+    projectCollaborationInstalled();
+  });
+
   test('selected browser-callable RPCs are hardened for browser access', () => {
+    const expectedRpcs = [
+      ...BROWSER_CALLABLE_SECURITY_DEFINER_RPCS,
+      ...(projectCollaborationInstalled() ? PROJECT_COLLABORATION_BROWSER_RPCS : []),
+    ];
     const rows = runCatalogQuery<RpcRow>(
-      securityDefinerRpcCatalogQuery(BROWSER_CALLABLE_SECURITY_DEFINER_RPCS),
+      securityDefinerRpcCatalogQuery(expectedRpcs),
     );
 
     expect(rows, 'RPC catalog rows should match expected function count').toHaveLength(
-      BROWSER_CALLABLE_SECURITY_DEFINER_RPCS.length,
+      expectedRpcs.length,
     );
     for (const row of rows) {
       expect(row.exists, `${row.proname} should exist`).toBe(true);
@@ -636,6 +687,7 @@ order by c.relname;
   });
 
   test('contractor-local archive lifecycle catalog is private, owned, indexed, and trigger-enforced', () => {
+    const hasProjectCollaboration = projectCollaborationInstalled();
     const [eventTable] = runCatalogQuery<{
       table_owner: string;
       rls_enabled: boolean;
@@ -704,7 +756,10 @@ where not t.tgisinternal
   )
 order by t.tgname;
     `);
-    expect(triggerRows).toHaveLength(12);
+    expect(triggerRows).toHaveLength(hasProjectCollaboration ? 12 : 11);
+    expect(
+      triggerRows.some(row => row.trigger_name === 'servsync_guard_local_project_assignment'),
+    ).toBe(hasProjectCollaboration);
     expect(triggerRows.every(row => row.enabled === 'O')).toBe(true);
   });
 
@@ -1471,12 +1526,16 @@ order by e.proname;
   });
 
   test('selected internal-only RPCs remain unavailable to browser roles', () => {
+    const expectedRpcs = [
+      ...INTERNAL_ONLY_SECURITY_DEFINER_RPCS,
+      ...(projectCollaborationInstalled() ? PROJECT_COLLABORATION_INTERNAL_RPCS : []),
+    ];
     const rows = runCatalogQuery<RpcRow>(
-      securityDefinerRpcCatalogQuery(INTERNAL_ONLY_SECURITY_DEFINER_RPCS),
+      securityDefinerRpcCatalogQuery(expectedRpcs),
     );
 
     expect(rows, 'Internal RPC catalog rows should match expected function count').toHaveLength(
-      INTERNAL_ONLY_SECURITY_DEFINER_RPCS.length,
+      expectedRpcs.length,
     );
     for (const row of rows) {
       expect(row.exists, `${row.proname} should exist`).toBe(true);
