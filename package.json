@@ -31,6 +31,7 @@
     "test:controlled-ops": "node --test tests/controlled-ops/*.test.mjs",
     "test:controlled-ops:browser": "node --test tests/controlled-ops/browser-*.test.mjs",
     "test:controlled-ops:browser:pilot": "node tests/controlled-ops/browser-pilot/run-pilot.mjs",
+    "test:draft-optional-customer-migrations": "scripts/validation/validate-draft-optional-customer-migrations.sh",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
