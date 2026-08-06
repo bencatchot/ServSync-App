@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-06
 
+- Branch: `codex/backend-environment-parity-guard-v1`
+- Starting main SHA: `67af5290b05fc88305d74818d5c0625fa93635f6`
+- Files changed:
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - `scripts/backend-parity/catalog-query.sql`
+  - `scripts/backend-parity/lib.mjs`
+  - `scripts/backend-parity/check.mjs`
+  - `scripts/backend-parity/rollout-status.mjs`
+  - `tests/backend-parity/backend-parity.test.mjs`
+  - `package.json`
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added Backend Environment Parity Guard v1 as explicit read-only operator tooling. Production is the supported-schema authority; Demo is the normal supported peer with exact reviewed scenario exceptions; Sandbox additions and supported-object drift remain separately visible. The normalized catalog contract covers logical relations/columns, constraints, indexes, triggers, RLS, public plus ServSync-owned storage policies, function overloads/arguments/returns/ownership/security/search paths/definitions, execution grants, table and column ACLs, and relevant default ACLs without reading business data or secrets.
+- Intentional differences and rollout status: `config/backend-environment-parity.json` records fixed project identities, the three Demo scenario relation families, six exact trusted Demo function overloads, and the approved Sandbox Project Collaboration experiment. `config/backend-environment-rollouts.json` adds a machine-validated Sandbox/Production/Demo status ledger with required reasons for `Applied`, `Pending`, `N/A`, and `Intentionally deferred` states. The live command remains explicit and is not added to credentialed CI; source-only work does not query live databases by default.
+- Read-only environment result: Production versus Demo passed with 90/90 supported relations, 1,264/1,264 columns, 724/724 constraints, 403/403 indexes, 100/100 triggers, 218/218 policies, 287/287 functions, 968/968 function grants, 2,073/2,073 table grants, 80/80 column grants, and 96/96 expanded default-ACL grants. Demo's 129 additional catalog entries all map to the reviewed scenario foundation. Sandbox retained 297 reviewed Project Collaboration entries, exposed two additional Sandbox-only storage policies as unclassified experiments, and returned 23 unexplained supported-object findings, so the ledger records Sandbox as pending rather than aligned. No SQL, schema, data, users, grants, settings, flags, entitlements, or deployments changed.
+- Validation: Ten local Node tests cover a missing Production RPC, changed function grant, missing RLS policy, changed column/RLS state, incomplete/duplicate snapshots, unexpected Demo table, allowed Demo-only objects, visible Sandbox experiments, identity swaps, manifest reasons/duplicates, read-only SQL enforcement, and rollout-ledger completeness. Live reads used only the three fixed healthy project identities and did not persist snapshots or private data. TypeScript and the Production build passed; focused changed-script lint passed with only the inherited invalid `allowShortCircuit` startup option bypassed. Full lint remains blocked before changed-source evaluation by that unchanged ESLint 9 incompatibility. Production dependency audit retained one inherited low-severity DOMPurify advisory.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 now records the parity guard and keeps Sandbox supported-schema reconciliation as explicit operational follow-up.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Establishes Production authority, normal Demo alignment, explicit Sandbox experiments, and rollout-ledger expectations for future database work.
+
 - Branch: `codex/demo-production-schema-parity-v1`
 - Starting main SHA: `528b5c4e0fa549aaf74047c974fa2ab7aabc47bc`
 - Files changed:

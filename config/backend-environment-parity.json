@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "authoritativeEnvironment": "production",
+  "catalogSchemas": ["public"],
+  "additionalPolicySchemas": ["storage"],
+  "environments": {
+    "production": {
+      "projectRef": "uqgtheclhxqlnjpfmheq",
+      "projectName": "ServSync Production",
+      "organizationId": "bktpuodtbjodamwsmuce",
+      "role": "supported-schema-reference"
+    },
+    "demo": {
+      "projectRef": "bdytwgejqnlblhrnqxkp",
+      "projectName": "ServSync Demo",
+      "organizationId": "bktpuodtbjodamwsmuce",
+      "role": "supported-schema-peer"
+    },
+    "sandbox": {
+      "projectRef": "zpzdkoaubyjtsomccxya",
+      "projectName": "ServSync Sandbox",
+      "organizationId": "bktpuodtbjodamwsmuce",
+      "role": "experimental-peer"
+    }
+  },
+  "intentionalDifferences": {
+    "demo": {
+      "relationFamilies": [
+        {
+          "object": "public.demo_scenario_records",
+          "reason": "Private Demo scenario record registry."
+        },
+        {
+          "object": "public.demo_scenario_runs",
+          "reason": "Private Demo scenario execution registry."
+        },
+        {
+          "object": "public.demo_scenarios",
+          "reason": "Private Demo scenario catalog."
+        }
+      ],
+      "functions": [
+        {
+          "object": "public.servsync_demo_finish_run(uuid, text, jsonb)",
+          "reason": "Trusted Demo scenario operator helper."
+        },
+        {
+          "object": "public.servsync_demo_register_record(uuid, text, text, uuid, text, text, jsonb)",
+          "reason": "Trusted Demo scenario operator helper."
+        },
+        {
+          "object": "public.servsync_demo_reset_order(text, text)",
+          "reason": "Trusted Demo scenario operator helper."
+        },
+        {
+          "object": "public.servsync_demo_reset_pk_column(text, text)",
+          "reason": "Trusted Demo scenario operator helper."
+        },
+        {
+          "object": "public.servsync_demo_reset_registered_run(uuid)",
+          "reason": "Trusted Demo scenario operator helper."
+        },
+        {
+          "object": "public.servsync_demo_start_run(text, text, text, text, text, timestamp with time zone, text, jsonb)",
+          "reason": "Trusted Demo scenario operator helper."
+        }
+      ],
+      "exactDifferences": []
+    },
+    "sandbox": {
+      "relationFamilies": [
+        {
+          "object": "public.project_authority_assignments",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.project_collaboration_allowed_profiles",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.project_events",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.project_parties",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.project_party_memberships",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.projects",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        }
+      ],
+      "functions": [
+        {
+          "object": "public.current_user_can_create_hidden_project_for_contractor(uuid)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.current_user_can_manage_hidden_project(uuid)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.current_user_can_view_project_event(uuid)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.current_user_project_collaboration_allowed()",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.current_user_project_company_role(uuid)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.servsync_attach_job_to_project(uuid, uuid)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.servsync_create_project(uuid, text, text, uuid, uuid)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.servsync_private_guard_local_project_assignment()",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        },
+        {
+          "object": "public.servsync_update_project(uuid, text, text)",
+          "reason": "Approved Sandbox-only Project Collaboration foundation."
+        }
+      ],
+      "exactDifferences": [
+        {
+          "category": "columns",
+          "object": "public.inspections.project_id",
+          "reason": "Approved Sandbox-only Project Collaboration link."
+        },
+        {
+          "category": "constraints",
+          "object": "public.inspections.inspections_project_id_fkey",
+          "reason": "Approved Sandbox-only Project Collaboration link."
+        },
+        {
+          "category": "indexes",
+          "object": "public.inspections_project_idx",
+          "reason": "Approved Sandbox-only Project Collaboration link."
+        }
+      ]
+    }
+  }
+}
