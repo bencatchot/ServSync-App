@@ -61,7 +61,10 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
     expect(canonicalAssertion).toContain("has_function_privilege('public', procedure_row.oid, 'EXECUTE')");
     expect(canonicalAssertion).toContain("has_function_privilege('anon', procedure_row.oid, 'EXECUTE')");
     expect(canonicalAssertion).toContain("not has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')");
+    expect(canonicalAssertion).toContain("not has_function_privilege('service_role', procedure_row.oid, 'EXECUTE')");
     expect(canonicalAssertion).toContain("has_table_privilege('authenticated', relation.oid, 'UPDATE')");
+    expect(canonicalAssertion).toContain("not has_table_privilege('service_role', relation.oid, 'DELETE')");
+    expect(canonicalAssertion).toContain("has_table_privilege('service_role', relation.oid, 'TRUNCATE')");
     expect(canonicalAssertion).toContain('attribute.attacl is not null');
     expect(canonicalAssertion).toContain('function_acl.is_grantable');
     expect(canonicalAssertion).toContain('table_acl.is_grantable');
@@ -76,6 +79,9 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
     expect(fixture).toContain('\\ir ../../servsync-durable-draft-inspection-checklist-path.sql');
     expect(fixture).toContain('\\ir ../../servsync-durable-draft-cohort-entitlement.sql');
     expect(fixture).toContain('\\ir ../../servsync-durable-draft-invoice-launch-foundation.sql');
+    expect(fixture).toContain('alter default privileges for role postgres in schema public');
+    expect(fixture).toContain('grant select, insert, update, delete on tables to anon, authenticated, service_role');
+    expect(fixture).toContain('grant execute on functions to anon, authenticated, service_role');
     expect(fixture).not.toMatch(/create\s+table\s+public\.contractor_work_draft/i);
     expect(fixture).not.toMatch(/create\s+function\s+public\.servsync_(get|save|launch)_work_draft/i);
     expect(fixture).not.toContain("return '{}'::jsonb");
@@ -103,8 +109,15 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
       'drift_public_rpc',
       'drift_anon_rpc',
       'drift_missing_authenticated_rpc',
+      'drift_missing_authenticated_table',
+      'drift_missing_service_rpc',
+      'drift_missing_service_table',
       'drift_authenticated_rpc_grant_option',
       'drift_service_rpc_grant_option',
+      'drift_service_table_grant_option',
+      'drift_service_extra_table_privilege',
+      'drift_service_column_acl',
+      'drift_unexpected_acl_grantee',
       'drift_table_acl',
       'drift_table_grant_option',
       'drift_column_acl',
@@ -128,6 +141,9 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
     expect(harness).toContain('Historical role/redaction contract failed');
     expect(harness).toContain('Cross-tenant directory isolation failed');
     expect(harness).toContain('Direct-table privilege cleanup did not hold');
+    expect(harness).toContain('Canonical Supabase Draft table ACL fixture is incorrect');
+    expect(harness).toContain('Canonical Supabase Draft RPC ACL fixture is incorrect');
+    expect(harness).toContain('Canonical Supabase Draft ACL fixture contains a non-owner grant option');
   });
 
   test('Draft-backed reads are dynamically gated and private', () => {

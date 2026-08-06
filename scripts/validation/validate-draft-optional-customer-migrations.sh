@@ -54,8 +54,15 @@ DATABASES=(
   drift_public_rpc
   drift_anon_rpc
   drift_missing_authenticated_rpc
+  drift_missing_authenticated_table
+  drift_missing_service_rpc
+  drift_missing_service_table
   drift_authenticated_rpc_grant_option
   drift_service_rpc_grant_option
+  drift_service_table_grant_option
+  drift_service_extra_table_privilege
+  drift_service_column_acl
+  drift_unexpected_acl_grantee
   drift_table_acl
   drift_table_grant_option
   drift_column_acl
@@ -347,6 +354,81 @@ SQL
 
 # Complete Draft: Draft visibility, count, history, and assignment guard remain active.
 psql_case draft_complete -f "$ROOT/tests/sql/draft-optional-complete-foundation.sql" >/dev/null
+psql_case draft_complete <<'SQL' >/dev/null
+do $$
+declare
+  v_table regclass;
+  v_function regprocedure;
+begin
+  foreach v_table in array array[
+    'public.contractor_work_drafts'::regclass,
+    'public.contractor_work_draft_items'::regclass,
+    'public.contractor_work_draft_launches'::regclass
+  ] loop
+    if not has_table_privilege('authenticated', v_table, 'SELECT')
+       or has_table_privilege('authenticated', v_table, 'INSERT')
+       or has_table_privilege('authenticated', v_table, 'UPDATE')
+       or has_table_privilege('authenticated', v_table, 'DELETE')
+       or not has_table_privilege('service_role', v_table, 'SELECT')
+       or not has_table_privilege('service_role', v_table, 'INSERT')
+       or not has_table_privilege('service_role', v_table, 'UPDATE')
+       or not has_table_privilege('service_role', v_table, 'DELETE')
+       or has_table_privilege('service_role', v_table, 'TRUNCATE')
+       or has_table_privilege('service_role', v_table, 'REFERENCES')
+       or has_table_privilege('service_role', v_table, 'TRIGGER')
+       or has_table_privilege('public', v_table, 'SELECT')
+       or has_table_privilege('anon', v_table, 'SELECT') then
+      raise exception 'Canonical Supabase Draft table ACL fixture is incorrect for %.', v_table;
+    end if;
+  end loop;
+
+  foreach v_function in array array[
+    'public.servsync_get_work_draft(uuid)'::regprocedure,
+    'public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)'::regprocedure,
+    'public.servsync_launch_work_draft(uuid,text,uuid)'::regprocedure
+  ] loop
+    if not has_function_privilege('authenticated', v_function, 'EXECUTE')
+       or not has_function_privilege('service_role', v_function, 'EXECUTE')
+       or has_function_privilege('public', v_function, 'EXECUTE')
+       or has_function_privilege('anon', v_function, 'EXECUTE') then
+      raise exception 'Canonical Supabase Draft RPC ACL fixture is incorrect for %.', v_function;
+    end if;
+  end loop;
+
+  if exists (
+    select 1
+      from pg_class relation
+      cross join lateral aclexplode(coalesce(
+        relation.relacl,
+        acldefault('r', relation.relowner)
+      )) acl
+     where relation.oid in (
+       'public.contractor_work_drafts'::regclass,
+       'public.contractor_work_draft_items'::regclass,
+       'public.contractor_work_draft_launches'::regclass
+     )
+       and acl.grantee <> relation.relowner
+       and acl.is_grantable
+  ) or exists (
+    select 1
+      from pg_proc procedure_row
+      cross join lateral aclexplode(coalesce(
+        procedure_row.proacl,
+        acldefault('f', procedure_row.proowner)
+      )) acl
+     where procedure_row.oid in (
+       'public.servsync_get_work_draft(uuid)'::regprocedure,
+       'public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)'::regprocedure,
+       'public.servsync_launch_work_draft(uuid,text,uuid)'::regprocedure
+     )
+       and acl.grantee <> procedure_row.proowner
+       and acl.is_grantable
+  ) then
+    raise exception 'Canonical Supabase Draft ACL fixture contains a non-owner grant option.';
+  end if;
+end;
+$$;
+SQL
 psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-read-list-parity-draft-optional.sql" >/dev/null
 psql_case draft_complete -f "$ROOT/servsync-admin-office-customer-creation-parity.sql" >/dev/null
 psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-direct-table-privilege-cleanup.sql" >/dev/null
@@ -491,7 +573,10 @@ for database in \
   drift_weak_fk drift_wrong_reference drift_fk_action drift_unvalidated_fk \
   drift_unexpected_overload drift_return_type drift_argument_type drift_rpc_body \
   drift_public_rpc drift_anon_rpc drift_missing_authenticated_rpc \
+  drift_missing_authenticated_table drift_missing_service_rpc drift_missing_service_table \
   drift_authenticated_rpc_grant_option drift_service_rpc_grant_option \
+  drift_service_table_grant_option drift_service_extra_table_privilege \
+  drift_service_column_acl drift_unexpected_acl_grantee \
   drift_table_acl drift_table_grant_option drift_column_acl drift_column_grant_option \
   drift_wrong_owner drift_security_invoker drift_search_path drift_rls \
   drift_missing_policy drift_policy_command drift_policy_expression archive_drift; do
@@ -629,6 +714,18 @@ psql_case drift_missing_authenticated_rpc -c \
   'revoke execute on function public.servsync_get_work_draft(uuid) from authenticated;' >/dev/null
 expect_read_rejection drift_missing_authenticated_rpc
 
+psql_case drift_missing_authenticated_table -c \
+  'revoke select on table public.contractor_work_drafts from authenticated;' >/dev/null
+expect_read_rejection drift_missing_authenticated_table
+
+psql_case drift_missing_service_rpc -c \
+  'revoke execute on function public.servsync_get_work_draft(uuid) from service_role;' >/dev/null
+expect_read_rejection drift_missing_service_rpc
+
+psql_case drift_missing_service_table -c \
+  'revoke delete on table public.contractor_work_drafts from service_role;' >/dev/null
+expect_read_rejection drift_missing_service_table
+
 psql_case drift_authenticated_rpc_grant_option -c \
   'grant execute on function public.servsync_get_work_draft(uuid) to authenticated with grant option;' >/dev/null
 expect_read_rejection drift_authenticated_rpc_grant_option
@@ -636,6 +733,24 @@ expect_read_rejection drift_authenticated_rpc_grant_option
 psql_case drift_service_rpc_grant_option -c \
   'grant execute on function public.servsync_get_work_draft(uuid) to service_role with grant option;' >/dev/null
 expect_read_rejection drift_service_rpc_grant_option
+
+psql_case drift_service_table_grant_option -c \
+  'grant select on table public.contractor_work_drafts to service_role with grant option;' >/dev/null
+expect_read_rejection drift_service_table_grant_option
+
+psql_case drift_service_extra_table_privilege -c \
+  'grant truncate on table public.contractor_work_drafts to service_role;' >/dev/null
+expect_read_rejection drift_service_extra_table_privilege
+
+psql_case drift_service_column_acl -c \
+  'grant update(title) on table public.contractor_work_drafts to service_role;' >/dev/null
+expect_read_rejection drift_service_column_acl
+
+psql_case drift_unexpected_acl_grantee <<'SQL' >/dev/null
+create role unexpected_draft_reader;
+grant select on table public.contractor_work_drafts to unexpected_draft_reader;
+SQL
+expect_read_rejection drift_unexpected_acl_grantee
 
 psql_case drift_table_acl -c \
   'grant update on table public.contractor_work_drafts to authenticated;' >/dev/null
@@ -743,4 +858,4 @@ psql_case draft_absent -f "$ROOT/servsync-contractor-local-customer-property-arc
 psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-read-list-parity-draft-optional.sql" >/dev/null
 psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-property-archive-restore-draft-optional.sql" >/dev/null
 
-echo 'Draft-optional compatibility: absent/canonical/reapply PASS; role/redaction PASS; 31 partial/structural/security/grant drift cases PASS.'
+echo 'Draft-optional compatibility: absent/canonical/reapply PASS; role/redaction PASS; 38 partial/structural/security/grant drift cases PASS.'

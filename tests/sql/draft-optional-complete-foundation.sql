@@ -182,6 +182,15 @@ returns boolean language sql stable as $$
   select public.current_user_can_access_contractor(p_contractor_id);
 $$;
 
+-- Existing Supabase projects canonically grant Data API roles access to new
+-- public objects through postgres default ACLs. The real Draft migrations below
+-- revoke PUBLIC/anon, narrow authenticated tables to SELECT, and retain trusted
+-- service_role CRUD/EXECUTE without grant options.
+alter default privileges for role postgres in schema public
+  grant select, insert, update, delete on tables to anon, authenticated, service_role;
+alter default privileges for role postgres in schema public
+  grant execute on functions to anon, authenticated, service_role;
+
 set role postgres;
 \ir ../../servsync-durable-draft-launch-foundation.sql
 \ir ../../servsync-durable-draft-inspection-checklist-path.sql

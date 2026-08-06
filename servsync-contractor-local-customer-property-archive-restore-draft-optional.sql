@@ -97,7 +97,7 @@ begin
           'servsync_private_assert_canonical_customer_draft_foundation',
           'public.servsync_private_assert_canonical_customer_draft_foundation()',
           'void',
-          '1eaee69de13819de76ee3ba31e5a06de'
+          '7000e555b221b648f37702f1cc5d6c25'
         ),
         (
           'servsync_private_customer_draft_foundation_available',

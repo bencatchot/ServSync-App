@@ -362,13 +362,14 @@ begin
         or has_function_privilege('public', procedure_row.oid, 'EXECUTE')
         or has_function_privilege('anon', procedure_row.oid, 'EXECUTE')
         or not has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')
+        or not has_function_privilege('service_role', procedure_row.oid, 'EXECUTE')
         or (
           select count(*)
             from aclexplode(coalesce(
               procedure_row.proacl,
               acldefault('f', procedure_row.proowner)
             )) function_acl
-        ) <> 2
+        ) <> 3
         or exists (
           select 1
             from aclexplode(coalesce(procedure_row.proacl, acldefault('f', procedure_row.proowner))) function_acl
@@ -376,7 +377,8 @@ begin
              and (
                function_acl.grantee not in (
                  procedure_row.proowner,
-                 (select oid from pg_roles where rolname = 'authenticated')
+                 (select oid from pg_roles where rolname = 'authenticated'),
+                 (select oid from pg_roles where rolname = 'service_role')
                )
                or function_acl.is_grantable
              )
@@ -404,23 +406,35 @@ begin
         or has_table_privilege('authenticated', relation.oid, 'TRIGGER')
         or has_table_privilege('public', relation.oid, 'SELECT')
         or has_table_privilege('anon', relation.oid, 'SELECT')
+        or not has_table_privilege('service_role', relation.oid, 'SELECT')
+        or not has_table_privilege('service_role', relation.oid, 'INSERT')
+        or not has_table_privilege('service_role', relation.oid, 'UPDATE')
+        or not has_table_privilege('service_role', relation.oid, 'DELETE')
+        or has_table_privilege('service_role', relation.oid, 'TRUNCATE')
+        or has_table_privilege('service_role', relation.oid, 'REFERENCES')
+        or has_table_privilege('service_role', relation.oid, 'TRIGGER')
         or (
           select count(*)
             from aclexplode(coalesce(
               relation.relacl,
               acldefault('r', relation.relowner)
             )) table_acl
-        ) <> 8
+        ) <> 12
         or exists (
           select 1
             from aclexplode(coalesce(relation.relacl, acldefault('r', relation.relowner))) table_acl
            where table_acl.grantee not in (
                relation.relowner,
-               (select oid from pg_roles where rolname = 'authenticated')
+               (select oid from pg_roles where rolname = 'authenticated'),
+               (select oid from pg_roles where rolname = 'service_role')
              )
               or (
                 table_acl.grantee = (select oid from pg_roles where rolname = 'authenticated')
                 and table_acl.privilege_type <> 'SELECT'
+              )
+              or (
+                table_acl.grantee = (select oid from pg_roles where rolname = 'service_role')
+                and table_acl.privilege_type not in ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
               )
               or table_acl.is_grantable
         )
