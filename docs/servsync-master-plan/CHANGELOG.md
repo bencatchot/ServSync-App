@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-05
 
+- Branch: `codex/contractor-local-customer-property-archive-restore-v1`
+- Starting main SHA: `145cb56b1629e867967e36ce15f2900e6c63e8ef`
+- Files changed:
+  - `servsync-contractor-local-customer-property-archive-restore.sql`
+  - `src/App.tsx`
+  - `src/features/customers/localCustomerArchive.ts`
+  - `src/features/customers/localCustomerDirectory.ts`
+  - `src/types.ts`
+  - `tests/e2e/contractor-local-customer-property-archive-restore-role-probes.spec.ts`
+  - `tests/e2e/contractor-local-customer-property-archive-restore.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Contractor-Local Customer and Property Archive/Restore v1 in repository source. The corrected additive migration (SHA-256 `762c6fdd8b1dacabb70730c7257691f959ebfd07cf67d2688b97756015a46c17`) adds reversible archive metadata, a private append-only lifecycle-event table, manager-only impact/archive/restore RPCs, active-only and archived-directory reads, redacted work-linked historical context, canonical assignment guards, active-subject enforcement for home-scoped inspection templates, and visit-event subject binding to existing Jobs. Project Collaboration is an optional assignment integration: project-specific preflight, guard, impact, and historical-context behavior installs only when the complete compatible `public.projects` foundation exists; a project-absent environment receives stable zero/empty project results, while a partial or incompatible project schema fails before archive DDL. The property lifecycle guard preserves the existing trusted transition that claims/maps an active local property while keeping already archived or mapped properties immutable. Owner, active Admin, and active Office may manage the lifecycle; Field Technician, Viewer, inactive/removed members, homeowners, anonymous callers, and cross-tenant callers fail closed. Claimed or mapped local records remain outside this lifecycle.
+- Lifecycle behavior: Archiving does not cancel, close, void, pay, complete, delete, or rewrite existing work. Customer archive makes the customer and its otherwise-active properties unavailable for new work without rewriting each property's archive state, and transactionally revokes pending claim invitations without reviving them on restore. Property archive is independent; restoring a customer does not restore independently archived properties, and property restore is denied while its parent remains archived. Existing work retains stable IDs and authorized historical labels, while every new-assignment path is guarded against archived subjects.
+- UI and privacy: The Customers workspace adds manager-only Active, Archived, and Inactive views; customer and property archive/restore controls; an impact-confirmation surface; archived status/date treatment; and mobile stacking. Ordinary active lists and new-work selectors exclude archived records and clear stale selections. Historical context remains work-linked and role-shaped, with no lower-role contact details, private notes, claim/invitation data, tokens, or lifecycle actor IDs.
+- Production compatibility correction and Sandbox rollout: The first authorized Production migration attempt stopped in its mandatory preflight because Production does not contain optional table `public.projects`. PostgreSQL rolled back the transaction completely; no Production DDL or business-data change occurred. The migration now treats Project Collaboration as optional without weakening any other prerequisite: an absent foundation skips only project-specific SQL, a complete compatible foundation retains project assignment enforcement and counts, and a partial or incompatible foundation fails closed before archive DDL. The exact corrected migration was reapplied successfully to Sandbox project `zpzdkoaubyjtsomccxya` from `2026-08-06T03:23:23Z` through `2026-08-06T03:23:27Z`. Sandbox remains temporarily ahead of main for PR #382 validation; Demo was untouched, Production remains unchanged after the rolled-back attempt, and no environment or project configuration changed.
+- Tests/checks run: A disposable local PostgreSQL 16 harness proved all three schema shapes: project-absent application succeeded with `project_count=0`, empty historical project context, and no project guard function/trigger; complete compatible project application succeeded and rejected assignment to an archived local property; partial project schema failed with the generic compatibility error before any archive column or lifecycle table was created. TypeScript, the Production build, and focused archive coverage passed 16/16. The Sandbox security catalog passed 25 tests with one unrelated gated recipient-session concurrency skip; all 17 deployed function bodies matched the corrected migration with expected ownership and security settings. A rollback-only Sandbox project probe rejected an archived-property assignment and left counts unchanged at 299 local contacts, 320 local homes, 13 claim invitations, zero archived rows, zero lifecycle events, and zero projects. Previously completed role/lifecycle, race, invitation, preservation, redaction, Draft/inspection/PDF/claim/multi-property, and exact-head desktop/mobile evidence remains applicable because no application source, role function, or non-project lifecycle behavior changed. Full ESLint remains blocked by the inherited ESLint 9 `allowShortCircuit` startup incompatibility.
+- Known risks or follow-ups:
+  - The corrected migration is installed only in Sandbox for validation. PR #382 remains draft and unmerged; Production rollout must begin again from the migration-first gate, and no Demo SQL/application rollout is authorized or complete.
+  - A final independent merge-readiness audit remains required before any separately authorized Production migration-first rollout.
+  - Connected-customer organizational archive, hard deletion/retention, bulk archive, Demo migration disposition, broader PostgreSQL default-ACL policy, broader customer-model consolidation, Service Plan parity, external delivery/guest actions, the non-owner appointment-window 401, and inherited ESLint repair remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the implemented and Sandbox-validated foundation while keeping merge, Production rollout, Demo disposition, and every excluded lifecycle/customer-model item active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the bounded contractor-local lifecycle architecture, permissions, historical-context and assignment guarantees, corrected migration identity, and Sandbox-only validation state.
+
 - Branch: `codex/pr380-production-rollout-doc-closeout`
 - Starting main SHA: `e8767c8bf795f46eb7fbb76aa98a8d0d14bc3f46` (normal two-parent merge commit for PR #380)
 - Files changed:

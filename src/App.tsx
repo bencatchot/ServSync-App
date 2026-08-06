@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   ArrowRight,
   Bell,
@@ -151,6 +152,13 @@ import {
   normalizeLocalCustomerSummaries,
   type LocalCustomerDirectoryLoadState,
 } from './features/customers/localCustomerDirectory';
+import {
+  archiveImpactItems,
+  mergeLocalCustomerContext,
+  normalizeArchivedLocalCustomers,
+  normalizeLocalCustomerArchiveImpact,
+  type LocalCustomerArchiveImpact,
+} from './features/customers/localCustomerArchive';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { useDurableDraftSummary } from './features/drafts/useDurableDraftSummary';
 import {
@@ -21537,7 +21545,7 @@ function ContractorDashboard({
   const [contractorReferralDraft, setContractorReferralDraft] = useState<ContractorReferralSubmitDraft>(() => createBlankContractorReferralSubmitDraft());
   const [submittingContractorReferral, setSubmittingContractorReferral] = useState(false);
   const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
-  const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
+  const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'archived' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'archived', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
   const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'requests', 'fieldwork', 'estimates', 'schedule'] as const, 'profile'));
@@ -21716,6 +21724,8 @@ function ContractorDashboard({
   const [creatingJobFromCalendarEventKey, setCreatingJobFromCalendarEventKey] = useState<string | null>(null);
   const [visitCalendarEventBusy, setVisitCalendarEventBusy] = useState(false);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
+  const [archivedLocalContacts, setArchivedLocalContacts] = useState<ContractorLocalContact[]>([]);
+  const [historicalLocalContacts, setHistoricalLocalContacts] = useState<ContractorLocalContact[]>([]);
   const [localCustomerDirectoryLoadState, setLocalCustomerDirectoryLoadState] = useState<LocalCustomerDirectoryLoadState>('idle');
   const [localCustomerDirectoryLoadError, setLocalCustomerDirectoryLoadError] = useState('');
   const localCustomerDirectoryRequestIdRef = useRef(0);
@@ -21741,6 +21751,19 @@ function ContractorDashboard({
   const [editingLocalCustomerProfileId, setEditingLocalCustomerProfileId] = useState<string | null>(null);
   const [editingLocalCustomerProfileDraft, setEditingLocalCustomerProfileDraft] = useState<LocalCustomerProfileEditDraft>(EMPTY_LOCAL_CUSTOMER_PROFILE_EDIT_DRAFT);
   const [savingLocalCustomerProfileEditId, setSavingLocalCustomerProfileEditId] = useState<string | null>(null);
+  const [localArchiveDialog, setLocalArchiveDialog] = useState<{
+    action: 'archive' | 'restore';
+    target: 'customer' | 'property';
+    contact: ContractorLocalContact;
+    home?: ContractorLocalHome;
+    impact?: LocalCustomerArchiveImpact;
+  } | null>(null);
+  const [loadingLocalArchiveImpact, setLoadingLocalArchiveImpact] = useState(false);
+  const [savingLocalArchiveAction, setSavingLocalArchiveAction] = useState(false);
+  const localCustomerContext = useMemo(
+    () => mergeLocalCustomerContext(localContacts, historicalLocalContacts, archivedLocalContacts),
+    [archivedLocalContacts, historicalLocalContacts, localContacts],
+  );
   const [connectedPropertyProposalsByConnectionId, setConnectedPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [loadingConnectedPropertyProposalsFor, setLoadingConnectedPropertyProposalsFor] = useState<string | null>(null);
   const [suggestingPropertyConnectionId, setSuggestingPropertyConnectionId] = useState<string | null>(null);
@@ -22441,6 +22464,8 @@ function ContractorDashboard({
     const localCustomerDirectoryRequestId = ++localCustomerDirectoryRequestIdRef.current;
     localCustomerManagementDetailRequestIdRef.current += 1;
     setLocalContacts([]);
+    setArchivedLocalContacts([]);
+    setHistoricalLocalContacts([]);
     setLocalCustomerDirectoryLoadState('loading');
     setLocalCustomerDirectoryLoadError('');
     setLocalCustomerManagementDetail(null);
@@ -22544,7 +22569,7 @@ function ContractorDashboard({
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
         const loadedCanManageCustomers = canManageContractorCustomersUi(loadedContractor, loadedTeamAccess, profile.id);
-        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
+        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localHistoricalContactsRes, archivedLocalContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -22574,6 +22599,10 @@ function ContractorDashboard({
             .eq('contractor_id', loadedContractor.id)
             .order('occurrence_starts_at', { ascending: true }),
           supabase.rpc('servsync_list_local_customer_summaries'),
+	          supabase.rpc('servsync_list_local_customer_historical_context'),
+	          loadedCanManageCustomers
+	            ? supabase.rpc('servsync_list_archived_local_customers')
+	            : Promise.resolve({ data: [], error: null }),
 	          loadedCanManageCustomers
 	            ? supabase.rpc('servsync_list_local_customer_claim_invites_v2', {
 	                p_contractor_id: loadedContractor.id,
@@ -22627,21 +22656,32 @@ function ContractorDashboard({
         if (!calendarEventOccurrenceExclusionsRes.error) setCalendarEventOccurrenceExclusions((calendarEventOccurrenceExclusionsRes.data || []) as ContractorCalendarEventOccurrenceExclusion[]);
         else setCalendarEventOccurrenceExclusions([]);
 	        if (localCustomerDirectoryRequestId === localCustomerDirectoryRequestIdRef.current) {
-	          if (localContactsRes.error) {
-	            setLocalContacts([]);
-	            setLocalCustomerDirectoryLoadState(localCustomerDirectoryFailureState(localContactsRes.error));
-	            setLocalCustomerDirectoryLoadError(readableError(localContactsRes.error, 'Contractor-created customers could not be loaded.'));
-	          } else {
-	            try {
-	              setLocalContacts(normalizeLocalCustomerSummaries(localContactsRes.data, loadedContractor.id));
-	              setLocalCustomerDirectoryLoadState('ready');
-	              setLocalCustomerDirectoryLoadError('');
-	            } catch (localCustomerError) {
-	              setLocalContacts([]);
-	              setLocalCustomerDirectoryLoadState('error');
-	              setLocalCustomerDirectoryLoadError(readableError(localCustomerError, 'Contractor-created customers could not be loaded safely.'));
-	            }
-	          }
+            const requiredContextError = localContactsRes.error
+              ?? localHistoricalContactsRes.error
+              ?? (loadedCanManageCustomers ? archivedLocalContactsRes.error : null);
+            if (requiredContextError) {
+              setLocalContacts([]);
+              setHistoricalLocalContacts([]);
+              setArchivedLocalContacts([]);
+              setLocalCustomerDirectoryLoadState(localCustomerDirectoryFailureState(requiredContextError));
+              setLocalCustomerDirectoryLoadError(readableError(requiredContextError, 'Contractor-created customer context could not be loaded.'));
+            } else {
+              try {
+                setLocalContacts(normalizeLocalCustomerSummaries(localContactsRes.data, loadedContractor.id));
+                setHistoricalLocalContacts(normalizeLocalCustomerSummaries(localHistoricalContactsRes.data, loadedContractor.id));
+                setArchivedLocalContacts(loadedCanManageCustomers
+                  ? normalizeArchivedLocalCustomers(archivedLocalContactsRes.data, loadedContractor.id)
+                  : []);
+                setLocalCustomerDirectoryLoadState('ready');
+                setLocalCustomerDirectoryLoadError('');
+              } catch (localCustomerError) {
+                setLocalContacts([]);
+                setHistoricalLocalContacts([]);
+                setArchivedLocalContacts([]);
+                setLocalCustomerDirectoryLoadState('error');
+                setLocalCustomerDirectoryLoadError(readableError(localCustomerError, 'Contractor-created customer context could not be loaded safely.'));
+              }
+            }
 	        }
         if (!localClaimInvitesRes.error) setLocalClaimInvites((localClaimInvitesRes.data || []) as LocalCustomerClaimInvite[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
@@ -22683,6 +22723,8 @@ function ContractorDashboard({
         setCalendarEventJobLinks([]);
         setCalendarEventOccurrenceExclusions([]);
         setLocalContacts([]);
+        setArchivedLocalContacts([]);
+        setHistoricalLocalContacts([]);
         setLocalCustomerDirectoryLoadState('ready');
         setLocalCustomerDirectoryLoadError('');
         setLocalClaimInvites([]);
@@ -22697,6 +22739,8 @@ function ContractorDashboard({
     } catch (err) {
       if (localCustomerDirectoryRequestId === localCustomerDirectoryRequestIdRef.current) {
         setLocalContacts([]);
+        setArchivedLocalContacts([]);
+        setHistoricalLocalContacts([]);
         setLocalCustomerDirectoryLoadState('error');
         setLocalCustomerDirectoryLoadError('The contractor workspace did not finish loading. Try again.');
       }
@@ -24047,7 +24091,7 @@ function ContractorDashboard({
     setContractorFinancialRecordKind('estimates');
     setFocusedInvoiceRecordId(null);
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
-    const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+    const local = estimate.local_contact_id ? localCustomerContext.find(item => item.id === estimate.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
     setContractorTab('inspections');
     setInspectionView('list');
@@ -24073,7 +24117,7 @@ function ContractorDashboard({
     setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
-    const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
+    const local = invoice.local_contact_id ? localCustomerContext.find(item => item.id === invoice.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
     setContractorTab('inspections');
     setInspectionView('list');
@@ -24488,7 +24532,7 @@ function ContractorDashboard({
     setFocusedInvoiceRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
-    const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
+    const local = invoice.local_contact_id ? localCustomerContext.find(item => item.id === invoice.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
     setContractorTab('inspections');
     setInspectionView('list');
@@ -24514,7 +24558,7 @@ function ContractorDashboard({
     setFocusedInvoiceRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
-    const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+    const local = estimate.local_contact_id ? localCustomerContext.find(item => item.id === estimate.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
     setContractorTab('inspections');
     setInspectionView('list');
@@ -28498,7 +28542,7 @@ function ContractorDashboard({
     ) ?? null
     : null;
   const selectedJobsLocalContact = jobsCustomerFilterSubjectId?.startsWith('local:')
-    ? localContacts.find(contact => `local:${contact.id}` === jobsCustomerFilterSubjectId) ?? null
+    ? localCustomerContext.find(contact => `local:${contact.id}` === jobsCustomerFilterSubjectId) ?? null
     : null;
   const selectedJobsCustomerName = selectedJobsConnection?.display_name || selectedJobsLocalContact?.display_name || '';
   const selectedJobsCustomerAddress = selectedJobsConnection
@@ -28762,11 +28806,30 @@ function ContractorDashboard({
   };
   const canManageContractorCustomers = canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id);
   const canCreateContractorLocalCustomers = canCreateContractorLocalCustomersUi(contractorDraft, teamAccess, profile.id);
+  useEffect(() => {
+    if (!canManageContractorCustomers && homeownerFilter === 'archived') {
+      setHomeownerFilter('active');
+    }
+  }, [canManageContractorCustomers, homeownerFilter]);
+  useEffect(() => {
+    if (
+      localCustomerDirectoryLoadState === 'ready'
+      && inspectionNewDraft.subject_type === 'local'
+      && inspectionNewDraft.local_contact_id
+      && !localContacts.some(contact => contact.id === inspectionNewDraft.local_contact_id)
+    ) {
+      setInspectionNewDraft(current => ({
+        ...current,
+        local_contact_id: '',
+        local_home_id: '',
+      }));
+    }
+  }, [inspectionNewDraft.local_contact_id, inspectionNewDraft.subject_type, localContacts, localCustomerDirectoryLoadState]);
   const selectedLocalCustomerSummaryId = selectedHomeownerSubjectId?.startsWith('local:')
     ? selectedHomeownerSubjectId.slice('local:'.length)
     : '';
   const selectedLocalCustomerSummary = selectedLocalCustomerSummaryId
-    ? localContacts.find(contact => contact.id === selectedLocalCustomerSummaryId) ?? null
+    ? localCustomerContext.find(contact => contact.id === selectedLocalCustomerSummaryId) ?? null
     : null;
   const loadSelectedLocalCustomerManagementDetail = useCallback(async () => {
     const contactId = selectedLocalCustomerSummary?.id ?? '';
@@ -29270,7 +29333,7 @@ function ContractorDashboard({
   const invoiceDraftCanSendToHomeowner = Boolean(selectedJobsSubject.homeownerUserId || activeInvoiceDraftRecord?.homeowner_user_id);
   const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId));
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
-  const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
+  const localHomesForPropertyLabels = localCustomerContext.flatMap(contact => contact.homes ?? []);
   const draftCustomerOptions: DraftCustomerOption[] = buildDraftCustomerOptions({
     contractorId: contractor?.id ?? '',
     connectedCustomers: connections.map(connection => ({
@@ -29484,7 +29547,11 @@ function ContractorDashboard({
     setContractorTab('inspections');
   };
   const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
-    const currentContact = localContacts.find(item => item.id === contact.id) ?? contact;
+    const currentContact = localContacts.find(item => item.id === contact.id) ?? null;
+    if (!currentContact) {
+      setError('This customer or property is archived and cannot receive new work. Reload the workspace before trying again.');
+      return;
+    }
     const selectedLocalHomeId = options?.localHomeId ?? (selectedHomeownerWorkspaceLocalHomeId || singleLocalHomeId(currentContact));
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
@@ -29528,7 +29595,7 @@ function ContractorDashboard({
       return conn?.display_name || 'Customer';
     }
     if (insp.local_contact_id) {
-      const contact = localContacts.find(c => c.id === insp.local_contact_id);
+      const contact = localCustomerContext.find(c => c.id === insp.local_contact_id);
       return contact?.display_name || 'Customer';
     }
     return 'Customer';
@@ -29542,7 +29609,7 @@ function ContractorDashboard({
         ? [home.nickname, location].filter(Boolean).join(' — ')
         : [conn?.city, conn?.state].filter(Boolean).join(', ');
     }
-    const contact = insp.local_contact_id ? localContacts.find(c => c.id === insp.local_contact_id) : null;
+    const contact = insp.local_contact_id ? localCustomerContext.find(c => c.id === insp.local_contact_id) : null;
     const home = contact?.homes?.find(h => h.id === insp.local_home_id) ?? contact?.homes?.[0];
     const location = home ? [home.address_line1, home.city, home.state].filter(Boolean).join(', ') : '';
     return home ? [home.nickname, location].filter(Boolean).join(' — ') : '';
@@ -30139,7 +30206,7 @@ function ContractorDashboard({
       const home = connection ? connectedHomeList(connection).find(candidate => candidate.id === insp.home_id) ?? connectedHomeList(connection)[0] ?? connection.home : null;
       return connection?.display_name ? `${connection.display_name}'s home` : home?.nickname || home?.address_line1 || 'this home';
     }
-    const contact = insp.local_contact_id ? localContacts.find(candidate => candidate.id === insp.local_contact_id) : null;
+    const contact = insp.local_contact_id ? localCustomerContext.find(candidate => candidate.id === insp.local_contact_id) : null;
     const localHome = contact?.homes?.find(home => home.id === insp.local_home_id) ?? contact?.homes?.[0] ?? null;
     return contact?.display_name ? `${contact.display_name}'s home` : localHome?.nickname || localHome?.address_line1 || 'this home';
   };
@@ -30153,7 +30220,7 @@ function ContractorDashboard({
       if (connection?.display_name?.trim()) return `${connection.display_name.trim()}'s Inspection Checklist`;
       return 'Home-specific Inspection Checklist';
     }
-    const contact = insp.local_contact_id ? localContacts.find(candidate => candidate.id === insp.local_contact_id) : null;
+    const contact = insp.local_contact_id ? localCustomerContext.find(candidate => candidate.id === insp.local_contact_id) : null;
     const localHome = contact?.homes?.find(home => home.id === insp.local_home_id) ?? contact?.homes?.[0] ?? null;
     if (localHome?.nickname?.trim()) return `${localHome.nickname.trim()} Inspection Checklist`;
     if (localHome?.address_line1?.trim()) return `${localHome.address_line1.trim()} Inspection Checklist`;
@@ -30603,7 +30670,7 @@ function ContractorDashboard({
       const finalInsp: Inspection = { ...insp, rooms_with_findings: updatedRooms, summary: summaryText };
 
       const homeownerConn = connections.find(c => c.homeowner_user_id === insp.homeowner_user_id);
-      const localContact = insp.local_contact_id ? localContacts.find(contact => contact.id === insp.local_contact_id) : null;
+      const localContact = insp.local_contact_id ? localCustomerContext.find(contact => contact.id === insp.local_contact_id) : null;
       const localHome = localContact?.homes?.find(home => home.id === insp.local_home_id) ?? localContact?.homes?.[0] ?? null;
       const homeownerName = homeownerConn?.display_name || localContact?.display_name || 'Customer';
       const homeAddress = fieldWorkSubjectAddress(insp) || (localHome
@@ -31495,7 +31562,7 @@ function ContractorDashboard({
       return [connection?.display_name || 'Customer', homeLabel].filter(Boolean).join(' · ');
     }
     if (template.local_contact_id) {
-      const contact = localContacts.find(candidate => candidate.id === template.local_contact_id);
+      const contact = localCustomerContext.find(candidate => candidate.id === template.local_contact_id);
       const home = contact?.homes?.find(candidate => candidate.id === template.local_home_id) ?? contact?.homes?.[0] ?? null;
       const homeLabel = home?.nickname || home?.address_line1 || '';
       return [contact?.display_name || 'Customer', homeLabel].filter(Boolean).join(' · ');
@@ -32023,17 +32090,93 @@ function ContractorDashboard({
     }
 	  };
 
+  const openLocalArchiveLifecycle = async (
+    action: 'archive' | 'restore',
+    target: 'customer' | 'property',
+    contact: ContractorLocalContact,
+    home?: ContractorLocalHome,
+  ) => {
+    if (!supabase || !canManageContractorCustomers) return;
+    setError('');
+    setNotice('');
+    if (action === 'restore') {
+      setLocalArchiveDialog({ action, target, contact, home });
+      return;
+    }
+
+    setLoadingLocalArchiveImpact(true);
+    try {
+      const { data, error: impactError } = await supabase.rpc('servsync_get_local_customer_archive_impact', {
+        p_local_contact_id: contact.id,
+        p_local_home_id: home?.id ?? null,
+      });
+      if (impactError) throw impactError;
+      setLocalArchiveDialog({
+        action,
+        target,
+        contact,
+        home,
+        impact: normalizeLocalCustomerArchiveImpact(data),
+      });
+    } catch (archiveImpactError) {
+      setError(readableError(archiveImpactError, 'Archive impact could not be loaded. Nothing was changed.'));
+    } finally {
+      setLoadingLocalArchiveImpact(false);
+    }
+  };
+
+  const confirmLocalArchiveLifecycle = async () => {
+    if (!supabase || !localArchiveDialog || !canManageContractorCustomers) return;
+    const { action, target, contact, home } = localArchiveDialog;
+    const rpc = target === 'customer'
+      ? action === 'archive' ? 'servsync_archive_local_customer' : 'servsync_restore_local_customer'
+      : action === 'archive' ? 'servsync_archive_local_property' : 'servsync_restore_local_property';
+    const args = target === 'customer'
+      ? { p_local_contact_id: contact.id }
+      : { p_local_home_id: home?.id ?? '' };
+    setSavingLocalArchiveAction(true);
+    setError('');
+    setNotice('');
+    try {
+      const { error: lifecycleError } = await supabase.rpc(rpc, args);
+      if (lifecycleError) throw lifecycleError;
+      setLocalArchiveDialog(null);
+      closeEditLocalCustomerProfileForm();
+      closeEditLocalHomeForm();
+      setAddingLocalHomeContactId(null);
+      setSelectedHomeownerWorkspaceLocalHomeId('');
+      setHomeownerWorkspacePropertyScope('selected');
+      setHomeownerFilter(action === 'archive' ? 'archived' : 'active');
+      setSelectedHomeownerSubjectId(`local:${contact.id}`);
+      setNotice(target === 'customer'
+        ? action === 'archive'
+          ? 'Customer archived. Historical work remains available and pending claim invitations were revoked.'
+          : 'Customer restored. Independently archived properties remain archived.'
+        : action === 'archive'
+          ? 'Property archived. Historical work remains available.'
+          : 'Property restored and available for new work.'
+      );
+      await loadContractor();
+    } catch (lifecycleError) {
+      setError(readableError(lifecycleError, `Unable to ${action} this ${target}.`));
+    } finally {
+      setSavingLocalArchiveAction(false);
+    }
+	  };
+
 	  const selectedClaimInviteHomeIdsForContact = (contact: ContractorLocalContact) => {
+	    if (contact.archived_at) return [];
 	    const eligibleHomeIds = sortedLocalHomes(contact.homes)
-	      .filter(home => !home.home_id && !home.claimed_at)
+	      .filter(home => !home.home_id && !home.claimed_at && !home.archived_at)
 	      .map(home => home.id);
 	    const selected = (localClaimInviteHomeSelections[contact.id] || []).filter(id => eligibleHomeIds.includes(id));
 	    return selected.length > 0 ? selected : eligibleHomeIds;
 	  };
 
 	  const toggleLocalClaimInviteHomeSelection = (contact: ContractorLocalContact, homeId: string) => {
+	    if (contact.archived_at) return;
 	    const eligibleHomeIds = sortedLocalHomes(contact.homes)
-	      .filter(home => !home.home_id && !home.claimed_at)
+	      .filter(home => !home.home_id && !home.claimed_at && !home.archived_at)
 	      .map(home => home.id);
 	    if (!eligibleHomeIds.includes(homeId)) return;
 	    setLocalClaimInviteHomeSelections(prev => {
@@ -32048,6 +32191,10 @@ function ContractorDashboard({
 
 	  const createLocalCustomerClaimInvite = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
+	if (contact.archived_at) {
+	  setError('Restore this customer before creating a new ServSync invitation.');
+	  return;
+	}
     const pendingInvite = localClaimInvites.find(invite =>
       invite.local_contact_id === contact.id
       && effectiveLocalClaimInviteStatus(invite) === 'pending'
@@ -32363,6 +32510,89 @@ function ContractorDashboard({
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+      {localArchiveDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="local-archive-lifecycle-title"
+          data-testid="local-archive-lifecycle-dialog"
+        >
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-5 shadow-xl sm:max-w-xl sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {localArchiveDialog.target === 'customer' ? 'Customer lifecycle' : 'Property lifecycle'}
+                </p>
+                <h2 id="local-archive-lifecycle-title" className="mt-1 text-lg font-bold text-slate-950">
+                  {localArchiveDialog.action === 'archive' ? 'Archive' : 'Restore'} {localArchiveDialog.target}
+                </h2>
+                <p className="mt-1 break-words text-sm text-slate-600">
+                  {localArchiveDialog.target === 'customer'
+                    ? localArchiveDialog.contact.display_name
+                    : localArchiveDialog.home?.nickname || localArchiveDialog.home?.address_line1 || 'Selected property'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLocalArchiveDialog(null)}
+                disabled={savingLocalArchiveAction}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                aria-label="Close lifecycle confirmation"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {localArchiveDialog.action === 'archive' ? (
+              <>
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  Historical work remains intact, but this {localArchiveDialog.target} will no longer be selectable for new work. Unsaved work in another browser session may fail to save.
+                  {localArchiveDialog.target === 'customer' && ' Pending claim invitations will be revoked and will not return after restore.'}
+                </div>
+                {localArchiveDialog.impact && (
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="local-archive-impact-summary">
+                    {archiveImpactItems(localArchiveDialog.impact).map(([label, count]) => (
+                      <div key={label} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <p className="break-words text-xs font-semibold text-slate-500">{label}</p>
+                        <p className="mt-1 text-lg font-bold text-slate-950">{count}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+                {localArchiveDialog.target === 'customer'
+                  ? 'The customer will return to active lists. Independently archived properties and previously revoked invitations stay archived or revoked.'
+                  : 'The property will return to active lists and new-work selectors with the same identity and history.'}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setLocalArchiveDialog(null)}
+                disabled={savingLocalArchiveAction}
+                className={buttonClass('secondary')}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmLocalArchiveLifecycle()}
+                disabled={savingLocalArchiveAction}
+                className={buttonClass(localArchiveDialog.action === 'restore' ? 'primary' : 'danger')}
+              >
+                {localArchiveDialog.action === 'restore' ? <RotateCcw size={14} /> : <Archive size={14} />}
+                {savingLocalArchiveAction
+                  ? `${localArchiveDialog.action === 'archive' ? 'Archiving' : 'Restoring'}...`
+                  : `${localArchiveDialog.action === 'archive' ? 'Archive' : 'Restore'} ${localArchiveDialog.target}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {contractorTab !== 'connections' && (localCustomerDirectoryLoadState === 'error' || localCustomerDirectoryLoadState === 'unauthorized') && (
         <section className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4" data-testid="local-customer-directory-workflow-error">
           <p className="text-sm font-semibold text-red-800">
@@ -35101,6 +35331,9 @@ function ContractorDashboard({
         const activeConnList = connections.filter(c => c.status === 'active');
         const inactiveConnList = connections.filter(c => c.status === 'declined' || c.status === 'revoked');
         const unclaimedLocalContacts = localContacts.filter(contact => !contact.homeowner_user_id && !contact.claimed_at);
+        const archivedUnclaimedLocalContacts = canManageContractorCustomers
+          ? archivedLocalContacts.filter(contact => !contact.homeowner_user_id && !contact.claimed_at)
+          : [];
 
         const activeSubjects: Subject[] = [
           ...connectionRequests.map(r => ({ kind: 'request' as const, id: `request:${r.connection_id}`, request: r })),
@@ -35108,6 +35341,7 @@ function ContractorDashboard({
           ...unclaimedLocalContacts.map(c => ({ kind: 'local' as const, id: `local:${c.id}`, contact: c })),
         ];
         const inactiveSubjects: Subject[] = inactiveConnList.map(c => ({ kind: 'connection' as const, id: c.connection_id, isActive: false, connection: c }));
+        const archivedSubjects: Subject[] = archivedUnclaimedLocalContacts.map(c => ({ kind: 'local' as const, id: `local:${c.id}`, contact: c }));
 
         const subjectAttentionScore = (subject: Subject) => {
           if (subject.kind === 'request') return 1000;
@@ -35150,7 +35384,7 @@ function ContractorDashboard({
 	          return normalizeText([
 	            subject.contact.display_name,
 	            ...homes.flatMap(home => [home.nickname, home.address_line1, home.city, home.state, home.zip_code]),
-            'not connected customer',
+            subject.contact.archived_at ? 'archived customer' : 'not connected customer',
           ].filter(Boolean).join(' '));
         };
         const homeownerSearchTerms = normalizeText(homeownerWorkspaceSearch).split(' ').filter(Boolean);
@@ -35159,12 +35393,24 @@ function ContractorDashboard({
           const haystack = subjectSearchText(subject);
           return homeownerSearchTerms.every(term => haystack.includes(term));
         };
-	        const visibleSubjects = (homeownerFilter === 'active' ? activeSubjects : inactiveSubjects)
+	        const subjectsForFilter = homeownerFilter === 'active'
+          ? activeSubjects
+          : homeownerFilter === 'archived'
+            ? archivedSubjects
+            : inactiveSubjects;
+	        const visibleSubjects = subjectsForFilter
 	          .filter(subjectMatchesSearch)
 	          .sort((a, b) => subjectAttentionScore(b) - subjectAttentionScore(a));
-	        const visibleSubjectTotalCount = homeownerFilter === 'active' ? activeSubjects.length : inactiveSubjects.length;
-		        const customerSidebarLabels = homeownerFilter === 'inactive' ? ['View: Inactive customers'] : [];
-	        const allSubjects = [...activeSubjects, ...inactiveSubjects];
+	        const visibleSubjectTotalCount = subjectsForFilter.length;
+		        const customerSidebarLabels = homeownerFilter === 'inactive'
+          ? ['View: Inactive customers']
+          : homeownerFilter === 'archived'
+            ? ['View: Archived customers']
+            : [];
+	        const allSubjects = [...activeSubjects, ...archivedSubjects, ...inactiveSubjects];
+        const customerFilters: Array<'active' | 'archived' | 'inactive'> = canManageContractorCustomers
+          ? ['active', 'archived', 'inactive']
+          : ['active', 'inactive'];
         const selectedSubject = allSubjects.find(s => s.id === selectedHomeownerSubjectId) ?? null;
         const showHomeownerMobileDetail = homeownerMobileDetailOpen || (showLocalContactForm && canCreateContractorLocalCustomers);
 
@@ -35196,11 +35442,11 @@ function ContractorDashboard({
                       {connectionRequests.length} connection request{connectionRequests.length === 1 ? '' : 's'} need review
                     </button>
                   )}
-                  <div className="grid grid-cols-2 gap-1 mt-3 bg-slate-100 rounded-xl p-1">
-                    {(['active', 'inactive'] as const).map(filter => (
+                  <div className={`grid ${canManageContractorCustomers ? 'grid-cols-3' : 'grid-cols-2'} gap-1 mt-3 bg-slate-100 rounded-xl p-1`}>
+                    {customerFilters.map(filter => (
                       <button key={filter} type="button" onClick={() => setHomeownerFilter(filter)}
                         className={`py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${homeownerFilter === filter ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
-                        {filter} ({filter === 'active' ? activeSubjects.length : inactiveSubjects.length})
+                        {filter} ({filter === 'active' ? activeSubjects.length : filter === 'archived' ? archivedSubjects.length : inactiveSubjects.length})
                       </button>
                     ))}
                   </div>
@@ -35222,7 +35468,7 @@ function ContractorDashboard({
                       </button>
 	                    )}
 	                  </div>
-	                  {(homeownerWorkspaceSearch || homeownerFilter === 'inactive') && (
+	                  {(homeownerWorkspaceSearch || homeownerFilter !== 'active') && (
 	                    <FilterSummary
 	                      className="mt-3"
 	                      compact
@@ -35232,9 +35478,9 @@ function ContractorDashboard({
 	                      searchTerm={homeownerWorkspaceSearch}
 	                      onClear={() => {
 	                        setHomeownerWorkspaceSearch('');
-	                        if (homeownerFilter === 'inactive') setHomeownerFilter('active');
+	                        if (homeownerFilter !== 'active') setHomeownerFilter('active');
 	                      }}
-	                      clearLabel={homeownerWorkspaceSearch && homeownerFilter === 'inactive' ? 'Clear search and show active' : homeownerWorkspaceSearch ? 'Clear search' : 'Show active'}
+	                      clearLabel={homeownerWorkspaceSearch && homeownerFilter !== 'active' ? 'Clear search and show active' : homeownerWorkspaceSearch ? 'Clear search' : 'Show active'}
 	                      testId="contractor-customer-filter-summary"
 	                    />
 	                  )}
@@ -35267,19 +35513,21 @@ function ContractorDashboard({
 		                        title={homeownerWorkspaceSearch ? 'No matching customers' : `No ${homeownerFilter} customers yet`}
 		                        body={homeownerWorkspaceSearch
 		                          ? 'Try a different search or clear it to see customers in this view.'
-		                          : homeownerFilter === 'inactive'
-		                            ? 'Inactive customer connections appear here after they are declined or revoked.'
-		                            : 'Connected customers, not-connected customers, and connection requests appear here.'}
-	                        action={homeownerWorkspaceSearch || homeownerFilter === 'inactive' ? (
+	                          : homeownerFilter === 'inactive'
+	                            ? 'Inactive customer connections appear here after they are declined or revoked.'
+	                            : homeownerFilter === 'archived'
+	                              ? 'Archived contractor-managed customers and properties appear here.'
+	                            : 'Connected customers, not-connected customers, and connection requests appear here.'}
+	                        action={homeownerWorkspaceSearch || homeownerFilter !== 'active' ? (
 	                          <button
 	                            type="button"
 	                            onClick={() => {
 	                              setHomeownerWorkspaceSearch('');
-	                              if (homeownerFilter === 'inactive') setHomeownerFilter('active');
+	                              if (homeownerFilter !== 'active') setHomeownerFilter('active');
 	                            }}
 	                            className={buttonClass('secondary')}
 	                          >
-	                            {homeownerWorkspaceSearch && homeownerFilter === 'inactive' ? 'Clear search and show active' : homeownerWorkspaceSearch ? 'Clear search' : 'Show active'}
+	                            {homeownerWorkspaceSearch && homeownerFilter !== 'active' ? 'Clear search and show active' : homeownerWorkspaceSearch ? 'Clear search' : 'Show active'}
 	                          </button>
 	                        ) : null}
 	                      />
@@ -35325,7 +35573,11 @@ function ContractorDashboard({
                       const home = homes[0];
                       subtitle = home?.address_line1 || home?.nickname || formatPhoneNumber(subject.contact.phone) || subject.contact.email || '';
                       const localConnectionStatus: CustomerConnectionStatus = localClaimStatus === 'pending' ? 'invitation_pending' : 'not_connected';
-                      badges.push({ ...customerConnectionStatusPresentation(localConnectionStatus), icon: customerConnectionStatusIcon(localConnectionStatus) });
+                      if (subject.contact.archived_at || homes.some(candidate => candidate.archived_at)) {
+                        badges.push({ label: subject.contact.archived_at ? 'Archived' : 'Archived property', tone: 'muted' });
+                      } else {
+                        badges.push({ ...customerConnectionStatusPresentation(localConnectionStatus), icon: customerConnectionStatusIcon(localConnectionStatus) });
+                      }
                       if (localClaimStatus && !['pending', 'claimed'].includes(localClaimStatus)) {
                         badges.push(localClaimInviteStatusPresentation(localClaimStatus));
                       }
@@ -35549,7 +35801,7 @@ function ContractorDashboard({
 	                    const conn = isConn ? selectedSubject.connection : null;
 	                    const selectedLocalCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
 	                    const localCustomerSummary = selectedLocalCustomer
-	                      ? localContacts.find(contact => contact.id === selectedLocalCustomer.id) ?? selectedLocalCustomer
+	                      ? localCustomerContext.find(contact => contact.id === selectedLocalCustomer.id) ?? selectedLocalCustomer
 	                      : null;
 	                    const localCustomerManagementDetailReady = Boolean(
 	                      canManageContractorCustomers
@@ -35563,6 +35815,7 @@ function ContractorDashboard({
                     const perm = conn ? normalizeSharingPermissions(conn.permissions) : null;
                     const connectedHomes = conn ? connectedHomeList(conn) : [];
                     const localHomes = localCustomer ? sortedLocalHomes(localCustomer.homes) : [];
+                    const localCustomerArchived = Boolean(localCustomer?.archived_at);
                     const connectedPropertyScopeEnabled = Boolean(conn && perm?.share_home_overview && connectedHomes.length > 0);
                     const localPropertyScopeEnabled = Boolean(!isConn && localHomes.length > 0);
                     const propertyScopeEnabled = connectedPropertyScopeEnabled || localPropertyScopeEnabled;
@@ -35581,7 +35834,13 @@ function ContractorDashboard({
                       ? propertyRecordLabel({ local_home_id: selectedWorkspaceLocalHome.id }, { localHomes })
                       : '';
                     const workspaceNewRecordHomeId = connectedPropertyScopeEnabled && homeownerWorkspacePropertyScope === 'selected' ? selectedWorkspaceHomeId : '';
-                    const workspaceNewRecordLocalHomeId = localPropertyScopeEnabled && homeownerWorkspacePropertyScope === 'selected' ? selectedWorkspaceLocalHomeId : '';
+                    const selectedLocalPropertyArchived = Boolean(selectedWorkspaceLocalHome?.archived_at);
+                    const localSubjectUnavailableForNewWork = localCustomerArchived || selectedLocalPropertyArchived;
+                    const workspaceNewRecordLocalHomeId = localPropertyScopeEnabled
+                      && homeownerWorkspacePropertyScope === 'selected'
+                      && !localSubjectUnavailableForNewWork
+                      ? selectedWorkspaceLocalHomeId
+                      : '';
                     const connectedHomeOptionLabel = (home: ContractorConnectedHomeownerHome, index: number) => {
                       const address = perm?.share_address ? compactAddressLabel(home) : '';
                       const location = perm?.share_home_overview ? [home.city, home.state, home.zip_code].filter(Boolean).join(' ') : '';
@@ -35610,7 +35869,9 @@ function ContractorDashboard({
 	                      ? {
 	                          latestPropertyCount: localClaimInvitePropertyCount(latestLocalClaimInvite),
 	                          latestPropertyIds: new Set(localClaimInvitePropertyIds(latestLocalClaimInvite)),
-	                          eligibleHomes: localHomes.filter(home => !home.home_id && !home.claimed_at),
+	                          eligibleHomes: localCustomerArchived
+                              ? []
+                              : localHomes.filter(home => !home.home_id && !home.claimed_at && !home.archived_at),
 	                          selectedHomeIds: selectedClaimInviteHomeIdsForContact(localCustomer),
 	                        }
 	                      : {
@@ -35627,7 +35888,7 @@ function ContractorDashboard({
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
-                    const customerProfileDraftAvailable = Boolean(conn || (localCustomer && !localCustomerIsClaimed));
+                    const customerProfileDraftAvailable = Boolean(conn || (localCustomer && !localCustomerIsClaimed && !localSubjectUnavailableForNewWork));
                     const customerProfileDraftDisabled = !DRAFT_JOB_UI_ENABLED
                       || durableDraftCohortSafeHold
                       || (sharedDraftComposerEnabled
@@ -36001,15 +36262,29 @@ function ContractorDashboard({
                       const isSaving = savingLocalHomeContactId === localCustomer.id;
                       return (
                         <div className="space-y-3">
-                          {homes.length === 0 ? (
-                            <EmptyState text="No property details on file for this customer." />
-                          ) : (
-                            <div className="grid grid-cols-1 gap-3">
-                              {homes.map((home, index) => {
-                                const address = compactAddressLabel(home);
-                                const claimed = Boolean(home.home_id || home.claimed_at);
-                                const selected = selectedWorkspaceLocalHomeId === home.id;
-                                const isEditingThisHome = editingLocalHome?.contactId === localCustomer.id && editingLocalHome.homeId === home.id;
+	                          {homes.length === 0 ? (
+	                            <EmptyState text="No property details on file for this customer." />
+	                          ) : (
+	                            <div className="space-y-4">
+	                              {[
+                                  { id: 'active', title: 'Active properties', homes: homes.filter(home => !home.archived_at) },
+                                  { id: 'archived', title: 'Archived properties', homes: homes.filter(home => Boolean(home.archived_at)) },
+                                ].filter(group => group.homes.length > 0).map(group => (
+                                  <section key={group.id} data-testid={group.id === 'archived' ? 'local-archived-properties' : 'local-active-properties'}>
+                                    {group.id === 'archived' && (
+                                      <div className="mb-2">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{group.title}</p>
+                                        <p className="mt-1 text-xs text-slate-500">These properties remain on historical work but cannot receive new work.</p>
+                                      </div>
+                                    )}
+	                                <div className="grid grid-cols-1 gap-3">
+	                              {group.homes.map((home, index) => {
+	                                const address = compactAddressLabel(home);
+	                                const claimed = Boolean(home.home_id || home.claimed_at);
+	                                const archived = Boolean(home.archived_at);
+	                                const unavailableWithCustomer = localCustomerArchived && !archived;
+	                                const selected = selectedWorkspaceLocalHomeId === home.id;
+	                                const isEditingThisHome = editingLocalHome?.contactId === localCustomer.id && editingLocalHome.homeId === home.id;
                                 return (
                                   <div
                                     key={home.id}
@@ -36029,9 +36304,14 @@ function ContractorDashboard({
                                           <p className="break-words text-sm font-bold text-slate-950">{home.nickname || `Property ${index + 1}`}</p>
                                           <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not saved'}</p>
                                         </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {selected && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">Selected</span>}
-                                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${claimed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+	                                        <div className="flex flex-wrap gap-1.5">
+	                                          {selected && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">Selected</span>}
+	                                          {(archived || unavailableWithCustomer) && (
+	                                            <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
+	                                              {archived ? 'Archived property' : 'Archived with customer'}
+	                                            </span>
+	                                          )}
+	                                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${claimed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                                             {claimed ? 'Linked to homeowner profile' : 'Local'}
                                           </span>
                                         </div>
@@ -36053,24 +36333,41 @@ function ContractorDashboard({
                                       ) : (
                                         <p className="text-xs text-slate-500">Contractor-local property details.</p>
                                       )}
-	                                      {localCustomerManagementDetailReady && (
-                                        <button
-                                          type="button"
-                                          onClick={() => openEditLocalHomeForm(localCustomer, home)}
-                                          disabled={claimed || isEditingThisHome}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          {isEditingThisHome ? 'Editing...' : 'Edit property'}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                          <div className="flex flex-wrap items-center gap-2">
-	                            {localCustomerManagementDetailReady && (
+	                                      {localCustomerManagementDetailReady && !claimed && (
+	                                        <div className="flex flex-wrap gap-2">
+	                                          {!archived && !localCustomerArchived && (
+	                                            <button
+	                                              type="button"
+	                                              onClick={() => openEditLocalHomeForm(localCustomer, home)}
+	                                              disabled={isEditingThisHome}
+	                                              className={buttonClass('secondary')}
+	                                            >
+	                                              {isEditingThisHome ? 'Editing...' : 'Edit property'}
+	                                            </button>
+	                                          )}
+	                                          <button
+	                                            type="button"
+	                                            onClick={() => void openLocalArchiveLifecycle(archived ? 'restore' : 'archive', 'property', localCustomer, home)}
+	                                            disabled={loadingLocalArchiveImpact || savingLocalArchiveAction || (archived && localCustomerArchived)}
+	                                            title={archived && localCustomerArchived ? 'Restore the customer before restoring this property.' : undefined}
+	                                            className={buttonClass(archived ? 'primary' : 'secondary')}
+	                                          >
+	                                            {archived ? <RotateCcw size={14} /> : <Archive size={14} />}
+	                                            {archived ? 'Restore property' : 'Archive property'}
+	                                          </button>
+	                                        </div>
+	                                      )}
+	                                    </div>
+	                                  </div>
+	                                );
+	                              })}
+	                                </div>
+	                              </section>
+	                              ))}
+	                            </div>
+	                          )}
+	                          <div className="flex flex-wrap items-center gap-2">
+	                            {localCustomerManagementDetailReady && !localCustomerArchived && (
                               <button
                                 type="button"
                                 onClick={() => openAddLocalHomeForm(localCustomer)}
@@ -36786,17 +37083,36 @@ function ContractorDashboard({
                                     <h3 className="font-bold text-slate-950">Profile</h3>
                                   </div>
 	                                  {localCustomer && !localCustomerIsClaimed && localCustomerManagementDetailReady && (
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditLocalCustomerProfileForm(localCustomer)}
-                                      disabled={editingLocalCustomerProfileId === localCustomer.id || savingLocalCustomerProfileEditId === localCustomer.id}
-                                      className={buttonClass('secondary')}
-                                    >
-                                      <Pencil size={14} />
-                                      {editingLocalCustomerProfileId === localCustomer.id ? 'Editing...' : 'Edit customer'}
-                                    </button>
+                                    <div className="flex flex-wrap gap-2">
+                                      {!localCustomer.archived_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditLocalCustomerProfileForm(localCustomer)}
+                                          disabled={editingLocalCustomerProfileId === localCustomer.id || savingLocalCustomerProfileEditId === localCustomer.id}
+                                          className={buttonClass('secondary')}
+                                        >
+                                          <Pencil size={14} />
+                                          {editingLocalCustomerProfileId === localCustomer.id ? 'Editing...' : 'Edit customer'}
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => void openLocalArchiveLifecycle(localCustomer.archived_at ? 'restore' : 'archive', 'customer', localCustomer)}
+                                        disabled={loadingLocalArchiveImpact || savingLocalArchiveAction}
+	                                        className={buttonClass(localCustomer.archived_at ? 'primary' : 'secondary')}
+	                                      >
+	                                        {localCustomer.archived_at ? <RotateCcw size={14} /> : <Archive size={14} />}
+	                                        {loadingLocalArchiveImpact ? 'Checking...' : localCustomer.archived_at ? 'Restore customer' : 'Archive customer'}
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
+	                              {localCustomer?.archived_at && (
+                                  <div className="mb-4 rounded-xl border border-slate-300 bg-slate-100 px-4 py-3" data-testid="archived-local-customer-status">
+                                    <p className="text-sm font-semibold text-slate-800">Archived {formatDateTime(localCustomer.archived_at)}</p>
+                                    <p className="mt-1 text-xs text-slate-600">Historical work remains intact. Restore this customer before assigning new work or creating a new claim invitation.</p>
+                                  </div>
+                                )}
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                   {conn && perm && (
                                     <>
@@ -36919,7 +37235,11 @@ function ContractorDashboard({
                                           )}
                                         </div>
 
-	                                        {localCustomerIsClaimed ? (
+	                                        {localCustomerArchived ? (
+	                                          <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+	                                            Restore this customer before creating a new claim invitation. Invitations revoked during archive do not reactivate.
+	                                          </p>
+	                                        ) : localCustomerIsClaimed ? (
 	                                          <p className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
 	                                            This customer record has been claimed by a homeowner account.
 	                                          </p>
@@ -37119,7 +37439,7 @@ function ContractorDashboard({
                                     <h3 className="font-bold text-slate-950">Jobs dashboard</h3>
                                     <p className="mt-1 text-sm text-slate-500">Quick view for this customer. Create and manage the actual workflow in Jobs.</p>
                                   </div>
-                                  {!isConn && localCustomer && canPrepareLocalCustomerClaimInvites && (
+	                                  {!isConn && localCustomer && !localCustomerArchived && canPrepareLocalCustomerClaimInvites && (
                                     <button
                                       type="button"
                                       disabled={creatingLocalClaimInviteId === localCustomer.id || localCustomerIsClaimed}
@@ -38331,10 +38651,13 @@ function ContractorDashboard({
                       {connections.filter(c => c.status === 'active').map(c => (
                         <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Customer'} — Connected</option>
                       ))}
-                      {localContacts.map(contact => (
-                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Customer'} — Not connected</option>
-                      ))}
-                    </select>
+	                      {localContacts.map(contact => (
+	                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Customer'} — Not connected</option>
+	                      ))}
+                          {selectedJobsLocalContact?.archived_at && !localContacts.some(contact => contact.id === selectedJobsLocalContact.id) && (
+                            <option value={`local:${selectedJobsLocalContact.id}`}>{selectedJobsLocalContact.display_name || 'Customer'} — Archived history</option>
+                          )}
+	                    </select>
                   </div>
                 </div>
 
@@ -39176,7 +39499,7 @@ function ContractorDashboard({
                     const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);
                     const estimateCustomerSearchText = (estimate: Estimate) => {
                       const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
-                      const local = estimate.local_contact_id ? localContacts.find(c => c.id === estimate.local_contact_id) : null;
+                      const local = estimate.local_contact_id ? localCustomerContext.find(c => c.id === estimate.local_contact_id) : null;
                       return [
                         connection?.display_name,
                         connection?.home?.address_line1,
@@ -39188,7 +39511,7 @@ function ContractorDashboard({
                     };
                     const invoiceCustomerSearchText = (invoice: Invoice) => {
                       const connection = invoice.homeowner_user_id ? connections.find(c => c.homeowner_user_id === invoice.homeowner_user_id) : null;
-                      const local = invoice.local_contact_id ? localContacts.find(c => c.id === invoice.local_contact_id) : null;
+                      const local = invoice.local_contact_id ? localCustomerContext.find(c => c.id === invoice.local_contact_id) : null;
                       return [
                         connection?.display_name,
                         connection?.home?.address_line1,
@@ -39581,7 +39904,7 @@ function ContractorDashboard({
                             <div className="space-y-2">
                               {visibleInvoiceRecords.map(invoice => {
                                 const connection = invoice.homeowner_user_id ? connections.find(c => c.homeowner_user_id === invoice.homeowner_user_id) : null;
-                                const local = invoice.local_contact_id ? localContacts.find(c => c.id === invoice.local_contact_id) : null;
+                                const local = invoice.local_contact_id ? localCustomerContext.find(c => c.id === invoice.local_contact_id) : null;
                                 const customerName = connection?.display_name || local?.display_name || 'Customer';
                                 const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                                 const customerServiceLabel = connection?.home?.nickname || local?.homes?.[0]?.nickname || customerAddress;
@@ -39747,7 +40070,7 @@ function ContractorDashboard({
                         {visibleEstimateRecords.map(estimate => {
                           const isInvoice = estimateDocumentLabel(estimate) === 'Invoice';
                           const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
-                          const local = estimate.local_contact_id ? localContacts.find(c => c.id === estimate.local_contact_id) : null;
+                          const local = estimate.local_contact_id ? localCustomerContext.find(c => c.id === estimate.local_contact_id) : null;
                           const customerName = connection?.display_name || local?.display_name || 'Customer';
                           const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                           const hasLinkedJob = estimateHasLinkedJob(estimate);

@@ -182,6 +182,7 @@ const CORE_PRIVATE_TABLES = [
   'contractor_home_property_proposals',
 	  'contractor_local_contacts',
 	  'contractor_local_homes',
+	  'contractor_local_customer_lifecycle_events',
 	  'contractor_local_customer_claim_invite_homes',
 	  'contractor_calendar_events',
   'contractor_visit_events',
@@ -247,7 +248,14 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
 	  'servsync_list_local_customer_claim_invites_v2',
   'servsync_list_local_invoice_delivery_links',
 	  'servsync_list_local_customer_summaries',
+	  'servsync_list_archived_local_customers',
+	  'servsync_list_local_customer_historical_context',
 	  'servsync_get_local_customer_management_detail',
+	  'servsync_get_local_customer_archive_impact',
+	  'servsync_archive_local_customer',
+	  'servsync_restore_local_customer',
+	  'servsync_archive_local_property',
+	  'servsync_restore_local_property',
   'servsync_list_my_shared_home_address_shells',
   'servsync_list_my_shared_home_reminder_shells',
   'servsync_list_my_shared_home_shells',
@@ -313,6 +321,13 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_private_consume_local_invoice_delivery_rate_limit',
   'servsync_private_current_local_invoice_delivery_contractor_id',
 	  'servsync_private_local_customer_read_context',
+	  'servsync_private_assert_active_local_subject',
+	  'servsync_private_guard_local_contact_lifecycle',
+	  'servsync_private_guard_local_home_lifecycle',
+	  'servsync_private_guard_local_work_assignment',
+	  'servsync_private_guard_local_claim_assignment',
+	  'servsync_private_guard_local_project_assignment',
+	  'servsync_private_guard_local_output_assignment',
   'servsync_private_local_invoice_delivery_metadata',
   'servsync_private_render_local_invoice_delivery',
   'servsync_bootstrap_local_invoice_delivery_session',
@@ -618,6 +633,79 @@ order by c.relname;
       ]).toEqual([false, false, false]);
       expect(row.service_role_explicit_column_grants).toBe(0);
     }
+  });
+
+  test('contractor-local archive lifecycle catalog is private, owned, indexed, and trigger-enforced', () => {
+    const [eventTable] = runCatalogQuery<{
+      table_owner: string;
+      rls_enabled: boolean;
+      rls_forced: boolean;
+      public_access: boolean;
+      anon_access: boolean;
+      authenticated_access: boolean;
+      service_role_select: boolean;
+      service_role_mutate: boolean;
+    }>(`
+select
+  pg_get_userbyid(c.relowner) as table_owner,
+  c.relrowsecurity as rls_enabled,
+  c.relforcerowsecurity as rls_forced,
+  has_table_privilege('public', c.oid, 'SELECT,INSERT,UPDATE,DELETE') as public_access,
+  has_table_privilege('anon', c.oid, 'SELECT,INSERT,UPDATE,DELETE') as anon_access,
+  has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE') as authenticated_access,
+  has_table_privilege('service_role', c.oid, 'SELECT') as service_role_select,
+  has_table_privilege('service_role', c.oid, 'INSERT,UPDATE,DELETE') as service_role_mutate
+from pg_class c
+where c.oid = 'public.contractor_local_customer_lifecycle_events'::regclass;
+    `);
+    expect(eventTable).toEqual({
+      table_owner: 'postgres',
+      rls_enabled: true,
+      rls_forced: true,
+      public_access: false,
+      anon_access: false,
+      authenticated_access: false,
+      service_role_select: true,
+      service_role_mutate: false,
+    });
+
+    const columns = runCatalogQuery<{ table_name: string; column_name: string }>(`
+select table_name, column_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name in ('contractor_local_contacts', 'contractor_local_homes')
+  and column_name in ('archived_at', 'archived_by')
+order by table_name, column_name;
+    `);
+    expect(columns).toEqual([
+      { table_name: 'contractor_local_contacts', column_name: 'archived_at' },
+      { table_name: 'contractor_local_contacts', column_name: 'archived_by' },
+      { table_name: 'contractor_local_homes', column_name: 'archived_at' },
+      { table_name: 'contractor_local_homes', column_name: 'archived_by' },
+    ]);
+
+    const triggerRows = runCatalogQuery<{ trigger_name: string; enabled: string }>(`
+select t.tgname as trigger_name, t.tgenabled as enabled
+from pg_trigger t
+where not t.tgisinternal
+  and t.tgname in (
+    'servsync_guard_local_contact_lifecycle',
+    'servsync_guard_local_home_lifecycle',
+    'servsync_guard_local_draft_assignment',
+    'servsync_guard_local_inspection_template_assignment',
+    'servsync_guard_local_calendar_assignment',
+    'servsync_guard_local_claim_invite_assignment',
+    'servsync_guard_local_claim_home_assignment',
+    'servsync_guard_local_visit_assignment',
+    'servsync_guard_local_project_assignment',
+    'servsync_guard_local_job_assignment',
+    'servsync_guard_local_estimate_assignment',
+    'servsync_guard_local_invoice_assignment'
+  )
+order by t.tgname;
+    `);
+    expect(triggerRows).toHaveLength(12);
+    expect(triggerRows.every(row => row.enabled === 'O')).toBe(true);
   });
 
   test('local invoice delivery, rate-limit, and recipient-session storage remain private for every browser role', () => {

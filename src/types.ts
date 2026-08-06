@@ -1436,6 +1436,7 @@ export interface ContractorLocalHome {
   local_contact_id: string;
   home_id?: string | null;
   claimed_at?: string | null;
+  archived_at?: string | null;
   nickname: string;
   address_line1: string;
   address_line2: string;
@@ -1459,6 +1460,7 @@ export interface ContractorLocalContact {
   email: string;
   notes: string;
   claimed_at?: string | null;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
   homes?: ContractorLocalHome[];
