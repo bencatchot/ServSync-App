@@ -63,7 +63,7 @@ async function captureSnapshot(name, environment, token, sql) {
     body: JSON.stringify({ query: sql }),
   });
   const snapshot = response?.[0]?.snapshot;
-  if (!snapshot || snapshot.snapshotVersion !== 1) {
+  if (!snapshot || snapshot.snapshotVersion !== 2) {
     throw new Error(`${name} returned an invalid catalog snapshot.`);
   }
   return snapshot;
@@ -80,16 +80,20 @@ function printResult(candidateName, result) {
   }
 
   for (const [label, findings, defaultLimit] of [
-    ['Intentional', result.intentional, 12],
-    ['Sandbox-only/experimental', result.experimental, 12],
+    ['Approved intentional additions', result.intentional, 12],
+    ['Definition-format', result.formatOnly, Number.POSITIVE_INFINITY],
     ['Unexplained', result.unexplained, Number.POSITIVE_INFINITY],
   ]) {
     if (findings.length === 0) continue;
-    console.log(`\n${label} differences (${findings.length}):`);
+    console.log(`\n${label}${label.endsWith('additions') ? '' : ' differences'} (${findings.length}):`);
     const shown = verbose ? findings : findings.slice(0, defaultLimit);
     for (const finding of shown) {
       const fields = finding.fields?.length ? ` [fields: ${finding.fields.join(', ')}]` : '';
       console.log(`- ${finding.category}: ${finding.kind} ${finding.object}${fields}${finding.reason ? ` — ${finding.reason}` : ''}`);
+      if (finding.kind === 'fingerprint-mismatch') {
+        console.log(`  expected counts/key/catalog: ${JSON.stringify(finding.expected.counts)} / ${finding.expected.keyFingerprint} / ${finding.expected.catalogFingerprint}`);
+        console.log(`  actual counts/key/catalog: ${JSON.stringify(finding.actual.counts)} / ${finding.actual.keyFingerprint} / ${finding.actual.catalogFingerprint}`);
+      }
     }
     if (shown.length < findings.length) {
       console.log(`- … ${findings.length - shown.length} more; rerun with --verbose for the complete list.`);

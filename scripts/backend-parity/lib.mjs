@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 export const CATALOG_CATEGORIES = [
   'relations',
+  'managedRelations',
   'columns',
   'constraints',
   'indexes',
@@ -14,8 +16,30 @@ export const CATALOG_CATEGORIES = [
   'defaultAcls',
 ];
 
+const EXPECTED_ENVIRONMENTS = Object.freeze({
+  production: Object.freeze({
+    projectRef: 'uqgtheclhxqlnjpfmheq',
+    projectName: 'ServSync Production',
+    organizationId: 'bktpuodtbjodamwsmuce',
+    role: 'supported-schema-reference',
+  }),
+  demo: Object.freeze({
+    projectRef: 'bdytwgejqnlblhrnqxkp',
+    projectName: 'ServSync Demo',
+    organizationId: 'bktpuodtbjodamwsmuce',
+    role: 'supported-schema-peer',
+  }),
+  sandbox: Object.freeze({
+    projectRef: 'zpzdkoaubyjtsomccxya',
+    projectName: 'ServSync Sandbox',
+    organizationId: 'bktpuodtbjodamwsmuce',
+    role: 'experimental-peer',
+  }),
+});
+
 const ROLLOUT_STATUSES = new Set(['Applied', 'Pending', 'N/A', 'Intentionally deferred']);
 const ENVIRONMENT_NAMES = ['sandbox', 'production', 'demo'];
+const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
 export async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
@@ -36,22 +60,79 @@ export function assertReadOnlyCatalogQuery(sql) {
   }
 }
 
+function sameIdentity(actual, expected) {
+  return Object.entries(expected).every(([key, value]) => actual?.[key] === value);
+}
+
+function validateAdditionGroup(group, environmentName, identities) {
+  if (!group?.id?.trim() || !group.reason?.trim()) {
+    throw new Error(`Invalid intentional-addition group for ${environmentName}.`);
+  }
+  const selectors = group.selectors;
+  if (!selectors
+    || !Array.isArray(selectors.relationScopes)
+    || !Array.isArray(selectors.functionScopes)
+    || !Array.isArray(selectors.exactObjects)) {
+    throw new Error(`Invalid selectors for ${environmentName} addition group ${group.id}.`);
+  }
+
+  const selectorCount = selectors.relationScopes.length
+    + selectors.functionScopes.length
+    + selectors.exactObjects.length;
+  if (selectorCount === 0) {
+    throw new Error(`Addition group ${group.id} must select at least one exact object or scope.`);
+  }
+
+  for (const [kind, values] of Object.entries(selectors)) {
+    for (const value of values) {
+      if (typeof value !== 'string' || !value.trim() || value.includes('*')) {
+        throw new Error(`Addition group ${group.id} has an invalid ${kind} selector.`);
+      }
+      const identity = `${kind}:${value}`;
+      if (identities.has(identity)) {
+        throw new Error(`Intentional-addition selector is duplicated for ${environmentName}: ${identity}.`);
+      }
+      identities.add(identity);
+      if (kind === 'exactObjects') {
+        const separator = value.indexOf(':');
+        if (separator < 1 || !CATALOG_CATEGORIES.includes(value.slice(0, separator))) {
+          throw new Error(`Addition group ${group.id} has an invalid exact object selector.`);
+        }
+      }
+    }
+  }
+
+  if (!group.expectedCounts || typeof group.expectedCounts !== 'object') {
+    throw new Error(`Addition group ${group.id} is missing expected category counts.`);
+  }
+  for (const [category, count] of Object.entries(group.expectedCounts)) {
+    if (!CATALOG_CATEGORIES.includes(category) || !Number.isInteger(count) || count < 0) {
+      throw new Error(`Addition group ${group.id} has an invalid expected count for ${category}.`);
+    }
+  }
+  if (!FINGERPRINT_PATTERN.test(group.expectedKeyFingerprint ?? '')
+    || !FINGERPRINT_PATTERN.test(group.expectedCatalogFingerprint ?? '')) {
+    throw new Error(`Addition group ${group.id} requires SHA-256 key and catalog fingerprints.`);
+  }
+}
+
 export function validateParityConfig(config) {
-  if (config.schemaVersion !== 1 || config.authoritativeEnvironment !== 'production') {
-    throw new Error('Parity config must use schemaVersion 1 with Production as the authority.');
+  if (config.schemaVersion !== 2 || config.authoritativeEnvironment !== 'production') {
+    throw new Error('Parity config must use schemaVersion 2 with Production as the authority.');
   }
   if (JSON.stringify(config.catalogSchemas) !== JSON.stringify(['public'])) {
     throw new Error('Parity config and catalog query must remain scoped to the public application schema.');
   }
-  if (JSON.stringify(config.additionalPolicySchemas) !== JSON.stringify(['storage'])) {
-    throw new Error('Parity config must include storage policies without treating managed storage internals as app schema.');
+  if (JSON.stringify(config.managedRelationSecurity) !== JSON.stringify(['storage.objects'])
+    || JSON.stringify(config.additionalPolicySchemas) !== JSON.stringify(['storage'])) {
+    throw new Error('Parity config must include bounded storage.objects security and storage policies.');
   }
 
   const refs = new Set();
   for (const name of ENVIRONMENT_NAMES) {
     const environment = config.environments?.[name];
-    if (!environment?.projectRef || !environment?.projectName || !environment?.organizationId) {
-      throw new Error(`Missing fixed identity for ${name}.`);
+    if (!sameIdentity(environment, EXPECTED_ENVIRONMENTS[name])) {
+      throw new Error(`${name} must retain its immutable approved project identity and role.`);
     }
     if (refs.has(environment.projectRef)) {
       throw new Error(`Environment project refs are not unique: ${environment.projectRef}.`);
@@ -60,25 +141,18 @@ export function validateParityConfig(config) {
   }
 
   for (const environmentName of ['demo', 'sandbox']) {
-    const rules = config.intentionalDifferences?.[environmentName];
-    if (!rules) throw new Error(`Missing intentional-difference rules for ${environmentName}.`);
-    const identities = new Set();
-    for (const [ruleType, entries] of [
-      ['relation', rules.relationFamilies],
-      ['function', rules.functions],
-      ['exact', rules.exactDifferences],
-    ]) {
-      if (!Array.isArray(entries)) throw new Error(`Invalid ${ruleType} rules for ${environmentName}.`);
-      for (const entry of entries) {
-        const identity = ruleType === 'exact' ? `${entry.category}:${entry.object}` : `${ruleType}:${entry.object}`;
-        if (!entry.object?.trim() || !entry.reason?.trim() || identities.has(identity)) {
-          throw new Error(`Invalid or duplicated ${environmentName} intentional difference: ${identity}.`);
-        }
-        if (ruleType === 'exact' && !CATALOG_CATEGORIES.includes(entry.category)) {
-          throw new Error(`Unknown intentional-difference category: ${entry.category}.`);
-        }
-        identities.add(identity);
+    const rules = config.intentionalAdditions?.[environmentName];
+    if (!Array.isArray(rules)) {
+      throw new Error(`Missing intentional-addition groups for ${environmentName}.`);
+    }
+    const ids = new Set();
+    const selectors = new Set();
+    for (const group of rules) {
+      if (ids.has(group.id)) {
+        throw new Error(`Intentional-addition group id is duplicated for ${environmentName}: ${group.id}.`);
       }
+      ids.add(group.id);
+      validateAdditionGroup(group, environmentName, selectors);
     }
   }
 }
@@ -112,32 +186,155 @@ function stableValue(value) {
   return value;
 }
 
-function equivalent(left, right) {
-  return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
+function stableJson(value) {
+  return JSON.stringify(stableValue(value));
 }
 
-function changedFields(left, right) {
+function sha256(value) {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+function readQuoted(source, start, quote) {
+  let index = start + 1;
+  while (index < source.length) {
+    if (source[index] === quote) {
+      if (source[index + 1] === quote) {
+        index += 2;
+        continue;
+      }
+      return index + 1;
+    }
+    if (source[index] === '\\' && source[start - 1]?.toLowerCase() === 'e') index += 1;
+    index += 1;
+  }
+  throw new Error('Unterminated quoted token in function definition.');
+}
+
+function readDollarQuoted(source, start) {
+  const delimiterMatch = source.slice(start).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/);
+  if (!delimiterMatch) return null;
+  const delimiter = delimiterMatch[0];
+  const end = source.indexOf(delimiter, start + delimiter.length);
+  if (end < 0) throw new Error('Unterminated dollar-quoted token in function definition.');
+  return { delimiter, end: end + delimiter.length };
+}
+
+function tokenizeSql(source) {
+  const tokens = [];
+  let index = 0;
+  while (index < source.length) {
+    const character = source[index];
+    if (/\s/.test(character)) {
+      index += 1;
+      continue;
+    }
+    if (source.startsWith('--', index)) {
+      const end = source.indexOf('\n', index + 2);
+      index = end < 0 ? source.length : end + 1;
+      continue;
+    }
+    if (source.startsWith('/*', index)) {
+      let depth = 1;
+      let cursor = index + 2;
+      while (cursor < source.length && depth > 0) {
+        if (source.startsWith('/*', cursor)) {
+          depth += 1;
+          cursor += 2;
+        } else if (source.startsWith('*/', cursor)) {
+          depth -= 1;
+          cursor += 2;
+        } else {
+          cursor += 1;
+        }
+      }
+      if (depth !== 0) throw new Error('Unterminated block comment in function definition.');
+      index = cursor;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      const end = readQuoted(source, index, character);
+      tokens.push(source.slice(index, end));
+      index = end;
+      continue;
+    }
+    if (character === '$') {
+      const quoted = readDollarQuoted(source, index);
+      if (quoted) {
+        tokens.push(source.slice(index, quoted.end));
+        index = quoted.end;
+        continue;
+      }
+    }
+    const word = source.slice(index).match(/^[A-Za-z_][A-Za-z0-9_$]*/);
+    if (word) {
+      tokens.push(word[0].toLowerCase());
+      index += word[0].length;
+      continue;
+    }
+    const number = source.slice(index).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);
+    if (number) {
+      tokens.push(number[0].toLowerCase());
+      index += number[0].length;
+      continue;
+    }
+    const operator = source.slice(index).match(/^(?:#>>|->>|::|:=|=>|<=|>=|<>|!=|\|\||->|#>|@>|<@|\?&|\?\||@@|@\?|<<|>>|&&|-\||\^@)/);
+    if (operator) {
+      tokens.push(operator[0]);
+      index += operator[0].length;
+      continue;
+    }
+    tokens.push(character);
+    index += 1;
+  }
+  return tokens.join('\u001f');
+}
+
+export function canonicalizeFunctionDefinition(definition) {
+  const bodyStart = /^AS[ \t]+(\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$)[ \t]*$/im.exec(definition);
+  if (!bodyStart) return tokenizeSql(definition);
+
+  const delimiter = bodyStart[1];
+  const opening = bodyStart.index + bodyStart[0].lastIndexOf(delimiter);
+  const bodyOffset = opening + delimiter.length;
+  const closing = definition.indexOf(delimiter, bodyOffset);
+  if (closing < 0) throw new Error('Function body delimiter is not closed.');
+
+  const prefix = definition.slice(0, opening);
+  const body = definition.slice(bodyOffset, closing);
+  const suffix = definition.slice(closing + delimiter.length);
+  return `${tokenizeSql(prefix)}\u001e${tokenizeSql(body)}\u001e${tokenizeSql(suffix)}`;
+}
+
+function normalizedEntry(category, entry) {
+  if (category !== 'functions' || typeof entry.definition !== 'string') return stableValue(entry);
+  return stableValue({
+    ...entry,
+    definition: canonicalizeFunctionDefinition(entry.definition),
+  });
+}
+
+function entryComparison(category, left, right) {
+  const logicalEquivalent = stableJson(normalizedEntry(category, left)) === stableJson(normalizedEntry(category, right));
+  const exactEquivalent = stableJson(left) === stableJson(right);
+  return {
+    logicalEquivalent,
+    formatOnly: category === 'functions' && logicalEquivalent && !exactEquivalent,
+  };
+}
+
+function changedFields(category, left, right) {
   return [...new Set([...Object.keys(left), ...Object.keys(right)])]
-    .filter(field => !equivalent(left[field], right[field]))
+    .filter(field => {
+      if (category === 'functions' && field === 'definition') {
+        return canonicalizeFunctionDefinition(left[field] ?? '') !== canonicalizeFunctionDefinition(right[field] ?? '');
+      }
+      return stableJson(left[field]) !== stableJson(right[field]);
+    })
     .sort();
 }
 
-function intentionalReason(config, environmentName, category, entry) {
-  const rules = config.intentionalDifferences?.[environmentName] ?? {};
-  const exact = (rules.exactDifferences ?? []).find(rule => rule.category === category && rule.object === entry.key);
-  if (exact) return exact.reason;
-
-  const relation = (rules.relationFamilies ?? []).find(rule => rule.object === entry.scope);
-  if (relation) return relation.reason;
-
-  const fn = (rules.functions ?? []).find(rule => rule.object === entry.scope);
-  if (fn) return fn.reason;
-
-  return null;
-}
-
 function validateSnapshot(snapshot, label) {
-  if (snapshot.snapshotVersion !== 1 || snapshot.catalogSchema !== 'public') {
+  if (snapshot.snapshotVersion !== 2 || snapshot.catalogSchema !== 'public') {
     throw new Error(`Unsupported ${label} catalog snapshot contract.`);
   }
   for (const category of CATALOG_CATEGORIES) {
@@ -154,18 +351,48 @@ function validateSnapshot(snapshot, label) {
   }
 }
 
+function matchesAdditionGroup(group, category, entry) {
+  return group.selectors.relationScopes.includes(entry.scope)
+    || group.selectors.functionScopes.includes(entry.scope)
+    || group.selectors.exactObjects.includes(`${category}:${entry.key}`);
+}
+
+export function fingerprintAdditionEntries(entries) {
+  const ordered = [...entries].sort((left, right) => {
+    const categoryOrder = CATALOG_CATEGORIES.indexOf(left.category) - CATALOG_CATEGORIES.indexOf(right.category);
+    return categoryOrder || left.entry.key.localeCompare(right.entry.key);
+  });
+  const counts = {};
+  for (const { category } of ordered) counts[category] = (counts[category] ?? 0) + 1;
+  const keys = ordered.map(({ category, entry }) => `${category}:${entry.key}`);
+  const catalog = ordered.map(({ category, entry }) => ({ category, entry: normalizedEntry(category, entry) }));
+  return {
+    counts,
+    keyFingerprint: sha256(stableJson(keys)),
+    catalogFingerprint: sha256(stableJson(catalog)),
+  };
+}
+
+function expectedCountsEqual(expected, actual) {
+  const normalizedExpected = Object.fromEntries(Object.entries(expected).filter(([, count]) => count > 0));
+  return stableJson(normalizedExpected) === stableJson(actual);
+}
+
 export function compareCatalogs(reference, candidate, config, candidateEnvironment) {
   const unexplained = [];
   const intentional = [];
-  const experimental = [];
+  const formatOnly = [];
   const counts = {};
+  const additions = [];
+  const claimedAdditionGroups = new Map();
 
+  validateParityConfig(config);
   validateSnapshot(reference, 'reference');
   validateSnapshot(candidate, 'candidate');
 
   for (const category of CATALOG_CATEGORIES) {
-    const referenceEntries = reference[category] ?? [];
-    const candidateEntries = candidate[category] ?? [];
+    const referenceEntries = reference[category];
+    const candidateEntries = candidate[category];
     const referenceByKey = new Map(referenceEntries.map(entry => [entry.key, entry]));
     const candidateByKey = new Map(candidateEntries.map(entry => [entry.key, entry]));
     let matching = 0;
@@ -174,23 +401,26 @@ export function compareCatalogs(reference, candidate, config, candidateEnvironme
       const actual = candidateByKey.get(key);
       if (!actual) {
         unexplained.push({ category, object: key, kind: 'missing' });
-      } else if (!equivalent(expected, actual)) {
-        const reason = intentionalReason(config, candidateEnvironment, category, actual);
-        const finding = { category, object: key, kind: 'different', fields: changedFields(expected, actual), reason };
-        if (reason) intentional.push(finding);
-        else unexplained.push(finding);
+        continue;
+      }
+      const comparison = entryComparison(category, expected, actual);
+      if (!comparison.logicalEquivalent) {
+        unexplained.push({
+          category,
+          object: key,
+          kind: 'logical-drift',
+          fields: changedFields(category, expected, actual),
+        });
       } else {
         matching += 1;
+        if (comparison.formatOnly) {
+          formatOnly.push({ category, object: key, kind: 'definition-format-drift', fields: ['definition'] });
+        }
       }
     }
 
     for (const [key, entry] of candidateByKey) {
-      if (referenceByKey.has(key)) continue;
-      const reason = intentionalReason(config, candidateEnvironment, category, entry);
-      const finding = { category, object: key, kind: 'additional', reason };
-      if (reason) intentional.push(finding);
-      else if (candidateEnvironment === 'sandbox') experimental.push(finding);
-      else unexplained.push(finding);
+      if (!referenceByKey.has(key)) additions.push({ category, entry });
     }
 
     counts[category] = {
@@ -200,12 +430,62 @@ export function compareCatalogs(reference, candidate, config, candidateEnvironme
     };
   }
 
-  let status = 'PASS — supported schema parity';
-  if (unexplained.length > 0) status = 'FAIL — unexplained Production/' + candidateEnvironment + ' drift';
-  else if (candidateEnvironment === 'sandbox' && (experimental.length > 0 || intentional.length > 0)) status = 'PASS WITH SANDBOX-ONLY/EXPERIMENTAL DIFFERENCES';
-  else if (intentional.length > 0) status = 'PASS WITH INTENTIONAL DIFFERENCES';
+  const approvedEntries = new Set();
+  for (const group of config.intentionalAdditions[candidateEnvironment] ?? []) {
+    const selected = additions.filter(({ category, entry }) => matchesAdditionGroup(group, category, entry));
+    for (const selectedEntry of selected) {
+      const identity = `${selectedEntry.category}:${selectedEntry.entry.key}`;
+      const claimedBy = claimedAdditionGroups.get(identity);
+      if (claimedBy) {
+        throw new Error(`Intentional addition ${identity} is ambiguously selected by ${claimedBy} and ${group.id}.`);
+      }
+      claimedAdditionGroups.set(identity, group.id);
+    }
+    const actual = fingerprintAdditionEntries(selected);
+    const valid = expectedCountsEqual(group.expectedCounts, actual.counts)
+      && group.expectedKeyFingerprint === actual.keyFingerprint
+      && group.expectedCatalogFingerprint === actual.catalogFingerprint;
+    if (!valid) {
+      unexplained.push({
+        category: 'intentionalAdditionGroups',
+        object: group.id,
+        kind: 'fingerprint-mismatch',
+        reason: group.reason,
+        expected: {
+          counts: group.expectedCounts,
+          keyFingerprint: group.expectedKeyFingerprint,
+          catalogFingerprint: group.expectedCatalogFingerprint,
+        },
+        actual,
+      });
+      for (const selectedEntry of selected) approvedEntries.add(selectedEntry);
+      continue;
+    }
+    for (const selectedEntry of selected) {
+      approvedEntries.add(selectedEntry);
+      intentional.push({
+        category: selectedEntry.category,
+        object: selectedEntry.entry.key,
+        kind: 'approved-addition',
+        reason: group.reason,
+        group: group.id,
+      });
+    }
+  }
 
-  return { status, counts, unexplained, intentional, experimental };
+  for (const addition of additions) {
+    if (!approvedEntries.has(addition)) {
+      unexplained.push({ category: addition.category, object: addition.entry.key, kind: 'unapproved-addition' });
+    }
+  }
+
+  let status = 'PASS — supported schema parity';
+  if (unexplained.length > 0) status = `FAIL — unexplained Production/${candidateEnvironment} drift`;
+  else if (candidateEnvironment === 'sandbox' && intentional.length > 0) status = 'PASS WITH APPROVED SANDBOX EXPERIMENTS';
+  else if (intentional.length > 0) status = 'PASS WITH INTENTIONAL DIFFERENCES';
+  else if (formatOnly.length > 0) status = 'PASS WITH DEFINITION-FORMAT DIFFERENCES';
+
+  return { status, counts, unexplained, intentional, formatOnly };
 }
 
 export function formatRolloutStatus(ledger) {

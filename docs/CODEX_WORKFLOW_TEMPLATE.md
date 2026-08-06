@@ -253,7 +253,7 @@ Passing unrelated exhaustive checks is not required unless repository rules, CI,
 
 ## Backend Environment Parity And Rollout Visibility
 
-Production defines the supported ServSync backend schema. Demo should normally remain on that schema generation, with only reviewed Demo-only infrastructure recorded in `config/backend-environment-parity.json`. Sandbox may carry approved experimental foundations, but those differences and any missing or changed Production-supported objects must remain explicit.
+Production defines the supported ServSync backend schema. Demo should normally remain on that schema generation, with only exact fingerprinted Demo-only additions recorded in `config/backend-environment-parity.json`. Sandbox may carry exact fingerprinted experimental additions, but unapproved additions and any missing or logically changed Production-supported objects fail parity. Intentional additions never excuse drift in an object that exists in Production.
 
 For every relevant database migration or bounded foundation:
 
@@ -262,7 +262,7 @@ For every relevant database migration or bounded foundation:
 - after an authorized Production or Demo rollout, run the explicit read-only parity command when approved credentials are available;
 - report whether Production/Demo parity passes and whether Sandbox has experiments or unexplained supported-object drift.
 
-Use `npm run backend:rollout:status` for the repository ledger and `npm run backend:parity:check -- --demo-only` for the live supported-peer comparison. The live command is operator-controlled and must not become a routine credentialed CI dependency. Source-only work does not need live database access unless its claims depend on deployed state. Applying SQL and changing environment state remain separately protected actions.
+Use `npm run backend:rollout:status` for the descriptive repository ledger and `npm run backend:parity:check -- --demo-only` for the live supported-peer comparison. An `Applied` ledger entry is not deployment or parity proof and never overrides a failing live comparison. The live command is operator-controlled and must not become a routine credentialed CI dependency. Source-only work does not need live database access unless its claims depend on deployed state. Applying SQL and changing environment state remain separately protected actions.
 
 See [ServSync Backend Environment Parity](servsync-master-plan/ServSync_Backend_Environment_Parity.md) for the comparison contract, fixed identities, intentional-difference manifest, security boundaries, and current state.
 

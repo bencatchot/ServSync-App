@@ -37,12 +37,13 @@ Load `SUPABASE_ACCESS_TOKEN` only from an approved secret store. Do not paste it
 The committed read-only query captures logical application catalog state for:
 
 - `public` relations, ownership, persistence, and RLS enablement/forced state;
+- the bounded owner, relation kind, persistence, and RLS enablement/forced state of `storage.objects` needed to interpret its policies safely;
 - columns by name, type, default, nullability, identity/generated state, and collation, without treating ordinal position as behavior;
 - constraints, validation and deferrability;
 - indexes and validity/readiness;
 - non-internal triggers;
 - `public` and application-owned `storage` policies;
-- function overloads, argument names/types/defaults, return type, language, owner, security mode, volatility, strictness, configuration/search path, and canonical PostgreSQL definition;
+- function overloads, argument names/types/defaults, return type, language, owner, security mode, volatility, strictness, configuration/search path, and canonical PostgreSQL definition, with comments and layout whitespace separated from logical definition changes;
 - effective function and table ACLs, explicit column ACLs, grant options, and relevant global/`public` default ACLs.
 
 The tool does not read or compare business rows, auth users, secrets, credentials, bucket contents, private record values, feature flags, entitlements, or environment-variable values. Supabase-managed `auth` and storage implementation internals are outside the schema comparison; ServSync-owned `storage.objects` policies remain included.
@@ -51,7 +52,9 @@ The fixed project identities live in `config/backend-environment-parity.json`. B
 
 ## Intentional Differences
 
-`config/backend-environment-parity.json` is the only allowlist. A rule identifies an exact relation family, exact function overload, or exact category/object difference and carries a reviewable reason.
+`config/backend-environment-parity.json` is the only intentional-addition manifest. Each group names exact relation scopes, exact function overloads, and any exact cross-scope objects, then pins the approved category counts, complete object-key SHA-256 fingerprint, and logical catalog SHA-256 fingerprint. A new column, constraint, index, trigger, policy, ACL, column grant, overload, grant option, or changed security property invalidates the group until an explicit reviewed repository update records the new fingerprint.
+
+Rules apply only to objects absent from Production. They never excuse a missing or changed Production-supported object, even when that object later shares a scope or function signature with an approved addition. Unlisted Demo and Sandbox additions fail parity; Sandbox additions are not treated as experiments merely because they exist in Sandbox.
 
 Current Demo exceptions are limited to:
 
@@ -59,18 +62,19 @@ Current Demo exceptions are limited to:
 - `public.demo_scenario_runs`;
 - `public.demo_scenario_records`;
 - the six exact trusted `servsync_demo_*` operator overloads;
-- supporting columns, constraints, indexes, triggers, and ACLs scoped to those exact objects.
+- the exact fingerprinted supporting columns, constraints, indexes, triggers, and ACLs for those objects.
 
-Project Collaboration is absent from Production and Demo, so it is not part of supported parity. Sandbox's six Project Collaboration tables, nine exact functions, and `inspections.project_id` link are recorded as an approved Sandbox-only experiment. The allowlist does not hide missing or changed Production-supported objects.
+Project Collaboration is absent from Production and Demo, so it is not part of supported parity. Sandbox's six Project Collaboration tables, nine exact functions, `inspections.project_id` link, and exact 297-object catalog fingerprint are recorded as an approved Sandbox-only experiment. The manifest does not hide missing or changed Production-supported objects.
 
 Results mean:
 
 - `PASS — supported schema parity`: exact supported contract with no additions.
 - `PASS WITH INTENTIONAL DIFFERENCES`: supported parity plus reviewed Demo additions.
-- `PASS WITH SANDBOX-ONLY/EXPERIMENTAL DIFFERENCES`: supported parity plus visible Sandbox experiments.
+- `PASS WITH APPROVED SANDBOX EXPERIMENTS`: supported parity plus exact manifest-approved Sandbox additions.
+- `PASS WITH DEFINITION-FORMAT DIFFERENCES`: logical parity with only comments or layout whitespace changed in function definitions.
 - `FAIL — unexplained Production/<environment> drift`: a supported object is missing/different or Demo has an unreviewed addition.
 
-Default output shows every unexplained finding and a bounded sample of intentional additions. `--verbose` prints the complete intentional/experimental inventory.
+Default output shows every unexplained and definition-format finding plus a bounded sample of approved additions. `--verbose` prints the complete approved-addition inventory. Function canonicalization tokenizes the outer SQL and PL/pgSQL body, removes comments and layout whitespace outside quoted values, preserves quoted strings and nested dollar-quoted values, and falls back conservatively when no standard outer body delimiter exists. Meaningful token changes remain logical drift.
 
 ## Rollout Ledger
 
@@ -81,7 +85,7 @@ Default output shows every unexplained finding and a bounded sample of intention
 - `N/A`
 - `Intentionally deferred`
 
-Every state requires a reason. The ledger is operational visibility, not a migration engine and not proof of deployed state by itself. Update it only from verified rollout evidence. After an authorized database rollout, record which environments received it, why any environment was skipped, and whether Production/Demo parity passed.
+Every state requires a reason. The ledger is operational visibility, not a migration engine and not proof of deployed state or parity by itself. A manually recorded `Applied` state never overrides a failing live comparison. Update it only from verified rollout evidence. After an authorized database rollout, record which environments received it, why any environment was skipped, and whether Production/Demo parity passed.
 
 Source-only work that has no database artifact may be `N/A` across all environments. Source-only PRs do not need live database access merely because this guard exists.
 
@@ -89,10 +93,10 @@ Source-only work that has no database artifact may be `N/A` across all environme
 
 Read-only validation on 2026-08-06 established:
 
-- Production vs Demo: `PASS WITH INTENTIONAL DIFFERENCES`. All 90 Production relations, 1,264 columns, 724 constraints, 403 indexes, 100 triggers, 218 policies, 287 functions, 968 function grants, 2,073 table grants, 80 column grants, and 96 expanded default-ACL grants match. Demo adds only 3 reviewed scenario relations, 6 reviewed operator functions, and their 120 supporting catalog entries.
-- Production vs Sandbox: `FAIL — unexplained Production/sandbox drift`. The 297 approved Project Collaboration catalog additions are intentional, two additional Sandbox-only `storage.objects` policies remain visible as unclassified experiments, and 23 findings remain unexplained.
+- Production vs Demo: `PASS WITH INTENTIONAL DIFFERENCES`. All 90 Production relations, the bounded `storage.objects` security fingerprint, 1,264 columns, 724 constraints, 403 indexes, 100 triggers, 218 policies, 287 functions, 968 function grants, 2,073 table grants, 80 column grants, and 96 expanded default-ACL grants match. Demo adds one exact fingerprinted 129-object scenario group: 3 reviewed scenario relations, 6 reviewed operator functions, and 120 supporting catalog entries.
+- Production vs Sandbox: `FAIL — unexplained Production/sandbox drift`. The exact 297-object Project Collaboration group is approved. Twenty-four findings remain unexplained: 22 missing or logically changed Production-supported entries plus two unapproved Sandbox-only `storage.objects` policies. One `notify_on_support_message()` definition difference is comments/layout-only and is reported separately without counting as logical drift.
 
-The current Sandbox drift consists of missing Stripe columns/indexes; two differing service-request-media policies; differing notification, signup, support, appointment, and field-work function definitions; missing field-work/Stripe functions; and the corresponding missing function grants. This guard does not authorize reconciliation. Any Sandbox repair requires a separate audit and SQL authorization.
+The current Sandbox logical drift consists of missing Stripe columns/indexes; two differing service-request-media policies; logically differing notification, signup, support, appointment, and field-work function definitions; missing field-work/Stripe functions and grants; plus the two unapproved storage policies. This guard does not authorize reconciliation or approve those storage policies. Any Sandbox repair or experiment approval requires a separate audit and repository/configuration decision, with SQL authorization where applicable.
 
 No SQL, schema, grants, data, users, settings, environment variables, feature flags, entitlements, or deployments changed while establishing this result.
 

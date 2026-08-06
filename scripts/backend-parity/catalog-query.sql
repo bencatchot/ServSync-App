@@ -14,6 +14,23 @@ with application_relations as (
   where n.nspname = 'public'
     and c.relkind in ('r', 'p', 'v', 'm', 'f')
 ),
+managed_relation_security as (
+  select
+    n.nspname || '.' || c.relname as key,
+    n.nspname || '.' || c.relname as scope,
+    n.nspname as schema_name,
+    c.relname as relation_name,
+    c.relkind::text as relation_kind,
+    pg_get_userbyid(c.relowner) as owner,
+    c.relpersistence::text as persistence,
+    c.relrowsecurity as rls_enabled,
+    c.relforcerowsecurity as rls_forced
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'storage'
+    and c.relname = 'objects'
+    and c.relkind in ('r', 'p')
+),
 application_columns as (
   select
     n.nspname || '.' || c.relname || '.' || a.attname as key,
@@ -195,9 +212,10 @@ application_default_acls as (
   where n.nspname = 'public' or d.defaclnamespace = 0
 )
 select jsonb_build_object(
-  'snapshotVersion', 1,
+  'snapshotVersion', 2,
   'catalogSchema', 'public',
   'relations', coalesce((select jsonb_agg(to_jsonb(x) order by x.key) from application_relations x), '[]'::jsonb),
+  'managedRelations', coalesce((select jsonb_agg(to_jsonb(x) order by x.key) from managed_relation_security x), '[]'::jsonb),
   'columns', coalesce((select jsonb_agg(to_jsonb(x) order by x.key) from application_columns x), '[]'::jsonb),
   'constraints', coalesce((select jsonb_agg(to_jsonb(x) order by x.key) from application_constraints x), '[]'::jsonb),
   'indexes', coalesce((select jsonb_agg(to_jsonb(x) order by x.key) from application_indexes x), '[]'::jsonb),
