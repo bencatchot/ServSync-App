@@ -692,9 +692,11 @@ where not t.tgisinternal
     'servsync_guard_local_contact_lifecycle',
     'servsync_guard_local_home_lifecycle',
     'servsync_guard_local_draft_assignment',
+    'servsync_guard_local_inspection_template_assignment',
     'servsync_guard_local_calendar_assignment',
     'servsync_guard_local_claim_invite_assignment',
     'servsync_guard_local_claim_home_assignment',
+    'servsync_guard_local_visit_assignment',
     'servsync_guard_local_project_assignment',
     'servsync_guard_local_job_assignment',
     'servsync_guard_local_estimate_assignment',
@@ -702,7 +704,7 @@ where not t.tgisinternal
   )
 order by t.tgname;
     `);
-    expect(triggerRows).toHaveLength(10);
+    expect(triggerRows).toHaveLength(12);
     expect(triggerRows.every(row => row.enabled === 'O')).toBe(true);
   });
 

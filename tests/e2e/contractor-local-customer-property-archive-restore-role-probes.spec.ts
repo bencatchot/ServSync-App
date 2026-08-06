@@ -166,11 +166,9 @@ test.describe('contractor-local archive/restore Sandbox role probes', () => {
     expect((await restoreProperty(accounts.owner, homeId)).error).toBeNull();
 
     await setLocalHomeClaimedAt(homeId, new Date().toISOString());
-    try {
-      expect((await archiveProperty(accounts.owner, homeId)).error?.message).toBe('Local property is unavailable.');
-      expect((await archiveCustomer(accounts.owner, contactId)).error?.message).toBe('Local customer is unavailable.');
-    } finally {
-      await setLocalHomeClaimedAt(homeId, null);
-    }
+    expect((await archiveProperty(accounts.owner, homeId)).error?.message).toBe('Local property is unavailable.');
+    expect((await archiveCustomer(accounts.owner, contactId)).error?.message).toBe('Local customer is unavailable.');
+    // The disposable customer is deleted by afterAll; deliberately do not
+    // simulate an unsupported claim reversal on an immutable claimed row.
   });
 });
