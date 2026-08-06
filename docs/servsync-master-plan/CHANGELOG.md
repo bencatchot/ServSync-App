@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-06
 
+- Branch: `codex/draft-optional-customer-migration-compatibility-v1`
+- Starting main SHA: `00359898c7d25bb739661e2451662c7371b9472f`
+- Files changed:
+  - `servsync-contractor-local-customer-read-list-parity-draft-optional.sql`
+  - `servsync-contractor-local-customer-property-archive-restore-draft-optional.sql`
+  - `tests/e2e/contractor-local-customer-draft-optional-compatibility.spec.ts`
+  - `tests/sql/draft-optional-customer-foundation.sql`
+  - `tests/sql/draft-optional-complete-foundation.sql`
+  - `scripts/validation/validate-draft-optional-customer-migrations.sh`
+  - `package.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements source-only Draft-Optional Contractor-Customer Migration Compatibility for curated environments such as Demo. Versioned read/list migration `servsync-contractor-local-customer-read-list-parity-draft-optional.sql` (SHA-256 `6c691991bb0c7bf2789674cc07c2e4e8944169d8b740a2761e5e03a42403d48a`) and archive migration `servsync-contractor-local-customer-property-archive-restore-draft-optional.sql` (SHA-256 `5a61e73fb91a1bd2a378cdf66feb15568b85bfafa336aa95c777f43c012ab85c`) supersede the immutable, checksum-recorded files for future alignment without altering their deployed bytes. A strict preflight accepts either no Durable Draft relations or the complete compatible three-table/RPC foundation; any partial or incompatible foundation fails before the compatibility functions or archive lifecycle DDL are installed.
+- Draft-free behavior: The role-shaped directory continues to derive tenant and role server-side and uses non-Draft Job, estimate, and invoice work to shape Viewer visibility. Archive/restore installs its complete non-Draft lifecycle, claim/invitation, historical-context, and assignment protection set; Draft triggers and launch lineage are omitted, `draft_count` remains zero, and Draft history remains absent. No Draft table, compatibility view, fake record, partial-invoicing object, Draft Job object, or Project Collaboration object is created.
+- Complete-Draft behavior: The current Draft-aware directory, impact count, historical context, new-assignment trigger, and output launch-lineage semantics remain available through dynamically gated references after the complete foundation passes ownership, RLS, column-shape, and RPC-signature checks. Existing Owner/Admin/Office authority, lower-role mutation denial, redaction, claimed-record protection, token containment, authorization-before-locking, and direct-table ACL cleanup remain unchanged.
+- Historical migration treatment: `servsync-contractor-local-customer-read-list-parity.sql` remains SHA-256 `0b90e4548ceec24e7bdd96a12ad9951f74b7ffc064f222a2f41b0e2ce109f41f`, and `servsync-contractor-local-customer-property-archive-restore.sql` remains SHA-256 `762c6fdd8b1dacabb70730c7257691f959ebfd07cf67d2688b97756015a46c17`. PR #382 is already merged and Production-active; this branch does not rewrite that history or change any installed environment.
+- Tests/checks run: A disposable PostgreSQL 16 harness applied the exact customer-management edit, versioned read/list, Admin/Office creation, direct-table cleanup, and versioned archive chain: Draft absent passed, complete Draft passed, partial Draft failed cleanly, and shape-incompatible Draft failed cleanly. Focused source assertions and customer/archive regressions passed 78/78 across compatibility, read/list, archive, management, creation, ACL cleanup, claim/invitation, multi-property, and unified Draft behavior. TypeScript and the Production build passed; the 26-test security catalog compiled/listed without remote execution. Focused changed-test lint passed with only the inherited invalid `@typescript-eslint/no-unused-expressions` option bypassed; full lint remains blocked at startup by the unchanged ESLint 9 `allowShortCircuit` incompatibility. Markdown links, anchors, and table shapes, shell syntax, migration hashes, package-lock consistency, `git diff --check`, added-line sensitive-value scanning, generated-artifact cleanup, and final clean-tree verification also passed.
+- Environment and rollout boundary: No SQL was applied to Demo, Sandbox, or Production; no feature flag, rollout mode, entitlement, environment variable, data, configuration, or deployment changed. Demo remains a curated Draft-free subset and still requires a separately authorized migration-by-migration baseline, application, catalog check, authenticated validation, and cleanup before customer backend parity can be claimed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the versioned compatibility prerequisite for Draft-free Demo customer alignment while keeping environment rollout, Durable Draft, Project Collaboration, and broader Demo parity separate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Establishes the supported absent/complete/fail-closed Draft architecture and preserves the existing Production/Sandbox semantics and rollout gates.
+
 - Branch: `codex/pr382-production-rollout-doc-closeout`
 - Starting main SHA: `67df8c6b41b903b50c4dac3a50921ada107b463d` (normal two-parent merge commit for PR #382)
 - Files changed:
