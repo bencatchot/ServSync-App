@@ -9,6 +9,17 @@ begin
 end;
 $$;
 
+-- Supabase projects grant Data API roles access to new public objects through
+-- postgres default ACLs. Individual migrations must narrow these grants.
+alter default privileges for role postgres in schema public
+  grant select, insert, update, delete on tables to anon, authenticated, service_role;
+alter default privileges for role postgres in schema public
+  grant execute on functions to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant execute on functions to anon, authenticated, service_role;
+
 create schema if not exists auth;
 create table auth.users (id uuid primary key);
 

@@ -187,6 +187,9 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
     expect(preflight).toContain('v_draft_relation_count not in (0, 3)');
     expect(preflight).toContain('perform public.servsync_private_assert_canonical_customer_draft_foundation();');
     expect(preflight).toContain('if not public.servsync_private_customer_draft_foundation_available() then');
+    expect(preflight).toContain("grantee_role.rolname not in ('postgres', 'service_role')");
+    expect(preflight).toContain('or function_acl.is_grantable');
+    expect(preflight).toContain(') <> 2');
     expect(draftTrigger).toContain('if public.servsync_private_customer_draft_foundation_available() then');
     expect(draftTrigger).toContain('execute $draft_trigger$');
     expect(impact).toContain('v_draft_count bigint := 0;');

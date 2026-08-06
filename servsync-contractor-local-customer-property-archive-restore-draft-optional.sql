@@ -136,13 +136,14 @@ begin
               procedure_row.proacl,
               acldefault('f', procedure_row.proowner)
             )) function_acl
-        ) <> 1
+        ) <> 2
         or exists (
           select 1
             from aclexplode(coalesce(procedure_row.proacl, acldefault('f', procedure_row.proowner))) function_acl
+            left join pg_roles grantee_role on grantee_role.oid = function_acl.grantee
            where function_acl.privilege_type = 'EXECUTE'
              and (
-               function_acl.grantee <> procedure_row.proowner
+               grantee_role.rolname not in ('postgres', 'service_role')
                or function_acl.is_grantable
              )
         )

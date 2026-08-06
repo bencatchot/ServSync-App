@@ -548,9 +548,7 @@ begin
             'contractor_local_customer_lifecycle_contact_idx',
             'contractor_local_customer_lifecycle_home_idx'
           )
-     )
-     or has_table_privilege('authenticated', 'public.contractor_local_contacts', 'SELECT')
-     or has_table_privilege('authenticated', 'public.contractor_local_homes', 'UPDATE') then
+     ) then
     raise exception 'Rejected Draft foundation left compatibility or archive state behind.';
   end if;
 end;
