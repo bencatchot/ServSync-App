@@ -232,13 +232,28 @@ test.describe('contractor-local customer and property archive/restore v1', () =>
     expect(guard).toContain("message = 'Customer or property is unavailable.'");
 
     for (const table of [
-      'contractor_local_homes', 'contractor_work_drafts', 'contractor_calendar_events',
+      'contractor_local_homes', 'contractor_work_drafts', 'inspection_templates', 'contractor_calendar_events',
       'contractor_local_customer_claim_invites', 'contractor_local_customer_claim_invite_homes',
       'projects', 'inspections', 'estimates', 'invoices',
     ]) {
       expect(sql).toMatch(new RegExp(`(?:on public\\.${table}|on\\s+public\\.${table})`));
     }
     expect(sql).toContain("v_new->>'local_contact_id' is not distinct from v_old->>'local_contact_id'");
+  });
+
+  test('visit-event assignments remain tied to their existing Job subject', () => {
+    const sql = source('servsync-contractor-local-customer-property-archive-restore.sql');
+    const guard = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_guard_local_visit_assignment()',
+      'alter function public.servsync_private_guard_local_visit_assignment()',
+    );
+
+    expect(guard).toContain('job.id = new.inspection_id');
+    expect(guard).toContain('job.contractor_id = new.contractor_id');
+    expect(guard).toContain('v_job.local_contact_id is distinct from new.local_contact_id');
+    expect(guard).not.toContain('archived_at');
+    expect(sql).toContain('on public.contractor_visit_events');
   });
 
   test('pre-archive Draft, estimate, job, and calendar lineage is checked at commit', () => {

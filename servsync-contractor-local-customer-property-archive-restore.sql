@@ -19,9 +19,11 @@ begin
      or to_regclass('public.contractor_local_customer_claim_invite_homes') is null
      or to_regclass('public.contractor_work_drafts') is null
      or to_regclass('public.contractor_work_draft_launches') is null
+     or to_regclass('public.inspection_templates') is null
      or to_regclass('public.inspections') is null
      or to_regclass('public.estimates') is null
      or to_regclass('public.invoices') is null
+     or to_regclass('public.contractor_visit_events') is null
      or to_regclass('public.contractor_calendar_events') is null
      or to_regclass('public.contractor_calendar_event_job_links') is null
      or to_regclass('public.projects') is null then
@@ -351,6 +353,11 @@ create trigger servsync_guard_local_draft_assignment
   before insert or update of contractor_id, local_contact_id, local_home_id on public.contractor_work_drafts
   for each row execute function public.servsync_private_guard_local_work_assignment();
 
+drop trigger if exists servsync_guard_local_inspection_template_assignment on public.inspection_templates;
+create trigger servsync_guard_local_inspection_template_assignment
+  before insert or update of contractor_id, local_contact_id, local_home_id on public.inspection_templates
+  for each row execute function public.servsync_private_guard_local_work_assignment();
+
 drop trigger if exists servsync_guard_local_calendar_assignment on public.contractor_calendar_events;
 create trigger servsync_guard_local_calendar_assignment
   before insert or update of contractor_id, local_contact_id on public.contractor_calendar_events
@@ -367,6 +374,49 @@ create trigger servsync_guard_local_claim_home_assignment
   before insert or update of contractor_id, local_contact_id, local_home_id
   on public.contractor_local_customer_claim_invite_homes
   for each row execute function public.servsync_private_guard_local_claim_assignment();
+
+-- Visit events are derived from an existing Job. Keep scheduling available for
+-- pre-archive work, but prevent direct browser writes from attaching a forged
+-- local-customer label that does not match the referenced Job.
+create or replace function public.servsync_private_guard_local_visit_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_job public.inspections;
+begin
+  if tg_op = 'UPDATE'
+     and new.contractor_id is not distinct from old.contractor_id
+     and new.inspection_id is not distinct from old.inspection_id
+     and new.local_contact_id is not distinct from old.local_contact_id then
+    return new;
+  end if;
+
+  select job.*
+    into v_job
+    from public.inspections job
+   where job.id = new.inspection_id
+     and job.contractor_id = new.contractor_id
+   for share;
+
+  if v_job.id is null
+     or v_job.local_contact_id is distinct from new.local_contact_id then
+    raise insufficient_privilege using message = 'Visit customer is unavailable.';
+  end if;
+
+  return new;
+end;
+$$;
+
+alter function public.servsync_private_guard_local_visit_assignment() owner to postgres;
+revoke all on function public.servsync_private_guard_local_visit_assignment() from public, anon, authenticated;
+
+drop trigger if exists servsync_guard_local_visit_assignment on public.contractor_visit_events;
+create trigger servsync_guard_local_visit_assignment
+  before insert or update of contractor_id, inspection_id, local_contact_id on public.contractor_visit_events
+  for each row execute function public.servsync_private_guard_local_visit_assignment();
 
 -- Projects name the tenant column differently. Keep the generic trigger payload
 -- stable without changing that existing schema.
