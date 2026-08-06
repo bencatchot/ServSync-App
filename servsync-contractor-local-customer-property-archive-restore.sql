@@ -262,7 +262,15 @@ begin
     or new.notes is distinct from old.notes;
 
   if v_subject_changed then
-    perform public.servsync_private_assert_active_local_subject(new.contractor_id, new.local_contact_id, new.id);
+    -- Validate the pre-transition local property while the row update itself
+    -- supplies the home lock. This preserves claim/mapping transitions from an
+    -- active local property without allowing edits to an already unavailable one.
+    perform public.servsync_private_assert_active_local_subject(new.contractor_id, new.local_contact_id, null);
+    if old.archived_at is not null
+       or old.home_id is not null
+       or old.claimed_at is not null then
+      raise insufficient_privilege using message = 'Local property is unavailable.';
+    end if;
   end if;
 
   return new;

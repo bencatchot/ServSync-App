@@ -241,6 +241,21 @@ test.describe('contractor-local customer and property archive/restore v1', () =>
     expect(sql).toContain("v_new->>'local_contact_id' is not distinct from v_old->>'local_contact_id'");
   });
 
+  test('active property claim transitions remain possible while unavailable properties stay immutable', () => {
+    const sql = source('servsync-contractor-local-customer-property-archive-restore.sql');
+    const guard = sourceBetween(
+      sql,
+      'create or replace function public.servsync_private_guard_local_home_lifecycle()',
+      'create or replace function public.servsync_private_guard_local_work_assignment()',
+    );
+
+    expect(guard).toContain('servsync_private_assert_active_local_subject(new.contractor_id, new.local_contact_id, null)');
+    expect(guard).toContain('old.archived_at is not null');
+    expect(guard).toContain('old.home_id is not null');
+    expect(guard).toContain('old.claimed_at is not null');
+    expect(guard).not.toContain('servsync_private_assert_active_local_subject(new.contractor_id, new.local_contact_id, new.id)');
+  });
+
   test('visit-event assignments remain tied to their existing Job subject', () => {
     const sql = source('servsync-contractor-local-customer-property-archive-restore.sql');
     const guard = sourceBetween(
