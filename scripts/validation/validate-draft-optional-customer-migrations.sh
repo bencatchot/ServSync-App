@@ -38,16 +38,35 @@ DATABASES=(
   draft_complete
   draft_partial
   draft_incompatible
+  drift_missing_column
+  drift_column_type
+  drift_nullability
+  drift_default
+  drift_check
   drift_weak_fk
   drift_wrong_reference
+  drift_fk_action
   drift_unvalidated_fk
   drift_unexpected_overload
+  drift_return_type
+  drift_argument_type
+  drift_rpc_body
   drift_public_rpc
   drift_anon_rpc
   drift_missing_authenticated_rpc
+  drift_authenticated_rpc_grant_option
+  drift_service_rpc_grant_option
   drift_table_acl
+  drift_table_grant_option
+  drift_column_acl
+  drift_column_grant_option
+  drift_wrong_owner
+  drift_security_invoker
+  drift_search_path
   drift_rls
-  drift_policy
+  drift_missing_policy
+  drift_policy_command
+  drift_policy_expression
   archive_drift
 )
 
@@ -335,12 +354,25 @@ psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-property-a
 psql_case draft_complete <<'SQL' >/dev/null
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', false);
 
-insert into public.contractor_work_drafts(id, contractor_id, local_contact_id, local_home_id)
+insert into public.contractor_work_drafts(
+  id,
+  contractor_id,
+  local_contact_id,
+  local_home_id,
+  subject_type,
+  subject_display_name_snapshot,
+  property_display_snapshot,
+  title
+)
 values (
   '50000000-0000-0000-0000-000000000001',
   '20000000-0000-0000-0000-000000000001',
   '30000000-0000-0000-0000-000000000001',
-  '40000000-0000-0000-0000-000000000001'
+  '40000000-0000-0000-0000-000000000001',
+  'local_contact',
+  'Local Customer',
+  '100 Main St',
+  'Canonical Draft'
 );
 
 do $$
@@ -374,11 +406,23 @@ begin
     raise exception 'Draft-linked archived historical context was not preserved.';
   end if;
   begin
-    insert into public.contractor_work_drafts(contractor_id, local_contact_id, local_home_id)
+    insert into public.contractor_work_drafts(
+      contractor_id,
+      local_contact_id,
+      local_home_id,
+      subject_type,
+      subject_display_name_snapshot,
+      property_display_snapshot,
+      title
+    )
     values (
       '20000000-0000-0000-0000-000000000001',
       '30000000-0000-0000-0000-000000000001',
-      '40000000-0000-0000-0000-000000000001'
+      '40000000-0000-0000-0000-000000000001',
+      'local_contact',
+      'Local Customer',
+      '100 Main St',
+      'Rejected Draft'
     );
     raise exception 'Archived Draft assignment was unexpectedly accepted.';
   exception when insufficient_privilege then
@@ -443,11 +487,37 @@ expect_read_rejection() {
 
 # Each complete-Draft drift case starts from the same catalog-faithful fixture.
 for database in \
-  drift_weak_fk drift_wrong_reference drift_unvalidated_fk \
-  drift_unexpected_overload drift_public_rpc drift_anon_rpc \
-  drift_missing_authenticated_rpc drift_table_acl drift_rls drift_policy archive_drift; do
+  drift_missing_column drift_column_type drift_nullability drift_default drift_check \
+  drift_weak_fk drift_wrong_reference drift_fk_action drift_unvalidated_fk \
+  drift_unexpected_overload drift_return_type drift_argument_type drift_rpc_body \
+  drift_public_rpc drift_anon_rpc drift_missing_authenticated_rpc \
+  drift_authenticated_rpc_grant_option drift_service_rpc_grant_option \
+  drift_table_acl drift_table_grant_option drift_column_acl drift_column_grant_option \
+  drift_wrong_owner drift_security_invoker drift_search_path drift_rls \
+  drift_missing_policy drift_policy_command drift_policy_expression archive_drift; do
   psql_case "$database" -f "$ROOT/tests/sql/draft-optional-complete-foundation.sql" >/dev/null
 done
+
+# Required columns, types, nullability, defaults, and checks are exact.
+psql_case drift_missing_column -c \
+  'alter table public.contractor_work_drafts drop column private_notes;' >/dev/null
+expect_read_rejection drift_missing_column
+
+psql_case drift_column_type -c \
+  'alter table public.contractor_work_drafts alter column private_notes type varchar(200);' >/dev/null
+expect_read_rejection drift_column_type
+
+psql_case drift_nullability -c \
+  'alter table public.contractor_work_drafts alter column property_display_snapshot drop not null;' >/dev/null
+expect_read_rejection drift_nullability
+
+psql_case drift_default -c \
+  'alter table public.contractor_work_drafts alter column title drop default;' >/dev/null
+expect_read_rejection drift_default
+
+psql_case drift_check -c \
+  'alter table public.contractor_work_draft_items drop constraint contractor_work_draft_items_title_not_blank;' >/dev/null
+expect_read_rejection drift_check
 
 # Weakened tenant match: the same constraint name only protects draft_id.
 psql_case drift_weak_fk <<'SQL' >/dev/null
@@ -473,6 +543,19 @@ alter table public.contractor_work_drafts
 SQL
 expect_read_rejection drift_wrong_reference
 
+# Canonical update/delete actions are part of the foreign-key contract.
+psql_case drift_fk_action <<'SQL' >/dev/null
+alter table public.contractor_work_drafts
+  drop constraint contractor_work_drafts_local_home_id_fkey;
+alter table public.contractor_work_drafts
+  add constraint contractor_work_drafts_local_home_id_fkey
+  foreign key (local_home_id)
+  references public.contractor_local_homes(id)
+  on update cascade
+  on delete restrict;
+SQL
+expect_read_rejection drift_fk_action
+
 # Structurally matching but unvalidated constraints are not canonical.
 psql_case drift_unvalidated_fk <<'SQL' >/dev/null
 alter table public.contractor_work_draft_items
@@ -495,6 +578,45 @@ grant execute on function public.servsync_get_work_draft(text) to authenticated;
 SQL
 expect_read_rejection drift_unexpected_overload
 
+psql_case drift_return_type <<'SQL' >/dev/null
+alter function public.servsync_get_work_draft(uuid)
+  rename to servsync_get_work_draft_canonical;
+create function public.servsync_get_work_draft(p_draft_id uuid)
+returns text language plpgsql security definer set search_path = public
+as $$ begin return '{}'::text; end $$;
+alter function public.servsync_get_work_draft(uuid) owner to postgres;
+revoke execute on function public.servsync_get_work_draft(uuid) from public, anon;
+grant execute on function public.servsync_get_work_draft(uuid) to authenticated;
+SQL
+expect_read_rejection drift_return_type
+
+psql_case drift_argument_type <<'SQL' >/dev/null
+alter function public.servsync_get_work_draft(uuid)
+  rename to servsync_get_work_draft_canonical;
+create function public.servsync_get_work_draft(p_draft_id text)
+returns jsonb language plpgsql security definer set search_path = public
+as $$ begin return '{}'::jsonb; end $$;
+alter function public.servsync_get_work_draft(text) owner to postgres;
+revoke execute on function public.servsync_get_work_draft(text) from public, anon;
+grant execute on function public.servsync_get_work_draft(text) to authenticated;
+SQL
+expect_read_rejection drift_argument_type
+
+psql_case drift_rpc_body <<'SQL' >/dev/null
+create or replace function public.servsync_save_work_draft(
+  p_draft_id uuid default null,
+  p_metadata jsonb default '{}'::jsonb,
+  p_items jsonb default '[]'::jsonb,
+  p_removed_item_ids jsonb default '[]'::jsonb
+)
+returns jsonb language plpgsql security definer set search_path = public
+as $$ begin return '{}'::jsonb; end $$;
+alter function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) owner to postgres;
+revoke execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) from public, anon;
+grant execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) to authenticated;
+SQL
+expect_read_rejection drift_rpc_body
+
 psql_case drift_public_rpc -c \
   'grant execute on function public.servsync_get_work_draft(uuid) to public;' >/dev/null
 expect_read_rejection drift_public_rpc
@@ -507,17 +629,72 @@ psql_case drift_missing_authenticated_rpc -c \
   'revoke execute on function public.servsync_get_work_draft(uuid) from authenticated;' >/dev/null
 expect_read_rejection drift_missing_authenticated_rpc
 
+psql_case drift_authenticated_rpc_grant_option -c \
+  'grant execute on function public.servsync_get_work_draft(uuid) to authenticated with grant option;' >/dev/null
+expect_read_rejection drift_authenticated_rpc_grant_option
+
+psql_case drift_service_rpc_grant_option -c \
+  'grant execute on function public.servsync_get_work_draft(uuid) to service_role with grant option;' >/dev/null
+expect_read_rejection drift_service_rpc_grant_option
+
 psql_case drift_table_acl -c \
   'grant update on table public.contractor_work_drafts to authenticated;' >/dev/null
 expect_read_rejection drift_table_acl
+
+psql_case drift_table_grant_option -c \
+  'grant select on table public.contractor_work_drafts to authenticated with grant option;' >/dev/null
+expect_read_rejection drift_table_grant_option
+
+psql_case drift_column_acl -c \
+  'grant update(title) on table public.contractor_work_drafts to authenticated;' >/dev/null
+expect_read_rejection drift_column_acl
+
+psql_case drift_column_grant_option -c \
+  'grant select(title) on table public.contractor_work_drafts to authenticated with grant option;' >/dev/null
+expect_read_rejection drift_column_grant_option
+
+psql_case drift_wrong_owner -c \
+  'alter table public.contractor_work_drafts owner to runner;' >/dev/null
+expect_read_rejection drift_wrong_owner
+
+psql_case drift_security_invoker -c \
+  'alter function public.servsync_get_work_draft(uuid) security invoker;' >/dev/null
+expect_read_rejection drift_security_invoker
+
+psql_case drift_search_path -c \
+  'alter function public.servsync_get_work_draft(uuid) set search_path = public, pg_temp;' >/dev/null
+expect_read_rejection drift_search_path
 
 psql_case drift_rls -c \
   'alter table public.contractor_work_draft_launches disable row level security;' >/dev/null
 expect_read_rejection drift_rls
 
-psql_case drift_policy -c \
+psql_case drift_missing_policy -c \
   'drop policy "Contractor work draft items: contractor team reads" on public.contractor_work_draft_items;' >/dev/null
-expect_read_rejection drift_policy
+expect_read_rejection drift_missing_policy
+
+psql_case drift_policy_command <<'SQL' >/dev/null
+drop policy "Contractor work drafts: contractor team reads" on public.contractor_work_drafts;
+create policy "Contractor work drafts: contractor team reads"
+  on public.contractor_work_drafts for update to authenticated
+  using (
+    public.current_user_can_access_contractor(contractor_id)
+    or public.current_user_is_platform_admin()
+  )
+  with check (
+    public.current_user_can_access_contractor(contractor_id)
+    or public.current_user_is_platform_admin()
+  );
+SQL
+expect_read_rejection drift_policy_command
+
+psql_case drift_policy_expression <<'SQL' >/dev/null
+drop policy "Contractor work drafts: contractor team reads" on public.contractor_work_drafts;
+create policy "Contractor work drafts: contractor team reads"
+  on public.contractor_work_drafts for select to authenticated
+  using (true);
+SQL
+expect_read_rejection drift_policy_expression
 
 # Partial Draft fails before either compatibility helper or archive metadata can be installed.
 psql_case draft_partial -c 'create table public.contractor_work_drafts(id uuid primary key);' >/dev/null
@@ -566,4 +743,4 @@ psql_case draft_absent -f "$ROOT/servsync-contractor-local-customer-property-arc
 psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-read-list-parity-draft-optional.sql" >/dev/null
 psql_case draft_complete -f "$ROOT/servsync-contractor-local-customer-property-archive-restore-draft-optional.sql" >/dev/null
 
-echo 'Draft-optional compatibility: absent/canonical/reapply PASS; role/redaction PASS; 12 partial/security/constraint drift cases PASS.'
+echo 'Draft-optional compatibility: absent/canonical/reapply PASS; role/redaction PASS; 31 partial/structural/security/grant drift cases PASS.'

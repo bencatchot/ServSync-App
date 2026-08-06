@@ -23,7 +23,7 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
 
   test('read boundary distinguishes absent, complete, and incompatible Draft foundations', () => {
     const sql = source('servsync-contractor-local-customer-read-list-parity-draft-optional.sql');
-    const preflight = sourceBetween(sql, 'do $$\ndeclare', 'create or replace function public.servsync_private_assert_canonical_customer_draft_foundation');
+    const preflight = sourceBetween(sql, 'do $$\nbegin', 'create or replace function public.servsync_private_assert_canonical_customer_draft_foundation');
     const canonicalAssertion = sourceBetween(
       sql,
       'create or replace function public.servsync_private_assert_canonical_customer_draft_foundation',
@@ -35,14 +35,21 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
       'create or replace function public.servsync_private_local_customer_has_readable_work',
     );
 
-    expect(preflight).toContain('v_draft_relation_count not in (0, 3)');
-    expect(preflight).toContain('if v_draft_relation_count = 3 then');
-    expect(preflight).toContain("raise exception 'Durable Draft foundation is incomplete or incompatible.'");
+    expect(preflight).toContain("raise exception 'Missing required local-customer or contractor-work tables.'");
+    expect(preflight).not.toContain('v_draft_relation_count');
     expect(preflight).not.toMatch(/or to_regclass\('public\.contractor_work_drafts'\) is null/);
+    expect(canonicalAssertion).toContain('if v_relation_count not in (0, 3) then');
+    expect(canonicalAssertion).toContain('perform public.servsync_private_assert_canonical_customer_draft_foundation();');
     expect(availability).toContain('if v_relation_count = 0 then\n    return false;');
     expect(availability).toContain('perform public.servsync_private_assert_canonical_customer_draft_foundation();');
     expect(availability).toContain('return true;');
     expect(canonicalAssertion).toContain("owner_role.rolname <> 'postgres'");
+    expect(canonicalAssertion).toContain("v_catalog_count <> 66");
+    expect(canonicalAssertion).toContain("v_catalog_count <> 47");
+    expect(canonicalAssertion).toContain("v_catalog_count <> 18");
+    expect(canonicalAssertion).toContain("v_catalog_count <> 3");
+    expect(canonicalAssertion).toContain("md5(procedure_row.prosrc) <> expected_function.body_fingerprint");
+    expect(canonicalAssertion).toContain('pg_get_function_arguments(procedure_row.oid)');
     expect(canonicalAssertion).toContain('not relation.relrowsecurity');
     expect(canonicalAssertion).toContain('relation.relforcerowsecurity');
     expect(canonicalAssertion).toContain("'FOREIGN KEY (draft_id, contractor_id) REFERENCES contractor_work_drafts(id, contractor_id) ON DELETE CASCADE'");
@@ -56,26 +63,22 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
     expect(canonicalAssertion).toContain("not has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')");
     expect(canonicalAssertion).toContain("has_table_privilege('authenticated', relation.oid, 'UPDATE')");
     expect(canonicalAssertion).toContain('attribute.attacl is not null');
+    expect(canonicalAssertion).toContain('function_acl.is_grantable');
+    expect(canonicalAssertion).toContain('table_acl.is_grantable');
     expect(canonicalAssertion).toContain('policy_row.polroles');
     expect(canonicalAssertion).toContain('policy_row.polwithcheck is not null');
   });
 
-  test('complete fixture mirrors the classifier security and structural contract', () => {
+  test('complete fixture installs the real canonical Durable Draft chain', () => {
     const fixture = source('tests/sql/draft-optional-complete-foundation.sql');
 
-    expect(fixture).toContain('constraint contractor_work_drafts_id_contractor_unique unique (id, contractor_id)');
-    expect(fixture).toContain('foreign key (draft_id, contractor_id)');
-    expect(fixture).toContain('references public.contractor_work_drafts(id, contractor_id)');
-    expect(fixture).toContain('alter table public.contractor_work_drafts owner to postgres');
-    expect(fixture).toContain('alter table public.contractor_work_drafts enable row level security');
-    expect(fixture).toContain('for select to authenticated');
-    expect(fixture).toContain('revoke all on table public.contractor_work_drafts from public, anon, authenticated');
-    expect(fixture).toContain('grant select on table public.contractor_work_drafts to authenticated');
-    expect(fixture).toContain('security definer\nset search_path = public');
-    expect(fixture).toContain('alter function public.servsync_get_work_draft(uuid) owner to postgres');
-    expect(fixture).toContain('revoke execute on function public.servsync_get_work_draft(uuid) from public, anon');
-    expect(fixture).toContain('grant execute on function public.servsync_get_work_draft(uuid) to authenticated');
-    expect(fixture.match(/create function public\.servsync_get_work_draft/g)).toHaveLength(1);
+    expect(fixture).toContain('\\ir ../../servsync-durable-draft-launch-foundation.sql');
+    expect(fixture).toContain('\\ir ../../servsync-durable-draft-inspection-checklist-path.sql');
+    expect(fixture).toContain('\\ir ../../servsync-durable-draft-cohort-entitlement.sql');
+    expect(fixture).toContain('\\ir ../../servsync-durable-draft-invoice-launch-foundation.sql');
+    expect(fixture).not.toMatch(/create\s+table\s+public\.contractor_work_draft/i);
+    expect(fixture).not.toMatch(/create\s+function\s+public\.servsync_(get|save|launch)_work_draft/i);
+    expect(fixture).not.toContain("return '{}'::jsonb");
   });
 
   test('PostgreSQL harness covers catalog drift and Draft-free roles transactionally', () => {
@@ -84,16 +87,35 @@ test.describe('Draft-optional contractor-customer migration compatibility', () =
     for (const database of [
       'draft_partial',
       'draft_incompatible',
+      'drift_missing_column',
+      'drift_column_type',
+      'drift_nullability',
+      'drift_default',
+      'drift_check',
       'drift_weak_fk',
       'drift_wrong_reference',
+      'drift_fk_action',
       'drift_unvalidated_fk',
       'drift_unexpected_overload',
+      'drift_return_type',
+      'drift_argument_type',
+      'drift_rpc_body',
       'drift_public_rpc',
       'drift_anon_rpc',
       'drift_missing_authenticated_rpc',
+      'drift_authenticated_rpc_grant_option',
+      'drift_service_rpc_grant_option',
       'drift_table_acl',
+      'drift_table_grant_option',
+      'drift_column_acl',
+      'drift_column_grant_option',
+      'drift_wrong_owner',
+      'drift_security_invoker',
+      'drift_search_path',
       'drift_rls',
-      'drift_policy',
+      'drift_missing_policy',
+      'drift_policy_command',
+      'drift_policy_expression',
       'archive_drift',
     ]) {
       expect(harness).toContain(database);

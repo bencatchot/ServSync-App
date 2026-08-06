@@ -6,9 +6,6 @@
 begin;
 
 do $$
-declare
-  v_draft_relation_count integer;
-  v_mismatch text;
 begin
   if to_regclass('public.contractor_local_contacts') is null
      or to_regclass('public.contractor_local_homes') is null
@@ -23,305 +20,6 @@ begin
      or to_regprocedure('public.current_user_can_manage_contractor_customers(uuid)') is null then
     raise exception 'Missing required contractor identity or customer-management helpers.';
   end if;
-
-  select count(*)
-    into v_draft_relation_count
-    from (values
-      (to_regclass('public.contractor_work_drafts')),
-      (to_regclass('public.contractor_work_draft_items')),
-      (to_regclass('public.contractor_work_draft_launches'))
-    ) draft_relation(oid)
-   where oid is not null;
-
-  if v_draft_relation_count not in (0, 3) then
-    raise exception 'Durable Draft foundation is incomplete or incompatible.';
-  end if;
-
-  if v_draft_relation_count = 3 then
-    with expected(table_name, column_name, type_name, is_not_null) as (
-      values
-        ('contractor_work_drafts', 'id', 'uuid', true),
-        ('contractor_work_drafts', 'contractor_id', 'uuid', true),
-        ('contractor_work_drafts', 'local_contact_id', 'uuid', false),
-        ('contractor_work_drafts', 'local_home_id', 'uuid', false),
-        ('contractor_work_drafts', 'status', 'text', true),
-        ('contractor_work_drafts', 'launched_invoice_id', 'uuid', false),
-        ('contractor_work_drafts', 'launched_invoice_id_snapshot', 'uuid', false),
-        ('contractor_work_drafts', 'created_at', 'timestamp with time zone', true),
-        ('contractor_work_draft_items', 'id', 'uuid', true),
-        ('contractor_work_draft_items', 'draft_id', 'uuid', true),
-        ('contractor_work_draft_items', 'contractor_id', 'uuid', true),
-        ('contractor_work_draft_launches', 'id', 'uuid', true),
-        ('contractor_work_draft_launches', 'draft_id', 'uuid', true),
-        ('contractor_work_draft_launches', 'contractor_id', 'uuid', true),
-        ('contractor_work_draft_launches', 'idempotency_key', 'uuid', true),
-        ('contractor_work_draft_launches', 'requested_output', 'text', true),
-        ('contractor_work_draft_launches', 'status', 'text', true),
-        ('contractor_work_draft_launches', 'launched_estimate_id', 'uuid', false),
-        ('contractor_work_draft_launches', 'launched_job_id', 'uuid', false),
-        ('contractor_work_draft_launches', 'launched_invoice_id', 'uuid', false),
-        ('contractor_work_draft_launches', 'launched_invoice_id_snapshot', 'uuid', false)
-    )
-    select string_agg(
-      format('public.%I.%I', expected.table_name, expected.column_name),
-      ', ' order by expected.table_name, expected.column_name
-    )
-      into v_mismatch
-      from expected
-      left join information_schema.columns column_info
-        on column_info.table_schema = 'public'
-       and column_info.table_name = expected.table_name
-       and column_info.column_name = expected.column_name
-       and column_info.data_type = expected.type_name
-       and (column_info.is_nullable = 'NO') = expected.is_not_null
-     where column_info.column_name is null;
-
-    if v_mismatch is not null then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-
-    if exists (
-      select 1
-        from (values
-          ('contractor_work_drafts'),
-          ('contractor_work_draft_items'),
-          ('contractor_work_draft_launches')
-        ) expected_table(table_name)
-        left join pg_class relation
-          on relation.relnamespace = 'public'::regnamespace
-         and relation.relname = expected_table.table_name
-         and relation.relkind in ('r', 'p')
-        left join pg_roles owner_role on owner_role.oid = relation.relowner
-       where relation.oid is null
-          or owner_role.rolname <> 'postgres'
-          or not relation.relrowsecurity
-          or relation.relforcerowsecurity
-    ) then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-
-    if to_regprocedure('public.servsync_get_work_draft(uuid)') is null
-       or to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)') is null
-       or to_regprocedure('public.servsync_launch_work_draft(uuid,text,uuid)') is null then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-
-    if exists (
-      with expected(
-        table_name,
-        constraint_name,
-        constraint_type,
-        local_columns,
-        referenced_table,
-        referenced_columns,
-        update_action,
-        delete_action
-      ) as (
-        values
-          ('contractor_work_drafts', 'contractor_work_drafts_pkey', 'p'::"char", array['id']::text[], null::text, null::text[], null::"char", null::"char"),
-          ('contractor_work_drafts', 'contractor_work_drafts_id_contractor_unique', 'u'::"char", array['id', 'contractor_id']::text[], null::text, null::text[], null::"char", null::"char"),
-          ('contractor_work_drafts', 'contractor_work_drafts_contractor_id_fkey', 'f'::"char", array['contractor_id']::text[], 'contractor_profiles', array['id']::text[], 'a'::"char", 'r'::"char"),
-          ('contractor_work_drafts', 'contractor_work_drafts_local_contact_id_fkey', 'f'::"char", array['local_contact_id']::text[], 'contractor_local_contacts', array['id']::text[], 'a'::"char", 'n'::"char"),
-          ('contractor_work_drafts', 'contractor_work_drafts_local_home_id_fkey', 'f'::"char", array['local_home_id']::text[], 'contractor_local_homes', array['id']::text[], 'a'::"char", 'n'::"char"),
-          ('contractor_work_drafts', 'contractor_work_drafts_launched_invoice_id_fkey', 'f'::"char", array['launched_invoice_id']::text[], 'invoices', array['id']::text[], 'a'::"char", 'n'::"char"),
-          ('contractor_work_draft_items', 'contractor_work_draft_items_pkey', 'p'::"char", array['id']::text[], null::text, null::text[], null::"char", null::"char"),
-          ('contractor_work_draft_items', 'contractor_work_draft_items_draft_id_fkey', 'f'::"char", array['draft_id']::text[], 'contractor_work_drafts', array['id']::text[], 'a'::"char", 'c'::"char"),
-          ('contractor_work_draft_items', 'contractor_work_draft_items_contractor_id_fkey', 'f'::"char", array['contractor_id']::text[], 'contractor_profiles', array['id']::text[], 'a'::"char", 'r'::"char"),
-          ('contractor_work_draft_items', 'contractor_work_draft_items_contractor_match_fk', 'f'::"char", array['draft_id', 'contractor_id']::text[], 'contractor_work_drafts', array['id', 'contractor_id']::text[], 'a'::"char", 'c'::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_pkey', 'p'::"char", array['id']::text[], null::text, null::text[], null::"char", null::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_draft_id_fkey', 'f'::"char", array['draft_id']::text[], 'contractor_work_drafts', array['id']::text[], 'a'::"char", 'r'::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_contractor_id_fkey', 'f'::"char", array['contractor_id']::text[], 'contractor_profiles', array['id']::text[], 'a'::"char", 'r'::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_launched_estimate_id_fkey', 'f'::"char", array['launched_estimate_id']::text[], 'estimates', array['id']::text[], 'a'::"char", 'n'::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_launched_job_id_fkey', 'f'::"char", array['launched_job_id']::text[], 'inspections', array['id']::text[], 'a'::"char", 'n'::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_launched_invoice_id_fkey', 'f'::"char", array['launched_invoice_id']::text[], 'invoices', array['id']::text[], 'a'::"char", 'n'::"char"),
-          ('contractor_work_draft_launches', 'contractor_work_draft_launches_contractor_match_fk', 'f'::"char", array['draft_id', 'contractor_id']::text[], 'contractor_work_drafts', array['id', 'contractor_id']::text[], 'a'::"char", 'r'::"char")
-      ), actual as (
-        select
-          relation.relname as table_name,
-          constraint_row.conname as constraint_name,
-          constraint_row.contype as constraint_type,
-          array(
-            select attribute.attname::text
-              from unnest(constraint_row.conkey) with ordinality key_column(attnum, position)
-              join pg_attribute attribute
-                on attribute.attrelid = constraint_row.conrelid
-               and attribute.attnum = key_column.attnum
-             order by key_column.position
-          ) as local_columns,
-          referenced_relation.relname as referenced_table,
-          array(
-            select attribute.attname::text
-              from unnest(constraint_row.confkey) with ordinality key_column(attnum, position)
-              join pg_attribute attribute
-                on attribute.attrelid = constraint_row.confrelid
-               and attribute.attnum = key_column.attnum
-             order by key_column.position
-          ) as referenced_columns,
-          constraint_row.confupdtype as update_action,
-          constraint_row.confdeltype as delete_action,
-          constraint_row.convalidated,
-          constraint_row.condeferrable,
-          constraint_row.condeferred
-        from pg_constraint constraint_row
-        join pg_class relation on relation.oid = constraint_row.conrelid
-        join pg_namespace namespace on namespace.oid = relation.relnamespace
-        left join pg_class referenced_relation on referenced_relation.oid = constraint_row.confrelid
-       where namespace.nspname = 'public'
-         and relation.relname in (
-           'contractor_work_drafts',
-           'contractor_work_draft_items',
-           'contractor_work_draft_launches'
-         )
-      )
-      select 1
-        from expected
-        left join actual using (table_name, constraint_name)
-       where actual.constraint_name is null
-          or actual.constraint_type <> expected.constraint_type
-          or actual.local_columns is distinct from expected.local_columns
-          or actual.referenced_table is distinct from expected.referenced_table
-          or (
-            expected.referenced_table is not null
-            and (
-              actual.referenced_columns is distinct from expected.referenced_columns
-              or actual.update_action <> expected.update_action
-              or actual.delete_action <> expected.delete_action
-            )
-          )
-          or not actual.convalidated
-          or actual.condeferrable
-          or actual.condeferred
-    ) then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-
-    if exists (
-      select 1
-        from (values
-          ('servsync_get_work_draft', 'public.servsync_get_work_draft(uuid)', array['p_draft_id']::text[], 0),
-          ('servsync_save_work_draft', 'public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)', array['p_draft_id', 'p_metadata', 'p_items', 'p_removed_item_ids']::text[], 4),
-          ('servsync_launch_work_draft', 'public.servsync_launch_work_draft(uuid,text,uuid)', array['p_draft_id', 'p_intended_output', 'p_idempotency_key']::text[], 0)
-        ) expected_function(function_name, signature, argument_names, default_count)
-        left join pg_proc procedure_row on procedure_row.oid = to_regprocedure(expected_function.signature)
-        left join pg_roles owner_role on owner_role.oid = procedure_row.proowner
-        left join pg_language language_row on language_row.oid = procedure_row.prolang
-       where procedure_row.oid is null
-          or (
-            select count(*)
-              from pg_proc overload
-              join pg_namespace namespace on namespace.oid = overload.pronamespace
-             where namespace.nspname = 'public'
-               and overload.proname = expected_function.function_name
-          ) <> 1
-          or owner_role.rolname <> 'postgres'
-          or not procedure_row.prosecdef
-          or coalesce(procedure_row.proconfig, '{}'::text[]) <> array['search_path=public']::text[]
-          or language_row.lanname <> 'plpgsql'
-          or procedure_row.prorettype <> 'jsonb'::regtype
-          or procedure_row.proargnames is distinct from expected_function.argument_names
-          or procedure_row.pronargdefaults <> expected_function.default_count
-          or has_function_privilege('public', procedure_row.oid, 'EXECUTE')
-          or has_function_privilege('anon', procedure_row.oid, 'EXECUTE')
-          or not has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')
-          or exists (
-            select 1
-              from aclexplode(coalesce(procedure_row.proacl, acldefault('f', procedure_row.proowner))) function_acl
-             where function_acl.privilege_type = 'EXECUTE'
-               and function_acl.grantee not in (
-                 procedure_row.proowner,
-                 (select oid from pg_roles where rolname = 'authenticated')
-               )
-          )
-    ) then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-
-    if exists (
-      select 1
-        from (values
-          ('contractor_work_drafts'),
-          ('contractor_work_draft_items'),
-          ('contractor_work_draft_launches')
-        ) expected_table(table_name)
-        join pg_class relation
-          on relation.relnamespace = 'public'::regnamespace
-         and relation.relname = expected_table.table_name
-       where not has_table_privilege('authenticated', relation.oid, 'SELECT')
-          or has_table_privilege('authenticated', relation.oid, 'INSERT')
-          or has_table_privilege('authenticated', relation.oid, 'UPDATE')
-          or has_table_privilege('authenticated', relation.oid, 'DELETE')
-          or has_table_privilege('authenticated', relation.oid, 'TRUNCATE')
-          or has_table_privilege('authenticated', relation.oid, 'REFERENCES')
-          or has_table_privilege('authenticated', relation.oid, 'TRIGGER')
-          or has_table_privilege('public', relation.oid, 'SELECT')
-          or has_table_privilege('anon', relation.oid, 'SELECT')
-          or exists (
-            select 1
-              from aclexplode(coalesce(relation.relacl, acldefault('r', relation.relowner))) table_acl
-             where table_acl.grantee not in (
-                 relation.relowner,
-                 (select oid from pg_roles where rolname = 'authenticated')
-               )
-                or (
-                  table_acl.grantee = (select oid from pg_roles where rolname = 'authenticated')
-                  and table_acl.privilege_type <> 'SELECT'
-                )
-          )
-          or exists (
-            select 1
-              from pg_attribute attribute
-             where attribute.attrelid = relation.oid
-               and attribute.attnum > 0
-               and not attribute.attisdropped
-               and attribute.attacl is not null
-          )
-    ) then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-
-    if (
-      select count(*)
-        from pg_policy policy_row
-       where policy_row.polrelid in (
-         'public.contractor_work_drafts'::regclass,
-         'public.contractor_work_draft_items'::regclass,
-         'public.contractor_work_draft_launches'::regclass
-       )
-    ) <> 3 or exists (
-      select 1
-        from (values
-          (
-            'contractor_work_drafts',
-            'Contractor work drafts: contractor team reads',
-            '(current_user_can_access_contractor(contractor_id)ORcurrent_user_is_platform_admin())'
-          ),
-          (
-            'contractor_work_draft_items',
-            'Contractor work draft items: contractor team reads',
-            '(EXISTS(SELECT1FROMcontractor_work_draftsdraftWHERE((draft.id=contractor_work_draft_items.draft_id)AND(draft.contractor_id=contractor_work_draft_items.contractor_id)AND(current_user_can_access_contractor(draft.contractor_id)ORcurrent_user_is_platform_admin()))))'
-          ),
-          (
-            'contractor_work_draft_launches',
-            'Contractor work draft launches: contractor team reads',
-            '(EXISTS(SELECT1FROMcontractor_work_draftsdraftWHERE((draft.id=contractor_work_draft_launches.draft_id)AND(draft.contractor_id=contractor_work_draft_launches.contractor_id)AND(current_user_can_access_contractor(draft.contractor_id)ORcurrent_user_is_platform_admin()))))'
-          )
-        ) expected_policy(table_name, policy_name, policy_expression)
-        left join pg_class relation
-          on relation.relnamespace = 'public'::regnamespace
-         and relation.relname = expected_policy.table_name
-        left join pg_policy policy_row
-          on policy_row.polrelid = relation.oid
-         and policy_row.polname = expected_policy.policy_name
-       where policy_row.oid is null
-          or policy_row.polcmd <> 'r'
-          or not policy_row.polpermissive
-          or policy_row.polroles <> array[(select oid from pg_roles where rolname = 'authenticated')]
-          or policy_row.polwithcheck is not null
-          or regexp_replace(pg_get_expr(policy_row.polqual, policy_row.polrelid), '\s+', '', 'g') <> expected_policy.policy_expression
-    ) then
-      raise exception 'Durable Draft foundation is incomplete or incompatible.';
-    end if;
-  end if;
 end;
 $$;
 
@@ -334,10 +32,172 @@ set search_path = public
 as $$
 declare
   v_mismatch text;
+  v_catalog_count integer;
+  v_catalog_fingerprint text;
 begin
   if to_regclass('public.contractor_work_drafts') is null
      or to_regclass('public.contractor_work_draft_items') is null
      or to_regclass('public.contractor_work_draft_launches') is null then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+
+  -- This manifest is derived from the repository's canonical Durable Draft
+  -- migration chain. Exact fingerprints reject reduced fixtures and drift in
+  -- columns, defaults, checks, foreign keys, indexes, and read policies.
+  select
+    count(*),
+    md5(string_agg(
+      concat_ws(
+        '|',
+        relation.relname,
+        attribute.attnum,
+        attribute.attname,
+        format_type(attribute.atttypid, attribute.atttypmod),
+        attribute.attnotnull,
+        coalesce(pg_get_expr(default_value.adbin, default_value.adrelid), '')
+      ),
+      E'\n' order by relation.relname, attribute.attnum
+    ))
+    into v_catalog_count, v_catalog_fingerprint
+    from pg_class relation
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    join pg_attribute attribute
+      on attribute.attrelid = relation.oid
+     and attribute.attnum > 0
+     and not attribute.attisdropped
+    left join pg_attrdef default_value
+      on default_value.adrelid = relation.oid
+     and default_value.adnum = attribute.attnum
+   where namespace.nspname = 'public'
+     and relation.relname in (
+       'contractor_work_drafts',
+       'contractor_work_draft_items',
+       'contractor_work_draft_launches'
+     );
+
+  if v_catalog_count <> 66
+     or v_catalog_fingerprint <> 'f8f99db80eb1596e2b6815cf5815cb1f' then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+
+  select
+    count(*),
+    md5(string_agg(
+      concat_ws(
+        '|',
+        relation.relname,
+        constraint_row.conname,
+        constraint_row.contype::text,
+        constraint_row.convalidated,
+        constraint_row.condeferrable,
+        constraint_row.condeferred,
+        pg_get_constraintdef(constraint_row.oid)
+      ),
+      E'\n' order by relation.relname, constraint_row.conname
+    ))
+    into v_catalog_count, v_catalog_fingerprint
+    from pg_constraint constraint_row
+    join pg_class relation on relation.oid = constraint_row.conrelid
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+   where namespace.nspname = 'public'
+     and relation.relname in (
+       'contractor_work_drafts',
+       'contractor_work_draft_items',
+       'contractor_work_draft_launches'
+     );
+
+  if v_catalog_count <> 47
+     or v_catalog_fingerprint <> 'd1e1f64e45caf31d8b24ff1a60dc0492' then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+
+  select
+    count(*),
+    md5(string_agg(
+      concat_ws('|', indexes.tablename, indexes.indexname, indexes.indexdef),
+      E'\n' order by indexes.tablename, indexes.indexname
+    ))
+    into v_catalog_count, v_catalog_fingerprint
+    from pg_indexes indexes
+   where indexes.schemaname = 'public'
+     and indexes.tablename in (
+       'contractor_work_drafts',
+       'contractor_work_draft_items',
+       'contractor_work_draft_launches'
+     );
+
+  if v_catalog_count <> 18
+     or v_catalog_fingerprint <> '71e6ae2cf6f57a21ac13f008280cb311' then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+
+  select
+    count(*),
+    md5(string_agg(
+      concat_ws(
+        '|',
+        relation.relname,
+        policy_row.polname,
+        policy_row.polcmd::text,
+        policy_row.polpermissive,
+        array_to_string(array(
+          select role.rolname
+            from pg_roles role
+           where role.oid = any(policy_row.polroles)
+           order by role.rolname
+        ), ','),
+        regexp_replace(
+          coalesce(pg_get_expr(policy_row.polqual, policy_row.polrelid), ''),
+          '\s+', '', 'g'
+        ),
+        regexp_replace(
+          coalesce(pg_get_expr(policy_row.polwithcheck, policy_row.polrelid), ''),
+          '\s+', '', 'g'
+        )
+      ),
+      E'\n' order by relation.relname, policy_row.polname
+    ))
+    into v_catalog_count, v_catalog_fingerprint
+    from pg_policy policy_row
+    join pg_class relation on relation.oid = policy_row.polrelid
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+   where namespace.nspname = 'public'
+     and relation.relname in (
+       'contractor_work_drafts',
+       'contractor_work_draft_items',
+       'contractor_work_draft_launches'
+     );
+
+  if v_catalog_count <> 3
+     or v_catalog_fingerprint <> '3714d5ee5b8b0e1a26053f935d0522e9' then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+
+  if exists (
+    select 1
+      from (values
+        (
+          'contractor_work_draft_items',
+          'contractor_work_draft_items_touch_updated_at',
+          '3de2933c436d2ebe28376a48c3020cee'
+        ),
+        (
+          'contractor_work_drafts',
+          'contractor_work_drafts_touch_updated_at',
+          '7a2fa7374d52ad54df3583d26f3cc80c'
+        )
+      ) expected_trigger(table_name, trigger_name, definition_fingerprint)
+      left join pg_class relation
+        on relation.relnamespace = 'public'::regnamespace
+       and relation.relname = expected_trigger.table_name
+      left join pg_trigger trigger_row
+        on trigger_row.tgrelid = relation.oid
+       and trigger_row.tgname = expected_trigger.trigger_name
+       and not trigger_row.tgisinternal
+     where trigger_row.oid is null
+        or md5(pg_get_triggerdef(trigger_row.oid))
+          <> expected_trigger.definition_fingerprint
+  ) then
     raise exception 'Durable Draft foundation is incomplete or incompatible.';
   end if;
 
@@ -441,10 +301,38 @@ begin
   if exists (
     select 1
       from (values
-        ('servsync_get_work_draft', 'public.servsync_get_work_draft(uuid)', array['p_draft_id']::text[], 0),
-        ('servsync_save_work_draft', 'public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)', array['p_draft_id', 'p_metadata', 'p_items', 'p_removed_item_ids']::text[], 4),
-        ('servsync_launch_work_draft', 'public.servsync_launch_work_draft(uuid,text,uuid)', array['p_draft_id', 'p_intended_output', 'p_idempotency_key']::text[], 0)
-      ) expected_function(function_name, signature, argument_names, default_count)
+        (
+          'servsync_get_work_draft',
+          'public.servsync_get_work_draft(uuid)',
+          array['p_draft_id']::text[],
+          'p_draft_id uuid',
+          0,
+          'f190871fa6f487af7a184bf0fb8dec68'
+        ),
+        (
+          'servsync_save_work_draft',
+          'public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)',
+          array['p_draft_id', 'p_metadata', 'p_items', 'p_removed_item_ids']::text[],
+          'p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT ''{}''::jsonb, p_items jsonb DEFAULT ''[]''::jsonb, p_removed_item_ids jsonb DEFAULT ''[]''::jsonb',
+          4,
+          'e08673847bd290effbcbfc1504662a34'
+        ),
+        (
+          'servsync_launch_work_draft',
+          'public.servsync_launch_work_draft(uuid,text,uuid)',
+          array['p_draft_id', 'p_intended_output', 'p_idempotency_key']::text[],
+          'p_draft_id uuid, p_intended_output text, p_idempotency_key uuid',
+          0,
+          '7e90e0745825a583bcb7a304a9270b57'
+        )
+      ) expected_function(
+        function_name,
+        signature,
+        argument_names,
+        argument_definition,
+        default_count,
+        body_fingerprint
+      )
       left join pg_proc procedure_row on procedure_row.oid = to_regprocedure(expected_function.signature)
       left join pg_roles owner_role on owner_role.oid = procedure_row.proowner
       left join pg_language language_row on language_row.oid = procedure_row.prolang
@@ -461,18 +349,36 @@ begin
         or coalesce(procedure_row.proconfig, '{}'::text[]) <> array['search_path=public']::text[]
         or language_row.lanname <> 'plpgsql'
         or procedure_row.prorettype <> 'jsonb'::regtype
+        or procedure_row.prokind <> 'f'
+        or procedure_row.provolatile <> 'v'
+        or procedure_row.proparallel <> 'u'
+        or procedure_row.proisstrict
+        or procedure_row.proleakproof
         or procedure_row.proargnames is distinct from expected_function.argument_names
+        or pg_get_function_arguments(procedure_row.oid)
+          <> expected_function.argument_definition
         or procedure_row.pronargdefaults <> expected_function.default_count
+        or md5(procedure_row.prosrc) <> expected_function.body_fingerprint
         or has_function_privilege('public', procedure_row.oid, 'EXECUTE')
         or has_function_privilege('anon', procedure_row.oid, 'EXECUTE')
         or not has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')
+        or (
+          select count(*)
+            from aclexplode(coalesce(
+              procedure_row.proacl,
+              acldefault('f', procedure_row.proowner)
+            )) function_acl
+        ) <> 2
         or exists (
           select 1
             from aclexplode(coalesce(procedure_row.proacl, acldefault('f', procedure_row.proowner))) function_acl
            where function_acl.privilege_type = 'EXECUTE'
-             and function_acl.grantee not in (
-               procedure_row.proowner,
-               (select oid from pg_roles where rolname = 'authenticated')
+             and (
+               function_acl.grantee not in (
+                 procedure_row.proowner,
+                 (select oid from pg_roles where rolname = 'authenticated')
+               )
+               or function_acl.is_grantable
              )
         )
   ) then
@@ -498,6 +404,13 @@ begin
         or has_table_privilege('authenticated', relation.oid, 'TRIGGER')
         or has_table_privilege('public', relation.oid, 'SELECT')
         or has_table_privilege('anon', relation.oid, 'SELECT')
+        or (
+          select count(*)
+            from aclexplode(coalesce(
+              relation.relacl,
+              acldefault('r', relation.relowner)
+            )) table_acl
+        ) <> 8
         or exists (
           select 1
             from aclexplode(coalesce(relation.relacl, acldefault('r', relation.relowner))) table_acl
@@ -509,6 +422,7 @@ begin
                 table_acl.grantee = (select oid from pg_roles where rolname = 'authenticated')
                 and table_acl.privilege_type <> 'SELECT'
               )
+              or table_acl.is_grantable
         )
         or exists (
           select 1
@@ -551,6 +465,32 @@ begin
         or regexp_replace(pg_get_expr(policy_row.polqual, policy_row.polrelid), '\s+', '', 'g') <> expected_policy.policy_expression
   ) then
     raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+end;
+$$;
+
+-- Execute the one authoritative contract before any customer compatibility
+-- function or archive prerequisite can be installed. Transaction rollback
+-- removes this replacement too when the Draft catalog is incompatible.
+do $$
+declare
+  v_relation_count integer;
+begin
+  select count(*)
+    into v_relation_count
+    from (values
+      (to_regclass('public.contractor_work_drafts')),
+      (to_regclass('public.contractor_work_draft_items')),
+      (to_regclass('public.contractor_work_draft_launches'))
+    ) draft_relation(oid)
+   where oid is not null;
+
+  if v_relation_count not in (0, 3) then
+    raise exception 'Durable Draft foundation is incomplete or incompatible.';
+  end if;
+
+  if v_relation_count = 3 then
+    perform public.servsync_private_assert_canonical_customer_draft_foundation();
   end if;
 end;
 $$;

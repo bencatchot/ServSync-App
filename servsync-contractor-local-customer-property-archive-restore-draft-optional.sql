@@ -93,10 +93,25 @@ begin
   if exists (
     select 1
       from (values
-        ('servsync_private_assert_canonical_customer_draft_foundation', 'public.servsync_private_assert_canonical_customer_draft_foundation()', 'void'),
-        ('servsync_private_customer_draft_foundation_available', 'public.servsync_private_customer_draft_foundation_available()', 'boolean'),
-        ('servsync_private_local_customer_has_readable_work', 'public.servsync_private_local_customer_has_readable_work(uuid,uuid,uuid)', 'boolean')
-      ) expected_function(function_name, signature, return_type)
+        (
+          'servsync_private_assert_canonical_customer_draft_foundation',
+          'public.servsync_private_assert_canonical_customer_draft_foundation()',
+          'void',
+          '1eaee69de13819de76ee3ba31e5a06de'
+        ),
+        (
+          'servsync_private_customer_draft_foundation_available',
+          'public.servsync_private_customer_draft_foundation_available()',
+          'boolean',
+          'da99bd92dfb3f4e93245f7a637ae9438'
+        ),
+        (
+          'servsync_private_local_customer_has_readable_work',
+          'public.servsync_private_local_customer_has_readable_work(uuid,uuid,uuid)',
+          'boolean',
+          'b5cac7e2a656e06653cc26635e64da5b'
+        )
+      ) expected_function(function_name, signature, return_type, body_fingerprint)
       left join pg_proc procedure_row on procedure_row.oid = to_regprocedure(expected_function.signature)
       left join pg_roles owner_role on owner_role.oid = procedure_row.proowner
      where procedure_row.oid is null
@@ -111,14 +126,25 @@ begin
         or not procedure_row.prosecdef
         or coalesce(procedure_row.proconfig, '{}'::text[]) <> array['search_path=public']::text[]
         or procedure_row.prorettype <> expected_function.return_type::regtype
+        or md5(procedure_row.prosrc) <> expected_function.body_fingerprint
         or has_function_privilege('public', procedure_row.oid, 'EXECUTE')
         or has_function_privilege('anon', procedure_row.oid, 'EXECUTE')
         or has_function_privilege('authenticated', procedure_row.oid, 'EXECUTE')
+        or (
+          select count(*)
+            from aclexplode(coalesce(
+              procedure_row.proacl,
+              acldefault('f', procedure_row.proowner)
+            )) function_acl
+        ) <> 1
         or exists (
           select 1
             from aclexplode(coalesce(procedure_row.proacl, acldefault('f', procedure_row.proowner))) function_acl
            where function_acl.privilege_type = 'EXECUTE'
-             and function_acl.grantee <> procedure_row.proowner
+             and (
+               function_acl.grantee <> procedure_row.proowner
+               or function_acl.is_grantable
+             )
         )
   ) then
     raise exception 'Missing required contractor customer-management boundaries.';
