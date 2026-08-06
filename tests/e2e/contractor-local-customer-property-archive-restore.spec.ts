@@ -64,6 +64,17 @@ test.describe('contractor-local customer and property archive/restore v1', () =>
     expect(archiveImpactItems(impact)).toHaveLength(8);
     expect(() => normalizeLocalCustomerArchiveImpact({ ...impact, draft_count: -1 })).toThrow();
     expect(() => normalizeLocalCustomerArchiveImpact({ ...impact, draft_count: 1.5 })).toThrow();
+
+    expect(normalizeLocalCustomerArchiveImpact({
+      draft_count: 0,
+      job_count: 0,
+      estimate_count: 0,
+      unpaid_invoice_count: 0,
+      inspection_count: 0,
+      future_calendar_count: 0,
+      project_count: 0,
+      pending_invitation_count: 0,
+    }).projectCount).toBe(0);
   });
 
   test('archived and historical normalization retains safe labels without private fields', () => {
@@ -131,6 +142,41 @@ test.describe('contractor-local customer and property archive/restore v1', () =>
     expect(events).toContain('grant select on table public.contractor_local_customer_lifecycle_events to service_role;');
     expect(events).not.toMatch(/create\s+policy|grant\s+(?:insert|update|delete)/i);
     expect(events).toContain("array['token', 'claim_token', 'invite_token', 'phone', 'email', 'notes']");
+  });
+
+  test('project collaboration is optional, shape-gated, and contract-stable', () => {
+    const sql = source('servsync-contractor-local-customer-property-archive-restore.sql');
+    const preflight = sourceBetween(sql, 'declare\n  v_projects regclass', 'alter table public.contractor_local_contacts');
+    const projectIntegration = sourceBetween(sql, 'do $project_integration$', '-- Outputs derived from work');
+    const impact = sourceBetween(
+      sql,
+      'create or replace function public.servsync_get_local_customer_archive_impact',
+      'create or replace function public.servsync_archive_local_customer',
+    );
+    const historical = sourceBetween(
+      sql,
+      'create or replace function public.servsync_list_local_customer_historical_context()',
+      '-- Keep ordinary directory results active-only.',
+    );
+
+    expect(preflight).not.toContain("or to_regclass('public.projects') is null");
+    expect(preflight).toContain('if v_projects is not null and (');
+    expect(preflight).toContain("attribute.attname = 'original_creator_contractor_id'");
+    expect(preflight).toContain("constraint_row.conname = 'projects_local_home_id_fkey'");
+    expect(preflight).toContain("constraint_row.conname = 'projects_original_creator_contractor_id_fkey'");
+    expect(preflight).toContain("raise exception 'Project Collaboration foundation is incomplete or incompatible.'");
+
+    expect(projectIntegration).toContain("if to_regclass('public.projects') is not null then");
+    expect(projectIntegration).toContain('execute $project_function$');
+    expect(projectIntegration).toContain('execute $project_trigger$');
+    expect(projectIntegration).toContain('servsync_guard_local_project_assignment');
+
+    expect(impact).toContain('v_project_count bigint := 0;');
+    expect(impact).toContain("if to_regclass('public.projects') is not null then");
+    expect(impact).toContain("'project_count', v_project_count");
+    expect(historical).toContain("v_project_work jsonb := '[]'::jsonb;");
+    expect(historical).toContain("if to_regclass('public.projects') is not null then");
+    expect(historical).toContain('jsonb_to_recordset(v_project_work)');
   });
 
   test('lifecycle RPCs derive active manager context before tenant-scoped locks', () => {

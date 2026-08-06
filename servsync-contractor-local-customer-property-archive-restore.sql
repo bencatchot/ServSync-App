@@ -12,6 +12,8 @@
 begin;
 
 do $$
+declare
+  v_projects regclass := to_regclass('public.projects');
 begin
   if to_regclass('public.contractor_local_contacts') is null
      or to_regclass('public.contractor_local_homes') is null
@@ -25,9 +27,59 @@ begin
      or to_regclass('public.invoices') is null
      or to_regclass('public.contractor_visit_events') is null
      or to_regclass('public.contractor_calendar_events') is null
-     or to_regclass('public.contractor_calendar_event_job_links') is null
-     or to_regclass('public.projects') is null then
-    raise exception 'Missing required customer, claim, work, calendar, or project tables.';
+     or to_regclass('public.contractor_calendar_event_job_links') is null then
+    raise exception 'Missing required customer, claim, work, or calendar tables.';
+  end if;
+
+  -- Project Collaboration is optional, but a present table must be the complete
+  -- compatible foundation before any archive DDL is allowed to run.
+  if v_projects is not null and (
+    not exists (
+      select 1
+        from pg_class relation
+       where relation.oid = v_projects
+         and relation.relkind in ('r', 'p')
+    )
+    or (
+      select count(*)
+        from pg_attribute attribute
+       where attribute.attrelid = v_projects
+         and attribute.attnum > 0
+         and not attribute.attisdropped
+         and (
+           (attribute.attname = 'id' and attribute.atttypid = 'uuid'::regtype and attribute.attnotnull)
+           or (attribute.attname = 'local_home_id' and attribute.atttypid = 'uuid'::regtype and not attribute.attnotnull)
+           or (
+             attribute.attname = 'original_creator_contractor_id'
+             and attribute.atttypid = 'uuid'::regtype
+             and not attribute.attnotnull
+           )
+           or (attribute.attname = 'status' and attribute.atttypid = 'text'::regtype and attribute.attnotnull)
+         )
+    ) <> 4
+    or (
+      select count(*)
+        from pg_constraint constraint_row
+       where constraint_row.conrelid = v_projects
+         and (
+           (constraint_row.conname = 'projects_pkey' and constraint_row.contype = 'p')
+           or (constraint_row.conname = 'projects_status_check' and constraint_row.contype = 'c')
+           or (constraint_row.conname = 'projects_exactly_one_property_check' and constraint_row.contype = 'c')
+           or (constraint_row.conname = 'projects_original_creator_shape_check' and constraint_row.contype = 'c')
+           or (
+             constraint_row.conname = 'projects_local_home_id_fkey'
+             and constraint_row.contype = 'f'
+             and constraint_row.confrelid = 'public.contractor_local_homes'::regclass
+           )
+           or (
+             constraint_row.conname = 'projects_original_creator_contractor_id_fkey'
+             and constraint_row.contype = 'f'
+             and constraint_row.confrelid = 'public.contractor_profiles'::regclass
+           )
+         )
+    ) <> 6
+  ) then
+    raise exception 'Project Collaboration foundation is incomplete or incompatible.';
   end if;
 
   if to_regprocedure('public.servsync_current_contractor_profile()') is null
@@ -426,41 +478,51 @@ create trigger servsync_guard_local_visit_assignment
   before insert or update of contractor_id, inspection_id, local_contact_id on public.contractor_visit_events
   for each row execute function public.servsync_private_guard_local_visit_assignment();
 
--- Projects name the tenant column differently. Keep the generic trigger payload
--- stable without changing that existing schema.
-create or replace function public.servsync_private_guard_local_project_assignment()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
+-- Projects name the tenant column differently. Install this optional integration
+-- only when the compatible foundation passed the transaction preflight.
+do $project_integration$
 begin
-  if new.local_home_id is null then
-    return new;
-  end if;
+  if to_regclass('public.projects') is not null then
+    execute $project_function$
+      create or replace function public.servsync_private_guard_local_project_assignment()
+      returns trigger
+      language plpgsql
+      security definer
+      set search_path = public
+      as $body$
+      begin
+        if new.local_home_id is null then
+          return new;
+        end if;
 
-  if tg_op = 'UPDATE'
-     and new.original_creator_contractor_id is not distinct from old.original_creator_contractor_id
-     and new.local_home_id is not distinct from old.local_home_id then
-    return new;
-  end if;
+        if tg_op = 'UPDATE'
+           and new.original_creator_contractor_id is not distinct from old.original_creator_contractor_id
+           and new.local_home_id is not distinct from old.local_home_id then
+          return new;
+        end if;
 
-  perform public.servsync_private_assert_active_local_subject(
-    new.original_creator_contractor_id,
-    null,
-    new.local_home_id
-  );
-  return new;
+        perform public.servsync_private_assert_active_local_subject(
+          new.original_creator_contractor_id,
+          null,
+          new.local_home_id
+        );
+        return new;
+      end;
+      $body$
+    $project_function$;
+
+    alter function public.servsync_private_guard_local_project_assignment() owner to postgres;
+    revoke all on function public.servsync_private_guard_local_project_assignment() from public, anon, authenticated;
+
+    execute 'drop trigger if exists servsync_guard_local_project_assignment on public.projects';
+    execute $project_trigger$
+      create trigger servsync_guard_local_project_assignment
+        before insert or update of original_creator_contractor_id, local_home_id on public.projects
+        for each row execute function public.servsync_private_guard_local_project_assignment()
+    $project_trigger$;
+  end if;
 end;
-$$;
-
-alter function public.servsync_private_guard_local_project_assignment() owner to postgres;
-revoke all on function public.servsync_private_guard_local_project_assignment() from public, anon, authenticated;
-
-drop trigger if exists servsync_guard_local_project_assignment on public.projects;
-create trigger servsync_guard_local_project_assignment
-  before insert or update of original_creator_contractor_id, local_home_id on public.projects
-  for each row execute function public.servsync_private_guard_local_project_assignment();
+$project_integration$;
 
 -- Outputs derived from work that already existed at archive time remain
 -- operable. A deferred check can see the durable launch/link row written later
@@ -646,6 +708,7 @@ declare
   v_access_role text;
   v_contact_exists boolean := false;
   v_home_exists boolean := false;
+  v_project_count bigint := 0;
 begin
   select context.contractor_id, context.access_role
     into v_contractor_id, v_access_role
@@ -681,6 +744,20 @@ begin
     if not v_home_exists then
       raise insufficient_privilege using message = 'Local customer is unavailable.';
     end if;
+  end if;
+
+  if to_regclass('public.projects') is not null then
+    execute $project_count$
+      select count(*)
+        from public.projects project
+        join public.contractor_local_homes home on home.id = project.local_home_id
+       where project.original_creator_contractor_id = $1
+         and home.local_contact_id = $2
+         and ($3 is null or home.id = $3)
+         and project.status in ('active', 'paused')
+    $project_count$
+      into v_project_count
+      using v_contractor_id, p_local_contact_id, p_local_home_id;
   end if;
 
   return jsonb_build_object(
@@ -727,14 +804,7 @@ begin
          and event.starts_at >= now()
          and p_local_home_id is null
     ),
-    'project_count', (
-      select count(*) from public.projects project
-      join public.contractor_local_homes home on home.id = project.local_home_id
-       where project.original_creator_contractor_id = v_contractor_id
-         and home.local_contact_id = p_local_contact_id
-         and (p_local_home_id is null or home.id = p_local_home_id)
-         and project.status in ('active', 'paused')
-    ),
+    'project_count', v_project_count,
     'pending_invitation_count', (
       select count(distinct invite.id)
         from public.contractor_local_customer_claim_invites invite
@@ -1105,12 +1175,30 @@ declare
   v_contractor_id uuid;
   v_access_role text;
   v_result jsonb;
+  v_project_work jsonb := '[]'::jsonb;
 begin
   select context.contractor_id, context.access_role
     into v_contractor_id, v_access_role
     from public.servsync_private_local_customer_read_context() context;
   if v_contractor_id is null or v_access_role not in ('owner', 'admin', 'office', 'field_tech', 'viewer') then
     raise insufficient_privilege using message = 'Customer history is unavailable.';
+  end if;
+
+  if to_regclass('public.projects') is not null then
+    execute $project_history$
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'local_contact_id', home.local_contact_id,
+        'local_home_id', project.local_home_id
+      )), '[]'::jsonb)
+        from public.projects project
+        join public.contractor_local_homes home
+          on home.id = project.local_home_id
+         and home.contractor_id = project.original_creator_contractor_id
+       where project.original_creator_contractor_id = $1
+         and project.local_home_id is not null
+    $project_history$
+      into v_project_work
+      using v_contractor_id;
   end if;
 
   with work_contacts as (
@@ -1129,13 +1217,8 @@ begin
     select event.local_contact_id, null::uuid from public.contractor_calendar_events event
      where event.contractor_id = v_contractor_id and event.local_contact_id is not null
     union
-    select home.local_contact_id, project.local_home_id
-      from public.projects project
-      join public.contractor_local_homes home
-        on home.id = project.local_home_id
-       and home.contractor_id = project.original_creator_contractor_id
-     where project.original_creator_contractor_id = v_contractor_id
-       and project.local_home_id is not null
+    select project_work.local_contact_id, project_work.local_home_id
+      from jsonb_to_recordset(v_project_work) as project_work(local_contact_id uuid, local_home_id uuid)
   ), visible_contacts as (
     select distinct contact.*
       from public.contractor_local_contacts contact
