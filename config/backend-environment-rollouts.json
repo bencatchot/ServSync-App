@@ -110,6 +110,24 @@
           "reason": "The exact migration was applied for backend schema parity on 2026-08-07 at 18:40:29Z through 18:40:31Z. Catalog and preservation checks passed; no Resend credential was added and outbound Estimate email remains intentionally fail-closed."
         }
       }
+    },
+    {
+      "id": "finalized-report-external-email-delivery-v1",
+      "artifact": "servsync-finalized-report-external-email-delivery.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact corrected migration was applied on 2026-08-07; catalog, authenticated role, provider acceptance, one-PDF recipient scope, revocation, preservation, and cleanup checks passed."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07 at 20:18:38Z through 20:18:40Z. Catalog/security correspondence, preservation, and Production's existing sensitive server-only Resend runtime path were verified; provider acceptance is not inbox-receipt confirmation."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The exact migration was applied for backend schema parity on 2026-08-07 at 20:20:47Z through 20:20:49Z. Catalog and preservation checks passed; no Resend credential was added and outbound report email remains intentionally fail-closed."
+        }
+      }
     }
   ]
 }

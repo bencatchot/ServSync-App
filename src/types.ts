@@ -599,6 +599,44 @@ export interface RequestFreeEstimateDeliveryLookup {
   estimate?: RequestFreeEstimateDocument;
 }
 
+export type FinalizedReportDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
+export type FinalizedReportEmailDeliveryStatus = 'sending' | 'sent' | 'failed';
+
+export interface FinalizedReportEmailDeliveryAttempt {
+  id: string;
+  delivery_link_id: string;
+  recipient_email: string;
+  status: FinalizedReportEmailDeliveryStatus;
+  attempted_at: string;
+  sent_at: string | null;
+  failed_at: string | null;
+  failure_code: string | null;
+  attempted_by_name: string;
+}
+
+export interface FinalizedReportDeliveryLinkMetadata {
+  id: string;
+  state: FinalizedReportDeliveryLinkState;
+  created_at: string;
+  expires_at: string;
+  source_updated_at: string;
+  revoked_at: string | null;
+  first_opened_at: string | null;
+  last_opened_at: string | null;
+  open_count: number;
+  created_by_name: string;
+  revoked_by_name: string;
+  email_deliveries: FinalizedReportEmailDeliveryAttempt[];
+}
+
+export type RequestFreeFinalizedReportState = RequestFreeInvoiceDeliveryState;
+
+export interface RequestFreeFinalizedReportLookup {
+  state: RequestFreeFinalizedReportState;
+  pdf?: Blob;
+  fileName?: string;
+}
+
 export interface ExternalObjectMapping {
   id: string;
   provider: string;
