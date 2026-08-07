@@ -120,12 +120,12 @@
           "reason": "The exact corrected migration was applied on 2026-08-07; catalog, authenticated role, provider acceptance, one-PDF recipient scope, revocation, preservation, and cleanup checks passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Requires the separately authorized migration-first Production rollout and exact correspondence validation before source merge."
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07 at 20:18:38Z through 20:18:40Z. Catalog/security correspondence, preservation, and Production's existing sensitive server-only Resend runtime path were verified; provider acceptance is not inbox-receipt confirmation."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Requires the separately authorized schema-parity rollout; outbound report email should remain fail-closed without a Demo provider credential."
+          "status": "Applied",
+          "reason": "The exact migration was applied for backend schema parity on 2026-08-07 at 20:20:47Z through 20:20:49Z. Catalog and preservation checks passed; no Resend credential was added and outbound report email remains intentionally fail-closed."
         }
       }
     }
