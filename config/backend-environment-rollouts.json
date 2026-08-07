@@ -56,6 +56,24 @@
           "reason": "The exact migration was applied and catalog/preservation validation passed at 2026-08-07T09:01:50.151Z through 09:01:50.447Z before PR #387 merged."
         }
       }
+    },
+    {
+      "id": "sandbox-legacy-storage-policy-containment-v1",
+      "artifact": "servsync-sandbox-legacy-storage-policy-containment.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration removed only the two reviewed legacy photos/reports storage policies on 2026-08-07; RLS, ACLs, buckets, objects, all other policies, and Project Collaboration were preserved."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Neither legacy policy exists in Production; no SQL was applied."
+        },
+        "demo": {
+          "status": "N/A",
+          "reason": "Neither legacy policy exists in Demo; no SQL was applied."
+        }
+      }
     }
   ]
 }

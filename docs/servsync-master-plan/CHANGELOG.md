@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/sandbox-legacy-storage-policy-containment-v1`
+- Starting main SHA: `ffe76f2c6dcf8ee1b0776c86781f3de78269e5ef`
+- Files changed:
+  - `servsync-sandbox-legacy-storage-policy-containment.sql`
+  - `tests/e2e/sandbox-legacy-storage-policy-containment.spec.ts`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Adds and applies Sandbox Legacy Storage Policy Containment v1 through exact fail-closed migration `servsync-sandbox-legacy-storage-policy-containment.sql` (SHA-256 `65d5e708df5228d5bc3c77ca50bc2d44dc99467b04fe8ed57bc3eaa6e73ab090`). The migration requires the verified Sandbox storage owner, relation kind, enabled RLS, public bucket identities, and exact legacy policy definitions before dropping only `Photos storage: authenticated manage` and `Reports storage: authenticated manage`. The exact live policy names do not occur in repository history; archived initial-foundation SQL contains predecessor broad bucket access, so the live definitions are treated as untracked legacy Sandbox setup rather than supported product policy.
+- Caller and security review: Current application/server source has no `photos` or `reports` bucket caller, and the two stored photo paths have no canonical database reference in current media, document, inspection, homeowner-photo, or contractor-post records. Before containment, authenticated role simulation could read both `photos` rows. After containment, authenticated reads returned zero, updates affected zero rows, and a tagged insert failed under RLS with zero residue. Production and Demo did not contain either policy and were untouched. No replacement broad policy was added.
+- Sandbox preservation: `storage.objects` remains owned by `supabase_storage_admin` with RLS enabled and forced RLS disabled. Policy count changed only from 22 to 20, and the final remaining-policy fingerprint exactly matched the pre-change fingerprint with the two target policies excluded. Table and column ACL fingerprints were unchanged. The `photos` and `reports` buckets remain public with unchanged metadata; the two existing `photos` object IDs and full row fingerprint were unchanged, while `reports` remained empty. No bucket or object was created, moved, modified, or deleted, and Project Collaboration remained the exact approved 297-object experiment.
+- Validation and parity: Focused containment checks passed 4/4, TypeScript and the Production build passed, and live catalog/role/preservation checks passed. The existing broader authenticated storage-media suite could not start because its stored homeowner credential is no longer valid; no claim is made that this suite reran. Supported bucket callers and all non-target storage policies remained byte/logically unchanged. Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with the exact 129-object scenario group. Production versus Sandbox remains `FAIL`, but the unexplained count fell from 24 to 22 and neither legacy storage policy remains; missing Stripe/schema/function/grant and differing policy/function findings stay visible.
+- Scope boundary: Both legacy buckets remain public, so removal of authenticated RLS management access does not make existing public object URLs private. Retention or migration of the two unreferenced photo objects, broader bucket disposition, Stripe/schema/function reconciliation, and Project Collaboration remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 records the completed bounded Sandbox policy containment while retaining public-object disposition, broader Sandbox reconciliation, and public-launch operational work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the narrowed Sandbox security posture and accurate remaining parity count without claiming full Sandbox alignment.
+
 - Branch: `codex/pr387-rollout-doc-closeout`
 - Starting main SHA: `20e1b04adafaa5f5919a43b6d9fc9f4ede4cc74d`
 - Files changed:
