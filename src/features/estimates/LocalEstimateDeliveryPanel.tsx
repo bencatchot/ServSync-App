@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Copy, Link2, RefreshCw, ShieldX, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy, Link2, Mail, RefreshCw, Send, ShieldX, X } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requestFreeLocalEstimateUrl } from '../../appLinks';
 import type {
@@ -13,6 +13,7 @@ import {
   listLocalEstimateDeliveryLinks,
   revokeLocalEstimateDeliveryLink,
   rotateLocalEstimateDeliveryLink,
+  sendLocalEstimateEmail,
 } from './requestFreeEstimateDelivery';
 
 function readableError(error: unknown, fallback: string) {
@@ -38,6 +39,12 @@ function stateLabel(state: LocalEstimateDeliveryLinkMetadata['state']) {
   if (state === 'expired') return 'Expired';
   if (state === 'replaced') return 'Replaced';
   return 'Revoked';
+}
+
+function emailStatusLabel(status: 'sending' | 'sent' | 'failed') {
+  if (status === 'sent') return 'Sent';
+  if (status === 'failed') return 'Failed';
+  return 'Sending';
 }
 
 function OneTimeEstimateLinkDialog({ url, copiedInitially, returnFocusTarget, onClose }: {
@@ -157,8 +164,9 @@ export function LocalEstimateDeliveryPanel({
   const [expanded, setExpanded] = useState(false);
   const [links, setLinks] = useState<LocalEstimateDeliveryLinkMetadata[]>([]);
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState<'create' | 'rotate' | 'revoke' | null>(null);
+  const [busy, setBusy] = useState<'create' | 'rotate' | 'revoke' | 'send' | null>(null);
   const [expiresDays, setExpiresDays] = useState(30);
+  const [recipientEmail, setRecipientEmail] = useState(localContact.email ?? '');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [oneTimeUrl, setOneTimeUrl] = useState('');
@@ -194,10 +202,11 @@ export function LocalEstimateDeliveryPanel({
     setLinks([]);
     setLoading(false);
     setBusy(null);
+    setRecipientEmail(localContact.email ?? '');
     setError('');
     setNotice('');
     clearOneTimeUrl();
-  }, [clearOneTimeUrl, contextKey]);
+  }, [clearOneTimeUrl, contextKey, localContact.email]);
 
   const load = useCallback(async () => {
     const requestId = ++historyRequestRef.current;
@@ -323,12 +332,45 @@ export function LocalEstimateDeliveryPanel({
     }
   };
 
+  const sendEmail = async () => {
+    if (busyRef.current) return;
+    const requestId = ++actionRequestRef.current;
+    const requestContext = contextKey;
+    const isCurrent = () => mountedRef.current && actionRequestRef.current === requestId && contextKeyRef.current === requestContext;
+    busyRef.current = true;
+    setBusy('send');
+    setError('');
+    setNotice('');
+    try {
+      const attempt = await sendLocalEstimateEmail(client, estimate.id, recipientEmail, expiresDays);
+      if (!isCurrent()) return;
+      await load();
+      if (isCurrent()) {
+        setNotice(`Estimate sent to ${attempt.recipient_email}. A fresh secure link replaced any earlier account-free link.`);
+        await onEstimateChanged();
+      }
+    } catch (err) {
+      if (isCurrent()) {
+        const message = readableError(err, 'The Estimate email could not be sent. No successful send was recorded.');
+        await load();
+        if (isCurrent()) setError(message);
+      }
+    } finally {
+      if (actionRequestRef.current === requestId) {
+        busyRef.current = false;
+        if (isCurrent()) setBusy(null);
+      }
+    }
+  };
+
   const claimed = Boolean(localContact.homeowner_user_id || localContact.claimed_at);
   const hasLineItems = (estimate.line_items?.length ?? 0) > 0;
   const expirationValid = Number.isInteger(expiresDays) && expiresDays >= 1 && expiresDays <= 90;
+  const recipientEmailValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipientEmail.trim()) && recipientEmail.trim().length <= 254;
   const canPublishStatus = estimate.status === 'draft' || estimate.status === 'sent' || estimate.status === 'revised';
   const canCreate = canManage && !disabledReason && !claimed && hasLineItems && canPublishStatus && !activeLink;
   const canRotate = canManage && !disabledReason && !claimed && hasLineItems && canPublishStatus && Boolean(activeLink);
+  const canSend = canManage && !disabledReason && !claimed && hasLineItems && canPublishStatus;
 
   return (
     <div className="mt-3 rounded-lg border border-[#D8DEE8] bg-[#F8FAFD]" data-testid="local-estimate-delivery-panel">
@@ -339,14 +381,14 @@ export function LocalEstimateDeliveryPanel({
         aria-expanded={expanded}
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-semibold text-[#223D67]"
       >
-        <span className="flex items-center gap-2"><Link2 size={16} /> Secure Estimate link</span>
+        <span className="flex items-center gap-2"><Mail size={16} /> Estimate delivery</span>
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
 
       {expanded && (
         <div className="space-y-4 border-t border-[#D8DEE8] p-3">
           <p className="text-xs leading-5 text-[#526784]">
-            Publish a document-specific, read-only snapshot for this Customer. The link does not grant account access or record acceptance, approval, signature, or payment.
+            Send or copy a document-specific, read-only Estimate for this Customer. Delivery does not grant account access or record acceptance, approval, signature, or payment.
           </p>
           {loading ? <p className="text-sm text-[#526784]">Loading secure-link history...</p> : (
             <>
@@ -360,6 +402,19 @@ export function LocalEstimateDeliveryPanel({
                       </div>
                       <p className="mt-1">Snapshot {dateTime(link.source_updated_at)} · Created {dateTime(link.created_at)}{link.created_by_name ? ` by ${link.created_by_name}` : ''}</p>
                       <p className="mt-1">Opened {link.open_count} time{link.open_count === 1 ? '' : 's'} · First {dateTime(link.first_opened_at)} · Latest {dateTime(link.last_opened_at)}</p>
+                      {(link.email_deliveries ?? []).map(delivery => (
+                        <div key={delivery.id} className="mt-2 border-t border-slate-100 pt-2" data-testid="local-estimate-email-delivery-history-item">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className={`font-semibold ${delivery.status === 'sent' ? 'text-emerald-700' : delivery.status === 'failed' ? 'text-red-700' : 'text-amber-700'}`}>
+                              Email {emailStatusLabel(delivery.status)}
+                            </span>
+                            <span>{dateTime(delivery.sent_at ?? delivery.failed_at ?? delivery.attempted_at)}</span>
+                          </div>
+                          <p className="mt-1 break-all">To {delivery.recipient_email}{delivery.attempted_by_name ? ` · by ${delivery.attempted_by_name}` : ''}</p>
+                          {delivery.status === 'failed' && <p className="mt-1 text-red-700">The provider did not confirm this send. Check the address and retry.</p>}
+                          {delivery.status === 'sending' && <p className="mt-1 text-amber-700">ServSync is waiting for a confirmed provider result.</p>}
+                        </div>
+                      ))}
                       {link.revoked_at && <p className="mt-1">Ended {dateTime(link.revoked_at)}{link.revoked_by_name ? ` by ${link.revoked_by_name}` : ''}</p>}
                     </div>
                   ))}
@@ -371,6 +426,37 @@ export function LocalEstimateDeliveryPanel({
               {disabledReason && <p className="text-xs font-semibold text-amber-800">{disabledReason}</p>}
               {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</p>}
               {notice && <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{notice}</p>}
+
+              {canSend && (
+                <div className="space-y-3 rounded-md border border-slate-200 bg-white p-3" data-testid="local-estimate-email-send-form">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Mail size={16} /> Send Estimate</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">Confirm the address for this delivery. Editing it here does not change the Customer profile.</p>
+                  </div>
+                  <label htmlFor={`local-estimate-recipient-${estimate.id}`} className="block text-xs font-semibold text-slate-700">
+                    Recipient email
+                    <input
+                      id={`local-estimate-recipient-${estimate.id}`}
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={recipientEmail}
+                      onChange={event => setRecipientEmail(event.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                      placeholder="customer@example.com"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void sendEmail()}
+                    disabled={Boolean(busy) || !expirationValid || !recipientEmailValid}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+                  >
+                    <Send size={16} /> {busy === 'send' ? 'Sending...' : (links.some(link => (link.email_deliveries ?? []).length > 0) ? 'Resend Estimate' : 'Send Estimate')}
+                  </button>
+                  <p className="text-xs leading-5 text-slate-500">Each send publishes a fresh snapshot and invalidates the previous account-free link. The recipient receives view-only access to this Estimate.</p>
+                </div>
+              )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                 {(canCreate || canRotate) && (
@@ -390,7 +476,7 @@ export function LocalEstimateDeliveryPanel({
                 )}
                 {canCreate && (
                   <button type="button" onClick={() => void create()} disabled={Boolean(busy) || !expirationValid} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                    <Link2 size={16} /> {busy === 'create' ? 'Creating...' : estimate.status === 'draft' ? 'Issue Estimate & create link' : 'Create snapshot link'}
+                    <Link2 size={16} /> {busy === 'create' ? 'Creating...' : estimate.status === 'draft' ? 'Issue Estimate & copy link' : 'Create copyable link'}
                   </button>
                 )}
                 {canRotate && (

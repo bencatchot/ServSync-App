@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/secure-estimate-email-delivery-v1`
+- Starting main SHA: `5104f8baec2b370dacf298c66c5b95d506bea2fc`
+- Files changed:
+  - `api/send-local-estimate-email.ts`
+  - `servsync-secure-estimate-email-delivery.sql`
+  - `src/features/estimates/LocalEstimateDeliveryPanel.tsx`
+  - `src/features/estimates/requestFreeEstimateDelivery.ts`
+  - `src/types.ts`
+  - `tests/e2e/secure-estimate-email-delivery.spec.ts`
+  - `tests/e2e/secure-estimate-email-delivery-sandbox.spec.ts`
+  - `config/backend-environment-rollouts.json`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Secure Estimate Email Delivery v1 on the existing request-free Estimate boundary. Authorized Owner, active Admin, and active Office users can confirm a delivery-specific recipient address, send or resend one eligible Not connected Customer Estimate, see `Sending`, `Sent`, or `Failed` history, and retry without changing the Customer profile email. Every attempt publishes a fresh immutable snapshot and replaces the prior account-free link; Connected Customer delivery and authenticated approval behavior remain unchanged.
+- Security architecture: A same-origin server route derives user and tenant authority through the authenticated preparation RPC, builds one branded allowlisted message, and sends it through the repository's existing Resend pattern with a non-`VITE_` provider credential. Raw bearers are present only in the outbound secure link and are never returned to the UI or persisted. Private forced-RLS attempt storage has no browser or service-role table access; history exposes only recipient, safe status/timestamps/failure code, and actor name. Provider results are finalized only by a service-role RPC. Per-Estimate cooldown and contractor daily limits reduce relay abuse, and claimed, mapped, archived, inactive, foreign-tenant, Field Technician, and Viewer cases remain denied.
+- Sandbox rollout and validation: Exact migration `servsync-secure-estimate-email-delivery.sql` (SHA-256 `73705106b0e747b8bcd581394da6b43e05787d665869d2cf5e402d22e5e20949`) was applied transactionally to Sandbox `zpzdkoaubyjtsomccxya`. Catalog checks confirmed postgres ownership, fixed `search_path=public`, intended `SECURITY DEFINER`/invoker state, one expected overload, authenticated-only preparation, service-role-only result recording, private-helper denial, forced RLS, no policies, no browser/service-role table or column grants, and the immutable validation trigger. Authenticated Admin and Office preparation passed; Field Technician, Viewer, and cross-tenant callers were denied. One provider request was accepted by Resend for the approved disposable recipient, sanitized `Sent` history was recorded, document-scoped recipient bootstrap and rotation invalidation passed, and no raw bearer or provider identifier appeared in ordinary history.
+- Preservation and cleanup: Sandbox profiles 19, contractors 6, memberships 5, local contacts 299, local homes 320, and Estimates 138 plus all captured identifier digests matched the pre-application baseline. Temporary customers, properties, Estimates, line items, links, sessions, and email attempts were removed; final links, sessions, and email attempts were zero. No Production or Demo SQL, data, provider configuration, feature flag, entitlement, or deployment changed.
+- Rollout boundary: Production and Demo migration application remain pending. The Production and Demo Vercel projects do not currently expose the required `RESEND_API_KEY`; provider configuration is an explicit owner-controlled rollout prerequisite. No fake-success fallback is included. SMS, finalized-report delivery, anonymous PDF download, Estimate acceptance/acknowledgment, signatures, payments, replies, Service Plans, and broader guest access remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003B now records Sandbox-validated direct Estimate email delivery while retaining the remaining channels, documents, guest actions, and Production rollout as active work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the delivery-specific recipient override, secure provider boundary, validation evidence, and precise operational rollout dependency.
+
 - Branch: `codex/not-connected-customer-capability-parity-v1`
 - Starting main SHA: `be673a12a7fa51c0d2b24d86444a2b2755b19005`
 - Files changed:
