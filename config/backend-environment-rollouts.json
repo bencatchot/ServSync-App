@@ -102,12 +102,12 @@
           "reason": "The exact migration was applied on 2026-08-07; authenticated role, provider, recipient-scope, rotation, catalog, preservation, and cleanup checks passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Requires migration-first rollout and owner-controlled server-side Resend configuration before direct email delivery can operate."
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07 at 18:39:48Z through 18:39:50Z. Catalog and preservation checks passed, the approved Resend credential was added as a sensitive Production-only server variable, and a disposable Owner/provider/rotation/revocation smoke passed with complete cleanup."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Requires schema-parity migration; no provider credential or operational email enablement is claimed."
+          "status": "Applied",
+          "reason": "The exact migration was applied for backend schema parity on 2026-08-07 at 18:40:29Z through 18:40:31Z. Catalog and preservation checks passed; no Resend credential was added and outbound Estimate email remains intentionally fail-closed."
         }
       }
     }
