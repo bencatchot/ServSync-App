@@ -38,6 +38,7 @@ SQL_FILES=(
   "servsync-permanent-referral.sql"
   "servsync-referrals-v1.sql"
   "servsync-referral-attribution.sql"
+  "servsync-public-signup-role-hardening.sql"
   "servsync-fix-invite-code-gen.sql"
   "servsync-preserve-original-connection-source.sql"
   "servsync-invite-reward-tracking.sql"

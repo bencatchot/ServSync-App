@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-06",
+  "updatedOn": "2026-08-07",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -36,6 +36,24 @@
         "demo": {
           "status": "N/A",
           "reason": "No database migration."
+        }
+      }
+    },
+    {
+      "id": "public-signup-role-hardening-v1",
+      "artifact": "servsync-public-signup-role-hardening.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The corrected exact migration was applied and authenticated security/referral validation passed on 2026-08-07; Production and Demo remain pending."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "The current signup trigger requires the approved security reconciliation after Sandbox validation and independent review."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo must receive the same approved security reconciliation as Production; it must not remain intentionally behind."
         }
       }
     }
