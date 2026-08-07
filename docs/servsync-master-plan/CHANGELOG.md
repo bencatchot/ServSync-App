@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/not-connected-customer-capability-parity-v1`
+- Starting main SHA: `be673a12a7fa51c0d2b24d86444a2b2755b19005`
+- Files changed:
+  - `api/request-free-local-estimate-delivery.ts`
+  - `servsync-request-free-local-estimate-delivery.sql`
+  - `src/App.tsx`
+  - `src/appLinks.ts`
+  - `src/main.tsx`
+  - `src/types.ts`
+  - `src/features/estimates/LocalEstimateDeliveryPanel.tsx`
+  - `src/features/estimates/RequestFreeEstimateView.tsx`
+  - `src/features/estimates/requestFreeEstimateDelivery.ts`
+  - `tests/e2e/request-free-local-estimate-delivery.spec.ts`
+  - `tests/e2e/request-free-local-invoice-delivery.spec.ts`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Not-Connected Customer Capability Parity v1 as the first bounded Estimate-delivery slice. Authorized contractor Owner, active Admin, and active Office users can publish an immutable customer-facing snapshot for an eligible saved Estimate belonging to an unclaimed, unmapped, active Not connected Customer and property, then copy, rotate, or revoke one expiring recipient-specific link. The Connected Customer send/review/approval path is unchanged. The recipient receives only the specific Estimate snapshot and no customer contact fields, contractor-private customer/property notes, tokens, session identifiers, broader history, approval, signature, payment, or mutation authority.
+- Security architecture: The raw 256-bit bearer is returned once and only SHA-256 digests are persisted. A same-origin gateway reuses the existing provisioned request-free delivery Firewall boundary, exchanges the bearer for a fixed 30-minute `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` session, and uses only non-`VITE_` server credentials. Three private forced-RLS tables have no PUBLIC, anon, authenticated, or service-role table access. Management RPCs derive contractor context from the authenticated session; gateway RPCs are service-role-only; private helpers are postgres-only. Rotation, revocation, expiration, claim/link/archive transitions, inactive contractors, foreign tenants, and malformed identifiers fail closed.
+- Sandbox rollout and validation: Exact migration `servsync-request-free-local-estimate-delivery.sql` (SHA-256 `016a532e5b0db0ea48966a04091a741806406e1d32601b11885474547c2b29ad`) was applied transactionally to Sandbox `zpzdkoaubyjtsomccxya` after the `2026-08-07T14:59:18Z` baseline. All 12 functions and three private tables matched the intended ownership, `SECURITY DEFINER`/invoker, fixed `search_path=public`, overload, grant, forced-RLS, ACL, and trigger posture. Authenticated Owner/Admin/Office management passed; Field Technician, Viewer, inactive, cross-tenant, homeowner, and anonymous callers were denied. Direct Owner and anonymous table reads were denied 3/3 each. Recipient bootstrap/session, snapshot allowlist, rotation, revocation, and session invalidation passed. Contacts 299, homes 320, Estimates 138, line items 317, schedules 3, claim invitations 13, and all captured identifier digests were restored exactly; delivery rows and tagged fixtures returned to zero.
+- Validation: TypeScript and the Production build passed. The focused Estimate delivery suite passed 11/11, and combined Estimate plus established request-free Invoice delivery coverage passed 67/67. Disposable PostgreSQL 16 install and functional checks passed, including immutable snapshot content, sent-state publication, role denial, one-active-link rotation, and no legacy private line detail. Desktop and 390x844 recipient rendering passed without overflow. Production and Demo were untouched; exact-head Preview and normal PR checks remain the final source-side gates.
+- Scope boundary: This slice provides contractor-controlled secure Estimate delivery for Not connected Customers. It does not add Estimate acceptance, acknowledgment, signatures, payments, email/SMS providers, anonymous PDF download, report delivery, a guest portal, Service Plan delivery, or any change to Connected Customer authentication, Home History, approvals, notifications, claims, sharing, or property authority. Production and Demo rollout remain pending.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003B now records Sandbox-validated secure Estimate snapshot delivery while keeping provider delivery, reports, PDFs, guest actions, payments, and Service Plan parity active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the bounded Not connected Estimate-delivery capability and its security/identity boundary without claiming complete Connected/Not connected parity.
+
 - Branch: `codex/sandbox-legacy-storage-policy-containment-v1`
 - Starting main SHA: `ffe76f2c6dcf8ee1b0776c86781f3de78269e5ef`
 - Files changed:

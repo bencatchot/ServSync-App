@@ -74,6 +74,24 @@
           "reason": "Neither legacy policy exists in Demo; no SQL was applied."
         }
       }
+    },
+    {
+      "id": "not-connected-customer-estimate-delivery-v1",
+      "artifact": "servsync-request-free-local-estimate-delivery.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied and authenticated role, recipient-session, revocation, catalog, and preservation validation passed on 2026-08-07."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Requires separate controlled Production migration-first rollout authorization after PR review."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "No Demo SQL was authorized; keep the feature unsupported until separately rolled out with its server-side gateway prerequisites."
+        }
+      }
     }
   ]
 }
