@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/secure-estimate-acceptance-v1`
+- Starting main SHA: `2bff413187544459d2065a7ac4d47f32bd9c1445`
+- Files changed:
+  - `api/request-free-local-estimate-delivery.ts`
+  - `servsync-secure-guest-estimate-acceptance.sql`
+  - `src/types.ts`
+  - `src/features/estimates/LocalEstimateDeliveryPanel.tsx`
+  - `src/features/estimates/RequestFreeEstimateView.tsx`
+  - `src/features/estimates/requestFreeEstimateDelivery.ts`
+  - `tests/e2e/request-free-local-estimate-delivery.spec.ts`
+  - `tests/e2e/secure-guest-estimate-acceptance.spec.ts`
+  - `tests/e2e/secure-guest-estimate-acceptance-sandbox.spec.ts`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Secure Estimate Acceptance for Not Connected Customers v1 on the existing request-free Estimate session. An eligible recipient can explicitly accept the exact delivered Estimate without creating a ServSync account. The canonical Estimate lifecycle moves from `sent` to `accepted`, while a separate durable event records that the source was `secure_guest`, the accepted delivery/version timestamp, recipient email when present, and acceptance time. Contractor delivery history presents that channel and version without security internals. Connected Customer authenticated approval and the manual accepted-Estimate-to-Job workflow remain unchanged.
+- Integrity and security architecture: The service gateway sends only the digest of the existing protected recipient cookie to two service-role-only RPCs. Acceptance locks the Customer, property, Estimate, link, and session plus the mutable line/schedule snapshot inputs; rebuilds the canonical allowlisted snapshot; and requires exact JSON plus source timestamp correspondence before committing. One unique event per Estimate/link, advisory serialization, row/table locks, and transactional status/event/activity writes make duplicate, replay, and concurrent requests deterministic. Expired, revoked, rotated, stale, connected, claimed, mapped, archived, inactive, malformed, and cross-tenant contexts fail closed. The private forced-RLS event table has no policies or non-owner table/column grants. No raw bearer, session secret, snapshot hash, provider identifier, or broader Customer/property history reaches ordinary recipient or contractor APIs. Secure guest acceptance is not represented as verified identity or an electronic signature.
+- Sandbox rollout and validation: Exact migration `servsync-secure-guest-estimate-acceptance.sql` (SHA-256 `a81a5f3b98c90a94ba36b1dab2e5a7e0ab7b9e756f783275e5a2ef4045a439b7`) was applied transactionally to Sandbox `zpzdkoaubyjtsomccxya` at `2026-08-07T21:41:36Z` through `21:41:37Z`. Catalog verification found one postgres-owned forced-RLS/no-policy acceptance table, zero non-owner table/column grants, six expected functions with fixed `search_path=public`, the intended definer/invoker posture, one overload for each service RPC, service-role-only lookup/accept execution, one immutable-update trigger, six indexes, and 12 validated constraints. Authenticated Sandbox validation proved two simultaneous accepts converge on one event, duplicate replay is idempotent, stale line-item changes leave the Estimate `sent`, rotated/revoked sessions fail closed, every tested authenticated role lacks direct guest-accept execution, the recipient remains document-scoped, sanitized contractor history identifies the secure guest channel, and the accepted Estimate still creates a Job only through the existing explicit contractor action.
+- Preservation and rollout status: Sandbox profiles 19, contractors 6, memberships 5, local contacts 299, local homes 320, Estimates 138, lines 317, schedules 3, and workflow events 21 plus captured identifier/status digests returned exactly to baseline. Links, sessions, email attempts, acceptances, tagged records, and recent fixture token-rate rows returned to zero. The same exact migration was then applied transactionally to Production `uqgtheclhxqlnjpfmheq` at `2026-08-07T22:23:08Z` through `22:23:10Z` and Demo `bdytwgejqnlblhrnqxkp` at `2026-08-07T22:23:49Z` through `22:23:51Z`. Both deployments matched all six Sandbox function fingerprints and the postgres-owned, forced-RLS/no-policy table shape with zero browser table/column grants, 12 validated constraints, six indexes, and one immutable-update trigger. Production and Demo counts and identifier/status digests for profiles, Customers, properties, Estimates, line items, schedules, links, sessions, email attempts, and workflow events remained exactly at their captured baselines; acceptance rows remained zero. Production validation intentionally used exact catalog/security correspondence plus the completed Sandbox mutation/concurrency evidence rather than creating live business fixtures. No provider credential, environment variable, feature flag, entitlement, membership, Customer identity, or unrelated business record changed.
+- Validation: TypeScript passed. Focused request-free Estimate and secure acceptance source/gateway/UI coverage passed 20/20 at desktop and 390x844 mobile with no overflow, console errors, request failures, token persistence, or unsafe response shape. The gated authenticated Sandbox suite passed 4/4, including concurrency, stale snapshot, rotation/revocation, direct-role denial, Job handoff, an acceptance-versus-rotation race, and exact cleanup.
+- Remaining boundary: The migration-first Sandbox, Production, and Demo rollout is complete; normal PR merge and automatic source deployment remain. Electronic signatures, stronger identity verification, payments/deposits, replies, SMS, decline/negotiation, report acknowledgment, broader guest actions, Service Plans, and complete anonymous Customer portals remain separate product work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003B records Sandbox-validated exact-snapshot secure guest Estimate acceptance and keeps the remaining recipient actions and stronger identity/payment channels active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the distinct authenticated-versus-secure-guest acceptance model, canonical lifecycle convergence, integrity boundary, rollout state, and precise exclusions.
+
 - Branch: `codex/finalized-report-external-email-delivery-v1`
 - Starting main SHA: `50108e6985b4e54faf20109b5ce8df95947ea2d8`
 - Files changed:

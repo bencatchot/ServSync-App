@@ -388,7 +388,7 @@ export function LocalEstimateDeliveryPanel({
       {expanded && (
         <div className="space-y-4 border-t border-[#D8DEE8] p-3">
           <p className="text-xs leading-5 text-[#526784]">
-            Send or copy a document-specific, read-only Estimate for this Customer. Delivery does not grant account access or record acceptance, approval, signature, or payment.
+            Send or copy a document-specific Estimate for this Customer. The recipient can review and explicitly accept the exact delivered version without account access; this is not an electronic signature or payment.
           </p>
           {loading ? <p className="text-sm text-[#526784]">Loading secure-link history...</p> : (
             <>
@@ -415,6 +415,15 @@ export function LocalEstimateDeliveryPanel({
                           {delivery.status === 'sending' && <p className="mt-1 text-amber-700">ServSync is waiting for a confirmed provider result.</p>}
                         </div>
                       ))}
+                      {link.acceptance?.state === 'accepted' && (
+                        <div className="mt-2 border-t border-emerald-100 pt-2 text-emerald-800" data-testid="local-estimate-guest-acceptance-history">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold">Accepted through secure guest delivery</span>
+                            <span>{dateTime(link.acceptance.accepted_at)}</span>
+                          </div>
+                          <p className="mt-1">Accepted snapshot {dateTime(link.acceptance.source_updated_at)}{link.acceptance.recipient_email ? ` · Recipient ${link.acceptance.recipient_email}` : ''}</p>
+                        </div>
+                      )}
                       {link.revoked_at && <p className="mt-1">Ended {dateTime(link.revoked_at)}{link.revoked_by_name ? ` by ${link.revoked_by_name}` : ''}</p>}
                     </div>
                   ))}

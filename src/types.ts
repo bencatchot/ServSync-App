@@ -540,7 +540,18 @@ export interface LocalEstimateDeliveryLinkMetadata {
   created_by_name: string;
   revoked_by_name: string;
   email_deliveries: LocalEstimateEmailDeliveryAttempt[];
+  acceptance: LocalEstimateAcceptanceMetadata;
 }
+
+export type LocalEstimateAcceptanceMetadata =
+  | { state: 'not_accepted' }
+  | {
+      state: 'accepted';
+      channel: 'secure_guest';
+      accepted_at: string;
+      source_updated_at: string;
+      recipient_email: string | null;
+    };
 
 export type RequestFreeEstimateDeliveryState = RequestFreeInvoiceDeliveryState;
 
@@ -597,7 +608,12 @@ export interface RequestFreeEstimateDocument {
 export interface RequestFreeEstimateDeliveryLookup {
   state: RequestFreeEstimateDeliveryState;
   estimate?: RequestFreeEstimateDocument;
+  acceptance?: RequestFreeEstimateAcceptanceState;
 }
+
+export type RequestFreeEstimateAcceptanceState =
+  | { state: 'eligible' | 'stale' | 'ineligible' }
+  | { state: 'accepted'; accepted_at: string };
 
 export type FinalizedReportDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
 export type FinalizedReportEmailDeliveryStatus = 'sending' | 'sent' | 'failed';
