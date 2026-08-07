@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
+  LocalEstimateEmailDeliveryAttempt,
   LocalEstimateDeliveryLinkMetadata,
   RequestFreeEstimateDeliveryLookup,
 } from '../../types';
@@ -64,6 +65,48 @@ export async function revokeLocalEstimateDeliveryLink(client: SupabaseClient, li
   });
   if (error) throw error;
   return requireResult<LocalEstimateDeliveryLinkMetadata>(data, 'ServSync did not confirm the Estimate-link revocation.');
+}
+
+export async function sendLocalEstimateEmail(
+  client: SupabaseClient,
+  estimateId: string,
+  recipientEmail: string,
+  expiresDays: number,
+) {
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (sessionError || !accessToken) throw new Error('Sign in again before sending this Estimate.');
+
+  const response = await fetch('/api/send-local-estimate-email', {
+    method: 'POST',
+    cache: 'no-store',
+    credentials: 'same-origin',
+    referrerPolicy: 'same-origin',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      estimate_id: estimateId,
+      recipient_email: recipientEmail,
+      expires_days: expiresDays,
+    }),
+  });
+
+  const result: unknown = await response.json().catch(() => null);
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    throw new Error('ServSync could not confirm the Estimate email result.');
+  }
+  const record = result as Record<string, unknown>;
+  if (response.ok && record.status === 'sent' && record.attempt && typeof record.attempt === 'object') {
+    return record.attempt as LocalEstimateEmailDeliveryAttempt;
+  }
+  if (record.status === 'sending') {
+    throw new Error('The email provider may have accepted this Estimate, but ServSync could not confirm the result. Check delivery history before retrying.');
+  }
+  if (record.reason === 'invalid_request') throw new Error('Enter a valid recipient email and expiration.');
+  if (record.reason === 'delivery_unavailable') throw new Error('Estimate email delivery is unavailable. No successful send was recorded.');
+  throw new Error('The Estimate email could not be sent. You can retry after checking the recipient address.');
 }
 
 export async function lookupRequestFreeEstimate(

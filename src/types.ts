@@ -513,6 +513,20 @@ export interface RequestFreeInvoiceDeliveryLookup {
 
 export type LocalEstimateDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
 
+export type LocalEstimateEmailDeliveryStatus = 'sending' | 'sent' | 'failed';
+
+export interface LocalEstimateEmailDeliveryAttempt {
+  id: string;
+  delivery_link_id: string;
+  recipient_email: string;
+  status: LocalEstimateEmailDeliveryStatus;
+  attempted_at: string;
+  sent_at: string | null;
+  failed_at: string | null;
+  failure_code: string | null;
+  attempted_by_name: string;
+}
+
 export interface LocalEstimateDeliveryLinkMetadata {
   id: string;
   state: LocalEstimateDeliveryLinkState;
@@ -525,6 +539,7 @@ export interface LocalEstimateDeliveryLinkMetadata {
   open_count: number;
   created_by_name: string;
   revoked_by_name: string;
+  email_deliveries: LocalEstimateEmailDeliveryAttempt[];
 }
 
 export type RequestFreeEstimateDeliveryState = RequestFreeInvoiceDeliveryState;

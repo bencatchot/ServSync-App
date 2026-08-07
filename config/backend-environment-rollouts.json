@@ -92,6 +92,24 @@
           "reason": "The exact Production migration was applied on 2026-08-07 for backend schema parity. Demo operational access remains fail-closed unless its existing server-side gateway configuration supports the request-free route."
         }
       }
+    },
+    {
+      "id": "secure-estimate-email-delivery-v1",
+      "artifact": "servsync-secure-estimate-email-delivery.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07; authenticated role, provider, recipient-scope, rotation, catalog, preservation, and cleanup checks passed."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07 at 18:39:48Z through 18:39:50Z. Catalog and preservation checks passed, the approved Resend credential was added as a sensitive Production-only server variable, and a disposable Owner/provider/rotation/revocation smoke passed with complete cleanup."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The exact migration was applied for backend schema parity on 2026-08-07 at 18:40:29Z through 18:40:31Z. Catalog and preservation checks passed; no Resend credential was added and outbound Estimate email remains intentionally fail-closed."
+        }
+      }
     }
   ]
 }
