@@ -156,12 +156,12 @@
           "reason": "The exact migration was applied and safely reapplied on 2026-08-07; catalog/security, exact-snapshot change request and decline, mutual exclusion, replay, stale/revoked denial, preservation, and rollback cleanup checks passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Awaiting controlled migration-first Production rollout authorization after Sandbox validation and merge-readiness completion."
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07 at approximately 23:19Z; catalog/security correspondence, rollback-only response behavior, exact preservation, and zero fixture residue passed."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Awaiting the same exact migration after Production for supported-schema parity; no provider or presentation change is required."
+          "status": "Applied",
+          "reason": "The exact migration was applied after Production on 2026-08-07 at approximately 23:19Z for supported-schema parity; catalog/security correspondence and preservation passed without provider, flag, presentation, or scenario changes."
         }
       }
     }
