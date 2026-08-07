@@ -40,6 +40,8 @@ const EXPECTED_ENVIRONMENTS = Object.freeze({
 const ROLLOUT_STATUSES = new Set(['Applied', 'Pending', 'N/A', 'Intentionally deferred']);
 const ENVIRONMENT_NAMES = ['sandbox', 'production', 'demo'];
 const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const POSTGRES_OPERATOR_CHARACTER = /[+\-*/<>=~!@#%^&|`?]/;
+const POSTGRES_OPERATOR_TRAILING_SIGN_DISAMBIGUATOR = /[~!@#%^&|`?]/;
 
 export async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
@@ -219,6 +221,30 @@ function readDollarQuoted(source, start) {
   return { delimiter, end: end + delimiter.length };
 }
 
+function readPostgresOperator(source, start) {
+  let end = start;
+  while (end < source.length && POSTGRES_OPERATOR_CHARACTER.test(source[end])) {
+    if (end > start && (source.startsWith('--', end) || source.startsWith('/*', end))) break;
+    end += 1;
+  }
+
+  let operator = source.slice(start, end);
+  const trailingSigns = [];
+  while (operator.length > 1
+    && /[+-]$/.test(operator)
+    && !POSTGRES_OPERATOR_TRAILING_SIGN_DISAMBIGUATOR.test(operator)) {
+    trailingSigns.unshift(operator.at(-1));
+    operator = operator.slice(0, -1);
+  }
+
+  return { end, tokens: [operator, ...trailingSigns] };
+}
+
+function readNumber(source, start) {
+  const value = source.slice(start);
+  return value.match(/^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[oO][0-7](?:_?[0-7])*|0[bB][01](?:_?[01])*|(?:(?:\d(?:_?\d)*)\.(?:\d(?:_?\d)*)?|\.(?:\d(?:_?\d)*)|(?:\d(?:_?\d)*))(?:[eE][+-]?\d(?:_?\d)*)?)/)?.[0] ?? null;
+}
+
 function tokenizeSql(source) {
   const tokens = [];
   let index = 0;
@@ -271,16 +297,22 @@ function tokenizeSql(source) {
       index += word[0].length;
       continue;
     }
-    const number = source.slice(index).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);
+    const number = readNumber(source, index);
     if (number) {
-      tokens.push(number[0].toLowerCase());
-      index += number[0].length;
+      tokens.push(number.toLowerCase());
+      index += number.length;
       continue;
     }
-    const operator = source.slice(index).match(/^(?:#>>|->>|::|:=|=>|<=|>=|<>|!=|\|\||->|#>|@>|<@|\?&|\?\||@@|@\?|<<|>>|&&|-\||\^@)/);
-    if (operator) {
-      tokens.push(operator[0]);
-      index += operator[0].length;
+    if (POSTGRES_OPERATOR_CHARACTER.test(character)) {
+      const operator = readPostgresOperator(source, index);
+      tokens.push(...operator.tokens);
+      index = operator.end;
+      continue;
+    }
+    const punctuation = source.slice(index).match(/^(?:::|:=|\.\.)/);
+    if (punctuation) {
+      tokens.push(punctuation[0]);
+      index += punctuation[0].length;
       continue;
     }
     tokens.push(character);

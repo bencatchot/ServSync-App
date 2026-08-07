@@ -360,6 +360,36 @@ test('function comments and formatting are separated from logical definition dri
   );
 });
 
+test('function canonicalization preserves PostgreSQL operator and literal boundaries', () => {
+  const definition = body => canonicalFunctionDefinition.replace(
+    'return query select id from public.customers;',
+    body,
+  );
+  const canonical = body => canonicalizeFunctionDefinition(definition(body));
+
+  assert.notEqual(canonical('return 1 ## 2;'), canonical('return 1 # # 2;'));
+  assert.equal(canonical("return payload->>'name';"), canonical("return payload ->> 'name';"));
+  assert.equal(canonical('return 1##2;'), canonical('return 1 ## 2;'));
+  assert.equal(canonical('return 1+2;'), canonical('return 1 + 2;'));
+  assert.notEqual(canonical("return payload->>'name';"), canonical("return payload#>>'{name}';"));
+  assert.equal(canonical('return 1 /* layout */ + 2;'), canonical('return 1+2;'));
+  assert.notEqual(canonical("return 'a  b';"), canonical("return 'a b';"));
+  assert.notEqual(canonical('return "Customer Name";'), canonical('return "customer name";'));
+  assert.notEqual(canonical('return $value$a  b$value$;'), canonical('return $value$a b$value$;'));
+  assert.notEqual(canonical('return 1_000;'), canonical('return 1 _000;'));
+  assert.notEqual(canonical('return 1000;'), canonical('return 1001;'));
+
+  const operatorBoundaryDrift = compareCatalogs(snapshot(), snapshot({
+    functions: [entry('public.list_customers()', 'public.list_customers()', {
+      security_definer: true,
+      return_type: 'SETOF uuid',
+      definition: definition('return 1 # # 2;'),
+    })],
+  }), configWithGroups(), 'demo');
+  assert.match(operatorBoundaryDrift.status, /^FAIL/);
+  assert.equal(operatorBoundaryDrift.unexplained[0].kind, 'logical-drift');
+});
+
 test('rollout ledger remains descriptive and requires every environment, status, and reason', () => {
   assert.doesNotThrow(() => validateRolloutLedger(rolloutLedger));
   assert.match(formatRolloutStatus(rolloutLedger), /\| Foundation \/ migration \| Sandbox \| Production \| Demo \|/);
