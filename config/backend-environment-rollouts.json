@@ -38,6 +38,24 @@
           "reason": "No database migration."
         }
       }
+    },
+    {
+      "id": "public-signup-role-hardening-v1",
+      "artifact": "servsync-public-signup-role-hardening.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Source correction is awaiting controlled Sandbox migration-first validation."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "The current signup trigger requires the approved security reconciliation after Sandbox validation and independent review."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo must receive the same approved security reconciliation as Production; it must not remain intentionally behind."
+        }
+      }
     }
   ]
 }

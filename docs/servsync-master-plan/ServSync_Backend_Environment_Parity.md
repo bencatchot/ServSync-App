@@ -98,6 +98,8 @@ Read-only validation on 2026-08-06 established:
 
 The current Sandbox logical or conservative definition drift consists of missing Stripe columns/indexes; two differing service-request-media policies; differing notification, signup, support, appointment, and field-work function definitions; missing field-work/Stripe functions and grants; plus the two unapproved storage policies. This guard does not authorize reconciliation or approve those storage policies. Any Sandbox repair or experiment approval requires a separate audit and repository/configuration decision, with SQL authorization where applicable.
 
+The signup-function difference is a separate priority security correction, not an exception to approve. Production and Demo currently retain an older profile-creation trigger that does not adequately constrain self-service role metadata, while Sandbox has the later referral-era role allowlist. `servsync-public-signup-role-hardening.sql` is the source-only canonical reconciliation: it permits only homeowner and contractor public account roles, defaults all other metadata to homeowner, preserves referral attribution, prevents authenticated profile-role rewrites, and is final in both blank-install sequences. Its rollout remains pending for Sandbox, Production, and Demo; no environment is claimed corrected until the exact migration is applied and catalog/security validation passes.
+
 No SQL, schema, grants, data, users, settings, environment variables, feature flags, entitlements, or deployments changed while establishing this result.
 
 ## Future Database Workflow

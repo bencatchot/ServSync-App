@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-06
 
+- Branch: `codex/public-signup-role-hardening-v1`
+- Starting main SHA: `1371ecfb746d782394a60e37945866ac8d7059f9`
+- Files changed:
+  - `servsync-public-signup-role-hardening.sql`
+  - `scripts/apply-sql-dry-run.sh`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/validation/validate-public-signup-role-hardening.sh`
+  - `tests/sql/public-signup-role-hardening-validation.sql`
+  - `tests/e2e/public-signup-role-hardening.spec.ts`
+  - `package.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Adds the source-only Public Signup Role Hardening and Referral Trigger Canonicalization security correction through `servsync-public-signup-role-hardening.sql` (SHA-256 `20895293ccba2cfa961bcf08b7c355ca3fd1bf852cd7a4fa7c3a22d4bb102593`). The canonical additive migration accepts only `homeowner` and `contractor` from untrusted signup metadata, resolves every unknown, malformed, platform-admin, or contractor-team role to homeowner, ignores app metadata for profile authority, preserves generic and contractor invite referral attribution, and leaves existing profile rows unchanged. A table trigger also prevents authenticated browser clients from assigning privileged roles during missing-profile recovery or changing an existing profile role, closing the direct post-signup upsert path while preserving ordinary profile-field updates.
+- Installer correction: Both supported blank-install orchestrators now apply the canonical migration after the historical referral-attribution migration, and no later installer migration defines `handle_new_user()`. Previously deployed historical migrations remain byte-identical. The canonical trigger function is owned by postgres, uses `SECURITY DEFINER` with fixed `search_path=public`, has one overload and one auth trigger, and denies direct execution to PUBLIC, anon, authenticated, and service_role. The private role guard is `SECURITY INVOKER`, fixed-path, trigger-only, and likewise unavailable for direct browser/service execution.
+- Validation: A disposable PostgreSQL 16 clean-install-prefix harness applied the real historical chain through the formerly overriding attribution migration and then the canonical reconciliation twice. It passed normal homeowner/contractor and Supabase Auth-role creation, safe fallback for platform-admin/team/unknown/malformed/app metadata, existing administrator preservation, same-user and cross-user profile escalation denial, safe missing-profile recovery, ordinary profile updates, universal/one-time/permanent referral attribution, missing-prerequisite rollback, ownership/security/search-path/grant/overload/trigger posture, and idempotence. Focused Playwright source/catalog checks passed 6/6 and pin historical migration hashes plus installer finality; Backend Parity Guard tests passed 16/16; TypeScript, Production build, focused changed-test lint, shell syntax, rollout-ledger rendering, `git diff --check`, Markdown consistency, and sensitive-value checks passed. Full lint remains blocked by the inherited ESLint 9 `allowShortCircuit` startup incompatibility.
+- Rollout status: No SQL was applied. Sandbox, Production, and Demo remain unchanged and all three are `Pending` in the descriptive rollout ledger. The required later order is Sandbox migration-first application, authenticated/security validation, independent review, coordinated Production and Demo application, catalog/function correspondence, and then normal merge/deployment. Production and Demo must not remain intentionally behind once rollout is approved.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 now tracks the source-complete signup security correction as the priority pending three-environment rollout while preserving unrelated Sandbox parity work separately.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the canonical self-service role policy, profile-role immutability boundary, referral preservation, and migration-first rollout gates without claiming a live environment correction.
+
 - Branch: `codex/backend-environment-parity-guard-v1`
 - Starting main SHA: `67af5290b05fc88305d74818d5c0625fa93635f6`
 - Files changed:
