@@ -13,6 +13,7 @@ export const APP_ROUTE_NAMES = [
   'trust-safety',
   'invoice-delivery',
   'estimate-delivery',
+  'report-delivery',
 ] as const;
 
 export type AppRouteName = typeof APP_ROUTE_NAMES[number];
@@ -78,4 +79,8 @@ export function requestFreeLocalInvoiceUrl(token: string, location?: AppLocation
 
 export function requestFreeLocalEstimateUrl(token: string, location?: AppLocationLike) {
   return appRouteUrl('estimate-delivery', { access: token }, location);
+}
+
+export function requestFreeFinalizedReportUrl(token: string, location?: AppLocationLike) {
+  return appRouteUrl('report-delivery', { access: token }, location);
 }

@@ -315,6 +315,7 @@ import {
 import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary';
 import { LocalInvoiceDeliveryPanel } from './features/invoices/LocalInvoiceDeliveryPanel';
 import { LocalEstimateDeliveryPanel } from './features/estimates/LocalEstimateDeliveryPanel';
+import { FinalizedReportDeliveryPanel } from './features/reports/FinalizedReportDeliveryPanel';
 import {
   demoPresentationJobCheckpointLabel,
   demoPresentationWorkItemProgress,
@@ -31392,6 +31393,7 @@ function ContractorDashboard({
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
   const canManageLocalEstimateDelivery = canManageLocalInvoiceDelivery;
+  const canManageFinalizedReportDelivery = canManageLocalInvoiceDelivery;
   const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
     ? 'Field techs cannot create contractor Draft Jobs in this workflow yet.'
     : currentContractorTeamRole === 'viewer'
@@ -43743,8 +43745,11 @@ function ContractorDashboard({
                   const reportSendHelperText = activeInspection.status !== 'finalized'
                     ? 'Finalize the report before sending it.'
                     : !activeInspection.homeowner_user_id
-                      ? 'This report can be filed with the customer record, but it cannot be sent until the customer connects a ServSync account.'
+                      ? 'Use Send to Customer to email this finalized report securely without requiring a ServSync account.'
                       : 'Send the report to the homeowner and close the linked request when applicable.';
+                  const reportLocalContact = activeInspection.local_contact_id
+                    ? localCustomerContext.find(contact => contact.id === activeInspection.local_contact_id) ?? null
+                    : null;
                   const finalizeReportHelperText = activeInspection.status === 'draft'
                     ? inspectionClosedForReview
                       ? 'Finalize saves and files the PDF. For connected customers, it becomes available in Documents and Home History and creates an in-app notification.'
@@ -44211,6 +44216,19 @@ function ContractorDashboard({
                       </div>
 
                       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE
+                          && supabase
+                          && canManageFinalizedReportDelivery
+                          && activeInspection.status === 'finalized'
+                          && !activeInspection.homeowner_user_id
+                          && reportLocalContact
+                          && activeInspection.local_home_id && (
+                            <FinalizedReportDeliveryPanel
+                              client={supabase}
+                              inspection={activeInspection}
+                              localContact={reportLocalContact}
+                            />
+                          )}
                         {reportSentAndCompleted ? (
                           <VisibilityNotice
                             title="Report sent · Job complete"

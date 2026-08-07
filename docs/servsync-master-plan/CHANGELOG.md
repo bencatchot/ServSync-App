@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/finalized-report-external-email-delivery-v1`
+- Starting main SHA: `50108e6985b4e54faf20109b5ce8df95947ea2d8`
+- Files changed:
+  - `api/request-free-finalized-report-delivery.ts`
+  - `api/send-finalized-report-email.ts`
+  - `servsync-finalized-report-external-email-delivery.sql`
+  - `src/App.tsx`
+  - `src/appLinks.ts`
+  - `src/main.tsx`
+  - `src/types.ts`
+  - `src/features/reports/FinalizedReportDeliveryPanel.tsx`
+  - `src/features/reports/RequestFreeFinalizedReportView.tsx`
+  - `src/features/reports/finalizedReportDelivery.ts`
+  - `tests/e2e/finalized-report-external-email-delivery.spec.ts`
+  - `tests/e2e/finalized-report-external-email-delivery-sandbox.spec.ts`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Finalized Report External Email Delivery v1 for the canonical customer-facing filed Job/inspection PDF. Owner, active Admin, and active Office users can confirm a delivery-only recipient address, send or resend one eligible finalized report for a Not connected Customer, review sanitized `Sending`/`Sent`/`Failed` history, and revoke access without changing Customer profile identity. Connected Customer Home History, Documents, notifications, and authenticated report access remain unchanged.
+- Security architecture: The filed private `home-documents/contractor-field-work/...` PDF is the canonical immutable delivery artifact. Each send snapshots its report/customer/property binding plus storage object ID, version, ETag, and size; every recipient request revalidates that fingerprint and the active contractor/local-customer lifecycle. A one-time 256-bit bearer is stored only as SHA-256, exchanged through a same-origin service gateway for a digest-only 30-minute `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/` session, and rotated on resend. Recipient responses contain only the one PDF. Four forced-RLS tables have no policies or direct non-owner table/column grants; management is authenticated and tenant-derived, recipient/result RPCs are service-role-only, and private helpers remain postgres-only. Field Technician, Viewer, inactive, cross-tenant, connected, claimed, mapped, archived, malformed, expired, revoked, and storage-drift cases fail closed.
+- Sandbox rollout and validation: Exact migration `servsync-finalized-report-external-email-delivery.sql` (SHA-256 `9a8b37bdb31ee01994123d362f6ee64681ca461f3778ee3ae652bafe62a7a843`) was applied to Sandbox `zpzdkoaubyjtsomccxya`. The first attempt stopped and rolled back before DDL because PostgreSQL truncated a 64-character helper name; the reviewed helper was shortened and the corrected migration then installed cleanly. Catalog checks confirmed four postgres-owned forced-RLS/no-policy tables, zero non-owner table/column grants, 16 single-overload functions with fixed `search_path=public`, the intended definer/invoker posture and six narrow grants, two validation triggers, 14 indexes, and 45 constraints. Authenticated Owner/Admin/Office delivery passed; Field Technician, Viewer, inactive, and cross-tenant callers were denied. Resend accepted a message to the approved disposable recipient, sanitized history passed, one-PDF bootstrap/download and revocation invalidation passed, and no bearer/provider/storage fingerprint leaked through ordinary history.
+- Preservation and cleanup: Sandbox returned to profiles 19, contractors 6, local contacts 299, local homes 320, inspections 208, finalized local reports 15, and filed report objects 15 with captured identifier digests unchanged. All tagged Customer/property/report/storage/link/session/attempt/rate-limit fixtures were removed. Existing report PDFs, Customer/profile data, connected flows, Estimate/Invoice delivery, storage RLS/policies, environment variables, feature flags, memberships, and configuration were unchanged.
+- Rollout status and boundary: Production and Demo remain untouched and `Pending`; the feature is not claimed live outside Sandbox. Production can reuse the existing approved server-side Resend configuration, while Demo should receive schema parity and remain provider-disabled unless separately authorized. This slice does not add report acknowledgment, acceptance, signatures, payments, replies, SMS, broad guest history/navigation, anonymous report search, Service Plans, or delivery of draft/internal/technician-only content. Resend provider acceptance is evidence of provider handoff, not independently confirmed inbox receipt.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003B now records Sandbox-validated finalized-report email delivery while retaining the Production/Demo rollout and later channels/actions as active work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the filed-PDF recipient boundary, contractor role policy, Sandbox evidence, and remaining rollout gate without claiming broader guest access.
+
 - Branch: `codex/secure-estimate-email-delivery-v1`
 - Starting main SHA: `5104f8baec2b370dacf298c66c5b95d506bea2fc`
 - Files changed:
