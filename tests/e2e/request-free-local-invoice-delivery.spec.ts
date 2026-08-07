@@ -243,7 +243,7 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
     expect(app).not.toContain("if (route === 'invoice-delivery')");
     expect(entry).toContain("await import('./features/invoices/RequestFreeInvoiceView')");
     expect(entry).toContain("await import('./App')");
-    expect(entry).toContain("window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/invoice-delivery`)");
+    expect(entry).toContain("window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/${route}`)");
     expect(entry).toContain("window.addEventListener('hashchange', onHashChange)");
     expect(entry).toContain("window.removeEventListener('hashchange', onHashChange)");
     expect(entry).toContain("window.addEventListener('popstate', onPopState)");

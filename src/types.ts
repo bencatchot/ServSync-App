@@ -511,6 +511,79 @@ export interface RequestFreeInvoiceDeliveryLookup {
   invoice?: RequestFreeInvoiceDocument;
 }
 
+export type LocalEstimateDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
+
+export interface LocalEstimateDeliveryLinkMetadata {
+  id: string;
+  state: LocalEstimateDeliveryLinkState;
+  created_at: string;
+  expires_at: string;
+  source_updated_at: string;
+  revoked_at: string | null;
+  first_opened_at: string | null;
+  last_opened_at: string | null;
+  open_count: number;
+  created_by_name: string;
+  revoked_by_name: string;
+}
+
+export type RequestFreeEstimateDeliveryState = RequestFreeInvoiceDeliveryState;
+
+export interface RequestFreeEstimateLineItem {
+  line_type: EstimateLineType;
+  title: string;
+  description: string;
+  model_spec: string;
+  supply_status: EstimateLineSupplyStatus | null;
+  quantity: number;
+  unit: string;
+  unit_price_cents: number | null;
+  labor_hours: number | null;
+}
+
+export interface RequestFreeEstimatePaymentScheduleItem {
+  invoice_type: EstimatePaymentScheduleInvoiceType;
+  label: string;
+  calculated_amount_cents: number;
+  due_trigger: string;
+}
+
+export interface RequestFreeEstimateDocument {
+  contractor: {
+    business_name: string;
+  };
+  customer: {
+    display_name: string;
+  };
+  property: {
+    address_line1: string;
+    address_line2: string;
+    city: string;
+    state: string;
+    zip_code: string;
+  };
+  title: string;
+  scope: string;
+  notes: string;
+  terms: string;
+  status: 'sent';
+  source_updated_at: string;
+  subtotal_cents: number;
+  material_total_cents: number;
+  labor_total_cents: number;
+  fee_total_cents: number;
+  other_total_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  line_items: RequestFreeEstimateLineItem[];
+  payment_schedule_items: RequestFreeEstimatePaymentScheduleItem[];
+}
+
+export interface RequestFreeEstimateDeliveryLookup {
+  state: RequestFreeEstimateDeliveryState;
+  estimate?: RequestFreeEstimateDocument;
+}
+
 export interface ExternalObjectMapping {
   id: string;
   provider: string;

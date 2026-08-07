@@ -314,6 +314,7 @@ import {
 } from './features/invoices/status';
 import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary';
 import { LocalInvoiceDeliveryPanel } from './features/invoices/LocalInvoiceDeliveryPanel';
+import { LocalEstimateDeliveryPanel } from './features/estimates/LocalEstimateDeliveryPanel';
 import {
   demoPresentationJobCheckpointLabel,
   demoPresentationWorkItemProgress,
@@ -31390,6 +31391,7 @@ function ContractorDashboard({
   const canManageLocalInvoiceDelivery = currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
+  const canManageLocalEstimateDelivery = canManageLocalInvoiceDelivery;
   const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
     ? 'Field techs cannot create contractor Draft Jobs in this workflow yet.'
     : currentContractorTeamRole === 'viewer'
@@ -38065,6 +38067,21 @@ function ContractorDashboard({
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                                           </div>
                                           {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows)}
+                                          {!SERVSYNC_DEMO_PRESENTATION_MODE
+                                            && supabase
+                                            && !isInvoiceWorkspaceTab
+                                            && localCustomer
+                                            && estimate.local_home_id
+                                            && canManageLocalEstimateDelivery && (
+                                              <LocalEstimateDeliveryPanel
+                                                client={supabase}
+                                                estimate={estimate}
+                                                localContact={localCustomer}
+                                                canManage={canManageLocalEstimateDelivery}
+                                                disabledReason={createEstimateCapability.disabled ? createEstimateCapability.reason : ''}
+                                                onEstimateChanged={loadContractor}
+                                              />
+                                            )}
                                           <div className="mt-3 flex flex-wrap gap-2">
                                             {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
                                               <>
@@ -40126,6 +40143,21 @@ function ContractorDashboard({
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                               </div>
                               {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows, { mobile: true })}
+                              {!SERVSYNC_DEMO_PRESENTATION_MODE
+                                && supabase
+                                && !isInvoice
+                                && local
+                                && estimate.local_home_id
+                                && canManageLocalEstimateDelivery && (
+                                  <LocalEstimateDeliveryPanel
+                                    client={supabase}
+                                    estimate={estimate}
+                                    localContact={local}
+                                    canManage={canManageLocalEstimateDelivery}
+                                    disabledReason={createEstimateCapability.disabled ? createEstimateCapability.reason : ''}
+                                    onEstimateChanged={loadContractor}
+                                  />
+                                )}
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {estimate.status === 'accepted' && !isInvoice && (
                                   <>
