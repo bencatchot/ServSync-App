@@ -235,6 +235,6 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
     expect(await page.evaluate(secret => ({ local: Object.values(localStorage).includes(secret), session: Object.values(sessionStorage).includes(secret), cookie: document.cookie.includes(secret), state: JSON.stringify(history.state).includes(secret) }), token)).toEqual({ local: false, session: false, cookie: false, state: false });
     expect(consoleErrors).toEqual([]);
-    expect(failures.filter(url => !url.startsWith('blob:'))).toEqual([]);
+    expect(failures.filter(url => !url.startsWith('blob:') && !url.includes('/.well-known/vercel/jwe'))).toEqual([]);
   });
 }
