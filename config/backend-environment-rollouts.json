@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-06",
+  "updatedOn": "2026-08-07",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -44,8 +44,8 @@
       "artifact": "servsync-public-signup-role-hardening.sql",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Source correction is awaiting controlled Sandbox migration-first validation."
+          "status": "Applied",
+          "reason": "The corrected exact migration was applied and authenticated security/referral validation passed on 2026-08-07; Production and Demo remain pending."
         },
         "production": {
           "status": "Pending",
