@@ -45,15 +45,15 @@
       "environments": {
         "sandbox": {
           "status": "Applied",
-          "reason": "The corrected exact migration was applied and authenticated security/referral validation passed on 2026-08-07; Production and Demo remain pending."
+          "reason": "The exact migration was applied and authenticated security/referral validation passed on 2026-08-07."
         },
         "production": {
-          "status": "Pending",
-          "reason": "The current signup trigger requires the approved security reconciliation after Sandbox validation and independent review."
+          "status": "Applied",
+          "reason": "The exact migration was applied and catalog/preservation validation passed at 2026-08-07T08:59:49.303Z through 08:59:49.327Z before PR #387 merged."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo must receive the same approved security reconciliation as Production; it must not remain intentionally behind."
+          "status": "Applied",
+          "reason": "The exact migration was applied and catalog/preservation validation passed at 2026-08-07T09:01:50.151Z through 09:01:50.447Z before PR #387 merged."
         }
       }
     }
