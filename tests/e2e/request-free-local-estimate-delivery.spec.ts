@@ -31,20 +31,23 @@ function between(text: string, start: string, end: string) {
 function gatewayFixture(options: {
   bootstrap?: string;
   session?: string;
-  acceptance?: string;
+  response?: string;
   accepted?: string;
+  responded?: string;
   rateLimited?: boolean;
   configurationError?: boolean;
 } = {}) {
   const bootstrapCalls: Array<{ token: string; digest: string; previous: string | null }> = [];
   const sessionCalls: string[] = [];
-  const acceptanceCalls: string[] = [];
+  const responseCalls: string[] = [];
   const acceptCalls: string[] = [];
+  const respondCalls: Array<{ digest: string; action: string; message: string | null }> = [];
   return {
     bootstrapCalls,
     sessionCalls,
-    acceptanceCalls,
+    responseCalls,
     acceptCalls,
+    respondCalls,
     handler: createRequestFreeEstimateDeliveryHandler({
       checkEntryRateLimit: async () => ({
         rateLimited: options.rateLimited ?? false,
@@ -58,13 +61,17 @@ function gatewayFixture(options: {
         sessionCalls.push(digest);
         return options.session ?? JSON.stringify({ state: 'unavailable' });
       },
-      lookupEstimateAcceptance: async digest => {
-        acceptanceCalls.push(digest);
-        return options.acceptance ?? JSON.stringify({ state: 'eligible' });
+      lookupEstimateResponse: async digest => {
+        responseCalls.push(digest);
+        return options.response ?? JSON.stringify({ state: 'eligible' });
       },
       acceptEstimate: async digest => {
         acceptCalls.push(digest);
         return options.accepted ?? JSON.stringify({ state: 'accepted', accepted_at: '2026-08-07T12:05:00.000Z' });
+      },
+      respondToEstimate: async (digest, action, message) => {
+        respondCalls.push({ digest, action, message });
+        return options.responded ?? JSON.stringify({ state: 'declined', responded_at: '2026-08-07T12:06:00.000Z', message: null });
       },
       generateSessionIdentifier: () => SESSION,
     }),
@@ -209,7 +216,7 @@ test.describe('request-free local Estimate same-origin gateway', () => {
     const fixture = gatewayFixture();
     const get = await fixture.handler(new Request('https://servsync.example/api/request-free-local-estimate-delivery'));
     expect(get.status).toBe(405);
-    for (const body of ['{', JSON.stringify({ token: 'bad' }), JSON.stringify({ token: TOKEN, extra: true }), JSON.stringify({ action: 'decline' }), JSON.stringify({ action: 'accept', estimate_id: 'forged' }), JSON.stringify([])]) {
+    for (const body of ['{', JSON.stringify({ token: 'bad' }), JSON.stringify({ token: TOKEN, extra: true }), JSON.stringify({ action: 'request_changes' }), JSON.stringify({ action: 'accept', estimate_id: 'forged' }), JSON.stringify([])]) {
       expect((await fixture.handler(request(body))).status).toBe(400);
     }
     expect((await fixture.handler(request('{}'))).status).toBe(200);
@@ -234,11 +241,11 @@ test.describe('request-free local Estimate same-origin gateway', () => {
       digest: createHash('sha256').update(SESSION).digest('hex'),
       previous: null,
     });
-    expect(fixture.acceptanceCalls).toEqual([createHash('sha256').update(SESSION).digest('hex')]);
+    expect(fixture.responseCalls).toEqual([createHash('sha256').update(SESSION).digest('hex')]);
   });
 
   test('enforces request, response, Firewall, and safe-shape boundaries', async () => {
-    expect(MAX_ESTIMATE_REQUEST_BYTES).toBe(1024);
+    expect(MAX_ESTIMATE_REQUEST_BYTES).toBe(4096);
     expect(MAX_ESTIMATE_PUBLIC_RESPONSE_BYTES).toBe(262144);
     expect(REQUEST_FREE_ESTIMATE_RATE_LIMIT_ID).toBe('request-free-local-invoice-delivery');
     expect((await gatewayFixture({ rateLimited: true }).handler(request('{}'))).status).toBe(429);

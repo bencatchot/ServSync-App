@@ -388,7 +388,7 @@ export function LocalEstimateDeliveryPanel({
       {expanded && (
         <div className="space-y-4 border-t border-[#D8DEE8] p-3">
           <p className="text-xs leading-5 text-[#526784]">
-            Send or copy a document-specific Estimate for this Customer. The recipient can review and explicitly accept the exact delivered version without account access; this is not an electronic signature or payment.
+            Send or copy a document-specific Estimate for this Customer. The recipient can accept, request changes to, or decline the exact delivered version without account access; these responses are not an electronic signature or payment.
           </p>
           {loading ? <p className="text-sm text-[#526784]">Loading secure-link history...</p> : (
             <>
@@ -422,6 +422,27 @@ export function LocalEstimateDeliveryPanel({
                             <span>{dateTime(link.acceptance.accepted_at)}</span>
                           </div>
                           <p className="mt-1">Accepted snapshot {dateTime(link.acceptance.source_updated_at)}{link.acceptance.recipient_email ? ` · Recipient ${link.acceptance.recipient_email}` : ''}</p>
+                        </div>
+                      )}
+                      {link.response?.state === 'changes_requested' && (
+                        <div className="mt-2 border-t border-amber-100 pt-2 text-amber-900" data-testid="local-estimate-guest-changes-history">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold">Request changes</span>
+                            <span>{dateTime(link.response.responded_at)}</span>
+                          </div>
+                          <p className="mt-1">Snapshot {dateTime(link.response.source_updated_at)}{link.response.recipient_email ? ` · Recipient ${link.response.recipient_email}` : ''}</p>
+                          {link.response.message && <p className="mt-2 whitespace-pre-wrap rounded-md bg-amber-50 p-2 text-sm leading-5 text-amber-950">{link.response.message}</p>}
+                          <p className="mt-2 font-semibold">Revise this Estimate through the normal workflow, then send a fresh version.</p>
+                        </div>
+                      )}
+                      {link.response?.state === 'declined' && (
+                        <div className="mt-2 border-t border-red-100 pt-2 text-red-800" data-testid="local-estimate-guest-decline-history">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold">Declined through secure guest delivery</span>
+                            <span>{dateTime(link.response.responded_at)}</span>
+                          </div>
+                          <p className="mt-1">Snapshot {dateTime(link.response.source_updated_at)}{link.response.recipient_email ? ` · Recipient ${link.response.recipient_email}` : ''}</p>
+                          {link.response.message && <p className="mt-2 whitespace-pre-wrap rounded-md bg-red-50 p-2 text-sm leading-5 text-red-950">{link.response.message}</p>}
                         </div>
                       )}
                       {link.revoked_at && <p className="mt-1">Ended {dateTime(link.revoked_at)}{link.revoked_by_name ? ` by ${link.revoked_by_name}` : ''}</p>}

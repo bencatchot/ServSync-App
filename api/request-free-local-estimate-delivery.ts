@@ -7,23 +7,28 @@ import { checkRateLimit } from '@vercel/firewall';
 export const REQUEST_FREE_ESTIMATE_RATE_LIMIT_ID = 'request-free-local-invoice-delivery';
 export const REQUEST_FREE_ESTIMATE_SESSION_COOKIE = '__Host-servsync-estimate-session';
 export const REQUEST_FREE_ESTIMATE_SESSION_SECONDS = 30 * 60;
-export const MAX_ESTIMATE_REQUEST_BYTES = 1_024;
+export const MAX_ESTIMATE_REQUEST_BYTES = 4_096;
 export const MAX_ESTIMATE_PUBLIC_RESPONSE_BYTES = 262_144;
 
 const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 const SAFE_STATES = new Set(['valid', 'invalid', 'expired', 'revoked', 'replaced', 'unavailable', 'rate_limited', 'error']);
 
 type SafeState = 'valid' | 'invalid' | 'expired' | 'revoked' | 'replaced' | 'unavailable' | 'rate_limited' | 'error';
-type SafeAcceptanceState = 'eligible' | 'accepted' | 'stale' | 'ineligible' | 'unavailable' | 'rate_limited' | 'error';
+type SafeResponseState = 'eligible' | 'accepted' | 'changes_requested' | 'declined' | 'stale' | 'ineligible' | 'unavailable' | 'rate_limited' | 'error' | 'invalid';
 type RateLimitResult = { rateLimited: boolean; configurationError?: boolean };
-type RequestMode = { kind: 'bootstrap'; token: string } | { kind: 'session' } | { kind: 'accept' };
+type RequestMode =
+  | { kind: 'bootstrap'; token: string }
+  | { kind: 'session' }
+  | { kind: 'accept' }
+  | { kind: 'respond'; action: 'request_changes' | 'decline'; message: string | null };
 
 export type RequestFreeEstimateGatewayDependencies = {
   checkEntryRateLimit: (request: Request) => Promise<RateLimitResult>;
   bootstrapEstimateSession: (token: string, sessionDigest: string, previousSessionDigest: string | null) => Promise<string>;
   lookupEstimateSession: (sessionDigest: string) => Promise<string>;
-  lookupEstimateAcceptance: (sessionDigest: string) => Promise<string>;
+  lookupEstimateResponse: (sessionDigest: string) => Promise<string>;
   acceptEstimate: (sessionDigest: string) => Promise<string>;
+  respondToEstimate: (sessionDigest: string, action: 'request_changes' | 'decline', message: string | null) => Promise<string>;
   generateSessionIdentifier: () => string;
 };
 
@@ -94,6 +99,16 @@ function parseRequestMode(body: string): RequestMode | null {
   const keys = Object.keys(record);
   if (keys.length === 0) return { kind: 'session' };
   if (keys.length === 1 && keys[0] === 'action' && record.action === 'accept') return { kind: 'accept' };
+  if ((keys.length === 1 || keys.length === 2)
+      && typeof record.action === 'string'
+      && (record.action === 'request_changes' || record.action === 'decline')
+      && keys.every(key => key === 'action' || key === 'message')) {
+    if (record.message !== undefined && record.message !== null && typeof record.message !== 'string') return null;
+    const message = typeof record.message === 'string' ? record.message.replace(/\r\n?/g, '\n').trim() : null;
+    if (record.action === 'request_changes' && (!message || message.length < 3 || message.length > 1_000)) return null;
+    if (record.action === 'decline' && message !== null && message.length > 1_000) return null;
+    return { kind: 'respond', action: record.action, message: message || null };
+  }
   if (keys.length !== 1 || keys[0] !== 'token' || typeof record.token !== 'string') return null;
   return TOKEN_PATTERN.test(record.token) ? { kind: 'bootstrap', token: record.token } : null;
 }
@@ -123,25 +138,46 @@ function safeLookupState(serialized: string): SafeState | null {
   return Object.keys(result).length === 1 ? result.state as SafeState : null;
 }
 
-function safeAcceptance(serialized: string) {
+function safeEstimateResponse(serialized: string) {
   let parsed: unknown;
   try { parsed = JSON.parse(serialized); } catch { return null; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const result = parsed as Record<string, unknown>;
   if (typeof result.state !== 'string') return null;
-  const state = result.state as SafeAcceptanceState;
-  if (!['eligible', 'accepted', 'stale', 'ineligible', 'unavailable', 'rate_limited', 'error'].includes(state)) return null;
+  const state = result.state as SafeResponseState;
+  if (!['eligible', 'accepted', 'changes_requested', 'declined', 'stale', 'ineligible', 'unavailable', 'rate_limited', 'error', 'invalid'].includes(state)) return null;
   if (state === 'accepted') {
     return Object.keys(result).sort().join(',') === 'accepted_at,state' && typeof result.accepted_at === 'string'
       ? { state, accepted_at: result.accepted_at }
       : null;
   }
+  if (state === 'changes_requested' || state === 'declined') {
+    const expectedKeys = 'message,responded_at,state';
+    const messageValid = state === 'changes_requested'
+      ? typeof result.message === 'string' && result.message.length >= 3 && result.message.length <= 1_000
+      : result.message === null || (typeof result.message === 'string' && result.message.length >= 1 && result.message.length <= 1_000);
+    return Object.keys(result).sort().join(',') === expectedKeys
+      && typeof result.responded_at === 'string'
+      && messageValid
+      ? { state, responded_at: result.responded_at, message: result.message as string | null }
+      : null;
+  }
   return Object.keys(result).length === 1 ? { state } : null;
 }
 
-function composeRecipientResponse(serializedEstimate: string, acceptance: { state: SafeAcceptanceState; accepted_at?: string }) {
+function composeRecipientResponse(serializedEstimate: string, response: {
+  state: SafeResponseState;
+  accepted_at?: string;
+  responded_at?: string;
+  message?: string | null;
+}) {
   const parsed = JSON.parse(serializedEstimate) as { state: 'valid'; estimate: Record<string, unknown> };
-  return JSON.stringify({ state: parsed.state, estimate: parsed.estimate, acceptance });
+  const acceptance = response.state === 'accepted'
+    ? { state: 'accepted', accepted_at: response.accepted_at }
+    : ['eligible', 'stale', 'ineligible'].includes(response.state)
+      ? { state: response.state }
+      : { state: 'ineligible' };
+  return JSON.stringify({ state: parsed.state, estimate: parsed.estimate, acceptance, response });
 }
 
 export async function checkEstimateEntryRateLimit(request: Request) {
@@ -177,11 +213,25 @@ export async function lookupEstimateSessionWithServiceRole(currentSessionDigest:
   return data;
 }
 
-export async function lookupEstimateAcceptanceWithServiceRole(currentSessionDigest: string) {
-  const { data, error } = await serviceRoleClient().rpc('servsync_lookup_local_estimate_delivery_acceptance', {
+export async function lookupEstimateResponseWithServiceRole(currentSessionDigest: string) {
+  const { data, error } = await serviceRoleClient().rpc('servsync_lookup_local_estimate_delivery_response', {
     p_session_digest: currentSessionDigest,
   });
-  if (error || typeof data !== 'string') throw new Error('Protected Estimate-acceptance lookup failed.');
+  if (error || typeof data !== 'string') throw new Error('Protected Estimate-response lookup failed.');
+  return data;
+}
+
+export async function respondToEstimateWithServiceRole(
+  currentSessionDigest: string,
+  action: 'request_changes' | 'decline',
+  message: string | null,
+) {
+  const { data, error } = await serviceRoleClient().rpc('servsync_respond_local_estimate_delivery_session', {
+    p_session_digest: currentSessionDigest,
+    p_action: action,
+    p_message: message,
+  });
+  if (error || typeof data !== 'string') throw new Error('Protected Estimate response failed.');
   return data;
 }
 
@@ -198,8 +248,9 @@ export function createRequestFreeEstimateDeliveryHandler(
     checkEntryRateLimit: checkEstimateEntryRateLimit,
     bootstrapEstimateSession: bootstrapEstimateSessionWithServiceRole,
     lookupEstimateSession: lookupEstimateSessionWithServiceRole,
-    lookupEstimateAcceptance: lookupEstimateAcceptanceWithServiceRole,
+    lookupEstimateResponse: lookupEstimateResponseWithServiceRole,
     acceptEstimate: acceptEstimateWithServiceRole,
+    respondToEstimate: respondToEstimateWithServiceRole,
     generateSessionIdentifier: () => randomBytes(32).toString('hex'),
   },
 ) {
@@ -244,20 +295,23 @@ export function createRequestFreeEstimateDeliveryHandler(
       if (state === 'rate_limited') return new Response(serialized, { status: 429, headers: { ...responseHeaders, 'Retry-After': '60', 'Set-Cookie': expiredSessionCookie() } });
       if (state === 'error') return new Response(serialized, { status: 503, headers: { ...responseHeaders, 'Set-Cookie': expiredSessionCookie() } });
 
-      let acceptance: ReturnType<typeof safeAcceptance> = null;
+      let estimateResponse: ReturnType<typeof safeEstimateResponse> = null;
       if (state === 'valid') {
         const activeDigest = mode.kind === 'bootstrap' ? sessionDigest(newSessionIdentifier) : digest!;
-        const serializedAcceptance = mode.kind === 'accept'
+        const serializedResponse = mode.kind === 'accept'
           ? await dependencies.acceptEstimate(activeDigest)
-          : await dependencies.lookupEstimateAcceptance(activeDigest);
-        acceptance = safeAcceptance(serializedAcceptance);
-        if (!acceptance) return failureResponse('error', 503);
-        if (acceptance.state === 'rate_limited') return failureResponse('rate_limited', 429, { 'Retry-After': '60' });
-        if (acceptance.state === 'error') return failureResponse('error', 503);
-        if (acceptance.state === 'unavailable') return failureResponse('unavailable', 200);
+          : mode.kind === 'respond'
+            ? await dependencies.respondToEstimate(activeDigest, mode.action, mode.message)
+            : await dependencies.lookupEstimateResponse(activeDigest);
+        estimateResponse = safeEstimateResponse(serializedResponse);
+        if (!estimateResponse) return failureResponse('error', 503);
+        if (estimateResponse.state === 'rate_limited') return failureResponse('rate_limited', 429, { 'Retry-After': '60' });
+        if (estimateResponse.state === 'error') return failureResponse('error', 503);
+        if (estimateResponse.state === 'invalid') return failureResponse('invalid', 400);
+        if (estimateResponse.state === 'unavailable') return failureResponse('unavailable', 200);
       }
 
-      const responseBody = state === 'valid' && acceptance ? composeRecipientResponse(serialized, acceptance) : serialized;
+      const responseBody = state === 'valid' && estimateResponse ? composeRecipientResponse(serialized, estimateResponse) : serialized;
       if (new TextEncoder().encode(responseBody).byteLength > MAX_ESTIMATE_PUBLIC_RESPONSE_BYTES) return failureResponse('error', 503);
 
       const cookie = mode.kind === 'bootstrap' && state === 'valid'
