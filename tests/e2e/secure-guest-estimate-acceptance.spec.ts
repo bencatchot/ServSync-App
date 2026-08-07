@@ -118,11 +118,12 @@ test.describe('secure guest Estimate acceptance boundary', () => {
         expect(digest).toBe(DIGEST);
         return JSON.stringify(estimateSnapshot);
       },
-      lookupEstimateAcceptance: async () => JSON.stringify({ state: 'eligible' }),
+      lookupEstimateResponse: async () => JSON.stringify({ state: 'eligible' }),
       acceptEstimate: async digest => {
         acceptCalls.push(digest);
         return JSON.stringify({ state: 'accepted', accepted_at: '2026-08-07T12:05:00.000Z' });
       },
+      respondToEstimate: async () => JSON.stringify({ state: 'ineligible' }),
       generateSessionIdentifier: () => randomBytes(32).toString('hex'),
     });
     const response = await handler(new Request('https://servsync.example/api/request-free-local-estimate-delivery', {
@@ -146,7 +147,8 @@ test.describe('secure guest Estimate acceptance boundary', () => {
       checkEntryRateLimit: async () => ({ rateLimited: false }),
       bootstrapEstimateSession: async () => JSON.stringify({ state: 'invalid' }),
       lookupEstimateSession: async () => JSON.stringify(estimateSnapshot),
-      lookupEstimateAcceptance: async () => JSON.stringify({ state: 'eligible' }),
+      lookupEstimateResponse: async () => JSON.stringify({ state: 'eligible' }),
+      respondToEstimate: async () => JSON.stringify({ state: 'ineligible' }),
       generateSessionIdentifier: () => SESSION,
     };
     const noSession = createRequestFreeEstimateDeliveryHandler({

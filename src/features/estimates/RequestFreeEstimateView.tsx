@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Building2, CheckCircle2, FileText, MapPin, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Building2, CheckCircle2, FileText, MapPin, MessageSquareText, ShieldCheck, XCircle } from 'lucide-react';
 import type {
   RequestFreeEstimateDeliveryLookup,
   RequestFreeEstimateDocument,
   RequestFreeEstimateLineItem,
 } from '../../types';
-import { acceptRequestFreeEstimate } from './requestFreeEstimateDelivery';
+import { acceptRequestFreeEstimate, respondToRequestFreeEstimate } from './requestFreeEstimateDelivery';
 
 type ViewState =
   | { status: 'loading' }
@@ -71,9 +71,11 @@ const unavailableCopy: Record<Exclude<ViewState['status'], 'loading' | 'ready'>,
 };
 
 export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimateDeliveryLookup | null }) {
-  const [acceptedLookup, setAcceptedLookup] = useState<RequestFreeEstimateDeliveryLookup | null>(null);
-  const [accepting, setAccepting] = useState(false);
-  const [acceptError, setAcceptError] = useState('');
+  const [responseLookup, setResponseLookup] = useState<RequestFreeEstimateDeliveryLookup | null>(null);
+  const [submitting, setSubmitting] = useState<'accept' | 'request_changes' | 'decline' | null>(null);
+  const [responseForm, setResponseForm] = useState<'request_changes' | 'decline' | null>(null);
+  const [responseMessage, setResponseMessage] = useState('');
+  const [responseError, setResponseError] = useState('');
   useEffect(() => {
     const previousTitle = document.title;
     const robots = document.createElement('meta');
@@ -95,7 +97,7 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
     };
   }, []);
 
-  const currentLookup = acceptedLookup ?? lookup;
+  const currentLookup = responseLookup ?? lookup;
   const view: ViewState = currentLookup === null ? { status: 'loading' } : stateFromLookup(currentLookup);
 
   if (view.status === 'loading') {
@@ -125,24 +127,54 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
   }
 
   const estimate = view.estimate;
-  const acceptance = currentLookup?.state === 'valid' ? currentLookup.acceptance : undefined;
+  const response = currentLookup?.state === 'valid'
+    ? currentLookup.response ?? currentLookup.acceptance
+    : undefined;
   const hasUnpricedLines = estimate.line_items.some(line => line.unit_price_cents === null);
   const acceptEstimate = async () => {
-    if (accepting || acceptance?.state !== 'eligible') return;
+    if (submitting || response?.state !== 'eligible') return;
     const confirmed = window.confirm('Accept this Estimate? This confirms that you approve this exact Estimate and authorize the contractor to proceed with the work described. This is not an electronic signature.');
     if (!confirmed) return;
-    setAccepting(true);
-    setAcceptError('');
+    setSubmitting('accept');
+    setResponseError('');
     try {
       const result = await acceptRequestFreeEstimate();
-      if (result.state !== 'valid' || !result.estimate || !result.acceptance) {
+      if (result.state !== 'valid' || !result.estimate || (!result.response && !result.acceptance)) {
         throw new Error('This Estimate could not be accepted from the current link.');
       }
-      setAcceptedLookup(result);
+      setResponseLookup(result.response ? result : { ...result, response: result.acceptance });
     } catch (error) {
-      setAcceptError(error instanceof Error ? error.message : 'Estimate acceptance is temporarily unavailable.');
+      setResponseError(error instanceof Error ? error.message : 'Estimate acceptance is temporarily unavailable.');
     } finally {
-      setAccepting(false);
+      setSubmitting(null);
+    }
+  };
+
+  const submitResponse = async (action: 'request_changes' | 'decline') => {
+    if (submitting || response?.state !== 'eligible') return;
+    const message = responseMessage.replace(/\r\n?/g, '\n').trim();
+    if (action === 'request_changes' && message.length < 3) {
+      setResponseError('Describe the changes you want the contractor to make.');
+      return;
+    }
+    if (message.length > 1_000) {
+      setResponseError('Keep your response to 1,000 characters or fewer.');
+      return;
+    }
+    setSubmitting(action);
+    setResponseError('');
+    try {
+      const result = await respondToRequestFreeEstimate(action, message || null);
+      if (result.state !== 'valid' || !result.estimate || !result.response) {
+        throw new Error('Your response could not be recorded from the current link.');
+      }
+      setResponseLookup(result);
+      setResponseForm(null);
+      setResponseMessage('');
+    } catch (error) {
+      setResponseError(error instanceof Error ? error.message : 'Your Estimate response is temporarily unavailable.');
+    } finally {
+      setSubmitting(null);
     }
   };
   return (
@@ -161,8 +193,8 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
             <div className="sm:text-right">
               <p className="text-xs font-semibold uppercase text-[#6B7D95]">Estimate total</p>
               <p className="mt-1 text-2xl font-bold">{money(estimate.total_cents)}</p>
-              <p className={`mt-1 text-sm font-semibold ${acceptance?.state === 'accepted' ? 'text-emerald-700' : 'text-[#526784]'}`}>
-                {acceptance?.state === 'accepted' ? 'Accepted' : 'Sent'}
+              <p className={`mt-1 text-sm font-semibold ${response?.state === 'accepted' ? 'text-emerald-700' : response?.state === 'declined' ? 'text-red-700' : 'text-[#526784]'}`}>
+                {response?.state === 'accepted' ? 'Accepted' : response?.state === 'declined' ? 'Declined' : response?.state === 'changes_requested' ? 'Changes requested' : 'Sent'}
               </p>
             </div>
           </div>
@@ -224,52 +256,136 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
             </section>
           )}
 
-          {acceptance?.state === 'eligible' && (
+          {response?.state === 'eligible' && (
             <section className="border-y border-[#D8DEE8] bg-[#F8FAFD] px-1 py-6" aria-labelledby="estimate-acceptance-heading" data-testid="request-free-estimate-acceptance-eligible">
-              <h2 id="estimate-acceptance-heading" className="text-base font-bold">Ready to proceed?</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526784]">By accepting, you confirm that you approve this Estimate and authorize the contractor to proceed with the work described. Acceptance applies only to the exact Estimate shown here and is not an electronic signature.</p>
-              {acceptError && <p role="alert" className="mt-3 text-sm font-semibold text-red-700">{acceptError}</p>}
-              <button
-                type="button"
-                onClick={() => void acceptEstimate()}
-                disabled={accepting}
-                className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0078FF] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
-              >
-                <CheckCircle2 size={17} aria-hidden="true" /> {accepting ? 'Accepting...' : 'Accept Estimate'}
-              </button>
+              <h2 id="estimate-acceptance-heading" className="text-base font-bold">Respond to this Estimate</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526784]">Your response applies only to the exact Estimate shown here. Accepting authorizes the contractor to proceed with the described work, but it is not an electronic signature or verified account identity.</p>
+              {responseError && <p role="alert" className="mt-3 text-sm font-semibold text-red-700">{responseError}</p>}
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => void acceptEstimate()}
+                  disabled={Boolean(submitting)}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0078FF] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+                >
+                  <CheckCircle2 size={17} aria-hidden="true" /> {submitting === 'accept' ? 'Accepting...' : 'Accept Estimate'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setResponseForm('request_changes'); setResponseMessage(''); setResponseError(''); }}
+                  disabled={Boolean(submitting)}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-[#A9B8CC] bg-white px-5 py-2.5 text-sm font-semibold text-[#223D67] disabled:opacity-60 sm:w-auto"
+                >
+                  <MessageSquareText size={17} aria-hidden="true" /> Request changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setResponseForm('decline'); setResponseMessage(''); setResponseError(''); }}
+                  disabled={Boolean(submitting)}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold text-red-700 disabled:opacity-60 sm:w-auto"
+                >
+                  <XCircle size={17} aria-hidden="true" /> Decline Estimate
+                </button>
+              </div>
+
+              {responseForm && (
+                <div className="mt-5 max-w-2xl rounded-md border border-[#D8DEE8] bg-white p-4" data-testid={`request-free-estimate-${responseForm}-form`}>
+                  <label htmlFor="secure-guest-estimate-response" className="block text-sm font-bold text-[#223D67]">
+                    {responseForm === 'request_changes' ? 'What would you like changed?' : 'Reason for declining (optional)'}
+                  </label>
+                  <textarea
+                    id="secure-guest-estimate-response"
+                    value={responseMessage}
+                    onChange={event => setResponseMessage(event.target.value.slice(0, 1_000))}
+                    rows={4}
+                    maxLength={1_000}
+                    autoFocus
+                    className="mt-2 w-full resize-y rounded-md border border-[#A9B8CC] px-3 py-2 text-sm text-[#02132D] outline-none focus:border-[#0078FF] focus:ring-2 focus:ring-[#0078FF]/20"
+                    placeholder={responseForm === 'request_changes' ? 'Describe the revision you need.' : 'Share a reason if you would like.'}
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[#6B7D95]">
+                    <span>{responseForm === 'request_changes' ? 'Required' : 'Optional'}</span>
+                    <span>{responseMessage.length}/1,000</span>
+                  </div>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => void submitResponse(responseForm)}
+                      disabled={Boolean(submitting) || (responseForm === 'request_changes' && responseMessage.trim().length < 3)}
+                      className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${responseForm === 'decline' ? 'bg-red-700' : 'bg-[#0078FF]'}`}
+                    >
+                      {submitting === responseForm ? 'Submitting...' : responseForm === 'request_changes' ? 'Submit change request' : 'Confirm decline'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setResponseForm(null); setResponseMessage(''); setResponseError(''); }}
+                      disabled={Boolean(submitting)}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#A9B8CC] bg-white px-4 py-2 text-sm font-semibold text-[#223D67] disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
-          {acceptance?.state === 'accepted' && (
+          {response?.state === 'accepted' && (
             <section className="border-y border-emerald-200 bg-emerald-50 px-1 py-6" aria-labelledby="estimate-accepted-heading" data-testid="request-free-estimate-accepted">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
                 <div>
                   <h2 id="estimate-accepted-heading" className="text-base font-bold text-emerald-950">Estimate accepted</h2>
-                  <p className="mt-1 text-sm leading-6 text-emerald-900">Accepted through this secure guest delivery on {dateTime(acceptance.accepted_at)}. You can continue to review the exact Estimate above.</p>
+                  <p className="mt-1 text-sm leading-6 text-emerald-900">Accepted through this secure guest delivery on {dateTime(response.accepted_at)}. You can continue to review the exact Estimate above.</p>
                   <p className="mt-1 text-xs leading-5 text-emerald-800">This records approval to proceed. It is not an electronic signature or verified account identity.</p>
                 </div>
               </div>
             </section>
           )}
 
-          {acceptance?.state === 'stale' && (
-            <section className="border-y border-amber-200 bg-amber-50 px-1 py-5" data-testid="request-free-estimate-acceptance-stale">
-              <p className="text-sm font-bold text-amber-950">An updated Estimate is required</p>
-              <p className="mt-1 text-sm leading-6 text-amber-900">This delivered version no longer matches the contractor's current Estimate and cannot be accepted. Ask the contractor to send the updated Estimate.</p>
+          {response?.state === 'changes_requested' && (
+            <section className="border-y border-amber-200 bg-amber-50 px-1 py-6" data-testid="request-free-estimate-changes-requested">
+              <div className="flex items-start gap-3">
+                <MessageSquareText className="mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+                <div>
+                  <h2 className="text-base font-bold text-amber-950">Changes requested</h2>
+                  <p className="mt-1 text-sm leading-6 text-amber-900">Your request was recorded on {dateTime(response.responded_at)} for this exact Estimate. The contractor can revise it and send you a new version.</p>
+                  {response.message && <p className="mt-3 whitespace-pre-wrap rounded-md border border-amber-200 bg-white/70 p-3 text-sm leading-6 text-amber-950">{response.message}</p>}
+                </div>
+              </div>
             </section>
           )}
 
-          {acceptance?.state === 'ineligible' && (
+          {response?.state === 'declined' && (
+            <section className="border-y border-red-200 bg-red-50 px-1 py-6" data-testid="request-free-estimate-declined">
+              <div className="flex items-start gap-3">
+                <XCircle className="mt-0.5 shrink-0 text-red-700" aria-hidden="true" />
+                <div>
+                  <h2 className="text-base font-bold text-red-950">Estimate declined</h2>
+                  <p className="mt-1 text-sm leading-6 text-red-900">Your response was recorded on {dateTime(response.responded_at)} for this Estimate version only. It does not prevent future work or a revised Estimate.</p>
+                  {response.message && <p className="mt-3 whitespace-pre-wrap rounded-md border border-red-200 bg-white/70 p-3 text-sm leading-6 text-red-950">{response.message}</p>}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {response?.state === 'stale' && (
+            <section className="border-y border-amber-200 bg-amber-50 px-1 py-5" data-testid="request-free-estimate-acceptance-stale">
+              <p className="text-sm font-bold text-amber-950">An updated Estimate is required</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">This delivered version no longer matches the contractor's current Estimate and cannot receive a response. Ask the contractor to send the updated Estimate.</p>
+            </section>
+          )}
+
+          {response?.state === 'ineligible' && (
             <section className="border-y border-amber-200 bg-amber-50 px-1 py-5" data-testid="request-free-estimate-acceptance-ineligible">
-              <p className="text-sm font-bold text-amber-950">Acceptance is unavailable</p>
-              <p className="mt-1 text-sm leading-6 text-amber-900">This Estimate is no longer eligible for acceptance from this link. Contact the contractor if you need an updated Estimate.</p>
+              <p className="text-sm font-bold text-amber-950">Response actions are unavailable</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">This Estimate is no longer eligible for a response from this link. Contact the contractor if you need an updated Estimate.</p>
             </section>
           )}
 
           <footer className="flex items-start gap-2 border-t border-[#E1E3E7] pt-5 text-xs leading-5 text-[#6B7D95]">
             <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#0078FF]" aria-hidden="true" />
-            <p>This secure link shows only the published Estimate snapshot. Viewing alone does not record acceptance. An explicit acceptance is recorded as secure guest approval, not a signature or verified account identity, and never grants access to Customer or property history.</p>
+            <p>This secure link shows only the published Estimate snapshot. Viewing alone does not record acceptance or any other response. Accept, Request changes, and Decline apply only to this version, do not verify identity or create a signature, and never grant access to Customer or property history.</p>
           </footer>
         </div>
       </article>

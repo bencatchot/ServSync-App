@@ -146,6 +146,24 @@
           "reason": "The exact Production migration was applied on 2026-08-07 at 22:23:49Z through 22:23:51Z for supported-schema parity; catalog/security correspondence and preservation passed, and no external email capability or configuration was added."
         }
       }
+    },
+    {
+      "id": "secure-guest-estimate-response-v1",
+      "artifact": "servsync-secure-guest-estimate-response.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied and safely reapplied on 2026-08-07; catalog/security, exact-snapshot change request and decline, mutual exclusion, replay, stale/revoked denial, preservation, and rollback cleanup checks passed."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Awaiting controlled migration-first Production rollout authorization after Sandbox validation and merge-readiness completion."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Awaiting the same exact migration after Production for supported-schema parity; no provider or presentation change is required."
+        }
+      }
     }
   ]
 }

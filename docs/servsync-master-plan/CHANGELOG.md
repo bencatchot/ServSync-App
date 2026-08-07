@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/secure-guest-estimate-response-v1`
+- Starting main SHA: `5ffe1f425fd57e44a4a4583d3f2f95a95bb030b8`
+- Files changed:
+  - `api/request-free-local-estimate-delivery.ts`
+  - `servsync-secure-guest-estimate-response.sql`
+  - `src/types.ts`
+  - `src/features/estimates/LocalEstimateDeliveryPanel.tsx`
+  - `src/features/estimates/RequestFreeEstimateView.tsx`
+  - `src/features/estimates/requestFreeEstimateDelivery.ts`
+  - `tests/e2e/request-free-local-estimate-delivery.spec.ts`
+  - `tests/e2e/secure-guest-estimate-acceptance.spec.ts`
+  - `tests/e2e/secure-guest-estimate-response.spec.ts`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Secure Guest Estimate Response v1 on the existing request-free Estimate session. A Not connected Customer can continue to accept the exact delivered Estimate, request changes with a required 3-1,000 character message, or decline that exact version with an optional reason. Request changes atomically records one immutable `secure_guest` response and returns the canonical Estimate from `sent` to editable `draft`; decline records the response and uses the existing `sent -> declined` lifecycle. Neither action edits line items, blocks future work, creates a chat, or asserts verified identity or signature. Contractor delivery history shows the response, timestamp, delivered version, recipient, and message without exposing security internals.
+- Integrity and security architecture: The same digest-only protected recipient session, immutable snapshot, advisory Estimate lock, row/table locks, lifecycle revalidation, and exact canonical snapshot reconstruction used by secure guest acceptance authorize the two new actions. One response or acceptance is authoritative per delivery; duplicate and conflicting submissions converge on that result, while stale, expired, rotated, revoked, connected, claimed, mapped, archived, inactive, malformed, and cross-tenant contexts fail closed. The private postgres-owned forced-RLS response table has no policies or non-owner table/column privileges. Only the service-role gateway can execute lookup/respond RPCs; raw bearers, session secrets, snapshot digests, and provider identifiers remain private. Request-change notification failure is best-effort and cannot erase a committed response.
+- Sandbox rollout and validation: Exact migration `servsync-secure-guest-estimate-response.sql` (SHA-256 `ffeaa9ace8faf547d49c630fea920fc560ed67767e2653ceb2b272aeeba1c70d`) was applied and safely reapplied to Sandbox `zpzdkoaubyjtsomccxya`. Catalog verification found one postgres-owned forced-RLS/no-policy response table, zero non-owner table privileges, one immutable trigger, six indexes, 12 constraints, fixed `search_path=public`, intended definer/invoker posture, single service RPC overloads, and service-role-only response lookup/write execution. A transactional live probe proved change-request, decline, acceptance mutual exclusion, replay, stale-version denial, revocation denial, sanitized history, and exact rollback cleanup. Sandbox profiles 19, contractors 6, memberships 5, contacts 299, homes 320, Estimates 138, identifier digests, and zero delivery/acceptance/response residue matched baseline.
+- Validation: TypeScript and the Production build passed. Focused request-free Estimate/acceptance/response coverage passed 31/31; a broader 107-test Estimate editing, secure Estimate email, Invoice delivery, finalized-report delivery, acceptance, and response regression set passed. Recipient Request changes and Decline interactions passed at desktop and 390x844 mobile without overflow. The implementation corrected an optional-decline parser mismatch found during self-review so an explicit `null` reason follows the same valid path as an omitted reason.
+- Rollout status and remaining boundary: Sandbox is Applied. Production and Demo remain Pending and require one controlled migration-first authorization before merge. Connected Customer authenticated responses, accepted-Estimate-to-Job handoff, Estimate email, Invoice delivery, and finalized-report delivery remain unchanged. Electronic signatures, stronger identity verification, payments/deposits, SMS, attachments, change orders, negotiation/chat, report acknowledgment, Service Plans, and broader guest access remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003B records the Sandbox-validated guest response actions and keeps Production/Demo rollout plus broader recipient capabilities active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the exact-version response semantics, lifecycle choices, security boundary, rollout state, and exclusions.
+
 - Branch: `codex/secure-estimate-acceptance-v1`
 - Starting main SHA: `2bff413187544459d2065a7ac4d47f32bd9c1445`
 - Files changed:

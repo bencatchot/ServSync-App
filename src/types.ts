@@ -541,6 +541,7 @@ export interface LocalEstimateDeliveryLinkMetadata {
   revoked_by_name: string;
   email_deliveries: LocalEstimateEmailDeliveryAttempt[];
   acceptance: LocalEstimateAcceptanceMetadata;
+  response: LocalEstimateResponseMetadata;
 }
 
 export type LocalEstimateAcceptanceMetadata =
@@ -551,6 +552,24 @@ export type LocalEstimateAcceptanceMetadata =
       accepted_at: string;
       source_updated_at: string;
       recipient_email: string | null;
+    };
+
+export type LocalEstimateResponseMetadata =
+  | { state: 'no_response' }
+  | {
+      state: 'accepted';
+      channel: 'secure_guest';
+      accepted_at: string;
+      source_updated_at: string;
+      recipient_email: string | null;
+    }
+  | {
+      state: 'changes_requested' | 'declined';
+      channel: 'secure_guest';
+      responded_at: string;
+      source_updated_at: string;
+      recipient_email: string | null;
+      message: string | null;
     };
 
 export type RequestFreeEstimateDeliveryState = RequestFreeInvoiceDeliveryState;
@@ -609,11 +628,16 @@ export interface RequestFreeEstimateDeliveryLookup {
   state: RequestFreeEstimateDeliveryState;
   estimate?: RequestFreeEstimateDocument;
   acceptance?: RequestFreeEstimateAcceptanceState;
+  response?: RequestFreeEstimateResponseState;
 }
 
 export type RequestFreeEstimateAcceptanceState =
   | { state: 'eligible' | 'stale' | 'ineligible' }
   | { state: 'accepted'; accepted_at: string };
+
+export type RequestFreeEstimateResponseState =
+  | RequestFreeEstimateAcceptanceState
+  | { state: 'changes_requested' | 'declined'; responded_at: string; message: string | null };
 
 export type FinalizedReportDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
 export type FinalizedReportEmailDeliveryStatus = 'sending' | 'sent' | 'failed';
