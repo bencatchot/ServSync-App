@@ -338,7 +338,7 @@ test('function comments and formatting are separated from logical definition dri
   const reference = snapshot();
   const formatted = canonicalFunctionDefinition
     .replace('begin\n  return query', 'begin\n  -- formatting-only note\n\n  return    query')
-    .replace('select id from', 'select id\nfrom');
+    .replace('select id from', 'select   id from');
   assert.equal(canonicalizeFunctionDefinition(canonicalFunctionDefinition), canonicalizeFunctionDefinition(formatted));
   const result = compareCatalogs(reference, snapshot({
     functions: [entry('public.list_customers()', 'public.list_customers()', {
@@ -360,7 +360,7 @@ test('function comments and formatting are separated from logical definition dri
   );
 });
 
-test('function canonicalization preserves PostgreSQL operator and literal boundaries', () => {
+test('function canonicalization only ignores proven-safe formatting differences', () => {
   const definition = body => canonicalFunctionDefinition.replace(
     'return query select id from public.customers;',
     body,
@@ -368,16 +368,27 @@ test('function canonicalization preserves PostgreSQL operator and literal bounda
   const canonical = body => canonicalizeFunctionDefinition(definition(body));
 
   assert.notEqual(canonical('return 1 ## 2;'), canonical('return 1 # # 2;'));
-  assert.equal(canonical("return payload->>'name';"), canonical("return payload ->> 'name';"));
-  assert.equal(canonical('return 1##2;'), canonical('return 1 ## 2;'));
-  assert.equal(canonical('return 1+2;'), canonical('return 1 + 2;'));
+  assert.notEqual(canonical("return payload->>'name';"), canonical("return payload ->> 'name';"));
+  assert.notEqual(canonical('return 1##2;'), canonical('return 1 ## 2;'));
+  assert.notEqual(canonical('return 1+2;'), canonical('return 1 + 2;'));
   assert.notEqual(canonical("return payload->>'name';"), canonical("return payload#>>'{name}';"));
-  assert.equal(canonical('return 1 /* layout */ + 2;'), canonical('return 1+2;'));
+  assert.equal(canonical('return 1 /* layout */ + 2;'), canonical('return 1 + 2;'));
+  assert.equal(canonical('return\n  1 + 2;'), canonical('return\n        1 + 2;'));
   assert.notEqual(canonical("return 'a  b';"), canonical("return 'a b';"));
   assert.notEqual(canonical('return "Customer Name";'), canonical('return "customer name";'));
   assert.notEqual(canonical('return $value$a  b$value$;'), canonical('return $value$a b$value$;'));
   assert.notEqual(canonical('return 1_000;'), canonical('return 1 _000;'));
   assert.notEqual(canonical('return 1000;'), canonical('return 1001;'));
+  assert.notEqual(canonical('return éé;'), canonical('return é é;'));
+  assert.notEqual(canonical('return U&"0061";'), canonical('return U & "0061";'));
+  assert.notEqual(canonical("return E'a\\nb';"), canonical("return E 'a\\nb';"));
+
+  const uncertainEscapeString = definition("return E'a\\nb';");
+  const reformattedUncertainEscapeString = uncertainEscapeString.replace('return E', 'return  E');
+  assert.notEqual(
+    canonicalizeFunctionDefinition(uncertainEscapeString),
+    canonicalizeFunctionDefinition(reformattedUncertainEscapeString),
+  );
 
   const operatorBoundaryDrift = compareCatalogs(snapshot(), snapshot({
     functions: [entry('public.list_customers()', 'public.list_customers()', {
@@ -388,6 +399,44 @@ test('function canonicalization preserves PostgreSQL operator and literal bounda
   }), configWithGroups(), 'demo');
   assert.match(operatorBoundaryDrift.status, /^FAIL/);
   assert.equal(operatorBoundaryDrift.unexplained[0].kind, 'logical-drift');
+});
+
+test('unproven function formatting cannot produce a non-failing parity result', () => {
+  const uncertainDefinition = canonicalFunctionDefinition.replace(
+    'return query select id from public.customers;',
+    "return E'a\\nb';",
+  );
+  const candidate = snapshot({
+    functions: [entry('public.list_customers()', 'public.list_customers()', {
+      security_definer: true,
+      return_type: 'SETOF uuid',
+      definition: uncertainDefinition.replace('return E', 'return  E'),
+    })],
+  });
+  const result = compareCatalogs(snapshot({
+    functions: [entry('public.list_customers()', 'public.list_customers()', {
+      security_definer: true,
+      return_type: 'SETOF uuid',
+      definition: uncertainDefinition,
+    })],
+  }), candidate, configWithGroups(), 'demo');
+  assert.match(result.status, /^FAIL/);
+  assert.equal(result.formatOnly.length, 0);
+  assert.equal(result.unexplained[0].kind, 'logical-drift');
+
+  const nonSqlReference = snapshot({
+    functions: [entry('public.list_customers()', 'public.list_customers()', {
+      language: 'plpython3u',
+      security_definer: true,
+      return_type: 'SETOF uuid',
+      definition: 'def list_customers():\n  return []\n',
+    })],
+  });
+  const nonSqlCandidate = structuredClone(nonSqlReference);
+  nonSqlCandidate.functions[0].definition = 'def list_customers():\n    return []\n';
+  const nonSqlResult = compareCatalogs(nonSqlReference, nonSqlCandidate, configWithGroups(), 'demo');
+  assert.match(nonSqlResult.status, /^FAIL/);
+  assert.equal(nonSqlResult.formatOnly.length, 0);
 });
 
 test('rollout ledger remains descriptive and requires every environment, status, and reason', () => {

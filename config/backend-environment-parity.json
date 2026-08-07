@@ -56,7 +56,7 @@
           "tableGrants": 48
         },
         "expectedKeyFingerprint": "sha256:f63af13d48e0bdc190c23d9fc6922247465b79041ceced1d9c889b6dc16e25bf",
-        "expectedCatalogFingerprint": "sha256:99512315508513567033826c3d586e9702218a572fcff743e126add75f591db3"
+        "expectedCatalogFingerprint": "sha256:077c10731301d97b20babe0da4886d186b18e8fe3d544782b9476d47c1f37c0b"
       }
     ],
     "sandbox": [
@@ -100,7 +100,7 @@
           "tableGrants": 96
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
-        "expectedCatalogFingerprint": "sha256:d8bb50e7027cbda140ee5b1cbce1edf3a07e9889d89baceb1b094198a8ab9bc7"
+        "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
       }
     ]
   }

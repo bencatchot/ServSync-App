@@ -40,8 +40,8 @@ const EXPECTED_ENVIRONMENTS = Object.freeze({
 const ROLLOUT_STATUSES = new Set(['Applied', 'Pending', 'N/A', 'Intentionally deferred']);
 const ENVIRONMENT_NAMES = ['sandbox', 'production', 'demo'];
 const FINGERPRINT_PATTERN = /^sha256:[0-9a-f]{64}$/;
-const POSTGRES_OPERATOR_CHARACTER = /[+\-*/<>=~!@#%^&|`?]/;
-const POSTGRES_OPERATOR_TRAILING_SIGN_DISAMBIGUATOR = /[~!@#%^&|`?]/;
+const PROVEN_FORMAT_PREFIX = 'proven-format-v1\u001d';
+const RAW_DEFINITION_PREFIX = 'raw-definition-v1\u001d';
 
 export async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
@@ -204,58 +204,56 @@ function readQuoted(source, start, quote) {
         index += 2;
         continue;
       }
-      return index + 1;
+      return { end: index + 1 };
     }
-    if (source[index] === '\\' && source[start - 1]?.toLowerCase() === 'e') index += 1;
+    if (quote === "'" && source[index] === '\\') return null;
     index += 1;
   }
-  throw new Error('Unterminated quoted token in function definition.');
+  return null;
 }
 
 function readDollarQuoted(source, start) {
-  const delimiterMatch = source.slice(start).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/);
-  if (!delimiterMatch) return null;
-  const delimiter = delimiterMatch[0];
+  let delimiter = '$$';
+  if (!source.startsWith(delimiter, start)) {
+    const delimiterEnd = source.indexOf('$', start + 1);
+    if (delimiterEnd < 0) return null;
+    const tag = source.slice(start + 1, delimiterEnd);
+    if (!/^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*$/u.test(tag)) return null;
+    delimiter = `$${tag}$`;
+  }
   const end = source.indexOf(delimiter, start + delimiter.length);
-  if (end < 0) throw new Error('Unterminated dollar-quoted token in function definition.');
+  if (end < 0) return null;
   return { delimiter, end: end + delimiter.length };
 }
 
-function readPostgresOperator(source, start) {
-  let end = start;
-  while (end < source.length && POSTGRES_OPERATOR_CHARACTER.test(source[end])) {
-    if (end > start && (source.startsWith('--', end) || source.startsWith('/*', end))) break;
-    end += 1;
-  }
-
-  let operator = source.slice(start, end);
-  const trailingSigns = [];
-  while (operator.length > 1
-    && /[+-]$/.test(operator)
-    && !POSTGRES_OPERATOR_TRAILING_SIGN_DISAMBIGUATOR.test(operator)) {
-    trailingSigns.unshift(operator.at(-1));
-    operator = operator.slice(0, -1);
-  }
-
-  return { end, tokens: [operator, ...trailingSigns] };
-}
-
-function readNumber(source, start) {
-  const value = source.slice(start);
-  return value.match(/^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[oO][0-7](?:_?[0-7])*|0[bB][01](?:_?[01])*|(?:(?:\d(?:_?\d)*)\.(?:\d(?:_?\d)*)?|\.(?:\d(?:_?\d)*)|(?:\d(?:_?\d)*))(?:[eE][+-]?\d(?:_?\d)*)?)/)?.[0] ?? null;
-}
-
-function tokenizeSql(source) {
-  const tokens = [];
+function normalizeProvenFormatting(source) {
+  const parts = [];
   let index = 0;
+  let pendingSeparator = null;
+
+  const markSeparator = hasNewline => {
+    if (hasNewline || pendingSeparator === null) pendingSeparator = hasNewline ? '\n' : ' ';
+  };
+  const append = value => {
+    if (parts.length > 0 && pendingSeparator !== null) parts.push(pendingSeparator);
+    pendingSeparator = null;
+    parts.push(value);
+  };
+
   while (index < source.length) {
     const character = source[index];
-    if (/\s/.test(character)) {
-      index += 1;
+    if (/[ \t\f\r\n]/.test(character)) {
+      let hasNewline = false;
+      while (index < source.length && /[ \t\f\r\n]/.test(source[index])) {
+        hasNewline ||= source[index] === '\r' || source[index] === '\n';
+        index += 1;
+      }
+      markSeparator(hasNewline);
       continue;
     }
     if (source.startsWith('--', index)) {
       const end = source.indexOf('\n', index + 2);
+      markSeparator(end >= 0);
       index = end < 0 ? source.length : end + 1;
       continue;
     }
@@ -273,75 +271,67 @@ function tokenizeSql(source) {
           cursor += 1;
         }
       }
-      if (depth !== 0) throw new Error('Unterminated block comment in function definition.');
+      if (depth !== 0) return null;
+      markSeparator(/[\r\n]/.test(source.slice(index, cursor)));
       index = cursor;
       continue;
     }
     if (character === "'" || character === '"') {
-      const end = readQuoted(source, index, character);
-      tokens.push(source.slice(index, end));
-      index = end;
+      const quoted = readQuoted(source, index, character);
+      if (!quoted) return null;
+      append(source.slice(index, quoted.end));
+      index = quoted.end;
       continue;
     }
     if (character === '$') {
       const quoted = readDollarQuoted(source, index);
       if (quoted) {
-        tokens.push(source.slice(index, quoted.end));
+        append(source.slice(index, quoted.end));
         index = quoted.end;
         continue;
       }
     }
-    const word = source.slice(index).match(/^[A-Za-z_][A-Za-z0-9_$]*/);
-    if (word) {
-      tokens.push(word[0].toLowerCase());
-      index += word[0].length;
-      continue;
-    }
-    const number = readNumber(source, index);
-    if (number) {
-      tokens.push(number.toLowerCase());
-      index += number.length;
-      continue;
-    }
-    if (POSTGRES_OPERATOR_CHARACTER.test(character)) {
-      const operator = readPostgresOperator(source, index);
-      tokens.push(...operator.tokens);
-      index = operator.end;
-      continue;
-    }
-    const punctuation = source.slice(index).match(/^(?:::|:=|\.\.)/);
-    if (punctuation) {
-      tokens.push(punctuation[0]);
-      index += punctuation[0].length;
-      continue;
-    }
-    tokens.push(character);
+    append(character);
     index += 1;
   }
-  return tokens.join('\u001f');
+  return parts.join('');
 }
 
 export function canonicalizeFunctionDefinition(definition) {
   const bodyStart = /^AS[ \t]+(\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$)[ \t]*$/im.exec(definition);
-  if (!bodyStart) return tokenizeSql(definition);
+  if (!bodyStart) {
+    const normalized = normalizeProvenFormatting(definition);
+    return normalized === null
+      ? `${RAW_DEFINITION_PREFIX}${definition}`
+      : `${PROVEN_FORMAT_PREFIX}${normalized}`;
+  }
 
   const delimiter = bodyStart[1];
   const opening = bodyStart.index + bodyStart[0].lastIndexOf(delimiter);
   const bodyOffset = opening + delimiter.length;
   const closing = definition.indexOf(delimiter, bodyOffset);
-  if (closing < 0) throw new Error('Function body delimiter is not closed.');
+  if (closing < 0) return `${RAW_DEFINITION_PREFIX}${definition}`;
 
   const prefix = definition.slice(0, opening);
   const body = definition.slice(bodyOffset, closing);
   const suffix = definition.slice(closing + delimiter.length);
-  return `${tokenizeSql(prefix)}\u001e${tokenizeSql(body)}\u001e${tokenizeSql(suffix)}`;
+  const normalized = [prefix, body, suffix].map(normalizeProvenFormatting);
+  if (normalized.some(value => value === null)) return `${RAW_DEFINITION_PREFIX}${definition}`;
+  return `${PROVEN_FORMAT_PREFIX}${normalized.join('\u001e')}`;
+}
+
+function comparableFunctionDefinition(entry) {
+  if (entry.language && !['sql', 'plpgsql'].includes(entry.language)) {
+    return `${RAW_DEFINITION_PREFIX}${entry.definition ?? ''}`;
+  }
+  return canonicalizeFunctionDefinition(entry.definition ?? '');
 }
 
 function normalizedEntry(category, entry) {
   if (category !== 'functions' || typeof entry.definition !== 'string') return stableValue(entry);
   return stableValue({
     ...entry,
-    definition: canonicalizeFunctionDefinition(entry.definition),
+    definition: comparableFunctionDefinition(entry),
   });
 }
 
@@ -358,7 +348,7 @@ function changedFields(category, left, right) {
   return [...new Set([...Object.keys(left), ...Object.keys(right)])]
     .filter(field => {
       if (category === 'functions' && field === 'definition') {
-        return canonicalizeFunctionDefinition(left[field] ?? '') !== canonicalizeFunctionDefinition(right[field] ?? '');
+        return comparableFunctionDefinition(left) !== comparableFunctionDefinition(right);
       }
       return stableJson(left[field]) !== stableJson(right[field]);
     })
