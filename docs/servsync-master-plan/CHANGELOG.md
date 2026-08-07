@@ -4,6 +4,28 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-07
+
+- Branch: `codex/pr387-rollout-doc-closeout`
+- Starting main SHA: `20e1b04adafaa5f5919a43b6d9fc9f4ede4cc74d`
+- Files changed:
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Records the completed three-environment rollout and normal merge of Public Signup Role Hardening and Referral Trigger Canonicalization. PR #387 merged as `20e1b04adafaa5f5919a43b6d9fc9f4ede4cc74d` with parents `1371ecfb746d782394a60e37945866ac8d7059f9` and `453d7827f0f7da8c94024bcc310be6cc737baa71`. The exact `servsync-public-signup-role-hardening.sql` migration (SHA-256 `4fe4f48a57cfeb3a46a07bcfe67f2e716ea9be29e369324da225b244d4be6f7a`) is now applied and validated in Sandbox `zpzdkoaubyjtsomccxya`, Production `uqgtheclhxqlnjpfmheq`, and Demo `bdytwgejqnlblhrnqxkp`.
+- Security outcome: Self-service signup can create only `homeowner` or `contractor` profiles. Public metadata cannot create `platform_admin` or contractor-team roles; unknown, malformed, internal, privileged, and team-role values use the approved safe homeowner fallback. Authenticated users cannot rewrite their own profile role, cross-user role mutation remains denied, and existing legitimate platform administrators were preserved. Universal, permanent, and one-time referral attribution remains supported, and the hardened `handle_new_user()` definition is final in the supported clean-install order.
+- Environment rollout and catalog validation: The corrected migration was applied to Production at `2026-08-07T08:59:49.303Z` through `08:59:49.327Z` and Demo at `2026-08-07T09:01:50.151Z` through `09:01:50.447Z`; Sandbox retained its previously authenticated exact installation. All three environments matched the reviewed function bodies, expected postgres ownership, fixed `search_path=public`, expected `SECURITY DEFINER`/`SECURITY INVOKER` state, one expected overload, direct-execution denials for PUBLIC, anon, authenticated, and service_role where designed, and the correct auth/profile trigger bindings.
+- Preservation and deployment: Production, Demo, and Sandbox retained 2, 0, and 1 platform administrators respectively. Existing administrator identifier fingerprints and captured profile, membership, customer, property, claim, referral, Draft, and other business counts/fingerprints were preserved; no permanent validation fixtures were created. No environment variables, feature flags, entitlements, memberships, configuration, or unrelated business data changed. Automatic Production deployment `dpl_3NFC3J4xNTvcKzUJroyiFS5SmGzC` and Demo deployment `dpl_12ERA2RGAPW8yT3dZh9UP5GbVyUC` both reached `READY` from the exact merge SHA. `servsync.app`, `www.servsync.app`, and `servsync-demo.vercel.app` returned HTTP 200.
+- Backend parity: Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with the exact approved 129-object Demo scenario group. Production versus Sandbox remains `FAIL`; the approved 297-object Project Collaboration group is still separate from 24 unrelated unresolved findings, including supported-schema/function/policy drift and two unapproved storage policies. Marking this migration `Applied` in all three environments does not imply broader Sandbox parity.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 now records the completed signup-boundary security rollout while retaining unrelated Sandbox reconciliation and public-launch operational work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Replaces the pending security-rollout state with the verified merged and three-environment deployed state without changing the underlying role policy.
+
 ## 2026-08-06
 
 - Branch: `codex/public-signup-role-hardening-v1`
