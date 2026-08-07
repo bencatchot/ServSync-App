@@ -130,3 +130,21 @@ export async function lookupRequestFreeEstimate(
   const data: unknown = await response.json();
   return requireResult<RequestFreeEstimateDeliveryLookup>(data, 'Estimate lookup is temporarily unavailable.');
 }
+
+export async function acceptRequestFreeEstimate(options: { request?: typeof fetch } = {}) {
+  const request = options.request ?? fetch;
+  const response = await request('/api/request-free-local-estimate-delivery', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'accept' }),
+    cache: 'no-store',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    referrerPolicy: 'no-referrer',
+  });
+  if (response.status === 429) {
+    return { state: 'rate_limited' } satisfies RequestFreeEstimateDeliveryLookup;
+  }
+  if (!response.ok) throw new Error('Estimate acceptance is temporarily unavailable.');
+  const data: unknown = await response.json();
+  return requireResult<RequestFreeEstimateDeliveryLookup>(data, 'Estimate acceptance is temporarily unavailable.');
+}

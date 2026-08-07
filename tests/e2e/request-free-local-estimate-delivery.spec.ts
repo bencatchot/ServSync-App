@@ -31,14 +31,20 @@ function between(text: string, start: string, end: string) {
 function gatewayFixture(options: {
   bootstrap?: string;
   session?: string;
+  acceptance?: string;
+  accepted?: string;
   rateLimited?: boolean;
   configurationError?: boolean;
 } = {}) {
   const bootstrapCalls: Array<{ token: string; digest: string; previous: string | null }> = [];
   const sessionCalls: string[] = [];
+  const acceptanceCalls: string[] = [];
+  const acceptCalls: string[] = [];
   return {
     bootstrapCalls,
     sessionCalls,
+    acceptanceCalls,
+    acceptCalls,
     handler: createRequestFreeEstimateDeliveryHandler({
       checkEntryRateLimit: async () => ({
         rateLimited: options.rateLimited ?? false,
@@ -51,6 +57,14 @@ function gatewayFixture(options: {
       lookupEstimateSession: async digest => {
         sessionCalls.push(digest);
         return options.session ?? JSON.stringify({ state: 'unavailable' });
+      },
+      lookupEstimateAcceptance: async digest => {
+        acceptanceCalls.push(digest);
+        return options.acceptance ?? JSON.stringify({ state: 'eligible' });
+      },
+      acceptEstimate: async digest => {
+        acceptCalls.push(digest);
+        return options.accepted ?? JSON.stringify({ state: 'accepted', accepted_at: '2026-08-07T12:05:00.000Z' });
       },
       generateSessionIdentifier: () => SESSION,
     }),
@@ -90,7 +104,10 @@ const validEstimate = {
     ],
     payment_schedule_items: [{ invoice_type: 'deposit', label: 'Deposit', calculated_amount_cents: 60000, due_trigger: 'At approval' }],
   },
+  acceptance: { state: 'eligible' },
 };
+
+const storedEstimateSnapshot = { state: validEstimate.state, estimate: validEstimate.estimate };
 
 test.describe('request-free local Estimate source and SQL boundary', () => {
   test('stores an immutable allowlisted snapshot and only SHA-256 bearer/session digests', () => {
@@ -192,7 +209,7 @@ test.describe('request-free local Estimate same-origin gateway', () => {
     const fixture = gatewayFixture();
     const get = await fixture.handler(new Request('https://servsync.example/api/request-free-local-estimate-delivery'));
     expect(get.status).toBe(405);
-    for (const body of ['{', JSON.stringify({ token: 'bad' }), JSON.stringify({ token: TOKEN, extra: true }), JSON.stringify([])]) {
+    for (const body of ['{', JSON.stringify({ token: 'bad' }), JSON.stringify({ token: TOKEN, extra: true }), JSON.stringify({ action: 'decline' }), JSON.stringify({ action: 'accept', estimate_id: 'forged' }), JSON.stringify([])]) {
       expect((await fixture.handler(request(body))).status).toBe(400);
     }
     expect((await fixture.handler(request('{}'))).status).toBe(200);
@@ -202,7 +219,7 @@ test.describe('request-free local Estimate same-origin gateway', () => {
   });
 
   test('creates a strict 30-minute HttpOnly cookie and stores only the session digest', async () => {
-    const fixture = gatewayFixture({ bootstrap: JSON.stringify(validEstimate) });
+    const fixture = gatewayFixture({ bootstrap: JSON.stringify(storedEstimateSnapshot) });
     const response = await fixture.handler(request(JSON.stringify({ token: TOKEN })));
     const cookie = response.headers.get('set-cookie') ?? '';
     expect(response.status).toBe(200);
@@ -217,6 +234,7 @@ test.describe('request-free local Estimate same-origin gateway', () => {
       digest: createHash('sha256').update(SESSION).digest('hex'),
       previous: null,
     });
+    expect(fixture.acceptanceCalls).toEqual([createHash('sha256').update(SESSION).digest('hex')]);
   });
 
   test('enforces request, response, Firewall, and safe-shape boundaries', async () => {
@@ -260,7 +278,7 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 
     await expect(page.getByRole('heading', { level: 1, name: 'Water heater replacement' })).toBeVisible();
     await expect(page.getByText('Fixture Customer')).toBeVisible();
     await expect(page.getByText('Water heater', { exact: true })).toBeVisible();
-    await expect(page.getByText('Viewing it does not confirm delivery', { exact: false })).toBeVisible();
+    await expect(page.getByText('Viewing alone does not record acceptance', { exact: false })).toBeVisible();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow, noarchive');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
     expect(await page.evaluate(secret => ({

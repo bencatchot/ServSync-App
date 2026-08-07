@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
-import { AlertTriangle, Building2, FileText, MapPin, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, Building2, CheckCircle2, FileText, MapPin, ShieldCheck } from 'lucide-react';
 import type {
   RequestFreeEstimateDeliveryLookup,
   RequestFreeEstimateDocument,
   RequestFreeEstimateLineItem,
 } from '../../types';
+import { acceptRequestFreeEstimate } from './requestFreeEstimateDelivery';
 
 type ViewState =
   | { status: 'loading' }
@@ -70,6 +71,9 @@ const unavailableCopy: Record<Exclude<ViewState['status'], 'loading' | 'ready'>,
 };
 
 export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimateDeliveryLookup | null }) {
+  const [acceptedLookup, setAcceptedLookup] = useState<RequestFreeEstimateDeliveryLookup | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState('');
   useEffect(() => {
     const previousTitle = document.title;
     const robots = document.createElement('meta');
@@ -91,7 +95,8 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
     };
   }, []);
 
-  const view: ViewState = lookup === null ? { status: 'loading' } : stateFromLookup(lookup);
+  const currentLookup = acceptedLookup ?? lookup;
+  const view: ViewState = currentLookup === null ? { status: 'loading' } : stateFromLookup(currentLookup);
 
   if (view.status === 'loading') {
     return (
@@ -120,7 +125,26 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
   }
 
   const estimate = view.estimate;
+  const acceptance = currentLookup?.state === 'valid' ? currentLookup.acceptance : undefined;
   const hasUnpricedLines = estimate.line_items.some(line => line.unit_price_cents === null);
+  const acceptEstimate = async () => {
+    if (accepting || acceptance?.state !== 'eligible') return;
+    const confirmed = window.confirm('Accept this Estimate? This confirms that you approve this exact Estimate and authorize the contractor to proceed with the work described. This is not an electronic signature.');
+    if (!confirmed) return;
+    setAccepting(true);
+    setAcceptError('');
+    try {
+      const result = await acceptRequestFreeEstimate();
+      if (result.state !== 'valid' || !result.estimate || !result.acceptance) {
+        throw new Error('This Estimate could not be accepted from the current link.');
+      }
+      setAcceptedLookup(result);
+    } catch (error) {
+      setAcceptError(error instanceof Error ? error.message : 'Estimate acceptance is temporarily unavailable.');
+    } finally {
+      setAccepting(false);
+    }
+  };
   return (
     <main className="min-h-screen bg-[#F4F7FB] px-3 py-6 text-[#02132D] sm:px-5 sm:py-10" data-testid="request-free-estimate-valid">
       <article className="mx-auto max-w-4xl overflow-hidden rounded-lg border border-[#D8DEE8] bg-white shadow-sm">
@@ -137,7 +161,9 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
             <div className="sm:text-right">
               <p className="text-xs font-semibold uppercase text-[#6B7D95]">Estimate total</p>
               <p className="mt-1 text-2xl font-bold">{money(estimate.total_cents)}</p>
-              <p className="mt-1 text-sm font-semibold text-[#526784]">Sent</p>
+              <p className={`mt-1 text-sm font-semibold ${acceptance?.state === 'accepted' ? 'text-emerald-700' : 'text-[#526784]'}`}>
+                {acceptance?.state === 'accepted' ? 'Accepted' : 'Sent'}
+              </p>
             </div>
           </div>
         </header>
@@ -198,9 +224,52 @@ export function RequestFreeEstimateView({ lookup }: { lookup: RequestFreeEstimat
             </section>
           )}
 
+          {acceptance?.state === 'eligible' && (
+            <section className="border-y border-[#D8DEE8] bg-[#F8FAFD] px-1 py-6" aria-labelledby="estimate-acceptance-heading" data-testid="request-free-estimate-acceptance-eligible">
+              <h2 id="estimate-acceptance-heading" className="text-base font-bold">Ready to proceed?</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526784]">By accepting, you confirm that you approve this Estimate and authorize the contractor to proceed with the work described. Acceptance applies only to the exact Estimate shown here and is not an electronic signature.</p>
+              {acceptError && <p role="alert" className="mt-3 text-sm font-semibold text-red-700">{acceptError}</p>}
+              <button
+                type="button"
+                onClick={() => void acceptEstimate()}
+                disabled={accepting}
+                className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0078FF] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
+              >
+                <CheckCircle2 size={17} aria-hidden="true" /> {accepting ? 'Accepting...' : 'Accept Estimate'}
+              </button>
+            </section>
+          )}
+
+          {acceptance?.state === 'accepted' && (
+            <section className="border-y border-emerald-200 bg-emerald-50 px-1 py-6" aria-labelledby="estimate-accepted-heading" data-testid="request-free-estimate-accepted">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                <div>
+                  <h2 id="estimate-accepted-heading" className="text-base font-bold text-emerald-950">Estimate accepted</h2>
+                  <p className="mt-1 text-sm leading-6 text-emerald-900">Accepted through this secure guest delivery on {dateTime(acceptance.accepted_at)}. You can continue to review the exact Estimate above.</p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-800">This records approval to proceed. It is not an electronic signature or verified account identity.</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {acceptance?.state === 'stale' && (
+            <section className="border-y border-amber-200 bg-amber-50 px-1 py-5" data-testid="request-free-estimate-acceptance-stale">
+              <p className="text-sm font-bold text-amber-950">An updated Estimate is required</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">This delivered version no longer matches the contractor's current Estimate and cannot be accepted. Ask the contractor to send the updated Estimate.</p>
+            </section>
+          )}
+
+          {acceptance?.state === 'ineligible' && (
+            <section className="border-y border-amber-200 bg-amber-50 px-1 py-5" data-testid="request-free-estimate-acceptance-ineligible">
+              <p className="text-sm font-bold text-amber-950">Acceptance is unavailable</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">This Estimate is no longer eligible for acceptance from this link. Contact the contractor if you need an updated Estimate.</p>
+            </section>
+          )}
+
           <footer className="flex items-start gap-2 border-t border-[#E1E3E7] pt-5 text-xs leading-5 text-[#6B7D95]">
             <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#0078FF]" aria-hidden="true" />
-            <p>This link shows only the published Estimate snapshot. Viewing it does not confirm delivery, receipt, acceptance, approval, signature, or payment, and it does not grant access to Customer or property history.</p>
+            <p>This secure link shows only the published Estimate snapshot. Viewing alone does not record acceptance. An explicit acceptance is recorded as secure guest approval, not a signature or verified account identity, and never grants access to Customer or property history.</p>
           </footer>
         </div>
       </article>

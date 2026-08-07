@@ -14,13 +14,16 @@ const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 const SAFE_STATES = new Set(['valid', 'invalid', 'expired', 'revoked', 'replaced', 'unavailable', 'rate_limited', 'error']);
 
 type SafeState = 'valid' | 'invalid' | 'expired' | 'revoked' | 'replaced' | 'unavailable' | 'rate_limited' | 'error';
+type SafeAcceptanceState = 'eligible' | 'accepted' | 'stale' | 'ineligible' | 'unavailable' | 'rate_limited' | 'error';
 type RateLimitResult = { rateLimited: boolean; configurationError?: boolean };
-type RequestMode = { kind: 'bootstrap'; token: string } | { kind: 'session' };
+type RequestMode = { kind: 'bootstrap'; token: string } | { kind: 'session' } | { kind: 'accept' };
 
 export type RequestFreeEstimateGatewayDependencies = {
   checkEntryRateLimit: (request: Request) => Promise<RateLimitResult>;
   bootstrapEstimateSession: (token: string, sessionDigest: string, previousSessionDigest: string | null) => Promise<string>;
   lookupEstimateSession: (sessionDigest: string) => Promise<string>;
+  lookupEstimateAcceptance: (sessionDigest: string) => Promise<string>;
+  acceptEstimate: (sessionDigest: string) => Promise<string>;
   generateSessionIdentifier: () => string;
 };
 
@@ -90,6 +93,7 @@ function parseRequestMode(body: string): RequestMode | null {
   const record = parsed as Record<string, unknown>;
   const keys = Object.keys(record);
   if (keys.length === 0) return { kind: 'session' };
+  if (keys.length === 1 && keys[0] === 'action' && record.action === 'accept') return { kind: 'accept' };
   if (keys.length !== 1 || keys[0] !== 'token' || typeof record.token !== 'string') return null;
   return TOKEN_PATTERN.test(record.token) ? { kind: 'bootstrap', token: record.token } : null;
 }
@@ -117,6 +121,27 @@ function safeLookupState(serialized: string): SafeState | null {
     return result.estimate && typeof result.estimate === 'object' && Object.keys(result).length === 2 ? 'valid' : null;
   }
   return Object.keys(result).length === 1 ? result.state as SafeState : null;
+}
+
+function safeAcceptance(serialized: string) {
+  let parsed: unknown;
+  try { parsed = JSON.parse(serialized); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const result = parsed as Record<string, unknown>;
+  if (typeof result.state !== 'string') return null;
+  const state = result.state as SafeAcceptanceState;
+  if (!['eligible', 'accepted', 'stale', 'ineligible', 'unavailable', 'rate_limited', 'error'].includes(state)) return null;
+  if (state === 'accepted') {
+    return Object.keys(result).sort().join(',') === 'accepted_at,state' && typeof result.accepted_at === 'string'
+      ? { state, accepted_at: result.accepted_at }
+      : null;
+  }
+  return Object.keys(result).length === 1 ? { state } : null;
+}
+
+function composeRecipientResponse(serializedEstimate: string, acceptance: { state: SafeAcceptanceState; accepted_at?: string }) {
+  const parsed = JSON.parse(serializedEstimate) as { state: 'valid'; estimate: Record<string, unknown> };
+  return JSON.stringify({ state: parsed.state, estimate: parsed.estimate, acceptance });
 }
 
 export async function checkEstimateEntryRateLimit(request: Request) {
@@ -152,11 +177,29 @@ export async function lookupEstimateSessionWithServiceRole(currentSessionDigest:
   return data;
 }
 
+export async function lookupEstimateAcceptanceWithServiceRole(currentSessionDigest: string) {
+  const { data, error } = await serviceRoleClient().rpc('servsync_lookup_local_estimate_delivery_acceptance', {
+    p_session_digest: currentSessionDigest,
+  });
+  if (error || typeof data !== 'string') throw new Error('Protected Estimate-acceptance lookup failed.');
+  return data;
+}
+
+export async function acceptEstimateWithServiceRole(currentSessionDigest: string) {
+  const { data, error } = await serviceRoleClient().rpc('servsync_accept_local_estimate_delivery_session', {
+    p_session_digest: currentSessionDigest,
+  });
+  if (error || typeof data !== 'string') throw new Error('Protected Estimate acceptance failed.');
+  return data;
+}
+
 export function createRequestFreeEstimateDeliveryHandler(
   dependencies: RequestFreeEstimateGatewayDependencies = {
     checkEntryRateLimit: checkEstimateEntryRateLimit,
     bootstrapEstimateSession: bootstrapEstimateSessionWithServiceRole,
     lookupEstimateSession: lookupEstimateSessionWithServiceRole,
+    lookupEstimateAcceptance: lookupEstimateAcceptanceWithServiceRole,
+    acceptEstimate: acceptEstimateWithServiceRole,
     generateSessionIdentifier: () => randomBytes(32).toString('hex'),
   },
 ) {
@@ -179,10 +222,11 @@ export function createRequestFreeEstimateDeliveryHandler(
     if (!mode) return failureResponse('invalid', 400);
 
     const existingSessionIdentifier = sessionIdentifierFromRequest(request);
-    if (mode.kind === 'session' && !existingSessionIdentifier) return failureResponse('unavailable', 200);
+    if (mode.kind !== 'bootstrap' && !existingSessionIdentifier) return failureResponse('unavailable', 200);
 
     let newSessionIdentifier = '';
     try {
+      const digest = existingSessionIdentifier ? sessionDigest(existingSessionIdentifier) : null;
       const serialized = mode.kind === 'bootstrap'
         ? await (async () => {
           newSessionIdentifier = dependencies.generateSessionIdentifier();
@@ -193,17 +237,33 @@ export function createRequestFreeEstimateDeliveryHandler(
             existingSessionIdentifier ? sessionDigest(existingSessionIdentifier) : null,
           );
         })()
-        : await dependencies.lookupEstimateSession(sessionDigest(existingSessionIdentifier!));
+        : await dependencies.lookupEstimateSession(digest!);
 
       const state = safeLookupState(serialized);
-      if (!state || new TextEncoder().encode(serialized).byteLength > MAX_ESTIMATE_PUBLIC_RESPONSE_BYTES) return failureResponse('error', 503);
+      if (!state) return failureResponse('error', 503);
       if (state === 'rate_limited') return new Response(serialized, { status: 429, headers: { ...responseHeaders, 'Retry-After': '60', 'Set-Cookie': expiredSessionCookie() } });
       if (state === 'error') return new Response(serialized, { status: 503, headers: { ...responseHeaders, 'Set-Cookie': expiredSessionCookie() } });
+
+      let acceptance: ReturnType<typeof safeAcceptance> = null;
+      if (state === 'valid') {
+        const activeDigest = mode.kind === 'bootstrap' ? sessionDigest(newSessionIdentifier) : digest!;
+        const serializedAcceptance = mode.kind === 'accept'
+          ? await dependencies.acceptEstimate(activeDigest)
+          : await dependencies.lookupEstimateAcceptance(activeDigest);
+        acceptance = safeAcceptance(serializedAcceptance);
+        if (!acceptance) return failureResponse('error', 503);
+        if (acceptance.state === 'rate_limited') return failureResponse('rate_limited', 429, { 'Retry-After': '60' });
+        if (acceptance.state === 'error') return failureResponse('error', 503);
+        if (acceptance.state === 'unavailable') return failureResponse('unavailable', 200);
+      }
+
+      const responseBody = state === 'valid' && acceptance ? composeRecipientResponse(serialized, acceptance) : serialized;
+      if (new TextEncoder().encode(responseBody).byteLength > MAX_ESTIMATE_PUBLIC_RESPONSE_BYTES) return failureResponse('error', 503);
 
       const cookie = mode.kind === 'bootstrap' && state === 'valid'
         ? activeSessionCookie(newSessionIdentifier)
         : state === 'valid' ? undefined : expiredSessionCookie();
-      return new Response(serialized, { status: 200, headers: cookie ? { ...responseHeaders, 'Set-Cookie': cookie } : responseHeaders });
+      return new Response(responseBody, { status: 200, headers: cookie ? { ...responseHeaders, 'Set-Cookie': cookie } : responseHeaders });
     } catch {
       return failureResponse('error', 503);
     } finally {

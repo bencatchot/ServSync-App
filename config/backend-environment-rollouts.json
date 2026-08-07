@@ -128,6 +128,24 @@
           "reason": "The exact migration was applied for backend schema parity on 2026-08-07 at 20:20:47Z through 20:20:49Z. Catalog and preservation checks passed; no Resend credential was added and outbound report email remains intentionally fail-closed."
         }
       }
+    },
+    {
+      "id": "secure-guest-estimate-acceptance-v1",
+      "artifact": "servsync-secure-guest-estimate-acceptance.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07; exact-snapshot acceptance, replay/concurrency, stale-version denial, rotation/revocation denial, direct-invocation denial, accepted-to-Job handoff, catalog, preservation, and cleanup checks passed."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production migration-first rollout requires separate final authorization after merge-readiness."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo should receive the exact migration with Production for supported-schema parity; no external email capability is required for the acceptance boundary."
+        }
+      }
     }
   ]
 }
