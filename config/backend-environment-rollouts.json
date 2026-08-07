@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "updatedOn": "2026-08-06",
+  "authoritativeEnvironment": "production",
+  "foundations": [
+    {
+      "id": "supported-backend-schema-2026-08-06",
+      "artifact": "PR #385 merge 67af5290b05fc88305d74818d5c0625fa93635f6",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Project Collaboration is an approved experiment, but the 2026-08-06 read-only comparison also found unresolved Production-supported Sandbox drift."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Authoritative supported backend schema."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Aligned by the controlled PR #385 Demo parity rollout."
+        }
+      }
+    },
+    {
+      "id": "backend-environment-parity-guard-v1",
+      "artifact": "Source-only validation tooling",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "No database migration."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "No database migration."
+        },
+        "demo": {
+          "status": "N/A",
+          "reason": "No database migration."
+        }
+      }
+    }
+  ]
+}

@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-06
 
+- Branch: `codex/backend-environment-parity-guard-v1`
+- Starting main SHA: `67af5290b05fc88305d74818d5c0625fa93635f6`
+- Files changed:
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - `scripts/backend-parity/catalog-query.sql`
+  - `scripts/backend-parity/lib.mjs`
+  - `scripts/backend-parity/check.mjs`
+  - `scripts/backend-parity/rollout-status.mjs`
+  - `tests/backend-parity/backend-parity.test.mjs`
+  - `package.json`
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added and independently corrected Backend Environment Parity Guard v1 as explicit read-only operator tooling. Production is bound to its immutable supported-schema identity; Demo is the normal supported peer; Sandbox additions require explicit approval. The normalized catalog contract covers logical relations/columns, constraints, indexes, triggers, public RLS, bounded `storage.objects` ownership/RLS, public plus ServSync-owned storage policies, function overloads/arguments/returns/ownership/security/search paths/definitions, execution grants, table and column ACLs, and relevant default ACLs without reading business data or secrets. Function comparison preserves non-whitespace characters and lexical separators, removes only proven-safe comment/layout differences, and falls back to exact raw definitions when quote parsing is uncertain; unproven equivalence fails instead of producing a format-only parity pass.
+- Intentional differences and rollout status: `config/backend-environment-parity.json` pins each approved addition group with exact relation/function/object selectors, category counts, a complete object-key SHA-256 fingerprint, and a logical catalog SHA-256 fingerprint. Rules apply only to additions; an unexpected child security object or changed Production-supported object fails. Demo's exact scenario group and Sandbox's exact Project Collaboration group are approved; all other additions fail. `config/backend-environment-rollouts.json` remains a descriptive Sandbox/Production/Demo ledger whose `Applied` state cannot override live parity failure. The live command remains explicit and is not added to credentialed CI.
+- Read-only environment result: Production versus Demo passed with 90/90 supported relations, 1/1 bounded managed relation, 1,264/1,264 columns, 724/724 constraints, 403/403 indexes, 100/100 triggers, 218/218 policies, 287/287 functions, 968/968 function grants, 2,073/2,073 table grants, 80/80 column grants, and 96/96 expanded default-ACL grants. Demo's exact fingerprinted scenario group contains 129 approved additions. Sandbox retained the exact 297-object Project Collaboration group and returned 25 unexplained findings: 23 missing or conservatively/logically changed supported entries plus two unapproved storage policies. The conservative comparator no longer treats the raw `notify_on_support_message()` difference as proven format-only. Sandbox remains pending rather than aligned. No SQL, schema, data, users, grants, settings, flags, entitlements, or deployments changed.
+- Validation: Sixteen local Node tests cover immutable whole-block environment swaps, exact manifest fingerprints, a missing RPC, changed function grants and grant options, changed/missing policies, public and storage RLS drift, changed columns/functions, unexpected children beneath approved tables, unapproved Demo/Sandbox additions, approved Demo and Project groups, logical-versus-proven-format function changes, custom and ordinary operator boundaries, Unicode and prefixed-token boundaries, quoted and dollar-quoted values, numeric literals, raw-definition fallback, incomplete/duplicate snapshots, read-only SQL enforcement, and rollout-ledger completeness. Live reads used only the three fixed healthy project identities and did not persist snapshots or private data. TypeScript, the Production build, focused changed-script lint, rollout-ledger validation, and `git diff --check` passed on the corrected working tree. Full lint remains blocked before changed-source evaluation by the unchanged ESLint 9 incompatibility. Production dependency audit retained one inherited low-severity DOMPurify advisory.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 now records the parity guard and keeps Sandbox supported-schema reconciliation as explicit operational follow-up.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Establishes Production authority, normal Demo alignment, explicit Sandbox experiments, and rollout-ledger expectations for future database work.
+
 - Branch: `codex/demo-production-schema-parity-v1`
 - Starting main SHA: `528b5c4e0fa549aaf74047c974fa2ab7aabc47bc`
 - Files changed:

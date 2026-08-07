@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 2,
+  "authoritativeEnvironment": "production",
+  "catalogSchemas": ["public"],
+  "managedRelationSecurity": ["storage.objects"],
+  "additionalPolicySchemas": ["storage"],
+  "environments": {
+    "production": {
+      "projectRef": "uqgtheclhxqlnjpfmheq",
+      "projectName": "ServSync Production",
+      "organizationId": "bktpuodtbjodamwsmuce",
+      "role": "supported-schema-reference"
+    },
+    "demo": {
+      "projectRef": "bdytwgejqnlblhrnqxkp",
+      "projectName": "ServSync Demo",
+      "organizationId": "bktpuodtbjodamwsmuce",
+      "role": "supported-schema-peer"
+    },
+    "sandbox": {
+      "projectRef": "zpzdkoaubyjtsomccxya",
+      "projectName": "ServSync Sandbox",
+      "organizationId": "bktpuodtbjodamwsmuce",
+      "role": "experimental-peer"
+    }
+  },
+  "intentionalAdditions": {
+    "demo": [
+      {
+        "id": "demo-scenario-infrastructure-v1",
+        "reason": "Private Demo scenario registry and exact trusted operator helpers.",
+        "selectors": {
+          "relationScopes": [
+            "public.demo_scenario_records",
+            "public.demo_scenario_runs",
+            "public.demo_scenarios"
+          ],
+          "functionScopes": [
+            "public.servsync_demo_finish_run(uuid, text, jsonb)",
+            "public.servsync_demo_register_record(uuid, text, text, uuid, text, text, jsonb)",
+            "public.servsync_demo_reset_order(text, text)",
+            "public.servsync_demo_reset_pk_column(text, text)",
+            "public.servsync_demo_reset_registered_run(uuid)",
+            "public.servsync_demo_start_run(text, text, text, text, text, timestamp with time zone, text, jsonb)"
+          ],
+          "exactObjects": []
+        },
+        "expectedCounts": {
+          "relations": 3,
+          "columns": 32,
+          "constraints": 17,
+          "indexes": 9,
+          "triggers": 2,
+          "functions": 6,
+          "functionGrants": 12,
+          "tableGrants": 48
+        },
+        "expectedKeyFingerprint": "sha256:f63af13d48e0bdc190c23d9fc6922247465b79041ceced1d9c889b6dc16e25bf",
+        "expectedCatalogFingerprint": "sha256:077c10731301d97b20babe0da4886d186b18e8fe3d544782b9476d47c1f37c0b"
+      }
+    ],
+    "sandbox": [
+      {
+        "id": "project-collaboration-foundation-v1",
+        "reason": "Approved Sandbox-only Project Collaboration foundation.",
+        "selectors": {
+          "relationScopes": [
+            "public.project_authority_assignments",
+            "public.project_collaboration_allowed_profiles",
+            "public.project_events",
+            "public.project_parties",
+            "public.project_party_memberships",
+            "public.projects"
+          ],
+          "functionScopes": [
+            "public.current_user_can_create_hidden_project_for_contractor(uuid)",
+            "public.current_user_can_manage_hidden_project(uuid)",
+            "public.current_user_can_view_project_event(uuid)",
+            "public.current_user_project_collaboration_allowed()",
+            "public.current_user_project_company_role(uuid)",
+            "public.servsync_attach_job_to_project(uuid, uuid)",
+            "public.servsync_create_project(uuid, text, text, uuid, uuid)",
+            "public.servsync_private_guard_local_project_assignment()",
+            "public.servsync_update_project(uuid, text, text)"
+          ],
+          "exactObjects": [
+            "columns:public.inspections.project_id",
+            "constraints:public.inspections.inspections_project_id_fkey",
+            "indexes:public.inspections_project_idx"
+          ]
+        },
+        "expectedCounts": {
+          "relations": 6,
+          "columns": 78,
+          "constraints": 59,
+          "indexes": 22,
+          "triggers": 6,
+          "functions": 9,
+          "functionGrants": 21,
+          "tableGrants": 96
+        },
+        "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
+        "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
+      }
+    ]
+  }
+}

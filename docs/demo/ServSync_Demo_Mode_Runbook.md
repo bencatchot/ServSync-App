@@ -131,6 +131,14 @@ TEST_SUPABASE_PROJECT_REF="bdytwgejqnlblhrnqxkp" \
 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium
 ```
 
+After an authorized Production or Demo database rollout, use the separate read-only supported-schema comparison from [ServSync Backend Environment Parity](../servsync-master-plan/ServSync_Backend_Environment_Parity.md):
+
+```bash
+SUPABASE_ACCESS_TOKEN=... npm run backend:parity:check -- --demo-only
+```
+
+The parity command verifies the fixed Production and Demo Management API identities and compares catalog contracts without reading business records. It does not replace the Demo scenario, role, security-catalog, Presentation-mode, or workflow checks, and it does not authorize SQL or configuration changes.
+
 Run authenticated FB-003A Demo validation only after the Demo fixture credentials are present through the approved secret location. Keep external-effect flags unset or explicitly disabled, and use only the internal/non-delivery claim-invitation path.
 
 The canonical authenticated FB-003A browser procedure is [FB-003A Authenticated Demo Validation](validation/FB-003A_Authenticated_Demo_Validation.md). That procedure defines Tests A-H, the safe guarded Copy Link handoff, required checkpoints, evidence rules, stop conditions, and the mutation ledger. Do not treat the procedure as a passing result until a separately authorized Demo validation run executes it and records evidence.
