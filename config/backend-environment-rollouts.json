@@ -84,12 +84,12 @@
           "reason": "The exact migration was applied and authenticated role, recipient-session, revocation, catalog, and preservation validation passed on 2026-08-07."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Requires separate controlled Production migration-first rollout authorization after PR review."
+          "status": "Applied",
+          "reason": "The exact Sandbox-validated migration was applied on 2026-08-07; catalog, grants, forced-RLS tables, trigger, and preservation checks matched the reviewed definition."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "No Demo SQL was authorized; keep the feature unsupported until separately rolled out with its server-side gateway prerequisites."
+          "status": "Applied",
+          "reason": "The exact Production migration was applied on 2026-08-07 for backend schema parity. Demo operational access remains fail-closed unless its existing server-side gateway configuration supports the request-free route."
         }
       }
     }
