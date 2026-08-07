@@ -138,12 +138,12 @@
           "reason": "The exact migration was applied on 2026-08-07; exact-snapshot acceptance, replay/concurrency, stale-version denial, rotation/revocation denial, direct-invocation denial, accepted-to-Job handoff, catalog, preservation, and cleanup checks passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Production migration-first rollout requires separate final authorization after merge-readiness."
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07 at 22:23:08Z through 22:23:10Z; catalog/security correspondence and captured business-count and identifier preservation matched the validated Sandbox definition without live acceptance fixtures."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo should receive the exact migration with Production for supported-schema parity; no external email capability is required for the acceptance boundary."
+          "status": "Applied",
+          "reason": "The exact Production migration was applied on 2026-08-07 at 22:23:49Z through 22:23:51Z for supported-schema parity; catalog/security correspondence and preservation passed, and no external email capability or configuration was added."
         }
       }
     }
