@@ -35,6 +35,8 @@ create role authenticated nologin;
 create role service_role nologin;
 create role supabase_auth_admin nologin;
 create schema auth authorization postgres;
+create schema extensions authorization postgres;
+create extension pgcrypto with schema extensions;
 create table auth.users (
   id uuid primary key,
   email text,

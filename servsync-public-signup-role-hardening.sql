@@ -174,7 +174,7 @@ begin
         reward_notes
       ) values (
         v_contractor_id,
-        upper(encode(gen_random_bytes(6), 'hex')),
+        upper(left(replace(pg_catalog.gen_random_uuid()::text, '-', ''), 12)),
         'permanent_qr',
         'used',
         v_contractor_owner_user_id,

@@ -173,6 +173,7 @@ begin
      where used_by_homeowner_id = '10000000-0000-0000-0000-000000000013'
        and invite_type = 'permanent_qr'
        and status = 'used'
+       and invite_code ~ '^[0-9A-F]{12}$'
   ) then
     raise exception 'Permanent referral attribution was not preserved';
   end if;
