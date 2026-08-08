@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
+import { REQUEST_FREE_INVOICE_SESSION_COOKIE } from './request-free-local-invoice-delivery.js';
 import {
   SERVSYNC_STRIPE_APPLICATION_FEE_CENTS,
   bearerToken,
@@ -9,6 +11,7 @@ import {
 } from '../server/stripeConnect.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SESSION_PATTERN = /^[0-9a-f]{64}$/;
 
 type PreparedPayment = {
   attempt_id: string;
@@ -32,6 +35,15 @@ function testPaymentMethod(behavior: string) {
   return null;
 }
 
+function sessionIdentifier(request: Request) {
+  const header = request.headers.get('cookie') ?? '';
+  const values = header.split(';').map(value => value.trim())
+    .filter(value => value.startsWith(`${REQUEST_FREE_INVOICE_SESSION_COOKIE}=`));
+  if (values.length !== 1) return null;
+  const value = values[0].slice(REQUEST_FREE_INVOICE_SESSION_COOKIE.length + 1);
+  return SESSION_PATTERN.test(value) ? value : null;
+}
+
 export default {
   async fetch(request: Request) {
     const config = stripeConnectServerConfig();
@@ -46,11 +58,10 @@ export default {
     try { input = await request.json(); } catch { return json({ reason: 'invalid_request' }, 400); }
     if (!input || typeof input !== 'object' || Array.isArray(input)) return json({ reason: 'invalid_request' }, 400);
     const record = input as Record<string, unknown>;
-    if (Object.keys(record).sort().join(',') !== 'behavior,idempotency_key,invoice_id') {
+    if (Object.keys(record).sort().join(',') !== 'behavior,idempotency_key') {
       return json({ reason: 'invalid_request' }, 400);
     }
-    if (typeof record.invoice_id !== 'string' || !UUID_PATTERN.test(record.invoice_id)
-      || typeof record.idempotency_key !== 'string' || !UUID_PATTERN.test(record.idempotency_key)) {
+    if (typeof record.idempotency_key !== 'string' || !UUID_PATTERN.test(record.idempotency_key)) {
       return json({ reason: 'invalid_request' }, 400);
     }
     const paymentMethod = typeof record.behavior === 'string' ? testPaymentMethod(record.behavior) : null;
@@ -60,12 +71,24 @@ export default {
       auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
     });
-    const { data, error } = await user.rpc('servsync_prepare_authenticated_stripe_invoice_checkout', {
-      p_invoice_id: record.invoice_id,
+    const { data: authorization, error: authorizationError } = await user.rpc('servsync_authorize_stripe_connect_onboarding');
+    const authorizedContractorId = authorization && typeof authorization === 'object'
+      ? (authorization as Record<string, unknown>).contractor_id
+      : null;
+    if (authorizationError || typeof authorizedContractorId !== 'string') return json({ reason: 'forbidden' }, 403);
+
+    const session = sessionIdentifier(request);
+    if (!session) return json({ reason: 'not_eligible' }, 409);
+    const service = createClient(config.supabaseUrl, config.serviceRoleKey, {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    });
+    const { data, error } = await service.rpc('servsync_prepare_request_free_stripe_invoice_checkout', {
+      p_session_digest: createHash('sha256').update(session).digest('hex'),
       p_idempotency_key: record.idempotency_key,
     });
     if (error || !data || typeof data !== 'object') return json({ reason: 'not_eligible' }, 409);
     const prepared = data as PreparedPayment;
+    if (prepared.contractor_id !== authorizedContractorId) return json({ reason: 'forbidden' }, 403);
 
     const metadata = {
       servsync_online_payment_attempt_id: prepared.attempt_id,
