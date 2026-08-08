@@ -221,6 +221,7 @@ test.describe('home_assets foundation SQL', () => {
     );
 
     expect(appSource).toContain(".from('home_assets')");
+    expect(appSource).not.toContain(".rpc('servsync_list_property_assets'");
     expect(appSource).toContain('Assets &amp; Systems');
     expect(sharedHomeShellSource).not.toContain('home_assets');
     expect(sharedReminderShellSource).not.toContain('home_assets');
@@ -244,9 +245,24 @@ test.describe('home_assets foundation SQL', () => {
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/security-catalog.spec.ts',
+      'servsync-property-asset-bridge.sql',
+      'scripts/validation/validate-property-asset-bridge.sh',
+      'tests/sql/property-asset-bridge-foundation.sql',
+      'tests/sql/property-asset-bridge-seed.sql',
+      'tests/sql/property-asset-bridge-validation.sql',
+      'tests/sql/property-asset-bridge-rollback.sql',
+      'tests/sql/property-asset-bridge-sandbox-transaction.sql',
+      'tests/e2e/property-asset-bridge.spec.ts',
+      'config/backend-environment-parity.json',
+      'config/backend-environment-rollouts.json',
+      'docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md',
+      'docs/servsync-master-plan/ServSync_Completed_Features.md',
+      'docs/servsync-master-plan/ServSync_Trade_Pack_Domain_Contracts_v1.md',
+      'docs/servsync-master-plan/ServSync_Trade_Pack_Architecture_v1.md',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
+      'package.json',
     ]);
 
     expect(files.length, 'branch should have changed files for this slice').toBeGreaterThan(0);
@@ -254,10 +270,19 @@ test.describe('home_assets foundation SQL', () => {
       expect(allowedFiles.has(file), `${file} should be an approved home_assets foundation file`).toBe(true);
     }
 
-    expect(files.some(file => file.endsWith('.sql') && !['servsync-home-assets-foundation.sql', 'servsync-home-map-layout-foundation.sql'].includes(file))).toBe(false);
+    expect(files.some(file => file.endsWith('.sql') && ![
+      'servsync-home-assets-foundation.sql',
+      'servsync-home-map-layout-foundation.sql',
+      'servsync-property-asset-bridge.sql',
+      'tests/sql/property-asset-bridge-foundation.sql',
+      'tests/sql/property-asset-bridge-seed.sql',
+      'tests/sql/property-asset-bridge-validation.sql',
+      'tests/sql/property-asset-bridge-rollback.sql',
+      'tests/sql/property-asset-bridge-sandbox-transaction.sql',
+    ].includes(file))).toBe(false);
     expect(files.some(file => file.includes('supabase/functions/'))).toBe(false);
     expect(files.some(file => file.includes('.env'))).toBe(false);
-    expect(files.some(file => file.includes('package'))).toBe(false);
+    expect(files.some(file => file === 'package-lock.json')).toBe(false);
     expect(files.some(file => file.includes('vercel'))).toBe(false);
     expect(files.some(file => /storage|bucket/i.test(file) && file !== 'servsync-home-assets-foundation.sql')).toBe(false);
   });

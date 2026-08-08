@@ -218,6 +218,24 @@
           "reason": "Demo should follow the Production-supported schema only in a later separately authorized parity rollout."
         }
       }
+    },
+    {
+      "id": "property-asset-bridge-v1",
+      "artifact": "servsync-property-asset-bridge.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Final corrected SHA-256 31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 21:52:44Z through 21:52:47Z after the zero-row prior bridge was safely rolled back. Catalog, ownership, forced-RLS, ACL, active/archived legacy timestamp preservation, role/property/tenant, local-claim continuity, revision immutability, concurrency, lifecycle, service_role direct-write/truncate denial, rollback-only behavior, and zero-residue validation passed; no Trade Pack capability or work type was enabled."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "The hidden bridge and its shared home_assets security/definition changes require a later separately authorized Production migration and validation."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo should follow the Production-supported schema only after a separately authorized Production/Demo bridge rollout."
+        }
+      }
     }
   ]
 }

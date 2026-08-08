@@ -91,7 +91,10 @@ Later Trade Section work must preserve these boundaries:
 
 - sections are ordered children of the existing Draft or Job;
 - multiple trades may coexist in one Draft, Estimate, Job, and Invoice;
-- property assets remain generic and preserve provenance/history;
+- Property Asset Bridge v1 extends the canonical `home_assets` identity with generic customer-safe fields, local-property claim continuity, append-only revisions, exact-revision concurrency, and property-derived authorization;
+- the current application client remains on the legacy Assets & Systems contract until a coordinated Production/Demo bridge rollout and client transition;
+- future sections may reference an asset UUID and accepted revision, but this foundation does not yet create that association;
+- property assets and history remain independent of Trade Pack entitlement and billing;
 - an assigned Field Technician may edit approved active-Job field content without gaining definition, Price Book, billing, or administrative authority;
 - Price Book items remain pricing sources copied into canonical work/Estimate lines;
 - templates and checklists remain reusable inputs rather than competing workflow systems;
@@ -102,8 +105,8 @@ Later Trade Section work must preserve these boundaries:
 
 The following are not part of this foundation:
 
-- Property Asset Bridge or asset mutation;
 - runtime Draft/Job section tables;
+- Draft/Job-to-asset association;
 - visible HVAC UI;
 - No Cooling professional content;
 - recommendation conversion;
@@ -111,4 +114,4 @@ The following are not part of this foundation:
 - Stripe product/price mapping or Trade Pack billing;
 - Production or Demo rollout.
 
-The next bounded slice is `Property Asset Bridge v1`.
+Property Asset Bridge v1 is now a separate hidden Sandbox-only foundation. The next bounded slice is `Durable Trade Section Instances v1`.

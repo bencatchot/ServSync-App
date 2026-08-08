@@ -24,6 +24,7 @@ test.describe('Assets & Systems v1 UI', () => {
     expect(dataSource).toContain(".is('archived_at', null)");
     expect(dataSource).toContain(".order('asset_category'");
     expect(dataSource).toContain(".order('name'");
+    expect(dataSource).toContain("'Unable to load Assets & Systems.'");
     expect(assetSource).toContain('Assets &amp; Systems');
     expect(assetSource).toContain('Add asset');
     expect(assetSource).toContain('Edit asset/system');
@@ -31,6 +32,10 @@ test.describe('Assets & Systems v1 UI', () => {
     expect(assetLogic).toContain('archived_at: new Date().toISOString()');
     expect(assetLogic).toContain('home_room_id: homeAssetDraft.home_room_id || null');
     expect(assetLogic).toContain('created_by: profile.id');
+    expect(assetLogic).toContain("'Unable to save asset.'");
+    expect(assetLogic).toContain("'Unable to archive asset.'");
+    expect(assetSource).toContain('No active assets or systems yet.');
+    expect(assetSource).toContain('flex flex-col gap-3 sm:flex-row');
     expect(assetLogic).not.toContain('.delete()');
   });
 
@@ -65,7 +70,7 @@ test.describe('Assets & Systems v1 UI', () => {
     const assetSource = sourceBetween(app, 'const renderHomeAssetForm =', 'const renderSharedHomeShellsPanel =');
     const contractorSource = sourceBetween(
       app,
-      'function ContractorDashboard({ profile, onSignOut }',
+      'function ContractorDashboard({',
       'function PlatformAdminDashboard({ onSignOut }',
     );
 

@@ -6,6 +6,43 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-08
 
+- Branch: `codex/property-asset-bridge-v1`
+- Starting main SHA: `6da828d357570451d1ae983dfe610e01c7975843`
+- Files changed:
+  - `servsync-property-asset-bridge.sql`
+  - `scripts/validation/validate-property-asset-bridge.sh`
+  - `tests/sql/property-asset-bridge-foundation.sql`
+  - `tests/sql/property-asset-bridge-seed.sql`
+  - `tests/sql/property-asset-bridge-validation.sql`
+  - `tests/sql/property-asset-bridge-rollback.sql`
+  - `tests/sql/property-asset-bridge-sandbox-transaction.sql`
+  - `tests/e2e/property-asset-bridge.spec.ts`
+  - `tests/e2e/home-assets-ui.spec.ts`
+  - `tests/e2e/home-assets-foundation.spec.ts`
+  - `package.json`
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md`
+  - `docs/servsync-master-plan/ServSync_Trade_Pack_Domain_Contracts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds Property Asset Bridge v1 as a hidden extension of the canonical `home_assets` identity. Generic strict asset kinds and bounded customer-safe fields support connected and contractor-managed Not connected properties. Approved local-customer claim mapping preserves the same asset UUID and complete lineage when the canonical home is established. Append-only full revisions record actor, source contractor, property lineage, mutation kind, and time for create, update, lifecycle, and claim-map changes; exact expected revisions reject stale concurrent writes.
+- Authorization and security: Fixed-path RPCs derive exact homeowner or contractor/property authority. Homeowner owner/admin callers may manage assets and retain private notes; member/viewer callers receive a redacted customer-safe view. Active connected Owner/Admin/Office callers may manage assets for an exact shared property, while Field Technician/Viewer are read-only. Local Owner/Admin/Office may manage; local Field Technician is read-only and Viewer remains denied until an assignment-scoped runtime Job boundary exists. Inactive, archived, disconnected, cross-tenant, cross-contractor, cross-property, and arbitrary-ID access fails closed. Both asset tables are postgres-owned, forced-RLS, and policy-free with no browser table/column grants. Canonical Supabase `service_role` table ACLs remain present, while guarded mutation and immutable-revision triggers deny direct history manipulation. Only five narrow RPCs are granted to `authenticated`.
+- Lifecycle and product boundary: Assets use active/retired lifecycle rather than destructive deletion, and history survives disconnection, claim, retirement, Trade Pack downgrade, and later catalog changes. Contractor mutation cannot replace homeowner-private notes; another contractor's identity is redacted from history projections. Property Asset identity and history are independent of Stripe, subscription, billing, and Trade Pack capability. The current homeowner Assets & Systems client intentionally remains byte-identical to `main` and continues using the legacy direct-table contract; it does not call the Sandbox-only bridge RPCs.
+- Merge-readiness compatibility correction: The original draft head unconditionally changed the homeowner client to four bridge RPCs that do not exist in Production or Demo. That cutover, its expanded client types, and its rewritten UI contract test were removed before merge. Focused regression coverage now requires the legacy client path and rejects bridge RPC calls, keeping the foundation hidden and inert until a later coordinated Production/Demo migration and client transition.
+- Sandbox rollout: Final corrected exact migration `servsync-property-asset-bridge.sql` (SHA-256 `31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b`) was applied only to Sandbox `zpzdkoaubyjtsomccxya` on `2026-08-08T21:52:44Z` through `21:52:47Z`, after the zero-row prior bridge was safely rolled back. Live catalog correspondence confirmed two postgres-owned forced-RLS/policy-free tables, zero browser table grants, the audited service-role ACL, five authenticated RPCs, zero PUBLIC/anon RPC execution, six bridge-added triggers, and invoker-context guards that reject direct `service_role` writes and truncation despite forged private session settings. Populated active/archived fixtures also proved that schema backfill preserves original UUIDs, room links, private notes, archive state, and timestamps in both the asset and initial historical snapshot. Transactional role, claim, disconnection, lifecycle, revision, concurrency, and service-role immutability checks rolled back to zero asset/revision rows. Sandbox retained zero capability grants and zero enabled Trade Pack work types.
+- Parity evidence: Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with the same 129 exact Demo additions. Production versus Sandbox remains the expected `FAIL` with 597 exact approved additions and 34 visible findings. Twelve new findings are the shared `home_assets` definition/security changes from this Sandbox-only bridge; the prior 22 unrelated Stripe, function, and policy findings remain unresolved. The exact manifest approves additions only and does not hide changed Production-supported objects.
+- Tests/checks run: Disposable PostgreSQL 16 canonical-chain forward migration, repeated-application rejection, missing-prerequisite rollback, exact guarded rollback, ownership/RLS/grant/search-path, role/property/tenant, local-claim continuity, malformed/oversized input, lifecycle, revision immutability, concurrency, downgrade/history, and zero-residue checks; live Sandbox catalog and rollback-only validation; 15 focused Playwright source/contract checks; typecheck; Production build; backend-parity tests and live comparisons; rollout-ledger validation; Bash syntax/execution; JSON parsing; changed-file scope and sensitive-value scans; and `git diff --check`. Repository-wide lint remains blocked before changed-file evaluation by the existing ESLint 9/typescript-eslint rule-loader incompatibility, and `shellcheck` is unavailable locally; neither is introduced by this slice.
+- Scope boundary and follow-up: No client runtime cutover, visible Property Asset/HVAC UI, runtime Trade Section, live Draft/Job asset association, enabled HVAC content, report/PDF/history projection, capability grant, or Production/Demo SQL/configuration occurred. The guarded rollback is pre-use only; once durable history exists, corrections must be additive. The next bounded slice after this merge remains `Durable Trade Section Instances v1`.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records the Sandbox-only canonical asset/history bridge and advances the next bounded work to durable runtime sections while preserving all visible/product rollout gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records canonical asset identity, claim continuity, revision/concurrency/security boundaries, provider-neutral history, and the deferred Draft/Job association and Production/Demo rollout.
+
 - Branch: `codex/trade-pack-domain-contracts-v1`
 - Starting main SHA: `810bb435c7de4facf183d30a725b8758477017dd`
 - Files changed:
