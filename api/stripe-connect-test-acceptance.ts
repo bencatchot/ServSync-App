@@ -35,34 +35,54 @@ export default {
     const stripe = createStripeClient(config.secretKey);
     try {
       const accountId = authorization.stripe_account_id;
-      await stripe.accounts.update(accountId, {
-        business_type: 'individual',
-        business_profile: {
-          mcc: '1520',
-          name: authorization.business_name,
-          product_description: 'ServSync Stripe TEST provider acceptance contractor.',
-          url: 'https://accessible.stripe.com',
-        },
-        individual: {
-          first_name: 'Test',
-          last_name: 'Contractor',
-          email: authorization.email,
-          phone: '0000000000',
-          dob: { day: 1, month: 1, year: 1901 },
-          address: {
-            line1: 'address_full_match',
-            city: 'Chicago',
-            state: 'IL',
-            postal_code: '60601',
-            country: 'US',
+      await stripe.v2.core.accounts.update(accountId, {
+        contact_phone: '0000000000',
+        configuration: {
+          merchant: {
+            mcc: '1520',
+            statement_descriptor: { descriptor: 'SERVSYNC TEST' },
+            support: { email: authorization.email, phone: '0000000000' },
           },
-          ssn_last_4: '0000',
         },
-        tos_acceptance: { date: Math.floor(Date.now() / 1000), ip: '127.0.0.1' },
+        defaults: {
+          profile: {
+            doing_business_as: authorization.business_name,
+            business_url: 'https://accessible.stripe.com',
+            product_description: 'ServSync Stripe TEST provider acceptance contractor.',
+          },
+        },
+        identity: {
+          entity_type: 'individual',
+          individual: {
+            given_name: 'Test',
+            surname: 'Contractor',
+            email: authorization.email,
+            phone: '0000000000',
+            date_of_birth: { day: 1, month: 1, year: 1901 },
+            address: {
+              line1: 'address_full_match',
+              city: 'Chicago',
+              state: 'IL',
+              postal_code: '60601',
+              country: 'US',
+            },
+            id_numbers: [{ type: 'us_ssn_last_4', value: '0000' }],
+          },
+          attestations: {
+            terms_of_service: {
+              account: { date: new Date().toISOString(), ip: '127.0.0.1', user_agent: 'ServSync provider acceptance' },
+            },
+          },
+        },
+        include: ['configuration.merchant', 'defaults', 'identity', 'requirements'],
       });
-      const banks = await stripe.accounts.listExternalAccounts(accountId, { object: 'bank_account', limit: 1 });
-      if (banks.data.length === 0) {
-        await stripe.accounts.createExternalAccount(accountId, { external_account: 'btok_us_verified' });
+      try {
+        const banks = await stripe.accounts.listExternalAccounts(accountId, { object: 'bank_account', limit: 1 });
+        if (banks.data.length === 0) {
+          await stripe.accounts.createExternalAccount(accountId, { external_account: 'btok_us_verified' });
+        }
+      } catch {
+        // Accounts v2 with a full Dashboard can require payout details through Stripe-hosted onboarding.
       }
       const account = await stripe.v2.core.accounts.retrieve(accountId, {
         include: ['configuration.merchant', 'defaults', 'identity', 'requirements'],
