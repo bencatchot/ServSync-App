@@ -140,6 +140,72 @@
         },
         "expectedKeyFingerprint": "sha256:7c9c9c79b5a2b8fa8281436f038387148b7b4f378ff2c4e37e50c005b65cd38b",
         "expectedCatalogFingerprint": "sha256:de72b3c75bc21a47b805aae689c74f0b1696f70c49190e8390ac638b50eb53c5"
+      },
+      {
+        "id": "property-asset-bridge-v1",
+        "reason": "Approved hidden Sandbox-only Property Asset bridge additions; shared home_assets security and definition changes remain visible drift until a separately authorized Production/Demo rollout.",
+        "selectors": {
+          "relationScopes": [
+            "public.home_asset_revisions"
+          ],
+          "functionScopes": [
+            "public.servsync_create_property_asset(uuid, uuid, uuid, uuid, text, text, text, text, text, text, text, date, smallint, date, text, text)",
+            "public.servsync_list_property_asset_revisions(uuid, uuid)",
+            "public.servsync_list_property_assets(uuid, uuid, uuid, boolean)",
+            "public.servsync_private_can_manage_property_assets(uuid, uuid, uuid)",
+            "public.servsync_private_can_read_property_assets(uuid, uuid, uuid)",
+            "public.servsync_private_guard_property_asset_insert()",
+            "public.servsync_private_guard_property_asset_revision()",
+            "public.servsync_private_map_claimed_property_assets()",
+            "public.servsync_private_property_asset_category(text)",
+            "public.servsync_private_property_asset_optional_text(text, integer, text, boolean)",
+            "public.servsync_private_record_property_asset_revision()",
+            "public.servsync_private_validate_property_asset_target(uuid, uuid, uuid)",
+            "public.servsync_set_property_asset_lifecycle(uuid, bigint, text, uuid)",
+            "public.servsync_update_property_asset(uuid, bigint, uuid, uuid, text, text, text, text, text, text, text, date, smallint, date, text, text)"
+          ],
+          "exactObjects": [
+            "columns:public.home_assets.approximate_age_years",
+            "columns:public.home_assets.asset_kind",
+            "columns:public.home_assets.customer_safe_description",
+            "columns:public.home_assets.lifecycle_status",
+            "columns:public.home_assets.local_home_id",
+            "columns:public.home_assets.location_label",
+            "columns:public.home_assets.origin_contractor_id",
+            "columns:public.home_assets.origin_kind",
+            "columns:public.home_assets.revision_number",
+            "columns:public.home_assets.serial_identifier",
+            "constraints:public.home_assets.home_assets_approximate_age_check",
+            "constraints:public.home_assets.home_assets_asset_kind_check",
+            "constraints:public.home_assets.home_assets_customer_safe_description_length",
+            "constraints:public.home_assets.home_assets_lifecycle_check",
+            "constraints:public.home_assets.home_assets_local_home_id_fkey",
+            "constraints:public.home_assets.home_assets_location_label_length",
+            "constraints:public.home_assets.home_assets_origin_check",
+            "constraints:public.home_assets.home_assets_origin_contractor_id_fkey",
+            "constraints:public.home_assets.home_assets_property_reference_check",
+            "constraints:public.home_assets.home_assets_revision_number_check",
+            "constraints:public.home_assets.home_assets_serial_identifier_length",
+            "indexes:public.home_assets_home_lifecycle_idx",
+            "indexes:public.home_assets_local_home_lifecycle_idx",
+            "indexes:public.home_assets_origin_contractor_idx",
+            "triggers:public.contractor_local_homes.contractor_local_homes_map_property_assets_trigger",
+            "triggers:public.home_assets.home_assets_guard_insert_trigger",
+            "triggers:public.home_assets.home_assets_record_revision_trigger"
+          ]
+        },
+        "expectedCounts": {
+          "relations": 1,
+          "columns": 41,
+          "constraints": 21,
+          "indexes": 7,
+          "triggers": 4,
+          "functions": 14,
+          "functionGrants": 19,
+          "tableGrants": 16
+        },
+        "expectedKeyFingerprint": "sha256:5b3fb0dceb459aba6336640d21a978992c0dc9c14d68d0eeb15d6d5bcf0f6a07",
+        "expectedCatalogFingerprint": "sha256:abea0717545fa303e69df92d7d7b5f41055fee4001a26cb441d0ec5ce1449045"
       }
     ]
   }

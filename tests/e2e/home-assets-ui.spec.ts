@@ -14,23 +14,25 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Assets & Systems v1 UI', () => {
-  test('loads active home_assets and supports owner/admin add edit archive without hard delete', () => {
+  test('loads active home assets and supports owner/admin add edit archive through controlled RPCs', () => {
     const app = appSource();
     const dataSource = sourceBetween(app, 'const loadHomeAssets = useCallback(async () => {', 'useEffect(() => {\n    void loadHomeAssets();');
     const assetLogic = sourceBetween(app, 'const openHomeAssetForm =', 'const signedHomeAssetUrl =');
     const assetSource = sourceBetween(app, 'const renderHomeAssetForm =', 'const renderSharedHomeShellsPanel =');
 
-    expect(dataSource).toContain(".from('home_assets')");
-    expect(dataSource).toContain(".is('archived_at', null)");
-    expect(dataSource).toContain(".order('asset_category'");
-    expect(dataSource).toContain(".order('name'");
+    expect(dataSource).toContain(".rpc('servsync_list_property_assets'");
+    expect(dataSource).toContain('p_include_retired: false');
+    expect(dataSource).not.toContain(".from('home_assets')");
     expect(assetSource).toContain('Assets &amp; Systems');
     expect(assetSource).toContain('Add asset');
     expect(assetSource).toContain('Edit asset/system');
     expect(assetSource).toContain('Archive');
-    expect(assetLogic).toContain('archived_at: new Date().toISOString()');
-    expect(assetLogic).toContain('home_room_id: homeAssetDraft.home_room_id || null');
-    expect(assetLogic).toContain('created_by: profile.id');
+    expect(assetLogic).toContain(".rpc('servsync_create_property_asset'");
+    expect(assetLogic).toContain(".rpc('servsync_update_property_asset'");
+    expect(assetLogic).toContain(".rpc('servsync_set_property_asset_lifecycle'");
+    expect(assetLogic).toContain('p_expected_revision: homeAssetDraft.revision_number');
+    expect(assetLogic).toContain("p_lifecycle_status: 'retired'");
+    expect(assetLogic).not.toContain(".from('home_assets')");
     expect(assetLogic).not.toContain('.delete()');
   });
 
@@ -65,7 +67,7 @@ test.describe('Assets & Systems v1 UI', () => {
     const assetSource = sourceBetween(app, 'const renderHomeAssetForm =', 'const renderSharedHomeShellsPanel =');
     const contractorSource = sourceBetween(
       app,
-      'function ContractorDashboard({ profile, onSignOut }',
+      'function ContractorDashboard({',
       'function PlatformAdminDashboard({ onSignOut }',
     );
 

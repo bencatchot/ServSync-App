@@ -996,17 +996,25 @@ export interface HomeRoomLayout {
 
 export interface HomeAsset {
   id: string;
-  home_id: string;
+  home_id: string | null;
+  local_home_id: string | null;
   home_room_id: string | null;
+  asset_kind: 'hvac' | 'plumbing' | 'electrical' | 'appliance' | 'roof' | 'exterior' | 'garage' | 'safety' | 'other';
   asset_category: string;
   asset_type: string | null;
   name: string;
+  location_label: string | null;
   manufacturer: string | null;
   model: string | null;
+  serial_identifier: string | null;
   install_date: string | null;
+  approximate_age_years: number | null;
   warranty_expires_on: string | null;
+  customer_safe_description: string | null;
   notes: string | null;
+  lifecycle_status: 'active' | 'retired';
   archived_at: string | null;
+  revision_number: number;
   created_by: string;
   created_at: string;
   updated_at: string;
