@@ -39,11 +39,12 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     }
     expect(scheduleRendererSource).toContain('data-testid="contractor-estimate-payment-schedule-section"');
     expect(scheduleRendererSource).toContain('Payment schedule');
-    expect(scheduleRendererSource).toContain('Create draft invoices from the homeowner-approved schedule rows.');
+    expect(scheduleRendererSource).toContain('Request billing deliberately from the accepted schedule. Draft Invoices are never sent automatically.');
     expect(scheduleRendererSource).toContain('data-testid="contractor-create-schedule-invoice"');
+    expect(scheduleRendererSource).toContain('Request deposit');
     expect(scheduleRendererSource).toContain('Create draft invoice');
     expect(scheduleRendererSource).toContain('createInvoiceFromEstimateScheduleItem(estimate, row.id)');
-    expect(scheduleRendererSource).toContain("estimate.status === 'accepted' && !row.linked_invoice_id");
+    expect(scheduleRendererSource).toContain("estimate.status === 'accepted' && canRequest");
   });
 
   test('schedule invoice action uses the narrow RPC and no direct invoice writes', () => {
@@ -70,7 +71,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     expect(createScheduleInvoiceSource).not.toContain('quickbooks');
   });
 
-  test('accepted scheduled estimates show compact invoice summary without replacing voided invoices', () => {
+  test('accepted scheduled estimates show financial progress and preserve voided Invoice history', () => {
     const source = appSource();
     const scheduleRendererSource = sourceBetween(
       source,
@@ -84,17 +85,17 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     );
 
     expect(scheduleRendererSource).toContain('data-testid="contractor-estimate-payment-schedule-summary"');
-    expect(scheduleRendererSource).toContain('Schedule invoices');
-    expect(scheduleRendererSource).toContain('schedule invoices created');
-    expect(scheduleRendererSource).toContain('Scheduled total');
-    expect(scheduleRendererSource).toContain('Uninvoiced scheduled');
-    expect(scheduleRendererSource).toContain('Loaded invoice statuses');
-    expect(scheduleRendererSource).toContain('This schedule row is linked to a voided invoice. Replacement invoices are not supported yet.');
+    expect(scheduleRendererSource).toContain('Estimate billing');
+    expect(scheduleRendererSource).toContain('Schedule total');
+    expect(scheduleRendererSource).toContain('Remaining scheduled');
+    expect(scheduleRendererSource).toContain('Remaining Estimate');
+    expect(scheduleRendererSource).toContain('Job creation remains available whether the deposit is unrequested, outstanding, partially paid, or paid.');
+    expect(scheduleRendererSource).toContain('The voided Invoice remains in history. A replacement draft uses this schedule amount and does not rewrite the old Invoice.');
     expect(summaryHelperSource).toContain('linkedCount: linkedRows.length');
-    expect(summaryHelperSource).toContain('uninvoicedScheduledCents');
+    expect(summaryHelperSource).toContain('estimateBillingSummary(estimate, invoices)');
     expect(summaryHelperSource).toContain('statusSummary');
-    expect(scheduleRendererSource).not.toContain('Create replacement');
-    expect(scheduleRendererSource).not.toContain('Replace invoice');
+    expect(scheduleRendererSource).toContain('Create replacement draft');
+    expect(scheduleRendererSource).toContain('Request deposit again');
     expect(scheduleRendererSource).not.toContain('unlink');
   });
 
@@ -126,18 +127,17 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
 
   test('linked schedule rows show safe statuses and open loaded invoices', () => {
     const source = appSource();
-    const statusHelperSource = sourceBetween(source, 'function scheduleLinkedInvoiceStatusLabel', 'function createBlankSavedEstimateChargeDraft');
+    const presentationSource = sourceFile('src/features/estimates/depositWorkflow.ts');
     const scheduleRendererSource = sourceBetween(
       source,
       'const renderContractorEstimatePaymentScheduleSection = (',
       'const createInvoiceFromJob = async',
     );
 
-    expect(statusHelperSource).toContain("if (invoice?.status === 'draft') return 'Draft invoice created';");
-    expect(statusHelperSource).toContain("if (invoice?.status === 'void') return 'Voided';");
-    expect(statusHelperSource).toContain("if (linkedInvoiceId) return 'Invoice linked';");
-    expect(scheduleRendererSource).toContain('const rowInvoice = row.linked_invoice_id');
-    expect(scheduleRendererSource).toContain('const linkedStatus = scheduleLinkedInvoiceStatusLabel(rowInvoice, row.linked_invoice_id);');
+    expect(presentationSource).toContain("if (invoice.status === 'draft')");
+    expect(presentationSource).toContain("if (invoice.status === 'void')");
+    expect(scheduleRendererSource).toContain('const rowInvoice = invoiceForScheduleRow(row, invoices);');
+    expect(scheduleRendererSource).toContain('const billingPresentation = scheduleBillingPresentation(row, rowInvoice);');
     expect(scheduleRendererSource).toContain('Open invoice');
     expect(scheduleRendererSource).toContain('openInvoiceRecord(rowInvoice)');
     expect(scheduleRendererSource).toContain('Due date to be confirmed');

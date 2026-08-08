@@ -308,13 +308,20 @@ import {
 import { WorkflowActivityTimelineWithDurableEvents } from './features/workflow/WorkflowActivityTimelineWithDurableEvents';
 import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread';
 import {
-  invoiceCanMarkPaid,
   invoiceCanVoid,
   invoiceStatusLabel,
 } from './features/invoices/status';
 import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary';
+import { RecordInvoicePaymentDialog } from './features/invoices/RecordInvoicePaymentDialog';
+import { normalizeOfflinePaymentRecords, type OfflinePaymentSubmission } from './features/invoices/offlinePayments';
 import { LocalInvoiceDeliveryPanel } from './features/invoices/LocalInvoiceDeliveryPanel';
 import { LocalEstimateDeliveryPanel } from './features/estimates/LocalEstimateDeliveryPanel';
+import {
+  canRequestScheduleInvoice,
+  estimateBillingSummary,
+  invoiceForScheduleRow,
+  scheduleBillingPresentation,
+} from './features/estimates/depositWorkflow';
 import { FinalizedReportDeliveryPanel } from './features/reports/FinalizedReportDeliveryPanel';
 import {
   demoPresentationJobCheckpointLabel,
@@ -385,6 +392,7 @@ import type {
   InspectionTemplateRoom,
   Invoice,
   InvoiceBacklogItem,
+  InvoiceOfflinePaymentRecord,
   InvoiceStatus,
   InvoiceLineItem,
   JobWorkItem,
@@ -1614,14 +1622,6 @@ function estimatePaymentScheduleDisplayWarning(estimate: Estimate) {
   return '';
 }
 
-function scheduleLinkedInvoiceStatusLabel(invoice: Invoice | null | undefined, linkedInvoiceId?: string | null) {
-  if (invoice?.status === 'draft') return 'Draft invoice created';
-  if (invoice?.status === 'void') return 'Voided';
-  if (invoice) return invoiceStatusLabel(invoice.status);
-  if (linkedInvoiceId) return 'Invoice linked';
-  return 'Not invoiced';
-}
-
 function estimatePaymentScheduleLinkedInvoiceSummary(estimate: Estimate, invoices: Invoice[]) {
   const rows = sortedEstimatePaymentScheduleRows(estimate);
   const linkedRows = rows.filter(row => Boolean(row.linked_invoice_id));
@@ -1637,14 +1637,13 @@ function estimatePaymentScheduleLinkedInvoiceSummary(estimate: Estimate, invoice
     .filter(status => (statusCounts[status] ?? 0) > 0)
     .map(status => `${statusCounts[status]} ${invoiceStatusLabel(status)}`)
     .join(' · ');
+  const billing = estimateBillingSummary(estimate, invoices);
 
   return {
     totalCount: rows.length,
     linkedCount: linkedRows.length,
     scheduledTotalCents: rows.reduce((sum, row) => sum + row.calculated_amount_cents, 0),
-    uninvoicedScheduledCents: rows
-      .filter(row => !row.linked_invoice_id)
-      .reduce((sum, row) => sum + row.calculated_amount_cents, 0),
+    ...billing,
     statusSummary,
   };
 }
@@ -21589,6 +21588,11 @@ function ContractorDashboard({
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [recordPaymentInvoice, setRecordPaymentInvoice] = useState<Invoice | null>(null);
+  const [recordPaymentHistory, setRecordPaymentHistory] = useState<InvoiceOfflinePaymentRecord[]>([]);
+  const [recordPaymentHistoryLoading, setRecordPaymentHistoryLoading] = useState(false);
+  const [recordPaymentHistoryError, setRecordPaymentHistoryError] = useState('');
+  const [recordingInvoicePayment, setRecordingInvoicePayment] = useState(false);
   const [jobWorkItemsByJobId, setJobWorkItemsByJobId] = useState<Record<string, JobWorkItem[]>>({});
   const [partialInvoiceJob, setPartialInvoiceJob] = useState<Inspection | null>(null);
   const [partialInvoiceSelectedIds, setPartialInvoiceSelectedIds] = useState<Set<string>>(new Set());
@@ -24065,6 +24069,9 @@ function ContractorDashboard({
   const validateEstimatePaymentScheduleForSave = () => {
     if (!estimatePaymentScheduleDraft.explicit) return { rows: [], error: '' };
     const rows = estimatePaymentScheduleRowsWithTotals();
+    if (rows.filter(row => row.invoice_type === 'deposit').length > 1) {
+      return { rows: [], error: 'Use one Deposit payment in the schedule. Add later milestones as Progress or Final payments.' };
+    }
     const normalizedRows = rows.map((row, index) => {
       const amountValue = estimatePaymentScheduleAmountValueForPayload(row);
       if (amountValue === null) {
@@ -24473,30 +24480,70 @@ function ContractorDashboard({
     }
   };
 
-  const markInvoicePaid = async (invoice: Invoice) => {
+  const loadInvoiceOfflinePaymentHistory = async (invoice: Invoice) => {
     if (!supabase) return;
-    setNotice('');
-    setError('');
-    setUpdatingInvoiceId(invoice.id);
+    setRecordPaymentHistoryLoading(true);
+    setRecordPaymentHistoryError('');
     try {
-      const { error: paidError } = await supabase.rpc('servsync_mark_invoice_paid', {
+      const { data, error: historyError } = await supabase.rpc('servsync_list_invoice_offline_payments', {
         p_invoice_id: invoice.id,
       });
-      if (paidError) throw paidError;
+      if (historyError) throw historyError;
+      setRecordPaymentHistory(normalizeOfflinePaymentRecords(data));
+    } catch (err) {
+      setRecordPaymentHistory([]);
+      setRecordPaymentHistoryError(readableError(err, 'Payment history could not be loaded.'));
+    } finally {
+      setRecordPaymentHistoryLoading(false);
+    }
+  };
+
+  const openRecordInvoicePayment = (invoice: Invoice) => {
+    if (!canManageInvoicePayments) {
+      setError('Only the contractor owner, admin, or office role can record Invoice payments.');
+      return;
+    }
+    setRecordPaymentInvoice(invoice);
+    setRecordPaymentHistory([]);
+    void loadInvoiceOfflinePaymentHistory(invoice);
+  };
+
+  const recordOfflineInvoicePayment = async (submission: OfflinePaymentSubmission) => {
+    if (!supabase || !recordPaymentInvoice) return;
+    setNotice('');
+    setError('');
+    setRecordingInvoicePayment(true);
+    try {
+      const { data, error: paymentError } = await supabase.rpc('servsync_record_offline_invoice_payment', {
+        p_invoice_id: recordPaymentInvoice.id,
+        p_idempotency_key: submission.idempotencyKey,
+        p_amount_cents: submission.amountCents,
+        p_payment_date: submission.paymentDate,
+        p_payment_method: submission.paymentMethod,
+        p_reference: submission.reference,
+        p_note: submission.note,
+      });
+      if (paymentError) throw paymentError;
+      const result = (data || {}) as { status?: InvoiceStatus; amount_paid_cents?: number; balance_due_cents?: number };
       setNotice(actionFeedbackMessage(
-        'Invoice marked paid',
-        'The invoice balance is now shown as paid. This records payment status only; ServSync did not process a payment.',
-        'contractor-invoice-paid-feedback',
+        result.status === 'paid' ? 'Invoice paid' : 'Payment recorded',
+        result.status === 'paid'
+          ? 'The Invoice balance is paid. ServSync recorded an offline payment and did not process money.'
+          : `${formatMoney(result.amount_paid_cents ?? 0)} recorded in total; ${formatMoney(result.balance_due_cents ?? 0)} remains.`,
+        'contractor-invoice-payment-feedback',
       ));
+      setRecordPaymentInvoice(null);
       await loadContractor();
     } catch (err) {
+      const paymentMessage = readableError(err, 'The Invoice balance was not changed. Review the payment details and try again.');
       setError(actionFeedbackMessage(
-        'Invoice could not be marked paid',
-        readableError(err, 'The invoice payment status was not changed. Review the invoice and try again.'),
-        'contractor-invoice-paid-error',
+        'Payment could not be recorded',
+        paymentMessage,
+        'contractor-invoice-payment-error',
       ));
+      throw new Error(paymentMessage);
     } finally {
-      setUpdatingInvoiceId(null);
+      setRecordingInvoicePayment(false);
     }
   };
 
@@ -24656,6 +24703,7 @@ function ContractorDashboard({
     setError('');
     setCreatingInvoiceSourceId(`schedule-item:${scheduleItemId}`);
     try {
+      const scheduleItem = sortedEstimatePaymentScheduleRows(estimate).find(row => row.id === scheduleItemId) ?? null;
       const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_estimate_schedule_item', {
         p_schedule_item_id: scheduleItemId,
       });
@@ -24665,7 +24713,11 @@ function ContractorDashboard({
       const invoice = await loadInvoiceById(result.invoice_id);
       if (result.created === false) openInvoiceRecord(invoice);
       else focusSavedInvoiceRecord(invoice);
-      setNotice('Draft invoice created from the approved payment schedule row.');
+      setNotice(result.created === false
+        ? 'Opened the Invoice already linked to this payment schedule item.'
+        : scheduleItem?.invoice_type === 'deposit'
+          ? 'Deposit Invoice draft created. Review it before sending; no message was sent automatically.'
+          : 'Draft Invoice created from the accepted payment schedule row. Review it before sending.');
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to create a draft invoice from this payment schedule row.'));
@@ -24685,6 +24737,7 @@ function ContractorDashboard({
     options: { mobile?: boolean } = {},
   ) => {
     const scheduleSummary = estimatePaymentScheduleLinkedInvoiceSummary(estimate, invoices);
+    const depositRowCount = scheduleRows.filter(row => row.invoice_type === 'deposit').length;
     const scheduleButtonClass = options.mobile ? mobileButtonClass : buttonClass;
     return (
       <div data-testid="contractor-estimate-payment-schedule-section" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -24692,7 +24745,7 @@ function ContractorDashboard({
           <div>
             <p className="text-sm font-bold text-slate-950">Payment schedule</p>
             {estimate.status === 'accepted' ? (
-              <p className="text-xs text-slate-500">Create draft invoices from the homeowner-approved schedule rows.</p>
+              <p className="text-xs text-slate-500">Request billing deliberately from the accepted schedule. Draft Invoices are never sent automatically.</p>
             ) : (
               <p className="text-xs text-slate-500">Invoices can be created after homeowner approval.</p>
             )}
@@ -24703,29 +24756,27 @@ function ContractorDashboard({
         </div>
         {estimate.status === 'accepted' && (
           <div data-testid="contractor-estimate-payment-schedule-summary" className="mt-3 rounded-lg border border-blue-100 bg-white p-3 text-xs">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="font-semibold uppercase tracking-wide text-blue-700">Schedule invoices</p>
-                <p className="mt-1 font-bold text-slate-950">
-                  {scheduleSummary.linkedCount} of {scheduleSummary.totalCount} schedule invoices created
-                </p>
-              </div>
-              <div className="grid gap-1 text-slate-600 sm:text-right">
-                <span>Scheduled total <strong className="text-slate-950">{formatMoney(scheduleSummary.scheduledTotalCents)}</strong></span>
-                <span>Uninvoiced scheduled <strong className="text-slate-950">{formatMoney(scheduleSummary.uninvoicedScheduledCents)}</strong></span>
-                {scheduleSummary.statusSummary && (
-                  <span>Loaded invoice statuses <strong className="text-slate-950">{scheduleSummary.statusSummary}</strong></span>
-                )}
-              </div>
+            <p className="font-semibold uppercase tracking-wide text-blue-700">Estimate billing</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div><span className="text-slate-500">Invoiced</span><p className="font-bold text-slate-950">{formatMoney(scheduleSummary.amountInvoicedCents)}</p></div>
+              <div><span className="text-slate-500">Paid</span><p className="font-bold text-slate-950">{formatMoney(scheduleSummary.amountPaidCents)}</p></div>
+              <div><span className="text-slate-500">Remaining scheduled</span><p className="font-bold text-slate-950">{formatMoney(scheduleSummary.remainingScheduledCents)}</p></div>
+              <div><span className="text-slate-500">Remaining Estimate</span><p className="font-bold text-slate-950">{formatMoney(scheduleSummary.remainingEstimateCents)}</p></div>
             </div>
+            <p className="mt-2 text-slate-600">Job creation remains available whether the deposit is unrequested, outstanding, partially paid, or paid.</p>
+            {scheduleSummary.statusSummary && <p className="mt-1 text-slate-500">Invoice statuses: {scheduleSummary.statusSummary}</p>}
           </div>
+        )}
+        {depositRowCount > 1 && (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            This accepted Estimate has multiple Deposit rows. Revise it to one Deposit before requesting billing.
+          </p>
         )}
         <div className="mt-3 grid gap-2">
           {scheduleRows.map(row => {
-            const rowInvoice = row.linked_invoice_id
-              ? invoices.find(invoice => invoice.id === row.linked_invoice_id) ?? null
-              : null;
-            const linkedStatus = scheduleLinkedInvoiceStatusLabel(rowInvoice, row.linked_invoice_id);
+            const rowInvoice = invoiceForScheduleRow(row, invoices);
+            const billingPresentation = scheduleBillingPresentation(row, rowInvoice);
+            const canRequest = canRequestScheduleInvoice(row, rowInvoice, depositRowCount);
             const scheduleActionKey = `schedule-item:${row.id}`;
             return (
               <div key={row.id} data-testid="contractor-estimate-payment-schedule-row" className="rounded-lg border border-slate-200 bg-white p-3">
@@ -24737,21 +24788,23 @@ function ContractorDashboard({
                         {estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type)}
                       </span>
                       <StatusBadge
-                        label={linkedStatus}
-                        tone={rowInvoice ? invoiceStatusPresentation(rowInvoice.status).tone : 'muted'}
+                        label={billingPresentation.label}
+                        tone={billingPresentation.tone}
                       />
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {formatMoney(row.calculated_amount_cents)} · {row.due_trigger?.trim() || 'Due date to be confirmed'}
                     </p>
+                    <p className="mt-1 text-xs font-medium text-slate-600">{billingPresentation.detail}</p>
+                    {rowInvoice && <p className="mt-1 text-xs text-slate-500">{rowInvoice.invoice_number ? `Invoice ${rowInvoice.invoice_number}` : 'Invoice draft'} · {formatMoney(rowInvoice.total_cents)}</p>}
                     {rowInvoice?.status === 'void' && (
                       <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
-                        This schedule row is linked to a voided invoice. Replacement invoices are not supported yet.
+                        The voided Invoice remains in history. A replacement draft uses this schedule amount and does not rewrite the old Invoice.
                       </p>
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {estimate.status === 'accepted' && !row.linked_invoice_id && (
+                    {estimate.status === 'accepted' && canRequest && (
                       <button
                         type="button"
                         onClick={() => void createInvoiceFromEstimateScheduleItem(estimate, row.id)}
@@ -24760,7 +24813,11 @@ function ContractorDashboard({
                         className={scheduleButtonClass('primary')}
                       >
                         <Receipt size={15} />
-                        {creatingInvoiceSourceId === scheduleActionKey ? 'Creating...' : 'Create draft invoice'}
+                        {creatingInvoiceSourceId === scheduleActionKey
+                          ? 'Creating...'
+                          : row.invoice_type === 'deposit'
+                            ? rowInvoice?.status === 'void' ? 'Request deposit again' : 'Request deposit'
+                            : rowInvoice?.status === 'void' ? 'Create replacement draft' : 'Create draft invoice'}
                       </button>
                     )}
                     {rowInvoice && (
@@ -31392,6 +31449,7 @@ function ContractorDashboard({
   const canManageLocalInvoiceDelivery = currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
+  const canManageInvoicePayments = canManageLocalInvoiceDelivery;
   const canManageLocalEstimateDelivery = canManageLocalInvoiceDelivery;
   const canManageFinalizedReportDelivery = canManageLocalInvoiceDelivery;
   const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
@@ -40053,16 +40111,17 @@ function ContractorDashboard({
                                         </div>
                                       </div>
                                     )}
-                                    {invoiceCanMarkPaid(invoice.status) && (
+                                    {canManageInvoicePayments && ['sent', 'viewed', 'overdue', 'partially_paid', 'paid'].includes(invoice.status) && (
                                       <div className={`mt-3 ${mobileActionRowClass()}`}>
                                         <button
                                           type="button"
-                                          onClick={() => void markInvoicePaid(invoice)}
-                                          disabled={updatingInvoiceId === invoice.id}
+                                          onClick={() => openRecordInvoicePayment(invoice)}
+                                          disabled={recordingInvoicePayment}
+                                          data-testid="contractor-record-invoice-payment"
                                           className={mobileButtonClass('primary')}
                                         >
                                           <CheckCircle2 size={15} />
-                                          {updatingInvoiceId === invoice.id ? 'Updating...' : 'Mark Paid'}
+                                          {invoice.status === 'paid' ? 'Payment history' : 'Record payment'}
                                         </button>
                                         {invoiceCanVoid(invoice.status) && (
                                           <button
@@ -44407,6 +44466,23 @@ function ContractorDashboard({
           })()}
 
         </div>
+      )}
+
+      {recordPaymentInvoice && (
+        <RecordInvoicePaymentDialog
+          invoice={recordPaymentInvoice}
+          payments={recordPaymentHistory}
+          loadingHistory={recordPaymentHistoryLoading}
+          historyError={recordPaymentHistoryError}
+          submitting={recordingInvoicePayment}
+          onClose={() => {
+            if (recordingInvoicePayment) return;
+            setRecordPaymentInvoice(null);
+            setRecordPaymentHistory([]);
+            setRecordPaymentHistoryError('');
+          }}
+          onSubmit={recordOfflineInvoicePayment}
+        />
       )}
 
       {partialInvoiceJob && partialInvoiceModalItems && (
