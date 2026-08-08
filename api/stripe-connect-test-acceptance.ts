@@ -68,11 +68,6 @@ export default {
             },
             id_numbers: [{ type: 'us_ssn_last_4', value: '0000' }],
           },
-          attestations: {
-            terms_of_service: {
-              account: { date: new Date().toISOString(), ip: '127.0.0.1', user_agent: 'ServSync provider acceptance' },
-            },
-          },
         },
         include: ['configuration.merchant', 'defaults', 'identity', 'requirements'],
       });
