@@ -89,6 +89,20 @@ begin
     raise exception 'Durable Trade Sections require the current canonical Job contract.';
   end if;
 
+  if not exists (
+    select 1
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'estimates'
+       and column_name in (
+         'contractor_id', 'homeowner_user_id', 'home_id', 'local_contact_id', 'local_home_id'
+       )
+     group by table_schema, table_name
+    having count(*) = 5
+  ) then
+    raise exception 'Durable Trade Sections require the current canonical Estimate property contract.';
+  end if;
+
   if not (
     select relrowsecurity and relforcerowsecurity
       from pg_class
@@ -683,7 +697,84 @@ security definer
 set search_path = pg_catalog, public
 as $$
 begin
+  if exists (
+    select 1
+      from public.trade_section_instances instance
+     where instance.work_draft_id = new.id
+       and (
+         instance.contractor_id <> new.contractor_id
+         or (
+           instance.local_home_id is not null
+           and (
+             new.local_home_id is distinct from instance.local_home_id
+             or new.local_contact_id is distinct from instance.local_contact_id
+             or (new.home_id is not null and new.home_id is distinct from instance.home_id)
+             or (new.homeowner_user_id is not null and new.homeowner_user_id is distinct from instance.homeowner_user_id)
+           )
+         )
+         or (
+           instance.local_home_id is null
+           and (
+             new.local_home_id is not null
+             or new.local_contact_id is not null
+             or new.home_id is distinct from instance.home_id
+             or new.homeowner_user_id is distinct from instance.homeowner_user_id
+           )
+         )
+       )
+  ) then
+    raise exception 'Trade Section Draft lineage is invalid.';
+  end if;
+
+  if old.launched_estimate_id_snapshot is not null
+     and new.launched_estimate_id_snapshot is distinct from old.launched_estimate_id_snapshot
+     and exists (
+       select 1 from public.trade_section_instances instance
+        where instance.work_draft_id = new.id
+     ) then
+    raise exception 'Trade Section Estimate lineage cannot be rewritten.';
+  end if;
+
+  if old.launched_job_id_snapshot is not null
+     and new.launched_job_id_snapshot is distinct from old.launched_job_id_snapshot
+     and exists (
+       select 1 from public.trade_section_instances instance
+        where instance.work_draft_id = new.id
+     ) then
+    raise exception 'Trade Section Job lineage cannot be rewritten.';
+  end if;
+
   if old.launched_estimate_id_snapshot is null and new.launched_estimate_id_snapshot is not null then
+    if exists (
+      select 1
+        from public.trade_section_instances instance
+       where instance.work_draft_id = new.id
+         and not exists (
+           select 1
+             from public.estimates estimate
+            where estimate.id = new.launched_estimate_id_snapshot
+              and estimate.contractor_id = instance.contractor_id
+              and (
+                (
+                  instance.local_home_id is not null
+                  and estimate.local_home_id = instance.local_home_id
+                  and estimate.local_contact_id = instance.local_contact_id
+                  and (estimate.home_id is null or estimate.home_id = instance.home_id)
+                  and (estimate.homeowner_user_id is null or estimate.homeowner_user_id = instance.homeowner_user_id)
+                )
+                or (
+                  instance.local_home_id is null
+                  and estimate.local_home_id is null
+                  and estimate.local_contact_id is null
+                  and estimate.home_id = instance.home_id
+                  and estimate.homeowner_user_id = instance.homeowner_user_id
+                )
+              )
+         )
+    ) then
+      raise exception 'Trade Section Estimate lineage is invalid.';
+    end if;
+
     perform set_config('servsync.trade_section_change_kind', 'estimate_linked', true);
     perform set_config('servsync.trade_section_source_kind', 'workflow_trigger', true);
     update public.trade_section_instances instance
@@ -692,10 +783,63 @@ begin
            updated_at = now()
      where instance.work_draft_id = new.id
        and instance.contractor_id = new.contractor_id
-       and instance.estimate_id is null;
+       and instance.estimate_id is null
+       and exists (
+         select 1
+           from public.estimates estimate
+          where estimate.id = new.launched_estimate_id_snapshot
+            and estimate.contractor_id = instance.contractor_id
+            and (
+              (
+                instance.local_home_id is not null
+                and estimate.local_home_id = instance.local_home_id
+                and estimate.local_contact_id = instance.local_contact_id
+                and (estimate.home_id is null or estimate.home_id = instance.home_id)
+                and (estimate.homeowner_user_id is null or estimate.homeowner_user_id = instance.homeowner_user_id)
+              )
+              or (
+                instance.local_home_id is null
+                and estimate.local_home_id is null
+                and estimate.local_contact_id is null
+                and estimate.home_id = instance.home_id
+                and estimate.homeowner_user_id = instance.homeowner_user_id
+              )
+            )
+       );
   end if;
 
   if old.launched_job_id_snapshot is null and new.launched_job_id_snapshot is not null then
+    if exists (
+      select 1
+        from public.trade_section_instances instance
+       where instance.work_draft_id = new.id
+         and not exists (
+           select 1
+             from public.inspections job
+            where job.id = new.launched_job_id_snapshot
+              and job.contractor_id = instance.contractor_id
+              and job.estimate_id is not distinct from instance.estimate_id
+              and (
+                (
+                  instance.local_home_id is not null
+                  and job.local_home_id = instance.local_home_id
+                  and job.local_contact_id = instance.local_contact_id
+                  and (job.home_id is null or job.home_id = instance.home_id)
+                  and (job.homeowner_user_id is null or job.homeowner_user_id = instance.homeowner_user_id)
+                )
+                or (
+                  instance.local_home_id is null
+                  and job.local_home_id is null
+                  and job.local_contact_id is null
+                  and job.home_id = instance.home_id
+                  and job.homeowner_user_id = instance.homeowner_user_id
+                )
+              )
+         )
+    ) then
+      raise exception 'Trade Section Job lineage is invalid.';
+    end if;
+
     perform set_config('servsync.trade_section_change_kind', 'job_linked', true);
     perform set_config('servsync.trade_section_source_kind', 'workflow_trigger', true);
     update public.trade_section_instances instance
@@ -704,7 +848,30 @@ begin
            updated_at = now()
      where instance.work_draft_id = new.id
        and instance.contractor_id = new.contractor_id
-       and instance.job_id is null;
+       and instance.job_id is null
+       and exists (
+         select 1
+           from public.inspections job
+          where job.id = new.launched_job_id_snapshot
+            and job.contractor_id = instance.contractor_id
+            and job.estimate_id is not distinct from instance.estimate_id
+            and (
+              (
+                instance.local_home_id is not null
+                and job.local_home_id = instance.local_home_id
+                and job.local_contact_id = instance.local_contact_id
+                and (job.home_id is null or job.home_id = instance.home_id)
+                and (job.homeowner_user_id is null or job.homeowner_user_id = instance.homeowner_user_id)
+              )
+              or (
+                instance.local_home_id is null
+                and job.local_home_id is null
+                and job.local_contact_id is null
+                and job.home_id = instance.home_id
+                and job.homeowner_user_id = instance.homeowner_user_id
+              )
+            )
+       );
   end if;
   return new;
 end;
@@ -717,7 +884,118 @@ security definer
 set search_path = pg_catalog, public
 as $$
 begin
+  if exists (
+    select 1
+      from public.trade_section_instances instance
+     where instance.job_id = new.id
+       and (
+         instance.contractor_id <> new.contractor_id
+         or instance.estimate_id is distinct from new.estimate_id
+         or (
+           instance.local_home_id is not null
+           and (
+             new.local_home_id is distinct from instance.local_home_id
+             or new.local_contact_id is distinct from instance.local_contact_id
+             or (new.home_id is not null and new.home_id is distinct from instance.home_id)
+             or (new.homeowner_user_id is not null and new.homeowner_user_id is distinct from instance.homeowner_user_id)
+           )
+         )
+         or (
+           instance.local_home_id is null
+           and (
+             new.local_home_id is not null
+             or new.local_contact_id is not null
+             or new.home_id is distinct from instance.home_id
+             or new.homeowner_user_id is distinct from instance.homeowner_user_id
+           )
+         )
+       )
+  ) then
+    raise exception 'Trade Section Job lineage cannot be rewritten.';
+  end if;
+
   if new.estimate_id is not null then
+    if not exists (
+      select 1
+        from public.estimates estimate
+       where estimate.id = new.estimate_id
+         and estimate.contractor_id = new.contractor_id
+         and (
+           (
+             new.local_home_id is not null
+             and estimate.local_home_id = new.local_home_id
+             and estimate.local_contact_id = new.local_contact_id
+             and (estimate.home_id is null or new.home_id is null or estimate.home_id = new.home_id)
+             and (
+               estimate.homeowner_user_id is null
+               or new.homeowner_user_id is null
+               or estimate.homeowner_user_id = new.homeowner_user_id
+             )
+           )
+           or (
+             new.local_home_id is null
+             and estimate.local_home_id is null
+             and estimate.local_contact_id is null
+             and estimate.home_id = new.home_id
+             and estimate.homeowner_user_id = new.homeowner_user_id
+           )
+         )
+    ) then
+      raise exception 'Trade Section Job lineage is invalid.';
+    end if;
+
+    if exists (
+      select 1
+        from public.trade_section_instances instance
+       where instance.contractor_id = new.contractor_id
+         and instance.estimate_id = new.estimate_id
+         and instance.job_id is null
+         and (
+           (
+             instance.local_home_id is not null
+             and (
+               new.local_home_id is distinct from instance.local_home_id
+               or new.local_contact_id is distinct from instance.local_contact_id
+               or (new.home_id is not null and new.home_id is distinct from instance.home_id)
+               or (new.homeowner_user_id is not null and new.homeowner_user_id is distinct from instance.homeowner_user_id)
+             )
+           )
+           or (
+             instance.local_home_id is null
+             and (
+               new.local_home_id is not null
+               or new.local_contact_id is not null
+               or new.home_id is distinct from instance.home_id
+               or new.homeowner_user_id is distinct from instance.homeowner_user_id
+             )
+           )
+           or not exists (
+             select 1
+               from public.estimates estimate
+              where estimate.id = new.estimate_id
+                and estimate.contractor_id = instance.contractor_id
+                and (
+                  (
+                    instance.local_home_id is not null
+                    and estimate.local_home_id = instance.local_home_id
+                    and estimate.local_contact_id = instance.local_contact_id
+                    and (estimate.home_id is null or estimate.home_id = instance.home_id)
+                    and (estimate.homeowner_user_id is null or estimate.homeowner_user_id = instance.homeowner_user_id)
+                  )
+                  or (
+                    instance.local_home_id is null
+                    and estimate.local_home_id is null
+                    and estimate.local_contact_id is null
+                    and estimate.home_id = instance.home_id
+                    and estimate.homeowner_user_id = instance.homeowner_user_id
+                  )
+                )
+           )
+         )
+    ) then
+      raise exception 'Trade Section Job lineage is invalid.';
+    end if;
+
     perform set_config('servsync.trade_section_change_kind', 'job_linked', true);
     perform set_config('servsync.trade_section_source_kind', 'workflow_trigger', true);
     update public.trade_section_instances instance
@@ -726,7 +1004,45 @@ begin
            updated_at = now()
      where instance.contractor_id = new.contractor_id
        and instance.estimate_id = new.estimate_id
-       and instance.job_id is null;
+       and instance.job_id is null
+       and (
+         (
+           instance.local_home_id is not null
+           and new.local_home_id = instance.local_home_id
+           and new.local_contact_id = instance.local_contact_id
+           and (new.home_id is null or new.home_id = instance.home_id)
+           and (new.homeowner_user_id is null or new.homeowner_user_id = instance.homeowner_user_id)
+         )
+         or (
+           instance.local_home_id is null
+           and new.local_home_id is null
+           and new.local_contact_id is null
+           and new.home_id = instance.home_id
+           and new.homeowner_user_id = instance.homeowner_user_id
+         )
+       )
+       and exists (
+         select 1
+           from public.estimates estimate
+          where estimate.id = new.estimate_id
+            and estimate.contractor_id = instance.contractor_id
+            and (
+              (
+                instance.local_home_id is not null
+                and estimate.local_home_id = instance.local_home_id
+                and estimate.local_contact_id = instance.local_contact_id
+                and (estimate.home_id is null or estimate.home_id = instance.home_id)
+                and (estimate.homeowner_user_id is null or estimate.homeowner_user_id = instance.homeowner_user_id)
+              )
+              or (
+                instance.local_home_id is null
+                and estimate.local_home_id is null
+                and estimate.local_contact_id is null
+                and estimate.home_id = instance.home_id
+                and estimate.homeowner_user_id = instance.homeowner_user_id
+              )
+            )
+       );
   end if;
   return new;
 end;
@@ -762,10 +1078,12 @@ end;
 $$;
 
 create trigger contractor_work_drafts_sync_trade_sections
-  after update of launched_estimate_id_snapshot, launched_job_id_snapshot on public.contractor_work_drafts
+  after update of contractor_id, homeowner_user_id, home_id, local_contact_id, local_home_id,
+    launched_estimate_id_snapshot, launched_job_id_snapshot on public.contractor_work_drafts
   for each row execute function public.servsync_private_sync_trade_section_draft_lineage();
 create trigger inspections_sync_trade_sections
-  after insert or update of estimate_id on public.inspections
+  after insert or update of contractor_id, homeowner_user_id, home_id, local_contact_id, local_home_id, estimate_id
+  on public.inspections
   for each row execute function public.servsync_private_sync_trade_section_job_lineage();
 create trigger contractor_local_homes_map_trade_sections
   after update of home_id on public.contractor_local_homes
@@ -1089,8 +1407,11 @@ begin
   end if;
   return query
   select instance.* from public.trade_section_instances instance
-   where (p_work_draft_id is not null and instance.work_draft_id = p_work_draft_id)
-      or (p_job_id is not null and instance.job_id = p_job_id)
+   where instance.contractor_id = v_contractor_id
+     and (
+       (p_work_draft_id is not null and instance.work_draft_id = p_work_draft_id)
+       or (p_job_id is not null and instance.job_id = p_job_id)
+     )
    order by instance.section_order, instance.created_at, instance.id;
 end;
 $$;
@@ -1113,7 +1434,9 @@ begin
     raise exception using errcode = '42501', message = 'Trade Section is unavailable.';
   end if;
   return query select revision.* from public.trade_section_revisions revision
-   where revision.instance_id = p_instance_id order by revision.revision_number;
+   where revision.instance_id = p_instance_id
+     and revision.contractor_id = v_contractor_id
+   order by revision.revision_number;
 end;
 $$;
 

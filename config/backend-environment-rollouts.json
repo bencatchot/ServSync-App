@@ -243,7 +243,7 @@
       "environments": {
         "sandbox": {
           "status": "Applied",
-          "reason": "Final corrected SHA-256 d4c4a856fd80c8dc89f8222818bbeabbf04fd1733860c7f207296f9aae134674 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 22:41:36Z. Both zero-history intermediate corrections used the guarded rollback and left no residue. Catalog, RPC/role, exact-work, idempotent workflow-lineage retry, value, concurrency, lifecycle, capability downgrade/revocation, and rollback-only behavior passed; zero instances, revisions, ordinary capability grants, and enabled work types remain."
+          "reason": "Final independently reviewed SHA-256 49c8b82a5b7af622178929a12f1d6519b00c2c95d71f0969efa2c2345824bb75 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 23:07:24Z through 23:07:25Z after the zero-history prior version was removed through the guarded rollback. Catalog, RPC/role, contractor-bound exact-work listing, cross-contractor/cross-property lineage denial, Estimate/Job rewrite denial, idempotent workflow retry, value, concurrency, lifecycle, capability downgrade/revocation, and rollback-only behavior passed; zero instances, revisions, ordinary capability grants, and enabled work types remain."
         },
         "production": {
           "status": "Pending",

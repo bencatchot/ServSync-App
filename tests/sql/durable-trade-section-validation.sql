@@ -27,6 +27,9 @@ returns void language sql as $$
   select set_config('request.jwt.claim.sub', coalesce(p_user_id::text, ''), false);
 $$;
 
+grant usage on schema trade_section_test to service_role;
+grant execute on all functions in schema trade_section_test to service_role;
+
 do $test$
 declare
   v_definition jsonb;
@@ -220,7 +223,7 @@ begin
 
   perform trade_section_test.set_user('00000000-0000-0000-0000-000000000007');
   v_result := public.servsync_create_trade_section_instance(
-    null, '71000000-0000-0000-0000-000000000001', 'fixturetrade.fixture_service', 1, null,
+    null, '71000000-0000-0000-0000-000000000004', 'fixturetrade.fixture_service', 1, null,
     '{"measurement":7,"verified":true}'::jsonb, 7, '80000000-0000-0000-0000-000000000007'
   );
   perform trade_section_test.assert(v_result ->> 'created_by_user_id' = '00000000-0000-0000-0000-000000000007', 'office may create');
@@ -310,6 +313,38 @@ begin
 
   select id into v_main_id from public.trade_section_instances
    where idempotency_key = '80000000-0000-0000-0000-000000000001';
+
+  execute 'set local role service_role';
+  perform trade_section_test.expect_error(
+    $$update public.contractor_work_drafts
+         set launched_estimate_id_snapshot = '72000000-0000-0000-0000-000000000002'
+       where id = '70000000-0000-0000-0000-000000000001'$$,
+    'Estimate lineage is invalid'
+  );
+  perform trade_section_test.expect_error(
+    $$update public.contractor_work_drafts
+         set launched_estimate_id_snapshot = '72000000-0000-0000-0000-000000000003'
+       where id = '70000000-0000-0000-0000-000000000001'$$,
+    'Estimate lineage is invalid'
+  );
+  perform trade_section_test.expect_error(
+    $$update public.contractor_work_drafts
+         set launched_job_id_snapshot = '71000000-0000-0000-0000-000000000002'
+       where id = '70000000-0000-0000-0000-000000000001'$$,
+    'Job lineage is invalid'
+  );
+  perform trade_section_test.expect_error(
+    $$update public.contractor_work_drafts
+         set launched_job_id_snapshot = '71000000-0000-0000-0000-000000000003'
+       where id = '70000000-0000-0000-0000-000000000001'$$,
+    'Job lineage is invalid'
+  );
+  execute 'reset role';
+  perform trade_section_test.assert(
+    (select estimate_id is null and job_id is null from public.trade_section_instances where id = v_main_id),
+    'service-role and malformed workflow references cannot link unrelated lineage'
+  );
+
   update public.contractor_work_drafts
      set launched_estimate_id_snapshot = '72000000-0000-0000-0000-000000000001'
    where id = '70000000-0000-0000-0000-000000000001';
@@ -317,12 +352,39 @@ begin
     (select estimate_id = '72000000-0000-0000-0000-000000000001' from public.trade_section_instances where id = v_main_id),
     'Draft launch preserves section UUID and adds Estimate lineage'
   );
+  perform trade_section_test.expect_error(
+    $$update public.contractor_work_drafts
+         set launched_estimate_id_snapshot = '72000000-0000-0000-0000-000000000004'
+       where id = '70000000-0000-0000-0000-000000000001'$$,
+    'cannot be rewritten'
+  );
+  perform trade_section_test.expect_error(
+    $$update public.inspections
+         set estimate_id = '72000000-0000-0000-0000-000000000001'
+       where id = '71000000-0000-0000-0000-000000000002'$$,
+    'Job lineage is invalid'
+  );
+  perform trade_section_test.expect_error(
+    $$update public.inspections
+         set estimate_id = '72000000-0000-0000-0000-000000000001'
+       where id = '71000000-0000-0000-0000-000000000003'$$,
+    'Job lineage is invalid'
+  );
   update public.inspections
      set estimate_id = '72000000-0000-0000-0000-000000000001'
    where id = '71000000-0000-0000-0000-000000000001';
   perform trade_section_test.assert(
     (select job_id = '71000000-0000-0000-0000-000000000001' from public.trade_section_instances where id = v_main_id),
     'accepted Estimate to Job preserves section UUID and history'
+  );
+  update public.inspections
+     set estimate_id = '72000000-0000-0000-0000-000000000001'
+   where id = '71000000-0000-0000-0000-000000000001';
+  perform trade_section_test.expect_error(
+    $$update public.inspections
+         set estimate_id = '72000000-0000-0000-0000-000000000004'
+       where id = '71000000-0000-0000-0000-000000000001'$$,
+    'cannot be rewritten'
   );
   perform trade_section_test.assert(
     (select bool_and(count_for_kind = 1) from (
@@ -373,7 +435,7 @@ declare
 begin
   perform trade_section_test.set_user('00000000-0000-0000-0000-000000000005');
   v_result := public.servsync_create_trade_section_instance(
-    null, '71000000-0000-0000-0000-000000000001', 'fixturetrade.fixture_service', 1, null,
+    null, '71000000-0000-0000-0000-000000000004', 'fixturetrade.fixture_service', 1, null,
     '{"measurement":20,"verified":true}'::jsonb, 20, '80000000-0000-0000-0000-000000000020'
   );
   v_instance_id := (v_result ->> 'id')::uuid;
@@ -396,7 +458,7 @@ begin
    where contractor_id = '20000000-0000-0000-0000-000000000001'
      and capability_id = '61000000-0000-0000-0000-000000000001';
   perform trade_section_test.expect_error(
-    $$select public.servsync_create_trade_section_instance(null,'71000000-0000-0000-0000-000000000001','fixturetrade.fixture_service',1,null,'{"measurement":30,"verified":true}'::jsonb,30,'80000000-0000-0000-0000-000000000030')$$,
+    $$select public.servsync_create_trade_section_instance(null,'71000000-0000-0000-0000-000000000004','fixturetrade.fixture_service',1,null,'{"measurement":30,"verified":true}'::jsonb,30,'80000000-0000-0000-0000-000000000030')$$,
     'capability is unavailable'
   );
   v_result := public.servsync_update_trade_section_values(v_instance_id, v_revision, '{"measurement":31,"verified":true}'::jsonb);
@@ -413,7 +475,7 @@ begin
     'revocation does not erase authorized historical reads'
   );
   perform trade_section_test.expect_error(
-    $$select public.servsync_create_trade_section_instance(null,'71000000-0000-0000-0000-000000000001','fixturetrade.fixture_service',1,null,'{"measurement":32,"verified":true}'::jsonb,32,'80000000-0000-0000-0000-000000000032')$$,
+    $$select public.servsync_create_trade_section_instance(null,'71000000-0000-0000-0000-000000000004','fixturetrade.fixture_service',1,null,'{"measurement":32,"verified":true}'::jsonb,32,'80000000-0000-0000-0000-000000000032')$$,
     'capability is unavailable'
   );
 end;

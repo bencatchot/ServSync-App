@@ -29,6 +29,10 @@ test.describe('Durable Trade Section Instances v1', () => {
     expect(sql).toContain('inspections_sync_trade_sections');
     expect(sql).toContain('contractor_local_homes_map_trade_sections');
     expect(sql).toContain("set_config('servsync.trade_section_change_kind', 'claim_mapped', true)");
+    expect(sql).toContain('Trade Section Estimate lineage is invalid.');
+    expect(sql).toContain('Trade Section Job lineage is invalid.');
+    expect(sql).toContain('Trade Section Estimate lineage cannot be rewritten.');
+    expect(sql).toContain('Trade Section Job lineage cannot be rewritten.');
   });
 
   test('fails closed on roles, capabilities, values, and stale revisions', () => {
@@ -64,6 +68,8 @@ test.describe('Durable Trade Section Instances v1', () => {
       'servsync_update_trade_section_values',
     ]);
     expect(sql).not.toMatch(/grant execute[\s\S]*to (?:anon|public)/i);
+    expect(sql).toContain('where instance.contractor_id = v_contractor_id');
+    expect(sql).toContain('and revision.contractor_id = v_contractor_id');
   });
 
   test('keeps the foundation hidden and compatible with unmigrated Production and Demo clients', () => {

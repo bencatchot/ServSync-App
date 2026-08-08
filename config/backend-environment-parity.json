@@ -251,7 +251,7 @@
           "tableGrants": 18
         },
         "expectedKeyFingerprint": "sha256:3bbdfd1c9bf8841a657341d5459a4893f151e76ee37bbc496b9013755d999d87",
-        "expectedCatalogFingerprint": "sha256:8970fbab23eef6192b91164cac8b2fd54245f3059f4a9f11c050970f2f5134b0"
+        "expectedCatalogFingerprint": "sha256:6ee9d0a594cb2196a86f51572c827beddbd7cf66160d6f5a7b4bad1f56e66c24"
       }
     ]
   }

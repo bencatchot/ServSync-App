@@ -6,7 +6,9 @@ create table public.estimates (
   id uuid primary key,
   contractor_id uuid not null references public.contractor_profiles(id) on delete restrict,
   homeowner_user_id uuid,
+  home_id uuid references public.homes(id) on delete set null,
   local_contact_id uuid,
+  local_home_id uuid references public.contractor_local_homes(id) on delete set null,
   inspection_id uuid,
   status text not null default 'draft'
 );
