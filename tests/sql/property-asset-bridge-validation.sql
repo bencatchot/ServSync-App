@@ -31,13 +31,43 @@ declare
   v_count integer;
 begin
   perform property_asset_test.assert(
-    (select count(*) = 1 from public.home_asset_revisions where asset_id = '50000000-0000-0000-0000-000000000001'),
-    'legacy asset receives one baseline revision'
+    (select count(*) = 2 from public.home_asset_revisions where asset_id in (
+      '50000000-0000-0000-0000-000000000001',
+      '50000000-0000-0000-0000-000000000002'
+    )),
+    'active and archived legacy assets each receive one baseline revision'
   );
   perform property_asset_test.assert(
     (select asset_kind = 'hvac' and revision_number = 1 and lifecycle_status = 'active'
        from public.home_assets where id = '50000000-0000-0000-0000-000000000001'),
     'legacy asset is backfilled without identity loss'
+  );
+  perform property_asset_test.assert(
+    (
+      select asset_kind = 'electrical'
+         and revision_number = 1
+         and lifecycle_status = 'retired'
+         and home_room_id = '11000000-0000-0000-0000-000000000001'
+         and notes = 'Archived homeowner private note'
+         and archived_at = timestamptz '2024-04-05 16:00:00+00'
+         and created_at = timestamptz '2020-01-02 15:00:00+00'
+         and updated_at = timestamptz '2024-04-05 16:00:00+00'
+        from public.home_assets
+       where id = '50000000-0000-0000-0000-000000000002'
+    ),
+    'archived legacy identity, room, notes, timestamps, and lifecycle are preserved'
+  );
+  perform property_asset_test.assert(
+    (
+      select change_kind = 'baseline'
+         and lifecycle_status = 'retired'
+         and home_room_id = '11000000-0000-0000-0000-000000000001'
+         and notes = 'Archived homeowner private note'
+        from public.home_asset_revisions
+       where asset_id = '50000000-0000-0000-0000-000000000002'
+         and revision_number = 1
+    ),
+    'archived legacy row receives a complete initial historical snapshot'
   );
 
   perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', true);
@@ -66,6 +96,26 @@ begin
     $$select public.servsync_create_property_asset(
       p_home_id => '10000000-0000-0000-0000-000000000001',
       p_asset_kind => 'hvac', p_name => repeat('x', 161))$$,
+    'too long'
+  );
+  perform property_asset_test.expect_error(
+    $$select public.servsync_create_property_asset(
+      p_home_id => '10000000-0000-0000-0000-000000000001',
+      p_asset_kind => 'hvac', p_name => '   ')$$,
+    'Asset name is required'
+  );
+  perform property_asset_test.expect_error(
+    $$select public.servsync_create_property_asset(
+      p_home_id => '10000000-0000-0000-0000-000000000001',
+      p_local_home_id => '41000000-0000-0000-0000-000000000001',
+      p_contractor_id => '20000000-0000-0000-0000-000000000001',
+      p_asset_kind => 'hvac', p_name => 'Conflicting property')$$,
+    'management is unavailable'
+  );
+  perform property_asset_test.expect_error(
+    $$select public.servsync_create_property_asset(
+      p_home_id => '10000000-0000-0000-0000-000000000001',
+      p_asset_kind => 'hvac', p_name => 'Oversized note', p_notes => repeat('x', 4001))$$,
     'too long'
   );
   perform property_asset_test.expect_error(
@@ -330,6 +380,85 @@ begin
 end;
 $test$;
 
+-- The canonical Supabase service_role ACL is retained for trusted platform
+-- reads, but direct writes must not be able to forge the private RPC context.
+set role service_role;
+select set_config('servsync.property_asset_change_kind', 'updated', false);
+select set_config('servsync.property_asset_source_kind', 'system', false);
+
+do $service_role_guard_test$
+declare
+  v_asset_id uuid := (
+    select id
+      from public.home_assets
+     order by id
+     limit 1
+  );
+  v_revision_id uuid := (
+    select id
+      from public.home_asset_revisions
+     order by id
+     limit 1
+  );
+begin
+  begin
+    update public.home_assets
+       set name = 'forged service role update'
+     where id = v_asset_id;
+    raise exception 'Expected direct service_role asset update to fail.';
+  exception when others then
+    if sqlerrm = 'Expected direct service_role asset update to fail.' then raise; end if;
+    if position('controlled mutation boundary' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected direct service_role asset update error: %', sqlerrm;
+    end if;
+  end;
+
+  begin
+    insert into public.home_assets (
+      id, home_id, asset_kind, asset_category, asset_type, name,
+      lifecycle_status, revision_number, created_by
+    ) values (
+      '50000000-0000-0000-0000-000000000099',
+      '10000000-0000-0000-0000-000000000001',
+      'hvac', 'HVAC', 'Furnace', 'forged service role insert',
+      'active', 1, '00000000-0000-0000-0000-000000000001'
+    );
+    raise exception 'Expected direct service_role asset insert to fail.';
+  exception when others then
+    if sqlerrm = 'Expected direct service_role asset insert to fail.' then raise; end if;
+    if position('controlled mutation boundary' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected direct service_role asset insert error: %', sqlerrm;
+    end if;
+  end;
+
+  begin
+    update public.home_asset_revisions
+       set name = 'forged service role history rewrite'
+     where id = v_revision_id;
+    raise exception 'Expected direct service_role revision update to fail.';
+  exception when others then
+    if sqlerrm = 'Expected direct service_role revision update to fail.' then raise; end if;
+    if position('immutable' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected direct service_role revision update error: %', sqlerrm;
+    end if;
+  end;
+
+  begin
+    truncate table public.home_assets, public.home_asset_revisions;
+    raise exception 'Expected direct service_role truncate to fail.';
+  exception when others then
+    if sqlerrm = 'Expected direct service_role truncate to fail.' then raise; end if;
+    if position('cannot be truncated' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected direct service_role truncate error: %', sqlerrm;
+    end if;
+  end;
+end;
+$service_role_guard_test$;
+
+reset role;
+reset servsync.property_asset_change_kind;
+reset servsync.property_asset_source_kind;
+
 do $$
 declare
   v_expected text[] := array[
@@ -362,6 +491,21 @@ begin
          and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')
     ),
     'private helpers have no direct execution grants'
+  );
+  perform property_asset_test.assert(
+    (
+      select count(*) = 4 and bool_and(not p.prosecdef)
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname in (
+           'home_assets_protect_identity',
+           'servsync_private_guard_property_asset_insert',
+           'servsync_private_guard_property_asset_revision',
+           'servsync_private_guard_property_asset_truncate'
+         )
+    ),
+    'table mutation guards run with the actual invoking role'
   );
 end;
 $$;

@@ -156,6 +156,7 @@
             "public.servsync_private_can_read_property_assets(uuid, uuid, uuid)",
             "public.servsync_private_guard_property_asset_insert()",
             "public.servsync_private_guard_property_asset_revision()",
+            "public.servsync_private_guard_property_asset_truncate()",
             "public.servsync_private_map_claimed_property_assets()",
             "public.servsync_private_property_asset_category(text)",
             "public.servsync_private_property_asset_optional_text(text, integer, text, boolean)",
@@ -191,7 +192,8 @@
             "indexes:public.home_assets_origin_contractor_idx",
             "triggers:public.contractor_local_homes.contractor_local_homes_map_property_assets_trigger",
             "triggers:public.home_assets.home_assets_guard_insert_trigger",
-            "triggers:public.home_assets.home_assets_record_revision_trigger"
+            "triggers:public.home_assets.home_assets_record_revision_trigger",
+            "triggers:public.home_assets.home_assets_guard_truncate_trigger"
           ]
         },
         "expectedCounts": {
@@ -199,13 +201,13 @@
           "columns": 41,
           "constraints": 21,
           "indexes": 7,
-          "triggers": 4,
-          "functions": 14,
-          "functionGrants": 19,
+          "triggers": 6,
+          "functions": 15,
+          "functionGrants": 20,
           "tableGrants": 16
         },
-        "expectedKeyFingerprint": "sha256:5b3fb0dceb459aba6336640d21a978992c0dc9c14d68d0eeb15d6d5bcf0f6a07",
-        "expectedCatalogFingerprint": "sha256:abea0717545fa303e69df92d7d7b5f41055fee4001a26cb441d0ec5ce1449045"
+        "expectedKeyFingerprint": "sha256:cc2f0bfc22a328b02b0c608aa7b4fa5c5e6b3e300101dba8dccf4401adc221c5",
+        "expectedCatalogFingerprint": "sha256:7e457e8980c401bcfb83d5b0039c259941d1a875ac636edaa5bb2f68f3e8c7b3"
       }
     ]
   }

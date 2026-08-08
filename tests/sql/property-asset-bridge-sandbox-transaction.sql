@@ -170,6 +170,55 @@ begin
 end;
 $sandbox$;
 
+set role service_role;
+select set_config('servsync.property_asset_change_kind', 'updated', false);
+select set_config('servsync.property_asset_source_kind', 'system', false);
+
+do $service_role_guard$
+declare
+  v_asset_id uuid := (
+    select id from public.home_assets where name like 'Rollback-only%' order by id limit 1
+  );
+  v_revision_id uuid := (
+    select id from public.home_asset_revisions where asset_id = v_asset_id order by revision_number limit 1
+  );
+begin
+  begin
+    update public.home_assets set name = 'forged service role update' where id = v_asset_id;
+    raise exception 'Sandbox service_role update unexpectedly succeeded.';
+  exception when others then
+    if sqlerrm = 'Sandbox service_role update unexpectedly succeeded.' then raise; end if;
+    if position('controlled mutation boundary' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected Sandbox service_role update error: %', sqlerrm;
+    end if;
+  end;
+
+  begin
+    update public.home_asset_revisions set name = 'forged service role history rewrite' where id = v_revision_id;
+    raise exception 'Sandbox service_role revision update unexpectedly succeeded.';
+  exception when others then
+    if sqlerrm = 'Sandbox service_role revision update unexpectedly succeeded.' then raise; end if;
+    if position('immutable' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected Sandbox service_role revision update error: %', sqlerrm;
+    end if;
+  end;
+
+  begin
+    truncate table public.home_assets, public.home_asset_revisions;
+    raise exception 'Sandbox service_role truncate unexpectedly succeeded.';
+  exception when others then
+    if sqlerrm = 'Sandbox service_role truncate unexpectedly succeeded.' then raise; end if;
+    if position('cannot be truncated' in lower(sqlerrm)) = 0 then
+      raise exception 'Unexpected Sandbox service_role truncate error: %', sqlerrm;
+    end if;
+  end;
+end;
+$service_role_guard$;
+
+reset role;
+reset servsync.property_asset_change_kind;
+reset servsync.property_asset_source_kind;
+
 rollback;
 
 select jsonb_build_object(

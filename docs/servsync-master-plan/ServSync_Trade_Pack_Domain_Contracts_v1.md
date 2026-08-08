@@ -92,6 +92,7 @@ Later Trade Section work must preserve these boundaries:
 - sections are ordered children of the existing Draft or Job;
 - multiple trades may coexist in one Draft, Estimate, Job, and Invoice;
 - Property Asset Bridge v1 extends the canonical `home_assets` identity with generic customer-safe fields, local-property claim continuity, append-only revisions, exact-revision concurrency, and property-derived authorization;
+- the current application client remains on the legacy Assets & Systems contract until a coordinated Production/Demo bridge rollout and client transition;
 - future sections may reference an asset UUID and accepted revision, but this foundation does not yet create that association;
 - property assets and history remain independent of Trade Pack entitlement and billing;
 - an assigned Field Technician may edit approved active-Job field content without gaining definition, Price Book, billing, or administrative authority;

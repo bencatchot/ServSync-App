@@ -3,7 +3,9 @@
 -- Extends the canonical homeowner home_assets foundation so the same durable
 -- asset identity can serve homeowner-owned homes and contractor-managed local
 -- properties. The bridge is intentionally independent of Trade Pack billing,
--- capabilities, Drafts, Jobs, and visible contractor UI.
+-- capabilities, Drafts, Jobs, and visible contractor UI. The current
+-- application remains on the legacy home_assets client contract until a
+-- coordinated Production/Demo rollout and client transition.
 
 begin;
 
@@ -23,6 +25,14 @@ begin
   if to_regprocedure('public.current_user_can_access_home(uuid)') is null then v_missing := array_append(v_missing, 'public.current_user_can_access_home(uuid)'); end if;
   if to_regprocedure('public.current_user_can_manage_home(uuid)') is null then v_missing := array_append(v_missing, 'public.current_user_can_manage_home(uuid)'); end if;
   if to_regprocedure('public.current_user_can_manage_contractor_customers(uuid)') is null then v_missing := array_append(v_missing, 'public.current_user_can_manage_contractor_customers(uuid)'); end if;
+  if not exists (
+    select 1
+      from pg_trigger
+     where tgrelid = 'public.home_assets'::regclass
+       and tgname = 'home_assets_touch_updated_at'
+       and not tgisinternal
+       and tgenabled <> 'D'
+  ) then v_missing := array_append(v_missing, 'public.home_assets.home_assets_touch_updated_at'); end if;
 
   if cardinality(v_missing) > 0 then
     raise exception 'Property Asset Bridge prerequisites are missing: %', array_to_string(v_missing, ', ');
@@ -99,6 +109,10 @@ alter table public.home_assets
   add column origin_contractor_id uuid,
   add column revision_number bigint;
 
+-- Backfill is a schema translation, not a user mutation. Preserve the exact
+-- historical timestamps that become part of each initial revision snapshot.
+alter table public.home_assets disable trigger home_assets_touch_updated_at;
+
 update public.home_assets
    set asset_kind = case lower(trim(asset_category))
      when 'hvac' then 'hvac'
@@ -114,6 +128,8 @@ update public.home_assets
        lifecycle_status = case when archived_at is null then 'active' else 'retired' end,
        origin_kind = 'homeowner',
        revision_number = 1;
+
+alter table public.home_assets enable trigger home_assets_touch_updated_at;
 
 alter table public.home_assets
   alter column asset_kind set not null,
@@ -476,7 +492,7 @@ $$;
 create or replace function public.home_assets_protect_identity()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -484,6 +500,9 @@ declare
   v_source_kind text := current_setting('servsync.property_asset_source_kind', true);
   v_mapped_home_id uuid;
 begin
+  if current_user <> 'postgres' then
+    raise exception 'Property assets may be changed only through the controlled mutation boundary.';
+  end if;
   if v_change_kind not in ('updated', 'retired', 'restored', 'claim_mapped')
      or v_source_kind not in ('homeowner', 'contractor', 'system') then
     raise exception 'Property assets may be changed only through the controlled mutation boundary.';
@@ -517,11 +536,12 @@ $$;
 create or replace function public.servsync_private_guard_property_asset_insert()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
-  if current_setting('servsync.property_asset_change_kind', true) <> 'created'
+  if current_user <> 'postgres'
+     or current_setting('servsync.property_asset_change_kind', true) <> 'created'
      or current_setting('servsync.property_asset_source_kind', true) not in ('homeowner', 'contractor')
      or new.revision_number <> 1 then
     raise exception 'Property assets may be created only through the controlled mutation boundary.';
@@ -565,17 +585,32 @@ $$;
 create or replace function public.servsync_private_guard_property_asset_revision()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
-  if tg_op = 'INSERT'
+  if current_user = 'postgres'
+     and tg_op = 'INSERT'
      and pg_trigger_depth() > 1
      and current_setting('servsync.property_asset_change_kind', true) in ('created', 'updated', 'retired', 'restored', 'claim_mapped')
      and current_setting('servsync.property_asset_source_kind', true) in ('homeowner', 'contractor', 'system') then
     return new;
   end if;
   raise exception 'Property asset revisions are immutable.';
+end;
+$$;
+
+create or replace function public.servsync_private_guard_property_asset_truncate()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if current_user <> 'postgres' then
+    raise exception 'Property Asset history cannot be truncated outside an owner-controlled migration.';
+  end if;
+  return null;
 end;
 $$;
 
@@ -600,6 +635,14 @@ create trigger home_assets_record_revision_trigger
 create trigger home_asset_revisions_immutable_trigger
   before insert or update or delete on public.home_asset_revisions
   for each row execute function public.servsync_private_guard_property_asset_revision();
+
+create trigger home_assets_guard_truncate_trigger
+  before truncate on public.home_assets
+  for each statement execute function public.servsync_private_guard_property_asset_truncate();
+
+create trigger home_asset_revisions_guard_truncate_trigger
+  before truncate on public.home_asset_revisions
+  for each statement execute function public.servsync_private_guard_property_asset_truncate();
 
 create or replace function public.servsync_private_map_claimed_property_assets()
 returns trigger
@@ -998,6 +1041,7 @@ revoke all on function public.servsync_private_validate_property_asset_target(uu
 revoke all on function public.servsync_private_guard_property_asset_insert() from public, anon, authenticated, service_role;
 revoke all on function public.servsync_private_record_property_asset_revision() from public, anon, authenticated, service_role;
 revoke all on function public.servsync_private_guard_property_asset_revision() from public, anon, authenticated, service_role;
+revoke all on function public.servsync_private_guard_property_asset_truncate() from public, anon, authenticated, service_role;
 revoke all on function public.servsync_private_map_claimed_property_assets() from public, anon, authenticated, service_role;
 revoke all on function public.home_assets_validate_home_room() from public, anon, authenticated, service_role;
 revoke all on function public.home_assets_protect_identity() from public, anon, authenticated, service_role;
@@ -1028,6 +1072,7 @@ alter function public.home_assets_protect_identity() owner to postgres;
 alter function public.servsync_private_guard_property_asset_insert() owner to postgres;
 alter function public.servsync_private_record_property_asset_revision() owner to postgres;
 alter function public.servsync_private_guard_property_asset_revision() owner to postgres;
+alter function public.servsync_private_guard_property_asset_truncate() owner to postgres;
 alter function public.servsync_private_map_claimed_property_assets() owner to postgres;
 alter function public.servsync_list_property_assets(uuid, uuid, uuid, boolean) owner to postgres;
 alter function public.servsync_create_property_asset(uuid, uuid, uuid, uuid, text, text, text, text, text, text, text, date, smallint, date, text, text) owner to postgres;

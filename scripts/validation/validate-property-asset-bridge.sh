@@ -68,6 +68,11 @@ if run_file property_asset_forward servsync-property-asset-bridge.sql 2>/dev/nul
   exit 1
 fi
 
+if run_file property_asset_forward tests/sql/property-asset-bridge-rollback.sql 2>/dev/null; then
+  printf 'Expected guarded rollback to refuse durable Property Asset history.\n' >&2
+  exit 1
+fi
+
 if "$PSQL" "postgresql://postgres@/property_asset_forward?host=$PGSOCKET&port=$PGPORT" \
   --set=ON_ERROR_STOP=1 \
   --command "set role authenticated; select count(*) from public.home_assets;" >/dev/null 2>&1; then

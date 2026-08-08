@@ -31,7 +31,9 @@ $$;
 drop trigger if exists contractor_local_homes_map_property_assets_trigger on public.contractor_local_homes;
 drop trigger if exists home_assets_guard_insert_trigger on public.home_assets;
 drop trigger if exists home_assets_record_revision_trigger on public.home_assets;
+drop trigger if exists home_assets_guard_truncate_trigger on public.home_assets;
 drop trigger if exists home_asset_revisions_immutable_trigger on public.home_asset_revisions;
+drop trigger if exists home_asset_revisions_guard_truncate_trigger on public.home_asset_revisions;
 
 drop function if exists public.servsync_list_property_asset_revisions(uuid, uuid);
 drop function if exists public.servsync_set_property_asset_lifecycle(uuid, bigint, text, uuid);
@@ -40,6 +42,7 @@ drop function if exists public.servsync_create_property_asset(uuid, uuid, uuid, 
 drop function if exists public.servsync_list_property_assets(uuid, uuid, uuid, boolean);
 drop function if exists public.servsync_private_map_claimed_property_assets();
 drop function if exists public.servsync_private_guard_property_asset_revision();
+drop function if exists public.servsync_private_guard_property_asset_truncate();
 drop function if exists public.servsync_private_record_property_asset_revision();
 drop function if exists public.servsync_private_guard_property_asset_insert();
 drop function if exists public.servsync_private_validate_property_asset_target(uuid, uuid, uuid);

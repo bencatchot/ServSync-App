@@ -59,4 +59,18 @@ insert into public.home_assets (
   'HVAC', 'Furnace', 'Existing furnace', 'Homeowner private note',
   '00000000-0000-0000-0000-000000000001'
 );
+insert into public.home_assets (
+  id, home_id, home_room_id, asset_category, asset_type, name, notes,
+  archived_at, created_by, created_at, updated_at
+) values (
+  '50000000-0000-0000-0000-000000000002',
+  '10000000-0000-0000-0000-000000000001',
+  '11000000-0000-0000-0000-000000000001',
+  'Electrical', 'Panel', 'Archived electrical panel',
+  'Archived homeowner private note',
+  timestamptz '2024-04-05 16:00:00+00',
+  '00000000-0000-0000-0000-000000000001',
+  timestamptz '2020-01-02 15:00:00+00',
+  timestamptz '2024-04-05 16:00:00+00'
+);
 reset request.jwt.claim.sub;

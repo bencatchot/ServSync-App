@@ -220,8 +220,8 @@ test.describe('home_assets foundation SQL', () => {
       appSource.indexOf('function PlatformAdminDashboard({ onSignOut }'),
     );
 
-    expect(appSource).toContain(".rpc('servsync_list_property_assets'");
-    expect(appSource).not.toContain(".from('home_assets')");
+    expect(appSource).toContain(".from('home_assets')");
+    expect(appSource).not.toContain(".rpc('servsync_list_property_assets'");
     expect(appSource).toContain('Assets &amp; Systems');
     expect(sharedHomeShellSource).not.toContain('home_assets');
     expect(sharedReminderShellSource).not.toContain('home_assets');

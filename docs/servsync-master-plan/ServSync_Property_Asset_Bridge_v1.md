@@ -2,7 +2,7 @@
 
 ## Status And Boundary
 
-Property Asset Bridge v1 is a hidden backend foundation installed only in ServSync Sandbox. It extends the existing canonical `public.home_assets` identity; it does not create a second customer, property, asset, Draft, Job, or history system.
+Property Asset Bridge v1 is a hidden backend foundation installed only in ServSync Sandbox. It extends the existing canonical `public.home_assets` identity; it does not create a second customer, property, asset, Draft, Job, or history system. The application client remains on the pre-bridge direct-table Assets & Systems contract so Production and Demo continue to work while their bridge rollout is Pending.
 
 The bridge establishes this future-safe relationship:
 
@@ -65,7 +65,7 @@ Only five fixed-path, `SECURITY DEFINER` RPCs are granted to `authenticated`:
 - retire or reactivate one asset at an expected revision;
 - list authorized revision history.
 
-Private validators and trigger helpers are not browser-callable. No RPC grants capability, enables a Trade Pack definition, or creates Draft, Job, document, billing, or history records.
+Private validators and trigger helpers are not browser-callable. No RPC grants capability, enables a Trade Pack definition, or creates Draft, Job, document, billing, or history records. No current application source calls these five RPCs; activating them in the homeowner or contractor client requires a later coordinated database rollout and client transition.
 
 ## Capability And Billing Separation
 
@@ -75,11 +75,11 @@ Future Trade Section creation may require an active exact capability. Existing a
 
 ## Rollout And Rollback
 
-Migration `servsync-property-asset-bridge.sql` SHA-256 `a4879abe9ce84bf82ce19c365be1f5b1793dd5d420130c7ec5fa2e9200f82696` was applied only to Sandbox `zpzdkoaubyjtsomccxya` on 2026-08-08 at `21:09:50Z` through `21:09:52Z`. Production and Demo remain Pending.
+Final corrected migration `servsync-property-asset-bridge.sql` SHA-256 `31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b` was applied only to Sandbox `zpzdkoaubyjtsomccxya` on 2026-08-08 at `21:52:44Z` through `21:52:47Z`, after the zero-row prior bridge was safely rolled back. The correction preserves original active and archived legacy timestamps during schema backfill, binds direct table mutation guards to the actual invoking database role, and blocks non-owner truncation, so preserved `service_role` ACLs cannot forge private RPC context or erase durable history. Production and Demo remain Pending, and the current client does not depend on the migration.
 
 The exact rollback is appropriate only before durable bridge data exists. It refuses to proceed when assets or revisions exist and restores the historical `home_assets` ownership, ACL, policy, trigger, and foreign-key contract only from the exact expected bridge state. After durable use begins, corrections must be additive forward migrations; history must not be destroyed to roll back a feature.
 
-Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`. Production versus Sandbox remains `FAIL`: 593 exact approved additions include Project Collaboration, Trade Pack Domain Contracts, and Property Asset Bridge additions, while 34 findings remain visible. Twelve of those findings are expected shared `home_assets` definition/security differences caused by this Sandbox-only bridge; the prior unrelated Stripe, function, and policy drift remains unresolved.
+Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`. Production versus Sandbox remains `FAIL`: 597 exact approved additions include Project Collaboration, Trade Pack Domain Contracts, and Property Asset Bridge additions, while 34 findings remain visible. Twelve of those findings are expected shared `home_assets` definition/security differences caused by this Sandbox-only bridge; the prior unrelated Stripe, function, and policy drift remains unresolved.
 
 ## Deferred Work
 

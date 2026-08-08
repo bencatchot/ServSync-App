@@ -14,25 +14,28 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Assets & Systems v1 UI', () => {
-  test('loads active home assets and supports owner/admin add edit archive through controlled RPCs', () => {
+  test('loads active home_assets and supports owner/admin add edit archive without hard delete', () => {
     const app = appSource();
     const dataSource = sourceBetween(app, 'const loadHomeAssets = useCallback(async () => {', 'useEffect(() => {\n    void loadHomeAssets();');
     const assetLogic = sourceBetween(app, 'const openHomeAssetForm =', 'const signedHomeAssetUrl =');
     const assetSource = sourceBetween(app, 'const renderHomeAssetForm =', 'const renderSharedHomeShellsPanel =');
 
-    expect(dataSource).toContain(".rpc('servsync_list_property_assets'");
-    expect(dataSource).toContain('p_include_retired: false');
-    expect(dataSource).not.toContain(".from('home_assets')");
+    expect(dataSource).toContain(".from('home_assets')");
+    expect(dataSource).toContain(".is('archived_at', null)");
+    expect(dataSource).toContain(".order('asset_category'");
+    expect(dataSource).toContain(".order('name'");
+    expect(dataSource).toContain("'Unable to load Assets & Systems.'");
     expect(assetSource).toContain('Assets &amp; Systems');
     expect(assetSource).toContain('Add asset');
     expect(assetSource).toContain('Edit asset/system');
     expect(assetSource).toContain('Archive');
-    expect(assetLogic).toContain(".rpc('servsync_create_property_asset'");
-    expect(assetLogic).toContain(".rpc('servsync_update_property_asset'");
-    expect(assetLogic).toContain(".rpc('servsync_set_property_asset_lifecycle'");
-    expect(assetLogic).toContain('p_expected_revision: homeAssetDraft.revision_number');
-    expect(assetLogic).toContain("p_lifecycle_status: 'retired'");
-    expect(assetLogic).not.toContain(".from('home_assets')");
+    expect(assetLogic).toContain('archived_at: new Date().toISOString()');
+    expect(assetLogic).toContain('home_room_id: homeAssetDraft.home_room_id || null');
+    expect(assetLogic).toContain('created_by: profile.id');
+    expect(assetLogic).toContain("'Unable to save asset.'");
+    expect(assetLogic).toContain("'Unable to archive asset.'");
+    expect(assetSource).toContain('No active assets or systems yet.');
+    expect(assetSource).toContain('flex flex-col gap-3 sm:flex-row');
     expect(assetLogic).not.toContain('.delete()');
   });
 

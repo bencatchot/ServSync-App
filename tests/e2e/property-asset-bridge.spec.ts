@@ -15,6 +15,9 @@ test.describe('Property Asset Bridge v1', () => {
     expect(sql).toContain('create table public.home_asset_revisions');
     expect(sql).toContain('home_asset_revisions_asset_revision_unique');
     expect(sql).toContain('home_asset_revisions_immutable_trigger');
+    expect(sql).toContain('home_assets_guard_truncate_trigger');
+    expect(sql).toContain('home_asset_revisions_guard_truncate_trigger');
+    expect(sql).toContain("if current_user <> 'postgres' then");
     expect(sql).toContain('revision_number = asset.revision_number + 1');
     expect(sql).not.toMatch(/\b(jsonb|metadata)\s+(?:not\s+null\s+)?default\s+'\{\}'/i);
   });
@@ -79,17 +82,18 @@ test.describe('Property Asset Bridge v1', () => {
     }
   });
 
-  test('keeps the existing homeowner UI visually unchanged while replacing direct table access', () => {
+  test('keeps the bridge hidden while Production and Demo retain the legacy asset client contract', () => {
     const app = source('src/App.tsx');
     const start = app.indexOf('const loadHomeAssets = useCallback(async () => {');
     const end = app.indexOf('const signedHomeAssetUrl =', start);
     const assetLogic = app.slice(start, end);
 
-    expect(assetLogic).toContain("rpc('servsync_list_property_assets'");
-    expect(assetLogic).toContain("rpc('servsync_create_property_asset'");
-    expect(assetLogic).toContain("rpc('servsync_update_property_asset'");
-    expect(assetLogic).toContain("rpc('servsync_set_property_asset_lifecycle'");
-    expect(assetLogic).not.toContain("from('home_assets')");
+    expect(assetLogic).toContain("from('home_assets')");
+    expect(assetLogic).toContain(".is('archived_at', null)");
+    expect(assetLogic).not.toContain("rpc('servsync_list_property_assets'");
+    expect(assetLogic).not.toContain("rpc('servsync_create_property_asset'");
+    expect(assetLogic).not.toContain("rpc('servsync_update_property_asset'");
+    expect(assetLogic).not.toContain("rpc('servsync_set_property_asset_lifecycle'");
     expect(app).not.toContain('Property Asset Bridge');
   });
 });
