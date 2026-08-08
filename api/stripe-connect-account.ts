@@ -24,9 +24,9 @@ type Authorization = {
 type Dependencies = {
   configured: () => boolean;
   authorize: (accessToken: string) => Promise<Authorization>;
-  createAccount: (authorization: Authorization) => Promise<Stripe.Account>;
-  retrieveAccount: (accountId: string) => Promise<Stripe.Account>;
-  persistAccount: (contractorId: string, account: Stripe.Account) => Promise<void>;
+  createAccount: (authorization: Authorization) => Promise<Stripe.V2.Core.Account>;
+  retrieveAccount: (accountId: string) => Promise<Stripe.V2.Core.Account>;
+  persistAccount: (contractorId: string, account: Stripe.V2.Core.Account) => Promise<void>;
   createAccountLink: (accountId: string, refreshUrl: string, returnUrl: string) => Promise<string>;
   rateLimit: (request: Request) => Promise<'ok' | 'limited' | 'unconfigured'>;
 };
@@ -101,7 +101,7 @@ function defaultDependencies(): Dependencies {
     },
     createAccount: async authorization => {
       if (!stripe) throw new Error('unconfigured');
-      return stripe.accounts.create(
+      return stripe.v2.core.accounts.create(
         canonicalConnectedAccountCreateParams({
           contractorId: authorization.contractor_id,
           businessName: authorization.business_name,
@@ -112,7 +112,9 @@ function defaultDependencies(): Dependencies {
     },
     retrieveAccount: async accountId => {
       if (!stripe) throw new Error('unconfigured');
-      return stripe.accounts.retrieve(accountId);
+      return stripe.v2.core.accounts.retrieve(accountId, {
+        include: ['configuration.merchant', 'defaults', 'identity', 'requirements'],
+      });
     },
     persistAccount: async (contractorId, account) => {
       if (!service) throw new Error('unconfigured');
@@ -135,12 +137,17 @@ function defaultDependencies(): Dependencies {
     },
     createAccountLink: async (accountId, refreshUrl, returnUrl) => {
       if (!stripe) throw new Error('unconfigured');
-      const link = await stripe.accountLinks.create({
+      const link = await stripe.v2.core.accountLinks.create({
         account: accountId,
-        refresh_url: refreshUrl,
-        return_url: returnUrl,
-        type: 'account_onboarding',
-        collection_options: { fields: 'eventually_due' },
+        use_case: {
+          type: 'account_onboarding',
+          account_onboarding: {
+            configurations: ['merchant'],
+            refresh_url: refreshUrl,
+            return_url: returnUrl,
+            collection_options: { fields: 'eventually_due', future_requirements: 'include' },
+          },
+        },
       });
       return link.url;
     },

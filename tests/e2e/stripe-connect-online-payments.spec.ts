@@ -30,25 +30,35 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
 }
 
-function account(overrides: Partial<Stripe.Account> = {}) {
+function account(overrides: Partial<Stripe.V2.Core.Account> = {}) {
   return {
     id: ACCOUNT_ID,
-    object: 'account',
-    charges_enabled: true,
-    payouts_enabled: true,
-    details_submitted: true,
-    capabilities: { card_payments: 'active', us_bank_account_ach_payments: 'active' },
-    controller: {
-      type: 'account',
-      fees: { payer: 'account' },
-      losses: { payments: 'stripe' },
-      requirement_collection: 'stripe',
-      stripe_dashboard: { type: 'full' },
+    object: 'v2.core.account',
+    applied_configurations: ['merchant'],
+    created: '2026-08-08T00:00:00.000Z',
+    livemode: false,
+    dashboard: 'full',
+    defaults: {
+      currency: 'usd',
+      responsibilities: {
+        fees_collector: 'stripe',
+        losses_collector: 'stripe',
+        requirements_collector: 'stripe',
+      },
     },
-    requirements: { currently_due: [], past_due: [], pending_verification: [] },
+    configuration: {
+      merchant: {
+        applied: true,
+        capabilities: {
+          card_payments: { status: 'active', status_details: [] },
+          ach_debit_payments: { status: 'active', status_details: [] },
+        },
+      },
+    },
+    requirements: { entries: [] },
     metadata: { servsync_contractor_id: CONTRACTOR_ID, servsync_environment: 'sandbox' },
     ...overrides,
-  } as Stripe.Account;
+  } as Stripe.V2.Core.Account;
 }
 
 function prepared(): PreparedStripeInvoiceCheckout {
@@ -74,33 +84,34 @@ function apiRequest(path: string, body: unknown, headers: HeadersInit = {}) {
 }
 
 test.describe('current Stripe Connect responsibility model', () => {
-  test('creates a controller-property account with Stripe fee/loss responsibility and no legacy type', () => {
+  test('creates an Accounts v2 merchant with Stripe fee/loss responsibility', () => {
     const params = canonicalConnectedAccountCreateParams({
       contractorId: CONTRACTOR_ID,
       businessName: 'Fixture Services',
       email: 'owner@example.test',
     });
-    expect(params.type).toBeUndefined();
-    expect(params.controller).toEqual({
-      fees: { payer: 'account' },
-      losses: { payments: 'stripe' },
-      requirement_collection: 'stripe',
-      stripe_dashboard: { type: 'full' },
+    expect(params.dashboard).toBe('full');
+    expect(params.defaults?.responsibilities).toEqual({
+      fees_collector: 'stripe',
+      losses_collector: 'stripe',
     });
-    expect(params.capabilities).toEqual({
+    expect(params.configuration?.merchant?.capabilities).toEqual({
       card_payments: { requested: true },
-      us_bank_account_ach_payments: { requested: true },
+      ach_debit_payments: { requested: true },
     });
-    expect(params.capabilities).not.toHaveProperty('transfers');
+    expect(params.configuration).not.toHaveProperty('recipient');
+    expect(params.include).toEqual(['configuration.merchant', 'defaults', 'identity', 'requirements']);
     expect(params.metadata?.servsync_application_fee_cents).toBe('0');
   });
 
   test('rejects application-fee, application-loss, or non-full-dashboard accounts', () => {
     expect(() => assertCanonicalConnectedAccount(account())).not.toThrow();
     for (const incompatible of [
-      account({ controller: { ...account().controller!, fees: { payer: 'application' } } }),
-      account({ controller: { ...account().controller!, losses: { payments: 'application' } } }),
-      account({ controller: { ...account().controller!, stripe_dashboard: { type: 'express' } } }),
+      account({ defaults: { responsibilities: { fees_collector: 'application', losses_collector: 'stripe', requirements_collector: 'stripe' } } }),
+      account({ defaults: { responsibilities: { fees_collector: 'stripe', losses_collector: 'application', requirements_collector: 'stripe' } } }),
+      account({ defaults: { responsibilities: { fees_collector: 'stripe', losses_collector: 'stripe', requirements_collector: 'application' } } }),
+      account({ dashboard: 'express' }),
+      account({ livemode: true }),
     ]) expect(() => assertCanonicalConnectedAccount(incompatible)).toThrow();
     expect(canonicalStripeAccountSnapshot(account())).toMatchObject({
       mode: 'test', account_status: 'active', fees_collector: 'stripe', losses_collector: 'stripe', dashboard_type: 'full',
@@ -244,6 +255,7 @@ test.describe('Connect webhook authority', () => {
       constructEvent: (_payload, signature) => { if (signature !== 'valid') throw new Error('bad'); return validEvent; },
       reconcile: async input => { reconciliations.push(input); },
       contractorForAccount: async () => CONTRACTOR_ID,
+      retrieveAccount: async () => account(),
       syncAccount: async () => undefined,
       retrieveCharge: async () => { throw new Error('not used'); },
     });
@@ -257,6 +269,7 @@ test.describe('Connect webhook authority', () => {
       constructEvent: () => validEvent,
       reconcile: async () => { throw new Error('database'); },
       contractorForAccount: async () => CONTRACTOR_ID,
+      retrieveAccount: async () => account(),
       syncAccount: async () => undefined,
       retrieveCharge: async () => { throw new Error('not used'); },
     });
@@ -265,18 +278,21 @@ test.describe('Connect webhook authority', () => {
 
   test('binds account updates through the persisted ServSync mapping, not editable Stripe metadata', async () => {
     const synced: string[] = [];
-    const updatedAccount = account({
+    const updatedAccount = {
+      id: ACCOUNT_ID,
+      object: 'account',
       metadata: {
         servsync_contractor_id: '99999999-9999-4999-8999-999999999999',
         servsync_environment: 'sandbox',
       },
-    });
+    } as Stripe.Account;
     const accountEvent = event('account.updated', updatedAccount);
     const handler = createStripeConnectWebhookHandler({
       configured: () => true,
       constructEvent: () => accountEvent,
       reconcile: async () => { throw new Error('not a payment event'); },
       contractorForAccount: async stripeAccountId => stripeAccountId === ACCOUNT_ID ? CONTRACTOR_ID : null,
+      retrieveAccount: async () => account({ metadata: { servsync_contractor_id: CONTRACTOR_ID, servsync_environment: 'sandbox' } }),
       syncAccount: async contractorId => { synced.push(contractorId); },
       retrieveCharge: async () => { throw new Error('not used'); },
     });
@@ -296,11 +312,11 @@ test('onboarding handler is Owner-authorized and never returns provider internal
     createAccount: async () => account(),
     retrieveAccount: async () => account(),
     persistAccount: async id => { persisted.push(id); },
-    createAccountLink: async () => 'https://connect.stripe.com/setup/s/test-fixture',
+    createAccountLink: async () => 'https://accounts.stripe.com/onboarding/test-fixture',
   });
   const result = await handler(apiRequest('/api/stripe-connect-account', { action: 'onboard' }, { Authorization: 'Bearer owner-jwt' }));
   expect(result.status).toBe(200);
-  expect(await result.json()).toEqual({ status: 'onboarding_required', url: 'https://connect.stripe.com/setup/s/test-fixture' });
+  expect(await result.json()).toEqual({ status: 'onboarding_required', url: 'https://accounts.stripe.com/onboarding/test-fixture' });
   expect(persisted).toEqual([CONTRACTOR_ID]);
 });
 

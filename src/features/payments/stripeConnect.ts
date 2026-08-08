@@ -84,7 +84,7 @@ export async function startStripeConnectOnboarding(client: SupabaseClient) {
   const result: unknown = await response.json();
   if (!response.ok || !result || typeof result !== 'object') throw new Error('Stripe onboarding is unavailable.');
   const url = (result as Record<string, unknown>).url;
-  if (typeof url !== 'string' || !url.startsWith('https://connect.stripe.com/')) throw new Error('Stripe onboarding is unavailable.');
+  if (typeof url !== 'string' || !url.startsWith('https://accounts.stripe.com/')) throw new Error('Stripe onboarding is unavailable.');
   return url;
 }
 

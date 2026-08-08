@@ -29,7 +29,8 @@ type Dependencies = {
   constructEvent: (payload: string, signature: string) => Stripe.Event;
   reconcile: (input: StripePaymentReconciliation) => Promise<void>;
   contractorForAccount: (stripeAccountId: string) => Promise<string | null>;
-  syncAccount: (contractorId: string, account: Stripe.Account) => Promise<void>;
+  retrieveAccount: (accountId: string) => Promise<Stripe.V2.Core.Account>;
+  syncAccount: (contractorId: string, account: Stripe.V2.Core.Account) => Promise<void>;
   retrieveCharge: (chargeId: string, stripeAccountId: string) => Promise<Stripe.Charge>;
 };
 
@@ -211,6 +212,12 @@ function defaultDependencies(): Dependencies {
       if (error) throw new Error('account_lookup_failed');
       return typeof data === 'string' ? data : null;
     },
+    retrieveAccount: async accountId => {
+      if (!stripe) throw new Error('unconfigured');
+      return stripe.v2.core.accounts.retrieve(accountId, {
+        include: ['configuration.merchant', 'defaults', 'identity', 'requirements'],
+      });
+    },
     syncAccount: async (contractorId, account) => {
       if (!service) throw new Error('unconfigured');
       const snapshot = canonicalStripeAccountSnapshot(account);
@@ -258,7 +265,7 @@ export function createStripeConnectWebhookHandler(dependencies: Dependencies = d
         if (account.metadata?.servsync_environment !== 'sandbox') return response('Ignored', 200);
         const contractorId = await dependencies.contractorForAccount(account.id);
         if (!contractorId) return response('Ignored', 200);
-        await dependencies.syncAccount(contractorId, account);
+        await dependencies.syncAccount(contractorId, await dependencies.retrieveAccount(account.id));
         return response('Handled', 200);
       }
       const reconciliation = await reconciliationFromStripeEvent(event, dependencies.retrieveCharge);

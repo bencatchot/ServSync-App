@@ -55,25 +55,33 @@ export function canonicalConnectedAccountCreateParams(input: {
   contractorId: string;
   businessName: string;
   email: string;
-}): Stripe.AccountCreateParams {
+}): Stripe.V2.Core.AccountCreateParams {
   return {
-    country: 'US',
-    default_currency: 'usd',
-    email: input.email || undefined,
-    business_profile: {
-      name: input.businessName,
-      product_description: 'Home maintenance, inspection, and contractor services billed through ServSync.',
+    contact_email: input.email || undefined,
+    display_name: input.businessName,
+    dashboard: 'full',
+    defaults: {
+      currency: 'usd',
+      locales: ['en-US'],
+      profile: {
+        doing_business_as: input.businessName,
+        product_description: 'Home maintenance, inspection, and contractor services billed through ServSync.',
+      },
+      responsibilities: {
+        fees_collector: 'stripe',
+        losses_collector: 'stripe',
+      },
     },
-    capabilities: {
-      card_payments: { requested: true },
-      us_bank_account_ach_payments: { requested: true },
+    identity: { country: 'us' },
+    configuration: {
+      merchant: {
+        capabilities: {
+          card_payments: { requested: true },
+          ach_debit_payments: { requested: true },
+        },
+      },
     },
-    controller: {
-      fees: { payer: 'account' },
-      losses: { payments: 'stripe' },
-      requirement_collection: 'stripe',
-      stripe_dashboard: { type: 'full' },
-    },
+    include: ['configuration.merchant', 'defaults', 'identity', 'requirements'],
     metadata: {
       servsync_contractor_id: input.contractorId,
       servsync_environment: 'sandbox',
@@ -82,11 +90,13 @@ export function canonicalConnectedAccountCreateParams(input: {
   };
 }
 
-export function assertCanonicalConnectedAccount(account: Stripe.Account) {
-  if (account.controller?.fees?.payer !== 'account') throw new Error('Connected account fee responsibility is incompatible.');
-  if (account.controller?.losses?.payments !== 'stripe') throw new Error('Connected account loss responsibility is incompatible.');
-  if (account.controller?.requirement_collection !== 'stripe') throw new Error('Connected account requirement collection is incompatible.');
-  if (account.controller?.stripe_dashboard?.type !== 'full') throw new Error('Connected account dashboard responsibility is incompatible.');
+export function assertCanonicalConnectedAccount(account: Stripe.V2.Core.Account) {
+  if (account.object !== 'v2.core.account' || account.livemode) throw new Error('Connected account mode is incompatible.');
+  if (!account.applied_configurations.includes('merchant')) throw new Error('Connected account merchant configuration is missing.');
+  if (account.defaults?.responsibilities.fees_collector !== 'stripe') throw new Error('Connected account fee responsibility is incompatible.');
+  if (account.defaults?.responsibilities.losses_collector !== 'stripe') throw new Error('Connected account loss responsibility is incompatible.');
+  if (account.defaults?.responsibilities.requirements_collector !== 'stripe') throw new Error('Connected account requirement collection is incompatible.');
+  if (account.dashboard !== 'full') throw new Error('Connected account dashboard responsibility is incompatible.');
 }
 
 export type CanonicalStripeAccountStatus =
@@ -96,32 +106,42 @@ export type CanonicalStripeAccountStatus =
   | 'active'
   | 'restricted';
 
-export function canonicalStripeAccountStatus(account: Stripe.Account): CanonicalStripeAccountStatus {
+function canonicalCapabilityStatus(capability: { status: string } | undefined) {
+  if (!capability) return 'unrequested' as const;
+  if (capability.status === 'active' || capability.status === 'pending') return capability.status;
+  return 'inactive' as const;
+}
+
+export function canonicalStripeAccountStatus(account: Stripe.V2.Core.Account): CanonicalStripeAccountStatus {
   assertCanonicalConnectedAccount(account);
-  const card = account.capabilities?.card_payments ?? 'inactive';
-  const ach = account.capabilities?.us_bank_account_ach_payments ?? 'inactive';
-  if (account.charges_enabled && card === 'active' && ach === 'active') return 'active';
-  if (account.requirements?.disabled_reason) return 'restricted';
-  if ((account.requirements?.past_due?.length ?? 0) > 0) return 'verification_required';
-  if (!account.details_submitted || (account.requirements?.currently_due?.length ?? 0) > 0) return 'setup_incomplete';
+  const capabilities = account.configuration?.merchant?.capabilities;
+  const card = canonicalCapabilityStatus(capabilities?.card_payments);
+  const ach = canonicalCapabilityStatus(capabilities?.ach_debit_payments);
+  if (card === 'active' && ach === 'active') return 'active';
+  if (card === 'inactive' || ach === 'inactive') return 'restricted';
+  const requirements = account.requirements?.entries ?? [];
+  if (requirements.some(entry => entry.minimum_deadline.status === 'past_due')) return 'verification_required';
+  if (requirements.some(entry => entry.awaiting_action_from === 'user')) return 'setup_incomplete';
   return 'payments_pending';
 }
 
-export function canonicalStripeAccountSnapshot(account: Stripe.Account) {
+export function canonicalStripeAccountSnapshot(account: Stripe.V2.Core.Account) {
   assertCanonicalConnectedAccount(account);
+  const requirements = account.requirements?.entries ?? [];
+  const capabilities = account.configuration?.merchant?.capabilities;
+  const card = canonicalCapabilityStatus(capabilities?.card_payments);
+  const ach = canonicalCapabilityStatus(capabilities?.ach_debit_payments);
   return {
     stripe_account_id: account.id,
     mode: 'test' as const,
     account_status: canonicalStripeAccountStatus(account),
-    charges_enabled: account.charges_enabled,
-    payouts_enabled: account.payouts_enabled,
-    details_submitted: account.details_submitted,
-    card_payments_status: account.capabilities?.card_payments ?? 'inactive',
-    ach_payments_status: account.capabilities?.us_bank_account_ach_payments ?? 'inactive',
-    requirements_due_count:
-      (account.requirements?.currently_due?.length ?? 0)
-      + (account.requirements?.past_due?.length ?? 0)
-      + (account.requirements?.pending_verification?.length ?? 0),
+    charges_enabled: card === 'active' && ach === 'active',
+    // Accounts v2 does not expose a payout-enabled boolean. Stripe owns payout setup in the full Dashboard.
+    payouts_enabled: false,
+    details_submitted: requirements.every(entry => entry.awaiting_action_from !== 'user'),
+    card_payments_status: card,
+    ach_payments_status: ach,
+    requirements_due_count: requirements.length,
     fees_collector: 'stripe' as const,
     losses_collector: 'stripe' as const,
     dashboard_type: 'full' as const,
