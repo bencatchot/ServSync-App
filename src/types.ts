@@ -457,6 +457,19 @@ export interface InvoiceOfflinePaymentRecord {
   created_at: string;
 }
 
+export interface InvoiceOnlinePaymentRecord {
+  id: string;
+  amount_cents: number;
+  accounted_amount_cents: number;
+  state: 'creating' | 'open' | 'processing' | 'succeeded' | 'failed' | 'canceled' | 'partially_refunded' | 'refunded' | 'disputed';
+  payment_method_type: 'card' | 'us_bank_account' | null;
+  checkout_created_at: string | null;
+  processing_at: string | null;
+  succeeded_at: string | null;
+  reversed_at: string | null;
+  created_at: string;
+}
+
 export type LocalInvoiceDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
 
 export interface LocalInvoiceDeliveryLinkMetadata {

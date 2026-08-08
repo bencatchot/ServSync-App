@@ -37,6 +37,7 @@
     "test:draft-optional-customer-migrations": "scripts/validation/validate-draft-optional-customer-migrations.sh",
     "test:public-signup-role-hardening": "scripts/validation/validate-public-signup-role-hardening.sh",
     "test:accepted-estimate-deposit-workflow": "scripts/validation/validate-accepted-estimate-deposit-workflow.sh",
+    "test:stripe-connect-online-payments": "scripts/validation/validate-stripe-connect-online-payments-foundation.sh",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
@@ -47,7 +48,8 @@
     "lucide-react": "^0.344.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "stripe": "^22.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

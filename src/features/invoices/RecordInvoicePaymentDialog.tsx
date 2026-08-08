@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
-import type { Invoice, InvoiceOfflinePaymentRecord } from '../../types';
+import type { Invoice, InvoiceOfflinePaymentRecord, InvoiceOnlinePaymentRecord } from '../../types';
 import { formatDateTime, formatMoney, formatShortDate } from '../../utils/format';
 import { invoiceBalanceDueCents } from './paymentPresentation';
 import {
@@ -14,6 +14,7 @@ import {
 interface RecordInvoicePaymentDialogProps {
   invoice: Invoice;
   payments: InvoiceOfflinePaymentRecord[];
+  onlinePayments: InvoiceOnlinePaymentRecord[];
   loadingHistory: boolean;
   submitting: boolean;
   historyError?: string;
@@ -24,6 +25,7 @@ interface RecordInvoicePaymentDialogProps {
 export function RecordInvoicePaymentDialog({
   invoice,
   payments,
+  onlinePayments,
   loadingHistory,
   submitting,
   historyError = '',
@@ -115,7 +117,26 @@ export function RecordInvoicePaymentDialog({
             <h3 id="invoice-payment-history-title" className="text-sm font-bold text-slate-950">Payment history</h3>
             {loadingHistory && <p className="mt-2 text-sm text-slate-500">Loading payment history...</p>}
             {!loadingHistory && historyError && <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{historyError}</p>}
-            {!loadingHistory && !historyError && payments.length === 0 && <p className="mt-2 text-sm text-slate-500">No offline payments recorded.</p>}
+            {!loadingHistory && !historyError && payments.length === 0 && onlinePayments.length === 0 && <p className="mt-2 text-sm text-slate-500">No payments recorded.</p>}
+            {!loadingHistory && !historyError && onlinePayments.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {onlinePayments.map(payment => {
+                  const method = payment.payment_method_type === 'us_bank_account' ? 'ACH' : payment.payment_method_type === 'card' ? 'Card' : 'Online payment';
+                  const state = payment.state === 'succeeded' ? 'Paid' : payment.state === 'processing' ? 'Processing' : payment.state === 'partially_refunded' ? 'Partially refunded' : payment.state.charAt(0).toUpperCase() + payment.state.slice(1);
+                  return (
+                    <article key={payment.id} className="rounded-md border border-slate-200 px-3 py-3 text-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-slate-950">{formatMoney(payment.amount_cents)} · Stripe {method}</p>
+                          <p className="mt-1 text-xs text-slate-500">{state} · {formatMoney(payment.accounted_amount_cents)} applied to this Invoice</p>
+                        </div>
+                        <span className="text-xs text-slate-500">{formatDateTime(payment.created_at)}</span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
             {!loadingHistory && !historyError && payments.length > 0 && (
               <div className="mt-3 space-y-2">
                 {payments.map(payment => (

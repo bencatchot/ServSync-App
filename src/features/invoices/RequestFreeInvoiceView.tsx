@@ -5,6 +5,7 @@ import type {
   RequestFreeInvoiceDocument,
 } from '../../types';
 import { invoiceStatusLabel } from './status';
+import { InvoiceOnlinePaymentButton } from '../payments/InvoiceOnlinePaymentButton';
 
 type ViewState =
   | { status: 'loading' }
@@ -115,7 +116,7 @@ export function RequestFreeInvoiceView({ lookup }: { lookup: RequestFreeInvoiceD
           <AlertTriangle className="mx-auto text-amber-600" aria-hidden="true" />
           <h1 className="mt-4 text-xl font-bold">{copy.title}</h1>
           <p className="mt-2 text-sm leading-6 text-[#526784]">{copy.body}</p>
-          <p className="mt-6 text-xs text-[#6B7D95]">ServSync does not use this link to create an account, approve work, or process payment.</p>
+          <p className="mt-6 text-xs text-[#6B7D95]">Opening this link does not create an account, approve work, or process a payment.</p>
         </div>
       </main>
     );
@@ -197,6 +198,8 @@ export function RequestFreeInvoiceView({ lookup }: { lookup: RequestFreeInvoiceD
               {invoice.amount_paid_cents > 0 && <div className="flex justify-between gap-4 text-emerald-700"><dt>Paid</dt><dd>-{money(invoice.amount_paid_cents)}</dd></div>}
             </dl>
           </section>
+
+          <InvoiceOnlinePaymentButton channel="request_free" invoiceId={null} />
 
           {(invoice.notes || invoice.terms) && (
             <section className="grid gap-5 border-t border-[#E1E3E7] pt-6 sm:grid-cols-2">

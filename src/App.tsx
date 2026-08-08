@@ -315,6 +315,9 @@ import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary
 import { RecordInvoicePaymentDialog } from './features/invoices/RecordInvoicePaymentDialog';
 import { normalizeOfflinePaymentRecords, type OfflinePaymentSubmission } from './features/invoices/offlinePayments';
 import { LocalInvoiceDeliveryPanel } from './features/invoices/LocalInvoiceDeliveryPanel';
+import { InvoiceOnlinePaymentButton } from './features/payments/InvoiceOnlinePaymentButton';
+import { StripeConnectAccountPanel } from './features/payments/StripeConnectAccountPanel';
+import { normalizeOnlinePaymentRecords } from './features/payments/stripeConnect';
 import { LocalEstimateDeliveryPanel } from './features/estimates/LocalEstimateDeliveryPanel';
 import {
   canRequestScheduleInvoice,
@@ -393,6 +396,7 @@ import type {
   Invoice,
   InvoiceBacklogItem,
   InvoiceOfflinePaymentRecord,
+  InvoiceOnlinePaymentRecord,
   InvoiceStatus,
   InvoiceLineItem,
   JobWorkItem,
@@ -14459,6 +14463,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Download size={16} />
             Download PDF
           </button>
+          {supabase && (
+            <InvoiceOnlinePaymentButton channel="authenticated" invoiceId={invoice.id} client={supabase} />
+          )}
           {invoiceFiled && (
             <button
               type="button"
@@ -14501,7 +14508,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             )}
             {options.showPaymentGuidance && (
               <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm text-blue-900">
-                Payment is handled directly with your contractor. Contact them for payment instructions.
+                Pay online when available, or contact your contractor for payment instructions.
                 <span className="mt-1 block text-xs text-blue-800">
                   Home History is where completed work and filed invoice/service records stay for future reference. Filing uses the invoice record and does not store a duplicate PDF.
                 </span>
@@ -15296,7 +15303,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </div>
                 {isOpenInvoice && (
                   <p className="mt-2 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-500">
-                    Payment is handled directly with your contractor.
+                    Pay online when available, or follow your contractor's payment instructions.
                   </p>
                 )}
               </div>
@@ -21590,6 +21597,7 @@ function ContractorDashboard({
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [recordPaymentInvoice, setRecordPaymentInvoice] = useState<Invoice | null>(null);
   const [recordPaymentHistory, setRecordPaymentHistory] = useState<InvoiceOfflinePaymentRecord[]>([]);
+  const [recordOnlinePaymentHistory, setRecordOnlinePaymentHistory] = useState<InvoiceOnlinePaymentRecord[]>([]);
   const [recordPaymentHistoryLoading, setRecordPaymentHistoryLoading] = useState(false);
   const [recordPaymentHistoryError, setRecordPaymentHistoryError] = useState('');
   const [recordingInvoicePayment, setRecordingInvoicePayment] = useState(false);
@@ -24463,7 +24471,7 @@ function ContractorDashboard({
       if (sendError) throw sendError;
       setNotice(actionFeedbackMessage(
         'Invoice sent',
-        'The homeowner can now view it. Payment is handled directly with the contractor.',
+        'The homeowner can now view it. Online payment appears only when the contractor has completed Stripe test setup; offline payment remains available.',
         'contractor-invoice-send-feedback',
       ));
       await loadContractor();
@@ -24485,13 +24493,17 @@ function ContractorDashboard({
     setRecordPaymentHistoryLoading(true);
     setRecordPaymentHistoryError('');
     try {
-      const { data, error: historyError } = await supabase.rpc('servsync_list_invoice_offline_payments', {
-        p_invoice_id: invoice.id,
-      });
-      if (historyError) throw historyError;
-      setRecordPaymentHistory(normalizeOfflinePaymentRecords(data));
+      const [offline, online] = await Promise.all([
+        supabase.rpc('servsync_list_invoice_offline_payments', { p_invoice_id: invoice.id }),
+        supabase.rpc('servsync_list_invoice_online_payments', { p_invoice_id: invoice.id }),
+      ]);
+      if (offline.error) throw offline.error;
+      if (online.error) throw online.error;
+      setRecordPaymentHistory(normalizeOfflinePaymentRecords(offline.data));
+      setRecordOnlinePaymentHistory(normalizeOnlinePaymentRecords(online.data));
     } catch (err) {
       setRecordPaymentHistory([]);
+      setRecordOnlinePaymentHistory([]);
       setRecordPaymentHistoryError(readableError(err, 'Payment history could not be loaded.'));
     } finally {
       setRecordPaymentHistoryLoading(false);
@@ -24505,6 +24517,7 @@ function ContractorDashboard({
     }
     setRecordPaymentInvoice(invoice);
     setRecordPaymentHistory([]);
+    setRecordOnlinePaymentHistory([]);
     void loadInvoiceOfflinePaymentHistory(invoice);
   };
 
@@ -33260,6 +33273,8 @@ function ContractorDashboard({
             </button>
           ))}
         </div>
+
+        {supabase && <StripeConnectAccountPanel client={supabase} />}
 
         <div id="contractor-profile-logo-branding" className="mb-5 scroll-mt-6 rounded-2xl border border-[#E1E3E7] bg-[#F7F9FC] p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -44472,6 +44487,7 @@ function ContractorDashboard({
         <RecordInvoicePaymentDialog
           invoice={recordPaymentInvoice}
           payments={recordPaymentHistory}
+          onlinePayments={recordOnlinePaymentHistory}
           loadingHistory={recordPaymentHistoryLoading}
           historyError={recordPaymentHistoryError}
           submitting={recordingInvoicePayment}
@@ -44479,6 +44495,7 @@ function ContractorDashboard({
             if (recordingInvoicePayment) return;
             setRecordPaymentInvoice(null);
             setRecordPaymentHistory([]);
+            setRecordOnlinePaymentHistory([]);
             setRecordPaymentHistoryError('');
           }}
           onSubmit={recordOfflineInvoicePayment}
