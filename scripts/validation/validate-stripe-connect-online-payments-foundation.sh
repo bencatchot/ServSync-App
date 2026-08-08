@@ -34,7 +34,23 @@ run --file "$ROOT/tests/sql/accepted-estimate-deposit-workflow-foundation.sql" >
 run --file "$ROOT/servsync-accepted-estimate-deposit-workflow.sql" >/dev/null
 run --file "$ROOT/tests/sql/stripe-connect-online-payments-test-extension.sql" >/dev/null
 run --file "$ROOT/servsync-stripe-connect-online-payments-foundation.sql" >/dev/null
+run --file "$ROOT/servsync-stripe-connect-provider-payment-id-compatibility.sql" >/dev/null
+run --file "$ROOT/servsync-stripe-connect-provider-payment-id-compatibility.sql" >/dev/null
 run --file "$ROOT/tests/sql/stripe-connect-online-payments-validation.sql" >/dev/null
 
-echo 'Stripe Connect Online Payments Foundation PostgreSQL validation passed.'
+if run >/dev/null 2>&1 <<SQL
+begin;
+alter table public.invoice_online_payment_attempts
+  drop constraint invoice_online_payment_attempts_charge_check;
+alter table public.invoice_online_payment_attempts
+  add constraint invoice_online_payment_attempts_charge_check
+  check (charge_id is null);
+\i '$ROOT/servsync-stripe-connect-provider-payment-id-compatibility.sql'
+rollback;
+SQL
+then
+  echo 'Provider payment ID compatibility migration accepted a drifted prerequisite.' >&2
+  exit 1
+fi
 
+echo 'Stripe Connect Online Payments Foundation PostgreSQL validation passed.'

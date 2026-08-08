@@ -391,11 +391,16 @@ test('source keeps secrets server-only and private SQL surfaces narrow', () => {
   expect(checkout).not.toMatch(/application_fee_amount|transfer_data|destination/);
 
   const sql = source('servsync-stripe-connect-online-payments-foundation.sql');
+  const providerIdCompatibility = source('servsync-stripe-connect-provider-payment-id-compatibility.sql');
   expect(sql).toContain("check (application_fee_cents = 0)");
   expect(sql).toContain("check (fees_collector = 'stripe')");
   expect(sql).toContain("check (losses_collector = 'stripe')");
   expect(sql).toContain('alter table public.invoice_online_payment_attempts force row level security;');
   expect(sql).toContain('invoice_offline_payment_records_online_conflict');
   expect(sql).toContain('invoices_online_payment_void_guard');
+  expect(providerIdCompatibility).toContain("charge_id ~ '^(ch|py)_[A-Za-z0-9_]{8,}$'");
+  expect(providerIdCompatibility).toContain('Stripe provider identifier constraint is incompatible.');
+  expect(providerIdCompatibility).toContain('not v_constraint_validated');
+  expect(providerIdCompatibility).toContain('validate constraint invoice_online_payment_attempts_charge_check');
   expect(sql).not.toMatch(/grant (?:select|insert|update|delete|truncate|references|trigger) on table public\.(?:contractor_stripe_payment_accounts|invoice_online_payment_attempts|stripe_connect_payment_events)/i);
 });

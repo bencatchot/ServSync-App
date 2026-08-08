@@ -141,8 +141,7 @@ test.describe('Invoice payment presentation', () => {
     expect(appSource).toContain('<InvoicePaymentSummary invoice={invoice} className="mt-2" />');
     expect(appSource).toContain('<InvoicePaymentSummary invoice={invoice} variant="detail" showStatus');
     expect(appSource).toContain('<InvoicePaymentSummary invoice={linkedInvoiceForJob}');
-    expect(appSource).toContain('Payment is handled directly with your contractor.');
-    expect(appSource).not.toContain('Pay now');
+    expect(appSource).toContain('Pay online when available, or contact your contractor for payment instructions.');
     expect(appSource).toContain('Record payment');
     expect(appSource).toContain('Payment history');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-compact"');

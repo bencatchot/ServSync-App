@@ -127,12 +127,12 @@ reset role;
 select public.servsync_reconcile_stripe_invoice_payment_event(
   'evt_succeeded12345678', now() + interval '1 second', 'payment_intent.succeeded', 'acct_fixture12345678',
   (select id from public.invoice_online_payment_attempts where invoice_id = '30000000-0000-0000-0000-000000000001'),
-  'cs_test_fixture12345678', 'pi_fixture12345678', 'ch_fixture12345678', 'us_bank_account', 'succeeded', 150000, 150000, null
+  'cs_test_fixture12345678', 'pi_fixture12345678', 'py_fixture12345678', 'us_bank_account', 'succeeded', 150000, 150000, null
 );
 select public.servsync_reconcile_stripe_invoice_payment_event(
   'evt_succeeded12345678', now() + interval '1 second', 'payment_intent.succeeded', 'acct_fixture12345678',
   (select id from public.invoice_online_payment_attempts where invoice_id = '30000000-0000-0000-0000-000000000001'),
-  'cs_test_fixture12345678', 'pi_fixture12345678', 'ch_fixture12345678', 'us_bank_account', 'succeeded', 150000, 150000, null
+  'cs_test_fixture12345678', 'pi_fixture12345678', 'py_fixture12345678', 'us_bank_account', 'succeeded', 150000, 150000, null
 );
 
 select public.servsync_reconcile_stripe_invoice_payment_event(
@@ -164,7 +164,7 @@ reset role;
 
 select public.servsync_reconcile_stripe_invoice_payment_event(
   'evt_refunded12345678', now() + interval '2 seconds', 'charge.refunded', 'acct_fixture12345678',
-  null, null, 'pi_fixture12345678', 'ch_fixture12345678', 'us_bank_account', 'partially_refunded', 150000, 100000, null
+  null, null, 'pi_fixture12345678', 'py_fixture12345678', 'us_bank_account', 'partially_refunded', 150000, 100000, null
 );
 
 do $$ begin
@@ -173,6 +173,19 @@ do $$ begin
     raise exception 'Provider reversal did not adjust the existing Invoice authority.';
   end if;
 end $$;
+
+do $$
+begin
+  begin
+    update public.invoice_online_payment_attempts
+       set charge_id = 'provider_fixture12345678'
+     where invoice_id = '30000000-0000-0000-0000-000000000001';
+    raise exception 'An unknown provider payment identifier prefix was accepted.';
+  exception when check_violation then
+    null;
+  end;
+end;
+$$;
 
 insert into public.contractor_local_contacts (id, contractor_id, display_name, email) values
   ('50000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Local Customer', 'local@example.test');

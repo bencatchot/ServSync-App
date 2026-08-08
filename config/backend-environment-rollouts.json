@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-07",
+  "updatedOn": "2026-08-08",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -189,7 +189,7 @@
       "environments": {
         "sandbox": {
           "status": "Applied",
-          "reason": "Exact migration SHA-256 41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374 was applied on 2026-08-08 at 02:00:15Z through 02:00:17Z. Catalog/security and rollback-only ACH processing, settlement, duplicate-event, equal-time ordering, sanitized history, and exact Invoice/offline-ledger preservation passed. Provider-backed test onboarding and Checkout remain fail-closed because no approved Stripe test key or Connect webhook secret is configured."
+          "reason": "Foundation SHA-256 41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374 and provider-ID compatibility SHA-256 f03eb5b754132501629fc6594b78fd8c6708085f646187026489d3dd20f064df are Applied in Sandbox. Provider-backed TEST onboarding, direct card and ACH charges, signed webhook settlement/failure/retry ordering, mixed offline/online accounting, reversal handling, and cleanup were validated on 2026-08-08."
         },
         "production": {
           "status": "Intentionally deferred",

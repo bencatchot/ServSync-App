@@ -4,6 +4,30 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-08
+
+- Branch: `codex/stripe-connect-online-payments-foundation-v1`
+- Provider acceptance correction files:
+  - `servsync-stripe-connect-provider-payment-id-compatibility.sql`
+  - `api/stripe-connect-webhook.ts`
+  - `scripts/validation/validate-stripe-connect-online-payments-foundation.sh`
+  - `tests/sql/stripe-connect-online-payments-validation.sql`
+  - `tests/e2e/stripe-connect-online-payments.spec.ts`
+  - `tests/e2e/invoice-payment-presentation.spec.ts`
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - active Stripe/parity/planning documentation
+- Summary of change: Completed provider-backed Stripe TEST acceptance in Sandbox. The ServSync-created connected account reached Active with card and ACH capabilities, Stripe fee/loss/requirements collection, and full Dashboard access. Real direct-charge card success/failure and ACH Processing-to-Paid/Failed flows reconciled through signed Connect webhooks; duplicate delivery remained idempotent, invalid signatures failed, mixed manual/online payment totaled correctly, and a test refund reversed only the Stripe-accounted amount.
+- Provider compatibility correction: Actual ACH provider events used Stripe `py_` payment record identifiers where the original database constraint accepted only `ch_` charge identifiers. Additive migration `servsync-stripe-connect-provider-payment-id-compatibility.sql` (SHA-256 `f03eb5b754132501629fc6594b78fd8c6708085f646187026489d3dd20f064df`) permits exact `ch_` or `py_` prefixes, rejects other provider-ID shapes, and refuses to replace an unvalidated or drifted prior constraint. The original foundation remains byte-identical at SHA-256 `41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374`.
+- Fee and launch evidence: The test card charge, Stripe fee, and net proceeds appeared on the contractor connected account. Provider objects had no application fee, destination, transfer data, or `on_behalf_of`; ServSync application fee remained `$0`. Production and Demo SQL/configuration were untouched, and live payment creation remains disabled.
+- Tests/checks run: PostgreSQL foundation-plus-compatibility validation; 15 focused Stripe Playwright checks; 98 payment, PDF, request-free Invoice, guest Estimate response, and finalized-report regressions; Owner-authorized/Admin-Office-Field-Viewer-denied live role probe; actual signed card/ACH/refund webhook reconciliation; typecheck; NodeNext typecheck; Production build; 16 backend parity tests; rollout-ledger validation; live Production/Demo and Production/Sandbox parity; sensitive-value scan; and `git diff --check`. One unrelated mutating Job smoke remains blocked by the existing Sandbox contractor-workspace load state.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-014 now distinguishes completed Sandbox provider acceptance from the still-prohibited live-money activation gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records actual direct-charge, fee attribution, asynchronous ACH, webhook, mixed-accounting, and reversal evidence.
+
 ## 2026-08-07
 
 - Branch: `codex/stripe-connect-online-payments-foundation-v1`
@@ -44,7 +68,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Payment lifecycle: Cards and ACH share one hosted Checkout path. ACH initiation remains Processing until an authoritative success or failure event. Settled amounts update the same Invoice `amount_paid_cents` and status used by offline payments; duplicate events do not double count, and bounded refund/dispute handling can reverse only the previously accounted online amount. Contractor history shows sanitized online state alongside offline payment records.
 - Sandbox rollout: Exact migration `servsync-stripe-connect-online-payments-foundation.sql` (SHA-256 `41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374`) was applied to Sandbox `zpzdkoaubyjtsomccxya` at `2026-08-08T02:00:15Z` through `02:00:17Z`. Live catalog checks confirmed three postgres-owned forced-RLS/no-policy tables, zero non-owner table/column grants, 15 fixed-path postgres-owned functions with exact authenticated/service-role execution boundaries, two guards, and 12 indexes. A rollback-only connected-Invoice probe proved ACH remains Processing before settlement, signed settlement updates the existing Invoice exactly once, duplicate events do not double count, an equal-time late processing event cannot regress success, and sanitized contractor history remains available. Invoices remained 83 with financial fingerprint `a9d6f746d8e7f31c3e4aa0de03a77dcb`, offline payments remained zero, and all three new tables returned to zero rows.
 - Tests/checks run: `npm run typecheck`; `npm run build`; `npm run test:stripe-connect-online-payments`; 13 focused Stripe server/static Playwright checks; 70 focused payment, request-free Invoice, secure guest response, and finalized-report Playwright regressions across desktop/mobile; `npm run backend:parity:test` (16 passing); `npm run backend:rollout:status`; exact migration hash/catalog checks; rollback-only Sandbox accounting/idempotency probe; changed-file credential scan; and `git diff --check`. Production versus Demo remained `PASS WITH INTENTIONAL DIFFERENCES`; Production versus Sandbox remained the expected `FAIL` with 475 exact approved additions and the same 22 unrelated unexplained findings. Repository-wide lint remains blocked before changed-file evaluation by the existing ESLint 9/typescript-eslint 8 rule-loader incompatibility, and `npm audit --omit=dev` continues to report the existing moderate DOMPurify advisory; neither originated in this slice.
-- Provider validation boundary: No approved Stripe test secret or Connect webhook signing secret was present in the established local or Sandbox server configuration. The server therefore remains intentionally fail-closed, and no connected account, Checkout Session, PaymentIntent, bank debit, card charge, provider event, or Stripe test resource was created. Production and Demo are intentionally deferred, and Production Pay Online remains incapable of activation through this source boundary.
+- Provider validation boundary at initial implementation: Provider-backed behavior was initially left fail-closed pending approved TEST configuration. The later 2026-08-08 entry records completed Sandbox provider acceptance and cleanup. Production and Demo remain intentionally deferred, and Production Pay Online remains incapable of activation through this source boundary.
 - Known risks or follow-ups: Live activation, real contractor onboarding, operational webhook registration, receipts, refund/dispute administration, payout support, application fees, launch monitoring, and broader progress/final billing automation remain separate. Existing approved Stripe test credentials are required for provider-backed Sandbox validation; no credential is committed or exposed.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
