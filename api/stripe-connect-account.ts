@@ -41,7 +41,15 @@ function safeProviderError(error: unknown) {
     param?: unknown;
     statusCode?: unknown;
     requestId?: unknown;
+    message?: unknown;
   };
+  const message = typeof candidate.message === 'string'
+    ? candidate.message
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+      .replace(/\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9]+\b/g, '[redacted-key]')
+      .replace(/\bwhsec_[A-Za-z0-9]+\b/g, '[redacted-webhook-secret]')
+      .slice(0, 500)
+    : null;
   return {
     kind: 'provider',
     type: typeof candidate.type === 'string' ? candidate.type : null,
@@ -49,6 +57,7 @@ function safeProviderError(error: unknown) {
     param: typeof candidate.param === 'string' ? candidate.param : null,
     status_code: typeof candidate.statusCode === 'number' ? candidate.statusCode : null,
     request_id: typeof candidate.requestId === 'string' ? candidate.requestId : null,
+    message,
   };
 }
 
