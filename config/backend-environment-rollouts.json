@@ -236,6 +236,24 @@
           "reason": "Demo should follow the Production-supported schema only after a separately authorized Production/Demo bridge rollout."
         }
       }
+    },
+    {
+      "id": "durable-trade-section-instances-v1",
+      "artifact": "servsync-durable-trade-section-instances.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Final corrected SHA-256 d4c4a856fd80c8dc89f8222818bbeabbf04fd1733860c7f207296f9aae134674 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 22:41:36Z. Both zero-history intermediate corrections used the guarded rollback and left no residue. Catalog, RPC/role, exact-work, idempotent workflow-lineage retry, value, concurrency, lifecycle, capability downgrade/revocation, and rollback-only behavior passed; zero instances, revisions, ordinary capability grants, and enabled work types remain."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Hidden Trade Pack and Property Asset prerequisites plus this durable runtime foundation require a later separately authorized Production migration sequence. The current client has no section-RPC dependency."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo should follow the Production-supported Trade Pack, Property Asset, and durable section schema only through a later separately authorized parity rollout."
+        }
+      }
     }
   ]
 }

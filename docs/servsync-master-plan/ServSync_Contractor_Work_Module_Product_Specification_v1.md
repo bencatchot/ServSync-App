@@ -704,6 +704,8 @@ Architecture guardrails:
 - Do not permanently lock the shared composer data model or component architecture to priced line items only.
 - Do not add inspection UI, checklist persistence, inspection templates, inspection SQL, or report-generation changes in Slice 2A-2C unless separately approved.
 
+Hidden Trade Pack runtime foundation: Durable Trade Section Instances v1 stores ordered contractor-private sections against the canonical persisted Draft or Job and preserves the same section UUID as a Draft gains its Estimate/Job lineage. Each section keeps an exact published definition version plus an independent immutable snapshot, strict bounded values, optional exact Property Asset revision, append-only revisions, and optimistic concurrency. This foundation does not alter the visible composer or operational Job UI. Homeowner projection, professional content, and Field Technician access remain unavailable; Field Technician support requires a later assignment-scoped Work authority rather than contractor-wide access.
+
 ### Standard Line-Item Scope
 
 Fields:

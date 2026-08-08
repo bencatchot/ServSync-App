@@ -79,14 +79,14 @@ Final corrected migration `servsync-property-asset-bridge.sql` SHA-256 `31e787b0
 
 The exact rollback is appropriate only before durable bridge data exists. It refuses to proceed when assets or revisions exist and restores the historical `home_assets` ownership, ACL, policy, trigger, and foreign-key contract only from the exact expected bridge state. After durable use begins, corrections must be additive forward migrations; history must not be destroyed to roll back a feature.
 
-Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`. Production versus Sandbox remains `FAIL`: 597 exact approved additions include Project Collaboration, Trade Pack Domain Contracts, and Property Asset Bridge additions, while 34 findings remain visible. Twelve of those findings are expected shared `home_assets` definition/security differences caused by this Sandbox-only bridge; the prior unrelated Stripe, function, and policy drift remains unresolved.
+Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`. After Durable Trade Section Instances v1, Production versus Sandbox remains `FAIL`: 761 exact approved additions include Project Collaboration, Trade Pack Domain Contracts, Property Asset Bridge, and Durable Trade Section additions, while the same 34 findings remain visible. Twelve are expected shared `home_assets` definition/security differences caused by this Sandbox-only bridge; the prior 22 unrelated Stripe, function, and policy findings remain unresolved.
 
 ## Deferred Work
 
 This slice does not implement:
 
-- runtime Draft or Job Trade Section instances;
-- asset association on a live Draft or Job;
+- visible runtime Draft or Job Trade Section controls;
+- Production/Demo client adoption of the bridge or section RPCs;
 - Field Technician assignment-scoped mutation;
 - visible Property Asset or HVAC workflows;
 - HVAC No Cooling fields or professional content;
@@ -94,4 +94,4 @@ This slice does not implement:
 - duplicate-asset correction or merge;
 - Production or Demo migration.
 
-The next bounded implementation slice is `Durable Trade Section Instances v1`.
+Durable Trade Section Instances v1 now provides the hidden Sandbox-only optional asset association while preserving accepted asset revision history. The controlling master plan should select the next bounded slice after independent review; visible runtime integration and Production/Demo rollout remain pending.
