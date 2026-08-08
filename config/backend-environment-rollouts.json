@@ -174,12 +174,12 @@
           "reason": "The exact migration was applied on 2026-08-07; catalog/security, fixed and percentage Deposit Invoice creation, retry/concurrency, offline partial/full payment, unpaid-void replacement, role/tenant denial, Job independence, preservation, and rollback cleanup checks passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Requires a controlled migration-first Production rollout after final owner authorization."
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-08 at 01:00:40Z through 01:00:42Z; Sandbox function/security correspondence, exact financial preservation, zero legacy partial balances, rollback-only fixed/percentage and partial/full payment behavior, role/tenant denial, unpaid-void replacement, and complete fixture cleanup passed."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Requires the exact Production-approved migration for supported-schema parity; no Stripe or payment-provider configuration is required."
+          "status": "Applied",
+          "reason": "The exact Production migration was applied on 2026-08-08 at 01:01:14Z through 01:01:15Z for supported-schema parity; catalog/security correspondence and exact preservation passed without changing Demo Presentation, flags, environment variables, provider configuration, or curated data."
         }
       }
     }
