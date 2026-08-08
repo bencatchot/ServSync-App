@@ -220,8 +220,11 @@ test.describe('home_assets foundation SQL', () => {
       appSource.indexOf('function PlatformAdminDashboard({ onSignOut }'),
     );
 
-    expect(appSource).toContain(".from('home_assets')");
-    expect(appSource).not.toContain(".rpc('servsync_list_property_assets'");
+    const adapterSource = sourceFile('src/propertyAssetAdapter.ts');
+    expect(appSource).not.toContain(".from('home_assets')");
+    expect(appSource).toContain('createPropertyAssetAdapter');
+    expect(adapterSource).toContain(".from('home_assets')");
+    expect(adapterSource).toContain("client.rpc('servsync_list_property_assets'");
     expect(appSource).toContain('Assets &amp; Systems');
     expect(sharedHomeShellSource).not.toContain('home_assets');
     expect(sharedReminderShellSource).not.toContain('home_assets');
@@ -235,6 +238,7 @@ test.describe('home_assets foundation SQL', () => {
       'servsync-home-assets-foundation.sql',
       'servsync-home-map-layout-foundation.sql',
       'src/App.tsx',
+      'src/propertyAssetAdapter.ts',
       'src/types.ts',
       'tests/e2e/home-assets-foundation.spec.ts',
       'tests/e2e/home-assets-ui.spec.ts',
@@ -253,6 +257,7 @@ test.describe('home_assets foundation SQL', () => {
       'tests/sql/property-asset-bridge-rollback.sql',
       'tests/sql/property-asset-bridge-sandbox-transaction.sql',
       'tests/e2e/property-asset-bridge.spec.ts',
+      'tests/e2e/property-asset-client-compatibility.spec.ts',
       'config/backend-environment-parity.json',
       'config/backend-environment-rollouts.json',
       'docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md',

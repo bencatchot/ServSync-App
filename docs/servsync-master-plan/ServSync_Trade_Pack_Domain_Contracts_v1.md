@@ -92,7 +92,7 @@ Durable Trade Section Instances v1 now preserves these boundaries in its hidden 
 - sections are ordered children of the existing Draft or Job;
 - multiple trades may coexist in one Draft, Estimate, Job, and Invoice;
 - Property Asset Bridge v1 extends the canonical `home_assets` identity with generic customer-safe fields, local-property claim continuity, append-only revisions, exact-revision concurrency, and property-derived authorization;
-- the current application client remains on the legacy Assets & Systems contract until a coordinated Production/Demo bridge rollout and client transition;
+- the unchanged Assets & Systems UI uses an RPC-first compatibility adapter with an exact missing-routine-only legacy fallback until the coordinated Production/Demo bridge rollout is complete;
 - a section may reference an exact asset UUID and accepted revision without making the asset capability-dependent;
 - property assets and history remain independent of Trade Pack entitlement and billing;
 - Field Technician access remains deferred until the canonical Work model provides an assignment-scoped boundary; contractor-wide access is not substituted;
@@ -112,6 +112,6 @@ The following remain outside the combined hidden foundations:
 - Stripe product/price mapping or Trade Pack billing;
 - Production or Demo rollout.
 
-Property Asset Bridge v1 and Durable Trade Section Instances v1 remain separate hidden Sandbox-only foundations. The controlling master plan selects the next bounded runtime slice after independent review; Production/Demo rollout and client adoption remain separately authorized.
+Property Asset Bridge v1 and Durable Trade Section Instances v1 remain separate hidden Sandbox-only foundations. The compatibility client does not activate either foundation. An independent post-deployment readiness review and separately authorized Demo-first, Production-second foundation rollout remain required before removing the legacy asset fallback or beginning visible runtime integration.
 
 Current parity evidence remains explicit: Production versus Demo is `PASS WITH INTENTIONAL DIFFERENCES`; Production versus Sandbox is `FAIL` with 761 exact approved additions and the same 34 visible findings. Durable sections add an exact-fingerprinted Sandbox group without hiding the 12 Property Asset bridge differences or 22 unrelated existing findings.

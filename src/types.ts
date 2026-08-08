@@ -1010,6 +1010,13 @@ export interface HomeAsset {
   created_by: string;
   created_at: string;
   updated_at: string;
+  asset_kind?: string | null;
+  lifecycle_status?: 'active' | 'retired' | null;
+  revision_number?: number | null;
+  location_label?: string | null;
+  serial_identifier?: string | null;
+  approximate_age_years?: number | null;
+  customer_safe_description?: string | null;
 }
 
 export interface ContractorProfile {
