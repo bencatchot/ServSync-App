@@ -118,10 +118,10 @@ export function canonicalStripeAccountStatus(account: Stripe.V2.Core.Account): C
   const card = canonicalCapabilityStatus(capabilities?.card_payments);
   const ach = canonicalCapabilityStatus(capabilities?.ach_debit_payments);
   if (card === 'active' && ach === 'active') return 'active';
-  if (card === 'inactive' || ach === 'inactive') return 'restricted';
   const requirements = account.requirements?.entries ?? [];
   if (requirements.some(entry => entry.minimum_deadline.status === 'past_due')) return 'verification_required';
   if (requirements.some(entry => entry.awaiting_action_from === 'user')) return 'setup_incomplete';
+  if (card === 'inactive' || ach === 'inactive') return 'restricted';
   return 'payments_pending';
 }
 

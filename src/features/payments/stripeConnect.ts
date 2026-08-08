@@ -36,6 +36,19 @@ function sandboxProjectFromClientBuild() {
 
 export const stripeConnectSandboxUiEnabled = sandboxProjectFromClientBuild();
 
+export function isStripeHostedAccountLink(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:'
+      && !url.username
+      && !url.password
+      && (url.hostname === 'connect.stripe.com' || url.hostname === 'accounts.stripe.com');
+  } catch {
+    return false;
+  }
+}
+
 const ONLINE_PAYMENT_STATES = new Set<InvoiceOnlinePaymentRecord['state']>([
   'creating', 'open', 'processing', 'succeeded', 'failed', 'canceled',
   'partially_refunded', 'refunded', 'disputed',
@@ -84,7 +97,7 @@ export async function startStripeConnectOnboarding(client: SupabaseClient) {
   const result: unknown = await response.json();
   if (!response.ok || !result || typeof result !== 'object') throw new Error('Stripe onboarding is unavailable.');
   const url = (result as Record<string, unknown>).url;
-  if (typeof url !== 'string' || !url.startsWith('https://accounts.stripe.com/')) throw new Error('Stripe onboarding is unavailable.');
+  if (!isStripeHostedAccountLink(url)) throw new Error('Stripe onboarding is unavailable.');
   return url;
 }
 

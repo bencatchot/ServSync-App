@@ -19,6 +19,7 @@ import {
   type StripePaymentReconciliation,
 } from '../../api/stripe-connect-webhook';
 import { createStripeConnectAccountHandler } from '../../api/stripe-connect-account';
+import { isStripeHostedAccountLink } from '../../src/features/payments/stripeConnect';
 
 const CONTRACTOR_ID = '11111111-1111-4111-8111-111111111111';
 const INVOICE_ID = '22222222-2222-4222-8222-222222222222';
@@ -115,6 +116,29 @@ test.describe('current Stripe Connect responsibility model', () => {
     ]) expect(() => assertCanonicalConnectedAccount(incompatible)).toThrow();
     expect(canonicalStripeAccountSnapshot(account())).toMatchObject({
       mode: 'test', account_status: 'active', fees_collector: 'stripe', losses_collector: 'stripe', dashboard_type: 'full',
+    });
+  });
+
+  test('classifies ordinary pre-onboarding requirements as setup incomplete', () => {
+    const pending = account({
+      configuration: {
+        merchant: {
+          applied: true,
+          capabilities: {
+            card_payments: { status: 'restricted', status_details: [] },
+            ach_debit_payments: { status: 'restricted', status_details: [] },
+          },
+        },
+      },
+      requirements: {
+        entries: [{
+          awaiting_action_from: 'user', errors: [], impact: {},
+          minimum_deadline: { status: 'currently_due' }, requested_reasons: [{ code: 'routine_onboarding' }],
+        }],
+      },
+    });
+    expect(canonicalStripeAccountSnapshot(pending)).toMatchObject({
+      account_status: 'setup_incomplete', charges_enabled: false, requirements_due_count: 1,
     });
   });
 
@@ -318,6 +342,14 @@ test('onboarding handler is Owner-authorized and never returns provider internal
   expect(result.status).toBe(200);
   expect(await result.json()).toEqual({ status: 'onboarding_required', url: 'https://accounts.stripe.com/onboarding/test-fixture' });
   expect(persisted).toEqual([CONTRACTOR_ID]);
+});
+
+test('client accepts only exact HTTPS Stripe-hosted onboarding origins', () => {
+  expect(isStripeHostedAccountLink('https://connect.stripe.com/setup/s/acct_fixture/link')).toBe(true);
+  expect(isStripeHostedAccountLink('https://accounts.stripe.com/onboarding/test-fixture')).toBe(true);
+  expect(isStripeHostedAccountLink('http://connect.stripe.com/setup/s/acct_fixture/link')).toBe(false);
+  expect(isStripeHostedAccountLink('https://connect.stripe.com.evil.example/setup')).toBe(false);
+  expect(isStripeHostedAccountLink('https://connect.stripe.com@evil.example/setup')).toBe(false);
 });
 
 test('status refresh retrieves an existing account and never creates one for a disconnected contractor', async () => {
