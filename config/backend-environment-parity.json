@@ -101,6 +101,45 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
+      },
+      {
+        "id": "trade-pack-domain-contracts-v1",
+        "reason": "Approved hidden Sandbox validation foundation for immutable Trade Pack definitions and default-deny provider-neutral contractor capabilities; Production and Demo rollout remain pending.",
+        "selectors": {
+          "relationScopes": [
+            "public.contractor_trade_pack_capability_grants",
+            "public.trade_pack_capabilities",
+            "public.trade_pack_trades",
+            "public.trade_pack_work_type_versions",
+            "public.trade_pack_work_types",
+            "public.trade_pack_workflow_families"
+          ],
+          "functionScopes": [
+            "public.servsync_get_trade_pack_work_type_version(uuid, text, integer)",
+            "public.servsync_list_available_trade_pack_work_types(uuid)",
+            "public.servsync_resolve_trade_pack_capability(uuid, text)",
+            "public.servsync_trade_pack_definition_contract_is_valid(jsonb)",
+            "public.servsync_trade_pack_guard_capability_grant()",
+            "public.servsync_trade_pack_guard_catalog_identity()",
+            "public.servsync_trade_pack_guard_definition_version()",
+            "public.servsync_trade_pack_guard_work_type_identity()",
+            "public.servsync_trade_pack_jsonb_has_exact_keys(jsonb, text[])",
+            "public.servsync_trade_pack_touch_updated_at()"
+          ],
+          "exactObjects": []
+        },
+        "expectedCounts": {
+          "relations": 6,
+          "columns": 39,
+          "constraints": 35,
+          "indexes": 14,
+          "triggers": 8,
+          "functions": 10,
+          "functionGrants": 13,
+          "tableGrants": 48
+        },
+        "expectedKeyFingerprint": "sha256:7c9c9c79b5a2b8fa8281436f038387148b7b4f378ff2c4e37e50c005b65cd38b",
+        "expectedCatalogFingerprint": "sha256:de72b3c75bc21a47b805aae689c74f0b1696f70c49190e8390ac638b50eb53c5"
       }
     ]
   }

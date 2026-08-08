@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-08
 
+- Branch: `codex/trade-pack-domain-contracts-v1`
+- Starting main SHA: `810bb435c7de4facf183d30a725b8758477017dd`
+- Files changed:
+  - `servsync-trade-pack-domain-contracts.sql`
+  - `tests/sql/trade-pack-domain-contracts-foundation.sql`
+  - `tests/sql/trade-pack-domain-contracts-validation.sql`
+  - `tests/sql/trade-pack-domain-contracts-rollback.sql`
+  - `tests/sql/trade-pack-domain-contracts-live-catalog.sql`
+  - `tests/sql/trade-pack-domain-contracts-sandbox-transaction.sql`
+  - `scripts/validation/validate-trade-pack-domain-contracts.sh`
+  - `package.json`
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Trade_Pack_Domain_Contracts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Adds Trade Pack Domain Contracts v1 as a hidden, default-deny foundation inside the existing Draft-first and Jobs lifecycle. Six private forced-RLS tables establish reusable workflow-family and trade identifiers, exact provider-neutral capabilities, stable work types, immutable published definition versions, and contractor capability state. Three authenticated read-only RPCs resolve exact tenant capability, list work types eligible for new work, and retrieve immutable versions for active or completion-only work. One disabled skeletal `hvac.no_cooling_service_call` definition validates the strict contract without diagnostic guidance, professional content, enabled work types, or contractor grants.
+- Versioning, visibility, and downgrade boundary: Definition JSON rejects unknown keys and malformed or duplicate structured readings, tests, findings, recommendations, choice options, and visibility classifications. `contractor_private` remains the safe default. Published/retired versions and system identities are immutable; future runtime records must retain the selected version and an independent snapshot. `active` permits new and existing specialized work, `completion_only` blocks new work while preserving existing-version resolution, and `revoked` denies both. Capability keys and schema contain no Stripe, product, price, tier, trial, discount, or provider identifiers.
+- Security boundary: All six tables are postgres-owned, forced-RLS, policy-free, and expose no table or column privileges to `PUBLIC`, `anon`, `authenticated`, or `service_role`. Only the three postgres-owned `SECURITY DEFINER` RPCs are granted to `authenticated`; each uses fixed `search_path=pg_catalog, public`, derives the user through `auth.uid()`, requires the existing exact-contractor access helper, and exposes no mutation. No non-owner execution grant is delegable.
+- Sandbox rollout: Exact migration `servsync-trade-pack-domain-contracts.sql` (SHA-256 `419d27426b7d336927642ae6a2a2632db4be564937849c58ad25ef60a923073c`) was applied only to Sandbox `zpzdkoaubyjtsomccxya` at `2026-08-08T18:44:15Z` through `18:44:17Z`. Live catalog correspondence passed with six relations, ten functions, zero capability grants, zero enabled work types, and one disabled skeletal definition. A rollback-only live transaction covered Owner, active Admin, Office, Field Technician, Viewer, inactive member, cross-tenant, default-deny, active, completion-only, and direct-table denial behavior, then returned Sandbox to zero grants and zero enabled work types.
+- Parity evidence: Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with the same 129 exact Demo scenario additions. Production versus Sandbox remains the expected `FAIL`: the 297 Project Collaboration and 173 Trade Pack objects are distinct exact-fingerprinted intentional additions, while the same 22 unrelated supported-schema/function/policy findings remain visible. Production and Demo were not modified; marking Sandbox `Applied` does not imply broader Sandbox parity.
+- Tests/checks run: Disposable PostgreSQL 16 forward, exact rollback, repeated-install rejection, missing-prerequisite rollback, strict contract, identifier, immutability, grant, role, tenant, downgrade, and residue checks; live Sandbox catalog and rollback-only role tests; typecheck; Production build; 16 backend-parity tests; rollout-ledger validation; live Production/Demo and Production/Sandbox parity; Bash syntax; changed-file sensitive-value scan; exact scope review; and `git diff --check`. Repository-wide lint remains blocked before changed-file evaluation by the existing ESLint 9/typescript-eslint rule-loader incompatibility, and `shellcheck` is unavailable locally; neither is introduced by this slice.
+- Scope boundary: No visible Trade Pack/HVAC UI, runtime Draft/Job section, Property Asset Bridge, asset mutation, recommendation conversion, report/PDF/history projection, Stripe mapping, entitlement activation, Production or Demo SQL/configuration, merge, or rollout occurred. The next bounded slice is `Property Asset Bridge v1`.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the hidden domain-contract foundation while keeping property assets, runtime sections, professional HVAC content, field workflows, customer projections, and controlled rollout active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the one-platform Trade Pack architecture, default-deny capability boundary, immutable definitions, safe visibility model, and explicitly deferred implementation slices.
+
 - Branch: `codex/stripe-connect-online-payments-foundation-v1`
 - Provider-neutral Production/Demo rollout: Exact foundation migration `servsync-stripe-connect-online-payments-foundation.sql` (SHA-256 `41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374`) and provider-ID compatibility migration `servsync-stripe-connect-provider-payment-id-compatibility.sql` (SHA-256 `f03eb5b754132501629fc6594b78fd8c6708085f646187026489d3dd20f064df`) were applied in reviewed order to Production `uqgtheclhxqlnjpfmheq` at `2026-08-08T17:14:49Z` through `17:15:04Z` and Demo `bdytwgejqnlblhrnqxkp` at `2026-08-08T17:15:51Z` through `17:15:52Z`.
 - Preservation and security evidence: Production remained at 11 Invoices, 22 Estimates, 12 schedule items, zero offline-payment rows, and the exact captured status/balance/schedule fingerprints; Demo remained at zero Invoices, Estimates, schedules, and offline-payment rows. Both environments have zero Stripe account mappings, payment attempts, and provider events. The three new tables are postgres-owned, forced-RLS, policy-free, and expose no non-owner table or column grants; reviewed fixed-path RPC grants, two guards, 12 indexes, the exact `ch_`/`py_` constraint, and `application_fee_cents = 0` correspond.
