@@ -7,6 +7,18 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 ## 2026-08-08
 
 - Branch: `codex/stripe-connect-online-payments-foundation-v1`
+- Provider-neutral Production/Demo rollout: Exact foundation migration `servsync-stripe-connect-online-payments-foundation.sql` (SHA-256 `41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374`) and provider-ID compatibility migration `servsync-stripe-connect-provider-payment-id-compatibility.sql` (SHA-256 `f03eb5b754132501629fc6594b78fd8c6708085f646187026489d3dd20f064df`) were applied in reviewed order to Production `uqgtheclhxqlnjpfmheq` at `2026-08-08T17:14:49Z` through `17:15:04Z` and Demo `bdytwgejqnlblhrnqxkp` at `2026-08-08T17:15:51Z` through `17:15:52Z`.
+- Preservation and security evidence: Production remained at 11 Invoices, 22 Estimates, 12 schedule items, zero offline-payment rows, and the exact captured status/balance/schedule fingerprints; Demo remained at zero Invoices, Estimates, schedules, and offline-payment rows. Both environments have zero Stripe account mappings, payment attempts, and provider events. The three new tables are postgres-owned, forced-RLS, policy-free, and expose no non-owner table or column grants; reviewed fixed-path RPC grants, two guards, 12 indexes, the exact `ch_`/`py_` constraint, and `application_fee_cents = 0` correspond.
+- Activation boundary: This rollout installs supported provider-neutral schema/source only. Production and Demo received no Stripe key, webhook secret, enablement flag, connected account, Checkout Session, PaymentIntent, charge, ACH debit, payout, or environment/configuration change. Their server gates remain fail closed and Production Pay Online remains unavailable. ServSync's application fee remains `$0`; live payment activation still requires a separate owner gate.
+- Parity impact: The 178-object Stripe foundation is no longer a Sandbox intentional addition and its exact exception was removed. Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with the same 129 Demo scenario additions. Production versus Sandbox remains `FAIL` with only the approved 297-object Project Collaboration experiment plus the same 22 unrelated supported-schema findings.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-014 now separates the merged three-environment provider-neutral foundation from the still-prohibited live-money launch gate; FB-016 removes the retired Stripe Sandbox exception while preserving the unresolved Sandbox drift.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the supported-schema rollout, exact preservation, fail-closed runtime boundary, and remaining live-activation decision.
+
+- Branch: `codex/stripe-connect-online-payments-foundation-v1`
 - Provider acceptance correction files:
   - `servsync-stripe-connect-provider-payment-id-compatibility.sql`
   - `api/stripe-connect-webhook.ts`

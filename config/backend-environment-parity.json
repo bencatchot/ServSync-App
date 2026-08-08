@@ -101,50 +101,6 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
-      },
-      {
-        "id": "stripe-connect-online-payments-foundation-v1",
-        "reason": "Approved Sandbox/test-only Stripe Connect direct-charge and provider-reconciliation foundation; Production and Demo payment activation remain disabled.",
-        "selectors": {
-          "relationScopes": [
-            "public.contractor_stripe_payment_accounts",
-            "public.invoice_online_payment_attempts",
-            "public.stripe_connect_payment_events"
-          ],
-          "functionScopes": [
-            "public.servsync_authorize_stripe_connect_onboarding()",
-            "public.servsync_fail_stripe_invoice_checkout(uuid, text)",
-            "public.servsync_get_invoice_online_payment_state(uuid)",
-            "public.servsync_get_request_free_invoice_online_payment_state(text)",
-            "public.servsync_get_stripe_connect_account_contractor(text)",
-            "public.servsync_get_stripe_connect_account_status()",
-            "public.servsync_list_invoice_online_payments(uuid)",
-            "public.servsync_prepare_authenticated_stripe_invoice_checkout(uuid, uuid)",
-            "public.servsync_prepare_request_free_stripe_invoice_checkout(text, uuid)",
-            "public.servsync_private_guard_invoice_online_payment_conflict()",
-            "public.servsync_private_guard_invoice_void_online_payment()",
-            "public.servsync_private_prepare_stripe_invoice_checkout(uuid, uuid, text, uuid)",
-            "public.servsync_reconcile_stripe_invoice_payment_event(text, timestamp with time zone, text, text, uuid, text, text, text, text, text, integer, integer, text)",
-            "public.servsync_record_stripe_checkout_session(uuid, text, text)",
-            "public.servsync_sync_stripe_connect_account(uuid, text, text, boolean, boolean, boolean, text, text, integer, text, text, text)"
-          ],
-          "exactObjects": [
-            "triggers:public.invoice_offline_payment_records.invoice_offline_payment_records_online_conflict",
-            "triggers:public.invoices.invoices_online_payment_void_guard"
-          ]
-        },
-        "expectedCounts": {
-          "relations": 3,
-          "columns": 53,
-          "constraints": 42,
-          "indexes": 12,
-          "triggers": 2,
-          "functions": 15,
-          "functionGrants": 27,
-          "tableGrants": 24
-        },
-        "expectedKeyFingerprint": "sha256:d675e9797fc6b24002e8055547463d5b4a0bcddfcd60a73eefeae2e38be5dba7",
-        "expectedCatalogFingerprint": "sha256:1e1fbf7a2ab49fe1a8898879c08f68f24fdff1854a32150a025d0413f9457367"
       }
     ]
   }
