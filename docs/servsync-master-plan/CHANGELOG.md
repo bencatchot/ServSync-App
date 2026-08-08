@@ -6,6 +6,43 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-08
 
+- Branch: `codex/durable-trade-section-instances-v1`
+- Starting main SHA: `22502bd7c48912c49fbf1ad5ded90b5796609a31`
+- Files changed:
+  - `servsync-durable-trade-section-instances.sql`
+  - `scripts/validation/validate-durable-trade-sections.sh`
+  - `tests/sql/durable-trade-section-foundation.sql`
+  - `tests/sql/durable-trade-section-seed.sql`
+  - `tests/sql/durable-trade-section-validation.sql`
+  - `tests/sql/durable-trade-section-service-role-validation.sql`
+  - `tests/sql/durable-trade-section-sandbox-transaction.sql`
+  - `tests/sql/durable-trade-section-rollback.sql`
+  - `tests/e2e/durable-trade-section-instances.spec.ts`
+  - `package.json`
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Durable_Trade_Section_Instances_v1.md`
+  - `docs/servsync-master-plan/ServSync_Trade_Pack_Domain_Contracts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md`
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds Durable Trade Section Instances v1 as a hidden Sandbox-only runtime foundation. Two private durable tables join one exact provider-neutral Trade Pack capability and published definition to the canonical contractor, Draft/Estimate/Job, connected or contractor-managed property, and optional accepted Property Asset revision. Each instance retains an independent immutable definition snapshot and SHA-256 fingerprint, strict bounded definition-driven values, lifecycle, current revision, actor, provenance, and timestamps. Draft launch, accepted Estimate-to-Job conversion, and local-property claim mapping append lineage to the same section UUID instead of copying the section.
+- History, concurrency, and capability behavior: Every create, values update, lifecycle transition, workflow link, and claim mapping appends a full immutable revision. Exact expected revisions reject stale writes. Hard delete, revision rewrite, and truncate fail below the RPC layer. `active` permits Owner/Admin/Office create and continuation; `completion_only` blocks new instances while allowing pre-downgrade active work to continue/complete; `revoked` blocks mutation while exact-work history remains readable. Terminal states do not reopen. Asset retirement/correction and later definition changes do not rewrite accepted historical snapshots. No Stripe/provider/product/price/tier/trial/discount field controls capability.
+- Authorization and visibility: Five postgres-owned fixed-path `SECURITY DEFINER` RPCs are granted only to `authenticated`. Owner, active Admin, and Office may mutate exact authorized work; Viewer is exact-work read-only. List responses match both the supplied Work UUID and the contractor derived from that persisted Draft/Job, while workflow triggers independently validate exact contractor and connected/local property subject before adding Estimate/Job lineage and reject later rewrites. Field Technician is denied because the canonical Work model lacks a safe assignment-scoped boundary; inactive, homeowner, cross-contractor, cross-work, cross-property, arbitrary asset/definition, disconnected, archived, disabled, malformed, and stale requests fail closed. Homeowners receive no raw section or revision feed. The two tables are postgres-owned, forced-RLS, policy-free, and expose no browser table/column ACL. Audited `service_role` SELECT is preserved while executor-bound guards reject forged-GUC mutation and immutable-history bypass.
+- Sandbox rollout and correction: The first exact zero-history application exposed that Supabase locates trusted `pgcrypto.digest` in `extensions`; rollback-only execution failed before any row committed. A later review made origin-Draft idempotent retry stable after the same section gains Estimate/Job lineage. Independent merge-readiness review then added server-authoritative contractor/property correspondence to Draft/Estimate/Job linkage, rewrite denial, and explicit derived-contractor list predicates. Every prior version had zero history and was removed through the guarded rollback with no residue. The final migration preflights pgcrypto and gives only the create RPC fixed path `pg_catalog, public, extensions`. Final SHA-256 `49c8b82a5b7af622178929a12f1d6519b00c2c95d71f0969efa2c2345824bb75` was applied only to Sandbox `zpzdkoaubyjtsomccxya` on `2026-08-08T23:07:24.773Z` through `23:07:25.506Z`. Local hostile `service_role`, cross-contractor, cross-property, malformed Estimate/Job, repeat-trigger, and rewrite tests plus live rollback-only Owner/Admin/Office/Viewer/Field Technician/cross-contractor, exact-work, stale-write, completion-only, revoked, forged-service-role, and history checks passed and returned Sandbox to zero instances, revisions, grants, and enabled work types; No Cooling remains disabled and Property Asset rows/revisions remain zero.
+- Compatibility and parity: No application runtime file changed and focused source tests reject every new RPC name in `src/App.tsx` and `src/types.ts`; Production and Demo remain compatible without Trade Pack, Property Asset Bridge, or Durable Trade Section SQL. Neither database was changed. Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with 129 exact additions. Production versus Sandbox remains `FAIL` with 761 exact approved additions and the same 34 findings: 12 expected shared `home_assets` bridge differences and 22 unrelated existing findings. The new 164-object section group is pinned by exact selectors, counts, key fingerprint, and catalog fingerprint.
+- Tests/checks run: Disposable PostgreSQL 16 ordered Trade Pack -> Property Asset Bridge -> Durable Trade Section forward chain; populated canonical Draft/Estimate/Job/property/asset fixtures; repeat-application rejection; missing-prerequisite zero residue; guarded rollback and rollback refusal with history; hostile `service_role`, cross-contractor, same-contractor cross-property, malformed lineage, list binding, repeat-trigger, and rewrite denial; strict values; Owner/Admin/Office/Viewer/Field/inactive/homeowner roles; claim identity; asset retirement snapshot; optimistic concurrency; lifecycle; active/completion-only/revoked; table/RLS/ACL/RPC/search-path; forged-GUC service-role guards; 12 focused section/bridge source-contract checks; live Sandbox catalog and rollback-only behavior; backend parity live comparison; rollout-ledger validation; typecheck; Production build; Bash syntax/execution; JSON parsing; sensitive-value/placeholder scan; migration checksum; exact scope; and `git diff --check`. Repository-wide lint remains subject to the inherited ESLint 9/typescript-eslint loader incompatibility; `shellcheck` availability is recorded separately in final validation.
+- Scope boundary and follow-up: No UI/client cutover, professional HVAC content, customer projection, report/PDF/history output, finding/recommendation conversion, capability grant, work-type enablement, Production/Demo SQL/configuration, Stripe change, manual deployment, merge, or later Trade Pack slice occurred. The next action is independent merge-readiness review of the draft PR; the controlling master plan should select a later bounded slice only after that review.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records the hidden durable runtime foundation while keeping visible integration, professional content, Field Technician assignment authority, customer projections, and controlled rollout active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records canonical section identity, workflow/claim continuity, immutable snapshots, strict values, revision/concurrency/security boundaries, capability downgrade behavior, and the deferred client/environment rollout.
+
 - Branch: `codex/property-asset-bridge-v1`
 - Starting main SHA: `6da828d357570451d1ae983dfe610e01c7975843`
 - Files changed:

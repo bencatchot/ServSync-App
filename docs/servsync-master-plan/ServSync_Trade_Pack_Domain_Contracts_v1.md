@@ -85,17 +85,17 @@ Each RPC uses a fixed `search_path`, derives the caller through `auth.uid()`, an
 
 Owner, active Admin, Office, Field Technician, and Viewer members may read their contractor's capability state because future UI needs a consistent fail-closed availability decision. This does not grant those roles specialized mutation authority. Runtime Draft/Job operations will separately apply existing role, assignment, commercial-action, subject, and tenant rules.
 
-## Future Instance Rules
+## Durable Instance Rules
 
-Later Trade Section work must preserve these boundaries:
+Durable Trade Section Instances v1 now preserves these boundaries in its hidden Sandbox-only runtime foundation:
 
 - sections are ordered children of the existing Draft or Job;
 - multiple trades may coexist in one Draft, Estimate, Job, and Invoice;
 - Property Asset Bridge v1 extends the canonical `home_assets` identity with generic customer-safe fields, local-property claim continuity, append-only revisions, exact-revision concurrency, and property-derived authorization;
 - the current application client remains on the legacy Assets & Systems contract until a coordinated Production/Demo bridge rollout and client transition;
-- future sections may reference an asset UUID and accepted revision, but this foundation does not yet create that association;
+- a section may reference an exact asset UUID and accepted revision without making the asset capability-dependent;
 - property assets and history remain independent of Trade Pack entitlement and billing;
-- an assigned Field Technician may edit approved active-Job field content without gaining definition, Price Book, billing, or administrative authority;
+- Field Technician access remains deferred until the canonical Work model provides an assignment-scoped boundary; contractor-wide access is not substituted;
 - Price Book items remain pricing sources copied into canonical work/Estimate lines;
 - templates and checklists remain reusable inputs rather than competing workflow systems;
 - customer-facing summaries are explicit projections;
@@ -103,10 +103,8 @@ Later Trade Section work must preserve these boundaries:
 
 ## Deferred Work
 
-The following are not part of this foundation:
+The following remain outside the combined hidden foundations:
 
-- runtime Draft/Job section tables;
-- Draft/Job-to-asset association;
 - visible HVAC UI;
 - No Cooling professional content;
 - recommendation conversion;
@@ -114,4 +112,6 @@ The following are not part of this foundation:
 - Stripe product/price mapping or Trade Pack billing;
 - Production or Demo rollout.
 
-Property Asset Bridge v1 is now a separate hidden Sandbox-only foundation. The next bounded slice is `Durable Trade Section Instances v1`.
+Property Asset Bridge v1 and Durable Trade Section Instances v1 remain separate hidden Sandbox-only foundations. The controlling master plan selects the next bounded runtime slice after independent review; Production/Demo rollout and client adoption remain separately authorized.
+
+Current parity evidence remains explicit: Production versus Demo is `PASS WITH INTENTIONAL DIFFERENCES`; Production versus Sandbox is `FAIL` with 761 exact approved additions and the same 34 visible findings. Durable sections add an exact-fingerprinted Sandbox group without hiding the 12 Property Asset bridge differences or 22 unrelated existing findings.

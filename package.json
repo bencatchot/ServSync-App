@@ -25,6 +25,7 @@
     "backend:rollout:status": "node scripts/backend-parity/rollout-status.mjs",
     "test:trade-pack-domain-contracts": "bash scripts/validation/validate-trade-pack-domain-contracts.sh",
     "test:property-asset-bridge": "bash scripts/validation/validate-property-asset-bridge.sh",
+    "test:durable-trade-sections": "bash scripts/validation/validate-durable-trade-sections.sh",
     "qa:production-smoke:check": "node tests/helpers/check-production-smoke-env.mjs",
     "load:public": "k6 run tests/load/public-anonymous.js",
     "load:sandbox:auth-read": "k6 run tests/load/sandbox-auth-read.js",
