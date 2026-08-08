@@ -548,6 +548,13 @@ test.describe('FB-003B request-free local invoice delivery source boundary', () 
 });
 
 test.describe('FB-003B request-free local invoice recipient UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/stripe-invoice-payment-state', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ available: false }),
+    }));
+  });
   const validInvoice = {
     state: 'valid',
     invoice: {
@@ -582,6 +589,34 @@ test.describe('FB-003B request-free local invoice recipient UI', () => {
       title,
       customer: { display_name: customerName },
     },
+  });
+
+  test('shows Sandbox Pay online for an eligible request-free Invoice without exposing broader data', async ({ page }) => {
+    const token = randomBytes(32).toString('hex');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.unroute('**/api/stripe-invoice-payment-state');
+    await page.route('**/api/stripe-invoice-payment-state', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        available: true,
+        mode: 'test',
+        amount_due_cents: validInvoice.invoice.total_cents,
+        payment_state: 'outstanding',
+        payment_method_type: null,
+        application_fee_cents: 0,
+      }),
+    }));
+    await page.route('**/api/request-free-local-invoice-delivery', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(validInvoice),
+    }));
+    await page.goto(`/#/invoice-delivery?access=${token}`);
+    await expect(page.getByRole('button', { name: 'Pay online' })).toBeVisible();
+    await expect(page.getByText('Secure Stripe test checkout')).toBeVisible();
+    expect(page.url()).not.toContain(token);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
   });
 
   for (const viewport of [
