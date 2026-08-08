@@ -1,8 +1,8 @@
 # ServSync Completed Features
 
-Last updated: 2026-08-03
+Last updated: 2026-08-08
 
-Last reconciled against `origin/main` at `410bd1554a646ee81ef9eb9d6cbe40ea7fc2ff9a` (merged PR #368).
+Last reconciled against `origin/main` at `810bb435c7de4facf183d30a725b8758477017dd`.
 
 ## Purpose
 
@@ -43,6 +43,7 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 - FB-002 and FB-024: Estimate Defaults & Templates v1 is complete; Price Book / Reusable Estimate Content Maturity remains active.
 - FB-004 and FB-027: Follow-Up Lite is complete; reporting beyond existing attention queues remains active.
 - FB-007: Draft-first Inspection Path Completion v1 is complete in Production; broader inspection/checklist maturity remains active under FB-007.
+- FB-007 Trade Pack boundary: Trade Pack Domain Contracts v1 is a hidden foundation within the active backlog, not a completed user-facing Trade Pack milestone. Property assets, runtime sections, reviewed HVAC content, and rollout remain active work.
 - FB-006, FB-021, and FB-022: Appointment Confirmation foundation v1 is complete; true contractor-controlled online booking remains active.
 - FB-010 and FB-025: workflow communication foundations exist; broader workflow-scoped communication remains active.
 - FB-013 and FB-028: provider-neutral integration foundations exist; accounting export and QuickBooks readiness remains active.

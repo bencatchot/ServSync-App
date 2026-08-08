@@ -266,22 +266,21 @@ One global Work destination is preferred. Do not overload mobile navigation with
 
 Current Production state:
 
-- Production serves the legacy Jobs workflow.
-- `VITE_DRAFT_JOB_UI_ENABLED` is absent in Production.
-- Draft-first code is merged but gated off in Production.
-- Draft backend SQL/RPC foundations remain installed.
-- Draft-first Work development should continue in sandbox/preview until the redesigned Work experience is cohesive, validated, and approved.
+- The redesigned Jobs landing and Draft-first workspace are the standard Production experience for authorized contractors under the reviewed `all_contractors` server rollout mode and all three compiled Work/Draft gates.
+- Durable Draft backend SQL/RPC foundations are installed and remain bounded by tenant checks, persistence authority, and output-specific launch authority.
+- Standard Estimate, Job, Inspection Checklist Job, and Invoice intended-output paths support durable save/resume and their separately authorized launch contracts.
+- Legacy and fail-closed fallback behavior remains available for unsupported, unresolved, or gate-disabled contexts.
+- Later Work expansion should continue through bounded Sandbox/Preview slices before any separately authorized Production schema or capability rollout.
 
 Current implementation state:
 
-- The legacy Jobs area mixes operational Jobs, Estimates, Invoices, Reports, Templates, Price Book, Service Plans (internally `service_agreement` records), and legacy creation flows.
+- The Jobs workspace remains the shared operational container for Drafts, Jobs, Estimates, Invoices, Reports, Templates, Price Book, and Service Plans (internally `service_agreement` records).
 - Current Draft composer foundations are reusable.
-- `Create Job` from Draft exists in code but is gated with the Draft UI.
-- `Create Estimate` and `Create Invoice` from Draft are not implemented.
+- Durable Draft launch paths exist for Standard Estimate, Job, Inspection Checklist Job, and Invoice outputs, each with output-specific authorization.
 - Continue Draft now refetches canonical persisted Draft records before opening.
 - Composer Drafts are excluded from operational lists and request-linked active service visit logic.
 - Current operational Job detail is too billing-heavy for the target Job Overview experience.
-- Current navigation reflects legacy implementation and subscription-history groupings such as `Add-Ons`.
+- Current navigation retains the existing `Jobs` product identity while following the broader Work ownership model.
 
 This specification does not make the Work redesign live.
 
@@ -1380,24 +1379,24 @@ Product-level contract classification:
 
 | Contract | Classification | Notes |
 | --- | --- | --- |
-| Draft persistence | Existing/reusable | Backend installed; UI gated in Production |
+| Draft persistence | Existing/reusable | Backend installed and used by the standard authorized Production Draft-first workspace |
 | Draft work items | Existing/reusable | Uses `job_work_items` as canonical scope foundation |
-| Top-level Draft notes | Required blocker if exposed | No durable contract currently; do not promise as durable |
-| Intended output | Required for shared launch resume | Needs durable round trip before saved/resumed Drafts depend on selected intent |
+| Top-level Draft notes | Existing/reusable | Durable contractor-private notes are supported; new projections must preserve privacy |
+| Intended output | Existing/reusable | Durable round trip supports current Estimate, Job, Inspection Checklist Job, and Invoice paths |
 | Draft photos/attachments | Later enhancement | Requires storage/RLS/media design |
 | Source context | Required blocker for contextual Drafts | Existing service/customer IDs help, but fuller source model may be needed |
 | Scheduling intent | Required blocker if initial spec includes durable scheduling fields | Must not create automatic appointments |
-| Draft -> Job launch | Existing/reusable, needs shared-composer validation | Current code uses activation RPC behind gate and consumes Draft by activating the same record |
-| Draft -> Estimate launch | Required blocker | Needs atomic snapshot/source/consumption contract |
-| Draft -> Invoice launch | Deferred blocker | Needs later direct-Invoice launch approval plus snapshot/source/billing contract |
-| Draft consumption state | Required blocker for Estimate launch | Must prevent one active Draft from repeatedly launching unrelated outputs |
-| Durable workflow linkage | Required blocker for Estimate launch | Must link source Draft, launched Estimate/Job, and later workflow records |
+| Draft -> Job launch | Existing/reusable | Uses the durable launch contract and preserves Draft/Job lineage |
+| Draft -> Estimate launch | Existing/reusable | Uses atomic snapshot/source/consumption behavior with Estimate-specific authority |
+| Draft -> Invoice launch | Existing/reusable | Uses the dedicated unsent Invoice launch path and billing authority |
+| Draft consumption state | Existing/reusable | Prevents one active Draft from repeatedly launching unrelated outputs |
+| Durable workflow linkage | Existing/reusable | Links source Draft, launch evidence, and created output while retaining deletion-compatible snapshots |
 | Additional-work Estimate -> same Job | Required blocker | Must prevent duplicate Jobs |
 | Duplicate launch prevention | Required blocker | Must be enforced at backend/RPC boundary, not only by frontend state |
 | Duplicate Job prevention | Existing and required | Accepted-estimate-to-job protections remain critical |
 | Activity/history | Later enhancement | Needed for mature traceability |
 | Job closeout/reopen | Later enhancement | Requires lifecycle/audit/billing rules |
-| Draft archive/discard | Required blocker if exposed | Must be safe and contractor-only |
+| Draft archive/discard | Existing/reusable | Contractor-only discard and consumed-state behavior remain bounded by current RPCs |
 | Homeowner-safe Job summary | Later enhancement | Must preserve permission boundaries |
 | Invoice/payment limitations | Existing plus future | Payment collection/accounting remain future |
 | Route/deep-link persistence | Required for redesign | Avoid blank or stale state after refresh |
@@ -1422,14 +1421,13 @@ Classification:
 | Current Templates | Reuse/adapt as Draft prefill tools |
 | Current header tabs | Adapt into Work internal navigation |
 | Add-Ons grouping | Deprecate after navigation/subscription separation |
-| Draft feature gate | Retain until cohesive Work redesign is approved |
+| Draft feature gate | Retain as an emergency and staged-rollout control after standard Production activation |
 
 Migration rules:
 
-- Production remains legacy during sandbox/preview development.
-- Do not partially replace Production Jobs again.
-- Promote Work only after cohesive end-to-end acceptance.
-- Legacy paths remain available until approved parity exists.
+- Production uses the cohesive Draft-first Jobs experience for authorized contractors.
+- Develop later Work capabilities behind bounded default-deny contracts and validate them in Sandbox/Preview before separate rollout approval.
+- Preserve legacy/fail-closed paths where current unsupported or unresolved contexts still require them.
 - Do not remove old flows merely because the specification exists.
 
 ## 24. Mobile Product Requirements

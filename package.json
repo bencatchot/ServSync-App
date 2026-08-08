@@ -23,6 +23,7 @@
     "backend:parity:check": "node scripts/backend-parity/check.mjs",
     "backend:parity:test": "node --test tests/backend-parity/*.test.mjs",
     "backend:rollout:status": "node scripts/backend-parity/rollout-status.mjs",
+    "test:trade-pack-domain-contracts": "bash scripts/validation/validate-trade-pack-domain-contracts.sh",
     "qa:production-smoke:check": "node tests/helpers/check-production-smoke-env.mjs",
     "load:public": "k6 run tests/load/public-anonymous.js",
     "load:sandbox:auth-read": "k6 run tests/load/sandbox-auth-read.js",
