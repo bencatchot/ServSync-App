@@ -4,7 +4,7 @@ import {
   canonicalStripeAccountSnapshot,
   createStripeClient,
   stripeConnectServerConfig,
-} from '../server/stripeConnect';
+} from '../server/stripeConnect.js';
 
 export const MAX_STRIPE_CONNECT_WEBHOOK_BYTES = 262_144;
 

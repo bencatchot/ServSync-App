@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@vercel/firewall';
 import type Stripe from 'stripe';
-import { REQUEST_FREE_INVOICE_SESSION_COOKIE } from './request-free-local-invoice-delivery';
+import { REQUEST_FREE_INVOICE_SESSION_COOKIE } from './request-free-local-invoice-delivery.js';
 import {
   SERVSYNC_STRIPE_APPLICATION_FEE_CENTS,
   SERVSYNC_STRIPE_PAYMENT_METHODS,
@@ -11,7 +11,7 @@ import {
   publicOrigin,
   sameOriginRequest,
   stripeConnectServerConfig,
-} from '../server/stripeConnect';
+} from '../server/stripeConnect.js';
 
 export const STRIPE_INVOICE_CHECKOUT_RATE_LIMIT_ID = 'stripe-invoice-checkout';
 export const MAX_STRIPE_INVOICE_CHECKOUT_REQUEST_BYTES = 1_024;

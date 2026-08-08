@@ -9,7 +9,7 @@ import {
   publicOrigin,
   sameOriginRequest,
   stripeConnectServerConfig,
-} from '../server/stripeConnect';
+} from '../server/stripeConnect.js';
 
 export const STRIPE_CONNECT_ACCOUNT_RATE_LIMIT_ID = 'stripe-connect-account';
 export const MAX_STRIPE_CONNECT_ACCOUNT_REQUEST_BYTES = 512;

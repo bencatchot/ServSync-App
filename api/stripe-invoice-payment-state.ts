@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { REQUEST_FREE_INVOICE_SESSION_COOKIE } from './request-free-local-invoice-delivery';
-import { bearerToken, sameOriginRequest, stripeConnectServerConfig } from '../server/stripeConnect';
+import { REQUEST_FREE_INVOICE_SESSION_COOKIE } from './request-free-local-invoice-delivery.js';
+import { bearerToken, sameOriginRequest, stripeConnectServerConfig } from '../server/stripeConnect.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SESSION_PATTERN = /^[0-9a-f]{64}$/;
@@ -94,4 +94,3 @@ export function createStripeInvoicePaymentStateHandler(dependencies: Dependencie
 
 const handler = createStripeInvoicePaymentStateHandler();
 export default { fetch: handler };
-
