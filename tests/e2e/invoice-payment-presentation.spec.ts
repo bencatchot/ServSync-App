@@ -130,7 +130,7 @@ test.describe('Invoice payment presentation', () => {
     }
   });
 
-  test('wires targeted contractor and homeowner surfaces without adding payment collection semantics', () => {
+  test('keeps homeowner display read-only while adding contractor offline-payment history', () => {
     const appSource = sourceFile('src/App.tsx');
     const componentSource = sourceFile('src/features/invoices/InvoicePaymentSummary.tsx');
     const helperSource = sourceFile('src/features/invoices/paymentPresentation.ts');
@@ -143,8 +143,8 @@ test.describe('Invoice payment presentation', () => {
     expect(appSource).toContain('<InvoicePaymentSummary invoice={linkedInvoiceForJob}');
     expect(appSource).toContain('Payment is handled directly with your contractor.');
     expect(appSource).not.toContain('Pay now');
-    expect(appSource).not.toContain('Payment method');
-    expect(appSource).not.toContain('Payment history');
+    expect(appSource).toContain('Record payment');
+    expect(appSource).toContain('Payment history');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-compact"');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-detail"');
     expect(componentSource).toContain('max-w-full flex-wrap');
@@ -160,14 +160,14 @@ test.describe('Invoice payment presentation', () => {
 
   test('preserves invoice action, PDF, date, SQL, and backend boundaries', () => {
     const appSource = sourceFile('src/App.tsx');
-    const statusSource = sourceFile('src/features/invoices/status.ts');
+    const paymentDialogSource = sourceFile('src/features/invoices/RecordInvoicePaymentDialog.tsx');
     const pdfSource = sourceFile('src/utils/pdfDocuments.ts');
     const dateSource = sourceFile('src/utils/datePresentation.ts');
     const helperSource = sourceFile('src/features/invoices/paymentPresentation.ts');
 
-    expect(statusSource).toContain("return ['sent', 'viewed', 'overdue', 'partially_paid'].includes(status);");
-    expect(statusSource).toContain("return ['draft', 'sent', 'viewed'].includes(status);");
-    expect(appSource).toContain('markInvoicePaid(invoice)');
+    expect(paymentDialogSource).toContain("['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)");
+    expect(paymentDialogSource).toContain('Record money received outside ServSync.');
+    expect(appSource).toContain('recordOfflineInvoicePayment');
     expect(appSource).toContain('voidInvoice(invoice)');
     expect(appSource).not.toContain("status === 'Paid'");
     expect(appSource).not.toContain("status === 'Partially Paid'");

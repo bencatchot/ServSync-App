@@ -443,6 +443,20 @@ export interface Invoice {
   backlog_items?: InvoiceBacklogItem[];
 }
 
+export type InvoiceOfflinePaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'card_terminal' | 'other';
+
+export interface InvoiceOfflinePaymentRecord {
+  id: string;
+  invoice_id: string;
+  amount_cents: number;
+  payment_date: string;
+  payment_method: InvoiceOfflinePaymentMethod;
+  reference: string | null;
+  note: string | null;
+  recorded_by_name: string;
+  created_at: string;
+}
+
 export type LocalInvoiceDeliveryLinkState = 'active' | 'expired' | 'revoked' | 'replaced';
 
 export interface LocalInvoiceDeliveryLinkMetadata {

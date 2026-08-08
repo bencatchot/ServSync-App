@@ -171,7 +171,8 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(financialListSource).toContain('Download PDF');
     expect(financialListSource).toContain('Send Invoice');
     expect(financialListSource).toContain('Edit draft');
-    expect(financialListSource).toContain('Mark Paid');
+    expect(financialListSource).toContain('Record payment');
+    expect(financialListSource).toContain('Payment history');
     expect(financialListSource).toContain('New invoice');
     expect(beginInvoiceSource).toContain("setContractorFinancialRecordKind('invoices');");
     expect(openInvoiceSource).toContain("setContractorFinancialRecordKind('invoices');");

@@ -164,6 +164,24 @@
           "reason": "The exact migration was applied after Production on 2026-08-07 at approximately 23:19Z for supported-schema parity; catalog/security correspondence and preservation passed without provider, flag, presentation, or scenario changes."
         }
       }
+    },
+    {
+      "id": "accepted-estimate-deposit-workflow-v1",
+      "artifact": "servsync-accepted-estimate-deposit-workflow.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied on 2026-08-07; catalog/security, fixed and percentage Deposit Invoice creation, retry/concurrency, offline partial/full payment, unpaid-void replacement, role/tenant denial, Job independence, preservation, and rollback cleanup checks passed."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Requires a controlled migration-first Production rollout after final owner authorization."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Requires the exact Production-approved migration for supported-schema parity; no Stripe or payment-provider configuration is required."
+        }
+      }
     }
   ]
 }

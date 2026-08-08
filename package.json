@@ -36,6 +36,7 @@
     "test:controlled-ops:browser:pilot": "node tests/controlled-ops/browser-pilot/run-pilot.mjs",
     "test:draft-optional-customer-migrations": "scripts/validation/validate-draft-optional-customer-migrations.sh",
     "test:public-signup-role-hardening": "scripts/validation/validate-public-signup-role-hardening.sh",
+    "test:accepted-estimate-deposit-workflow": "scripts/validation/validate-accepted-estimate-deposit-workflow.sh",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {

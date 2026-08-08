@@ -6,6 +6,42 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-07
 
+- Branch: `codex/accepted-estimate-deposit-workflow-v1`
+- Starting main SHA: `4498494fb03fd8e39636275624b9e0513be2a0d9`
+- Files changed:
+  - `servsync-accepted-estimate-deposit-workflow.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `src/features/estimates/depositWorkflow.ts`
+  - `src/features/invoices/offlinePayments.ts`
+  - `src/features/invoices/RecordInvoicePaymentDialog.tsx`
+  - `src/features/invoices/status.ts`
+  - `scripts/validation/validate-accepted-estimate-deposit-workflow.sh`
+  - `tests/sql/accepted-estimate-deposit-workflow-foundation.sql`
+  - `tests/sql/accepted-estimate-deposit-workflow-validation.sql`
+  - `tests/e2e/accepted-estimate-deposit-workflow.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/contractor-estimate-schedule-invoice-ui.spec.ts`
+  - `tests/e2e/invoice-payment-presentation.spec.ts`
+  - `package.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Implements Accepted Estimate Deposit Workflow v1 without activating Stripe. An accepted Estimate with exactly one Deposit schedule item shows `Request deposit`; the server derives the persisted fixed or percentage amount, creates one linked draft Deposit Invoice, and returns the contractor to review without sending it. Idempotent retries and concurrent requests converge on the same Invoice. An unpaid void Deposit Invoice remains in history and may be replaced deliberately; a paid void cannot be replaced. Connected and Not connected Customers continue using the existing authenticated and request-free Invoice experiences.
+- Manual payment and financial integrity: Owner, active Admin, and Office can record append-only offline cash, check, bank-transfer, external-terminal, or other payments with amount, date, actor, optional reference/note, and idempotency. Partial payments remain partial and expose the remaining Invoice balance; only full payment moves the Invoice to `paid`. Estimate billing shows invoiced, paid, remaining scheduled, and remaining Estimate amounts without counting a deposit above the agreed total. Job creation remains available while the deposit is not requested, outstanding, partial, or paid.
+- Security architecture: The new postgres-owned forced-RLS payment ledger has no browser or service-role table access and rejects update/delete. Controlled fixed-path RPCs derive tenant, Estimate, Customer, property, schedule item, Invoice amount, and actor from persisted state; use advisory and row locks; deny lower roles and cross-tenant callers; reject forged/over-balance payments; and preserve existing Invoice, delivery, PDF, Estimate-acceptance, and Job-handoff boundaries. No Stripe, Pay Now, provider secret, payment intent, refund, chargeback, or payout behavior is included.
+- Sandbox rollout and validation: Exact migration `servsync-accepted-estimate-deposit-workflow.sql` (SHA-256 `a3d74fc6ac1a7f44095c1ecb13713809b3701d9b5acff41d12f393d61cb19576`) was rollback-compiled and then applied to Sandbox `zpzdkoaubyjtsomccxya`. Catalog checks confirmed postgres ownership, fixed `search_path=public`, intended definer/invoker state, expected overloads/grants, forced RLS with zero policies, immutable payment rows, four indexes, nine constraints, and zero direct non-owner privileges. Transactional live validation proved Owner creation, Admin/Office idempotent access, Field Technician/Viewer/cross-tenant denial, request-free Not connected Invoice delivery, partial and full offline payment, sanitized history, and Job creation with paid, outstanding, and unrequested deposits. Transactional fixtures rolled back; the separately tagged browser fixture was removed explicitly after validation.
+- Preservation and rollout status: After transaction and browser cleanup, Sandbox returned to Estimates 138, payment schedules 3, Deposit rows 1, linked rows 0, Invoices 83, Deposit Invoices 2, partial Invoices 0, paid Invoices 2, and offline payment records 0. Tagged Estimates/Invoices were zero and captured identifier digests were exact. Production and Demo were untouched and remain Pending in the rollout ledger. Stripe remains disabled.
+- Validation: Disposable PostgreSQL 16 migration/reapplication, fixed/percentage/no-deposit, exact linking, real concurrent request, partial/full payment, append-only history, void/re-request, role/tenant, and unchanged Job-authority checks passed. TypeScript and the Production build passed. The related payment-schedule, PDF, Invoice, request-free delivery, and secure guest regression set passed 118/118. Exact working-tree Sandbox browser validation at 1440px and 390x844 proved deliberate Deposit Invoice creation, review-before-send behavior, offline-payment form/history presentation, zero horizontal overflow, and zero material console/network failures.
+- Known risks or follow-ups: Production and Demo require the exact migration through a separately authorized migration-first rollout. Online payment processing, Pay Now, receipts, refunds, chargebacks, automatic payouts, and broader accounting/provider reconciliation remain separate. The implementation intentionally allows Job creation regardless of deposit state.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-014 now records the Sandbox-applied provider-neutral deposit Invoice and offline-payment workflow while keeping online payment processing and financial-provider work active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records deliberate Deposit Invoice creation, partial/full offline payment accounting, connection-neutral Invoice delivery, and the nonblocking Job rule.
+
 - Branch: `codex/secure-guest-estimate-response-v1`
 - Starting main SHA: `5ffe1f425fd57e44a4a4583d3f2f95a95bb030b8`
 - Files changed:
