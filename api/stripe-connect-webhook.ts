@@ -202,7 +202,15 @@ function defaultDependencies(): Dependencies {
         p_target_accounted_amount_cents: input.target_accounted_amount_cents,
         p_failure_code: input.failure_code,
       });
-      if (error) throw new Error('reconciliation_failed');
+      if (error) {
+        console.error('Stripe payment reconciliation failed.', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw new Error('reconciliation_failed');
+      }
     },
     contractorForAccount: async stripeAccountId => {
       if (!service) throw new Error('unconfigured');
