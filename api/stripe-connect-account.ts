@@ -31,6 +31,27 @@ type Dependencies = {
   rateLimit: (request: Request) => Promise<'ok' | 'limited' | 'unconfigured'>;
 };
 
+type OnboardingStage = 'authorize' | 'create_account' | 'retrieve_account' | 'persist_account' | 'create_account_link';
+
+function safeProviderError(error: unknown) {
+  if (!error || typeof error !== 'object') return { kind: 'unknown' };
+  const candidate = error as {
+    type?: unknown;
+    code?: unknown;
+    param?: unknown;
+    statusCode?: unknown;
+    requestId?: unknown;
+  };
+  return {
+    kind: 'provider',
+    type: typeof candidate.type === 'string' ? candidate.type : null,
+    code: typeof candidate.code === 'string' ? candidate.code : null,
+    param: typeof candidate.param === 'string' ? candidate.param : null,
+    status_code: typeof candidate.statusCode === 'number' ? candidate.statusCode : null,
+    request_id: typeof candidate.requestId === 'string' ? candidate.requestId : null,
+  };
+}
+
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -137,14 +158,18 @@ export function createStripeConnectAccountHandler(dependencies: Dependencies = d
     let action: 'onboard' | 'refresh';
     try { action = await readBody(request); } catch { return json({ status: 'failed', reason: 'invalid_request' }, 400); }
 
+    let stage: OnboardingStage = 'authorize';
     try {
       const authorization = await dependencies.authorize(token);
       if (action === 'refresh' && !authorization.stripe_account_id) return json({ status: 'synced' });
+      stage = authorization.stripe_account_id ? 'retrieve_account' : 'create_account';
       const account = authorization.stripe_account_id
         ? await dependencies.retrieveAccount(authorization.stripe_account_id)
         : await dependencies.createAccount(authorization);
+      stage = 'persist_account';
       await dependencies.persistAccount(authorization.contractor_id, account);
       if (action === 'refresh') return json({ status: 'synced' });
+      stage = 'create_account_link';
       const origin = publicOrigin(request);
       const url = await dependencies.createAccountLink(
         account.id,
@@ -152,7 +177,8 @@ export function createStripeConnectAccountHandler(dependencies: Dependencies = d
         `${origin}/?stripe_connect=return`,
       );
       return json({ status: 'onboarding_required', url });
-    } catch {
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'stripe_connect_onboarding_failed', stage, error: safeProviderError(error) }));
       return json({ status: 'failed', reason: 'onboarding_unavailable' }, 403);
     }
   };
