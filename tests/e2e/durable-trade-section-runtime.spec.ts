@@ -9,6 +9,7 @@ import {
   emptyTradeSectionForm,
   parseTradeSectionDefinition,
   parseTradeSectionInstance,
+  parseTradeSectionInstances,
   persistedValuesFromForm,
 } from '../../src/features/trade-sections/tradeSectionContracts';
 import {
@@ -159,6 +160,21 @@ test.describe('Durable Trade Section Runtime Slice 1A contracts', () => {
       instance({ current_revision_number: 0 }),
       instance({ current_values: { measurement: 'forged', verified: true, condition: 'good' } }),
     ]) expect(() => parseTradeSectionInstance(payload, { contractorId: CONTRACTOR_ID, jobId: JOB_ID })).toThrow('malformed');
+    expect(() => parseTradeSectionInstance(instance({
+      definition_schema_version: 1,
+      definition_snapshot: definition({ schema_version: 2 }),
+    }), { contractorId: CONTRACTOR_ID, jobId: JOB_ID })).toThrow('malformed');
+    expect(() => parseTradeSectionInstances([instance(), instance()], { contractorId: CONTRACTOR_ID, jobId: JOB_ID })).toThrow('malformed');
+  });
+
+  test('keeps unsupported instance snapshots bounded and noneditable', () => {
+    const parsed = parseTradeSectionInstance(instance({
+      definition_schema_version: 2,
+      definition_snapshot: definition({ schema_version: 2 }),
+      current_values: { future_field: { nested: true } },
+    }), { contractorId: CONTRACTOR_ID, jobId: JOB_ID });
+    expect(parsed.definition).toMatchObject({ schemaVersion: 2, supported: false });
+    expect(parsed.values).toEqual({});
   });
 
   test('uses only the four approved RPCs and preserves exact server-derived arguments', async () => {

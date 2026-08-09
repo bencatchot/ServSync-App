@@ -177,7 +177,8 @@ export function parseTradeSectionDefinition(value: unknown): TradeSectionDefinit
 }
 
 function validateValues(value: unknown, definition: TradeSectionDefinition) {
-  if (!isRecord(value) || !definition.supported || Object.keys(value).length > 400) throw malformed();
+  if (!isRecord(value) || Object.keys(value).length > 400) throw malformed();
+  if (!definition.supported) return {};
   const fields = new Map(definition.fields.map(field => [field.key, field]));
   for (const field of definition.fields) {
     if (field.required && !(field.key in value)) throw malformed();
@@ -241,6 +242,7 @@ export function parseTradeSectionInstance(
     throw malformed();
   }
   const definition = parseTradeSectionDefinition(value.definition_snapshot);
+  if (requirePositiveInteger(value.definition_schema_version) !== definition.schemaVersion) throw malformed();
   const lifecycleStatus = value.lifecycle_status;
   if (!['active', 'completed', 'abandoned', 'voided'].includes(String(lifecycleStatus))) throw malformed();
   if (typeof value.definition_snapshot_sha256 !== 'string' || !HASH_PATTERN.test(value.definition_snapshot_sha256)) throw malformed();
@@ -269,7 +271,9 @@ export function parseTradeSectionInstances(
   expected: { contractorId: string; jobId: string },
 ) {
   if (!Array.isArray(value)) throw malformed();
-  return value.map(row => parseTradeSectionInstance(row, expected));
+  const instances = value.map(row => parseTradeSectionInstance(row, expected));
+  if (new Set(instances.map(instance => instance.id)).size !== instances.length) throw malformed();
+  return instances;
 }
 
 export type TradeSectionFormValue = string | boolean;

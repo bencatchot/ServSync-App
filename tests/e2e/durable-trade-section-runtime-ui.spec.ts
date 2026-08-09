@@ -153,6 +153,18 @@ test.describe('Durable Trade Section Job panel', () => {
     expect(calls.sort()).toEqual(['servsync_list_available_trade_pack_work_types', 'servsync_list_trade_section_instances']);
   });
 
+  test('shows unsupported existing snapshots without editable controls', async ({ page }) => {
+    await installHarness(page, {
+      instances: [instance({
+        definition_schema_version: 2,
+        definition_snapshot: { ...definition(), schema_version: 2 },
+        current_values: { future_field: { nested: true } },
+      })],
+    });
+    await expect(page.getByTestId('trade-section-instance-unsupported')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save section' })).toHaveCount(0);
+  });
+
   test('gives active Admin and Office the same server-bounded mutation shell', async ({ page }) => {
     for (const role of ['admin', 'office'] as const) {
       await installHarness(page, { role, workTypes: [workType()] });
