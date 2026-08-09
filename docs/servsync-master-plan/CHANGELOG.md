@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-09
 
+- Branch: `codex/trade-pack-foundation-rollout-reconciliation`
+- Starting main SHA: `25ac4e5c13a7f7041f7f1467695a96b029c7913f`
+- Files changed:
+  - `config/backend-environment-rollouts.json`
+  - `config/backend-environment-parity.json`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Trade_Pack_Domain_Contracts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md`
+  - `docs/servsync-master-plan/ServSync_Durable_Trade_Section_Instances_v1.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+- Summary of change: Reconciles the governed repository record after the exact ordered Trade Pack Domain Contracts, Property Asset Bridge, and Durable Trade Section Instances migrations were observed in Demo and applied independently to Production. Sandbox, Demo, and Production now share the hidden foundations; the three former Sandbox-only parity groups are retired while Project Collaboration and 22 unrelated Sandbox findings remain visible.
+- Rollout evidence: Demo accepted the three exact statements at `2026-08-09T11:24:04.861Z`, `11:24:45.347Z`, and `11:25:23.320Z`. Its curated asset retained UUID `dd0b383d-5583-49eb-9edf-69443fb5cd35`, lowercase `plumbing` category/kind, `water_heater` type, room/home identity, active lifecycle, revision 1, and fingerprint `a298adf8759f4e1c384804b071a68a94`. Immediate observation at `13:20:29.724Z` and delayed observation at `13:51:30.316Z` passed desktop/mobile RPC-first UI, direct-table denial, zero-layout preservation, inert counts, console/network, and public health checks.
+- Production rollout: Exact SHA-256 `419d27426b7d336927642ae6a2a2632db4be564937849c58ad25ef60a923073c` applied from `13:53:15.549Z` through `13:53:16.156Z`; `31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b` from `13:53:40.456Z` through `13:53:41.000Z`; and `49c8b82a5b7af622178929a12f1d6519b00c2c95d71f0969efa2c2345824bb75` from `13:56:43.234Z` through `13:56:43.853Z`. Each stage passed ownership, forced-RLS/policy-free tables, fixed-path RPC/ACL, direct-table denial, and inert-state validation before the next began.
+- Preservation and product boundary: Production retained zero assets and revisions plus exact captured fingerprints for homes, local customers/properties, Drafts, Estimates, Jobs, and invoices. Demo retained one asset and one baseline revision. Both environments retain zero Trade Section instances/revisions, capability grants, and enabled work types. No ad hoc data mutation, capability, No Cooling definition enablement, visible Trade Pack UI, professional content, Field Technician authority, Stripe/billing change, configuration change, or manual deployment occurred.
+- Tests/checks run: Exact migration checksums; staged live catalog/security/inert-state verification; immediate and delayed authenticated Demo desktop/mobile observation; Production RPC empty-state and direct-table denial; captured preservation fingerprints; Production-vs-Demo and Production-vs-Sandbox live parity; backend parity tests; rollout-ledger validation; JSON parsing; documentation consistency scan; sensitive-value/placeholder scan; exact changed-file scope; and `git diff --check`.
+- Known risks and follow-up: The database foundations remain hidden and default-deny. Visible Trade Section runtime integration, reviewed professional content, assignment-scoped Field Technician authority, customer-safe projections, and eventual removal of the temporary asset fallback remain separate bounded work. PR #256 must rebase without replacing the finalized Property Asset adapter.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records the completed three-environment hidden-foundation rollout while keeping every visible/runtime Trade Pack capability active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the supported-schema state, preservation evidence, inert security boundary, and next bounded runtime work.
+
 - Branch: `codex/primary-home-asset-visibility-v1`
 - Starting main SHA: `d61a9c9e23405cd795efe6803f31a753f6acab2c`
 - Files changed:
