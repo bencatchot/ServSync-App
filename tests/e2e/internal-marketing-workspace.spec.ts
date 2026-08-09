@@ -26,10 +26,11 @@ async function installMarketingHarness(page: Page, role: UserRole) {
     }).createRoot;
     const module = await dynamicImport('/src/features/marketing/MarketingWorkspace.tsx');
     const Workspace = module.InternalMarketingWorkspace as (...args: unknown[]) => unknown;
+    const client = { rpc: async () => ({ data: [], error: null }) };
 
     document.body.innerHTML = '<main class="mx-auto max-w-6xl bg-slate-50 p-4"><div id="marketing-test-root"></div></main>';
     createRoot(document.getElementById('marketing-test-root') as HTMLElement).render(
-      React.createElement(Workspace, { role, overview }),
+      React.createElement(Workspace, { role, overview, client }),
     );
   }, { role, overview });
 }
@@ -54,7 +55,7 @@ test.describe('internal Marketing workspace', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
     expect(source).toContain("profile.role === 'platform_admin' && <PlatformAdminDashboard profile={profile}");
     expect(source).toContain("{ id: 'marketing',    label: 'Marketing'");
-    expect(source).toContain('<InternalMarketingWorkspace role={profile.role} overview={marketingOverview} />');
+    expect(source).toContain('<InternalMarketingWorkspace role={profile.role} overview={marketingOverview} client={supabase!} />');
     expect(source.match(/<InternalMarketingWorkspace/g)).toHaveLength(1);
   });
 
@@ -100,6 +101,7 @@ test.describe('internal Marketing workspace', () => {
       await tab.click();
       await expect(tab).toHaveAttribute('aria-selected', 'true');
       if (section === 'overview') await expect(page.getByTestId('marketing-overview')).toBeVisible();
+      else if (section === 'content') await expect(page.getByTestId('marketing-content-workspace')).toBeVisible();
       else await expect(page.getByTestId(`marketing-section-${section}`)).toBeVisible();
     }
   });

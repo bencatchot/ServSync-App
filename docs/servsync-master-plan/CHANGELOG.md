@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-09
 
+- Branch: `codex/marketing-content-approval-slice-2`
+- Starting main SHA: `2b0b9763c22259aeb1b085c0ac6cb7c14243de21`
+- Files changed:
+  - `servsync-internal-marketing-content-approval.sql`
+  - `src/App.tsx`
+  - `src/features/marketing/marketingContent.ts`
+  - `src/features/marketing/MarketingContentWorkspace.tsx`
+  - `src/features/marketing/MarketingWorkspace.tsx`
+  - `tests/e2e/internal-marketing-workspace.spec.ts`
+  - `tests/e2e/internal-marketing-content-approval.spec.ts`
+  - `tests/backend-parity/backend-parity.test.mjs`
+  - `tests/sql/internal-marketing-content-approval-validation.sql`
+  - `tests/sql/internal-marketing-content-approval-sandbox-validation.sql`
+  - `scripts/validation/validate-internal-marketing-content-approval.sh`
+  - `config/backend-environment-rollouts.json`
+  - `config/backend-environment-parity.json`
+  - `docs/servsync-master-plan/ServSync_Marketing_Content_Approval_Foundation_v1.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Foundation Slice 2 replaces Content's placeholder with a durable internal idea/draft/review queue and connects the Overview to the real `needs_approval` records. Platform administrators can create content, edit idea/draft records, submit non-empty drafts, approve, return with a reason, or reject with a reason. Approved and rejected content remain terminal in v1; no publishing behavior exists.
+- Architecture and security: A reusable private workspace identity supports the internal audience now and canonical contractor binding later without exposing any contractor API. Three `postgres`-owned, forced-RLS, policy-free tables have no browser or service-role direct privileges. Four fixed-path `SECURITY DEFINER` RPCs derive `auth.uid()`, platform-admin authority, and the `servsync_internal` workspace server-side. Revision checks reject stale writes; a transition table preserves append-only decision evidence; contractor, homeowner, cross-workspace, malformed, and invalid-transition paths fail closed.
+- Environment rollout: Exact migration SHA-256 `325befc738a373f431b52019c25b5018d31efd3e21c473cdf81a9d1fca721944` was applied to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-09T19:39:23Z` through `19:39:25Z`, Demo `bdytwgejqnlblhrnqxkp` from `20:02:56Z` through `20:02:57Z`, and Production `uqgtheclhxqlnjpfmheq` from `20:06:04Z` through `20:06:05Z`. Demo passed before Production was touched. Every environment retains one internal workspace, zero content rows, and zero status events; no provider or environment configuration changed.
+- Tests/checks run: Disposable PostgreSQL migration, security, role, idempotency, stale-write, transition, cross-workspace, append-only, repeated-install, and preflight-residue coverage; rollback-only Sandbox, Demo, and Production workflow/catalog checks; exact pre/post Demo and Production business-data fingerprints; focused Marketing adapter/component/source Playwright across create/edit/submit/approve/return/reject, truthful states, role gating, and desktop plus `390x844`; TypeScript; Production build; backend parity manifest tests and live environment comparisons; rollout ledger; JSON/Bash checks; sensitive-value/scope scans; and `git diff --check`.
+- Known risks and follow-up: Approved-content revision policy, preparation/AI generation, publishing, scheduling, provider integrations, campaigns, prospecting/outreach, acquisition analytics, referrals/growth measurement, and contractor Business Marketing remain future slices. No content exists until an authorized platform administrator creates it through the internal workspace.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records the durable internal approval queue and exact remaining rollout, automation, provider, analytics, and contractor-tenant boundaries.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the shared persistence model, approval lifecycle, internal authorization, and completed empty-foundation rollout without claiming publishing or external availability.
+
 - Branch: `codex/marketing-foundation-slice-1`
 - Starting main SHA: `a7643c1f0387c105f7c90671fed60579dc4999f3`
 - Files changed:

@@ -45674,7 +45674,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
       )}
 
       {adminTab === 'marketing' && (
-        <InternalMarketingWorkspace role={profile.role} overview={marketingOverview} />
+        <InternalMarketingWorkspace role={profile.role} overview={marketingOverview} client={supabase!} />
       )}
 
       {adminTab === 'homeowners' && (

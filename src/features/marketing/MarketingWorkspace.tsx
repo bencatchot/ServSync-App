@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ChevronRight,
   FileText,
   Lightbulb,
   Megaphone,
@@ -21,6 +22,13 @@ import {
   type MarketingWorkspaceAudience,
   type MarketingWorkspaceSection,
 } from './marketingDomain';
+import {
+  createMarketingContentAdapter,
+  type MarketingContentItem,
+  type MarketingContentRpcClient,
+  type MarketingContentStatus,
+} from './marketingContent';
+import { MarketingContentWorkspace } from './MarketingContentWorkspace';
 
 const SECTION_PRESENTATION: Record<MarketingWorkspaceSection, { label: string; icon: typeof BarChart3 }> = {
   overview: { label: 'Overview', icon: BarChart3 },
@@ -49,8 +57,7 @@ const METRIC_ACCENTS: Record<MarketingMetric['id'], string> = {
   invites: 'bg-slate-100 text-slate-700',
 };
 
-const EMPTY_SECTION_COPY: Record<Exclude<MarketingWorkspaceSection, 'overview'>, { title: string; body: string }> = {
-  content: { title: 'No marketing content yet', body: 'Content work will appear here when it is created.' },
+const EMPTY_SECTION_COPY: Record<Exclude<MarketingWorkspaceSection, 'overview' | 'content'>, { title: string; body: string }> = {
   campaigns: { title: 'No campaigns yet', body: 'Campaign planning is not connected in this foundation.' },
   prospects: { title: 'No prospects yet', body: 'Prospecting and outreach are not enabled.' },
   growth: { title: 'Acquisition analytics are not connected', body: 'Growth reporting will remain unavailable until a real data source is approved.' },
@@ -111,7 +118,76 @@ function OperatingPanel({
   );
 }
 
-function MarketingOverview({ data }: { data: MarketingOverviewData }) {
+function ApprovalPanel({
+  items,
+  loading,
+  error,
+  onOpen,
+}: {
+  items: MarketingContentItem[];
+  loading: boolean;
+  error: string | null;
+  onOpen: (id: string | null) => void;
+}) {
+  return (
+    <section data-testid="marketing-needs-approval" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700" aria-hidden="true">
+            <CheckCircle2 size={17} />
+          </span>
+          <h2 className="text-sm font-bold text-slate-950">Needs Your Approval</h2>
+        </div>
+        {!loading && !error && <span className="text-sm font-bold text-slate-700">{items.length}</span>}
+      </div>
+      {loading ? (
+        <div className="mt-4 min-h-[8rem] border-y border-dashed border-slate-200 px-3 py-5 text-sm text-slate-500">
+          Loading approval queue...
+        </div>
+      ) : error ? (
+        <div className="mt-4 min-h-[8rem] border-y border-rose-200 bg-rose-50 px-3 py-5 text-sm text-rose-800">
+          Approval queue unavailable.
+        </div>
+      ) : items.length === 0 ? (
+        <div className="mt-4 min-h-[8rem] rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5">
+          <p className="text-sm font-semibold text-slate-700">Nothing waiting for approval</p>
+          <p className="mt-1 text-sm leading-5 text-slate-500">Submitted content will appear here for a decision.</p>
+        </div>
+      ) : (
+        <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+          {items.slice(0, 3).map(item => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onOpen(item.id)}
+              className="flex min-h-12 w-full min-w-0 items-center gap-2 py-2 text-left hover:text-blue-700"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{item.title}</span>
+              <ChevronRight size={16} className="shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+          <button type="button" onClick={() => onOpen(null)} className="min-h-11 w-full text-left text-sm font-bold text-blue-700 hover:text-blue-800">
+            View approval queue
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MarketingOverview({
+  data,
+  approvalItems,
+  contentLoading,
+  contentError,
+  onOpenApproval,
+}: {
+  data: MarketingOverviewData;
+  approvalItems: MarketingContentItem[];
+  contentLoading: boolean;
+  contentError: string | null;
+  onOpenApproval: (id: string | null) => void;
+}) {
   return (
     <div data-testid="marketing-overview" className="space-y-5">
       <section aria-label="Marketing performance summary" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -119,12 +195,11 @@ function MarketingOverview({ data }: { data: MarketingOverviewData }) {
       </section>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <OperatingPanel
-          title="Needs Your Approval"
-          icon={<CheckCircle2 size={17} />}
-          emptyTitle="Nothing waiting for approval"
-          emptyBody="Review items will appear here when an approval workflow exists."
-          testId="marketing-needs-approval"
+        <ApprovalPanel
+          items={approvalItems}
+          loading={contentLoading}
+          error={contentError}
+          onOpen={onOpenApproval}
         />
         <OperatingPanel
           title="Upcoming"
@@ -145,7 +220,7 @@ function MarketingOverview({ data }: { data: MarketingOverviewData }) {
   );
 }
 
-function MarketingFoundationState({ section }: { section: Exclude<MarketingWorkspaceSection, 'overview'> }) {
+function MarketingFoundationState({ section }: { section: Exclude<MarketingWorkspaceSection, 'overview' | 'content'> }) {
   const copy = EMPTY_SECTION_COPY[section];
   const Icon = SECTION_PRESENTATION[section].icon;
   return (
@@ -165,11 +240,32 @@ function MarketingFoundationState({ section }: { section: Exclude<MarketingWorks
 export function MarketingWorkspace({
   audience,
   overview,
+  content,
 }: {
   audience: MarketingWorkspaceAudience;
   overview: MarketingOverviewData;
+  content: {
+    items: MarketingContentItem[];
+    loading: boolean;
+    error: string | null;
+    onReload: () => Promise<void>;
+    onCreate: Parameters<typeof MarketingContentWorkspace>[0]['onCreate'];
+    onUpdate: Parameters<typeof MarketingContentWorkspace>[0]['onUpdate'];
+    onTransition: Parameters<typeof MarketingContentWorkspace>[0]['onTransition'];
+  };
 }) {
   const [section, setSection] = useState<MarketingWorkspaceSection>('overview');
+  const [contentFocus, setContentFocus] = useState<{
+    id: string | null;
+    status: MarketingContentStatus | 'all';
+    token: number;
+  } | null>(null);
+  const approvalItems = content.items.filter(item => item.status === 'needs_approval');
+
+  const openApproval = (id: string | null) => {
+    setContentFocus({ id, status: 'needs_approval', token: Date.now() });
+    setSection('content');
+  };
 
   return (
     <div data-testid="marketing-workspace" data-marketing-audience={audience.kind} className="min-w-0 space-y-4">
@@ -200,19 +296,118 @@ export function MarketingWorkspace({
       </nav>
 
       {section === 'overview'
-        ? <MarketingOverview data={overview} />
-        : <MarketingFoundationState section={section} />}
+        ? (
+          <MarketingOverview
+            data={overview}
+            approvalItems={approvalItems}
+            contentLoading={content.loading}
+            contentError={content.error}
+            onOpenApproval={openApproval}
+          />
+        )
+        : section === 'content'
+          ? (
+            <MarketingContentWorkspace
+              items={content.items}
+              loading={content.loading}
+              loadError={content.error}
+              focusRequest={contentFocus}
+              onReload={content.onReload}
+              onCreate={content.onCreate}
+              onUpdate={content.onUpdate}
+              onTransition={content.onTransition}
+            />
+          )
+          : <MarketingFoundationState section={section} />}
     </div>
   );
+}
+
+function AuthorizedInternalMarketingWorkspace({
+  overview,
+  client,
+}: {
+  overview: MarketingOverviewData;
+  client: MarketingContentRpcClient;
+}) {
+  const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
+  const [items, setItems] = useState<MarketingContentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setItems(await adapter.list('all'));
+    } catch (loadError) {
+      setItems([]);
+      setError(loadError instanceof Error ? loadError.message : 'ServSync could not load marketing content.');
+    } finally {
+      setLoading(false);
+    }
+  }, [adapter]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const content = {
+    items,
+    loading,
+    error,
+    onReload: load,
+    onCreate: async (value: {
+      title: string;
+      contentType: MarketingContentItem['contentType'];
+      body: string;
+      channelCategory: MarketingContentItem['channelCategory'];
+    }) => {
+      const receipt = await adapter.create({
+        ...value,
+        clientRequestId: crypto.randomUUID(),
+      });
+      await load();
+      return receipt.contentId;
+    },
+    onUpdate: async (item: MarketingContentItem, value: {
+      title: string;
+      contentType: MarketingContentItem['contentType'];
+      body: string;
+      channelCategory: MarketingContentItem['channelCategory'];
+    }) => {
+      await adapter.update({
+        ...value,
+        contentId: item.id,
+        expectedRevision: item.revisionNumber,
+      });
+      await load();
+    },
+    onTransition: async (
+      item: MarketingContentItem,
+      toStatus: Exclude<MarketingContentStatus, 'idea'>,
+      reason?: string,
+    ) => {
+      await adapter.transition({
+        contentId: item.id,
+        expectedRevision: item.revisionNumber,
+        toStatus,
+        reason,
+      });
+      await load();
+    },
+  };
+
+  return <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} />;
 }
 
 export function InternalMarketingWorkspace({
   role,
   overview,
+  client,
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
+  client: MarketingContentRpcClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
-  return <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} />;
+  return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;
 }
