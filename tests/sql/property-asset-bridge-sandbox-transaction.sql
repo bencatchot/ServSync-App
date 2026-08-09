@@ -208,7 +208,11 @@ begin
     raise exception 'Sandbox service_role truncate unexpectedly succeeded.';
   exception when others then
     if sqlerrm = 'Sandbox service_role truncate unexpectedly succeeded.' then raise; end if;
-    if position('cannot be truncated' in lower(sqlerrm)) = 0 then
+    if position('cannot be truncated' in lower(sqlerrm)) = 0
+       and not (
+         to_regclass('public.trade_section_instances') is not null
+         and position('foreign key constraint' in lower(sqlerrm)) > 0
+       ) then
       raise exception 'Unexpected Sandbox service_role truncate error: %', sqlerrm;
     end if;
   end;

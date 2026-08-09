@@ -49,7 +49,7 @@ test.describe('Home Map v1 UI', () => {
     const builderSource = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
     const contractorSource = sourceBetween(
       app,
-      'function ContractorDashboard({ profile, onSignOut }',
+      'function ContractorDashboard({\n',
       'function PlatformAdminDashboard({ onSignOut }',
     );
 

@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-08
 
+- Branch: `codex/property-asset-bridge-client-compatibility-v1`
+- Starting main SHA: `0c9b1d69251384f8fc4c7f40df85b4e9401baed4`
+- Files changed:
+  - `src/App.tsx`
+  - `src/propertyAssetAdapter.ts`
+  - `src/types.ts`
+  - `tests/e2e/property-asset-client-compatibility.spec.ts`
+  - `tests/e2e/property-asset-bridge.spec.ts`
+  - `tests/e2e/home-assets-ui.spec.ts`
+  - `tests/e2e/home-assets-foundation.spec.ts`
+  - `tests/e2e/home-map-ui.spec.ts`
+  - `tests/sql/property-asset-bridge-sandbox-transaction.sql`
+  - `config/backend-environment-rollouts.json`
+  - `docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md`
+  - `docs/servsync-master-plan/ServSync_Trade_Pack_Domain_Contracts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Completed_Features.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a narrow Assets & Systems compatibility adapter without changing the visible workflow. Load, create, edit, and archive call the existing Property Asset Bridge RPCs first. Only exact PostgREST `PGRST202` schema-cache responses naming the requested missing RPC may use the isolated historical `home_assets` path, so Sandbox runs through its migrated bridge while current Production and Demo remain functional before their pending database rollout.
+- Security and retry boundary: Successful empty RPC results stay on the bridge. Authorization, authentication, validation, RLS, malformed payload, network, timeout, ambiguous mutation, and generic server failures fail closed without fallback. Bridge payloads require valid matching asset/property identities, strict kinds and lifecycle state, and positive revisions. Bridge edits preserve hidden customer-safe fields; stale or missing revisions require reload. Identical concurrent client mutations share one in-flight operation, and ambiguous writes are never replayed through the legacy path. Revision history, contractor selection, Trade Sections, capabilities, and new UI remain unavailable.
+- Compatibility and rollout: The existing owner/shared-admin controls, member/viewer boundary, labels, loading/empty/error states, and legacy fields remain unchanged. The live rollback-only bridge validator now also recognizes the later durable-section foreign key as an expected service-role truncate denial when that downstream table exists; it does not weaken or change either database foundation. The Property Asset, Trade Pack Domain, and Durable Trade Section migrations remain Pending in Production and Demo; no SQL, configuration, feature flag, capability, work type, or No Cooling state changed. The rollout ledger remains descriptive and does not imply schema parity. PR #256 must rebase after this change and preserve the finalized adapter around its unrelated `App.tsx` work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records completed dual-schema client compatibility while keeping the three-foundation rollout and all visible Trade Pack runtime work active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the temporary exact-error fallback boundary and required independent readiness review before separately authorized Demo-first/Production-second rollout.
+
 - Branch: `codex/durable-trade-section-instances-v1`
 - Starting main SHA: `22502bd7c48912c49fbf1ad5ded90b5796609a31`
 - Files changed:

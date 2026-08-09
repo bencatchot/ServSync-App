@@ -14,29 +14,32 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Assets & Systems v1 UI', () => {
-  test('loads active home_assets and supports owner/admin add edit archive without hard delete', () => {
+  test('loads active assets through the compatibility adapter and supports owner/admin add edit archive without hard delete', () => {
     const app = appSource();
+    const adapter = sourceFile('src/propertyAssetAdapter.ts');
     const dataSource = sourceBetween(app, 'const loadHomeAssets = useCallback(async () => {', 'useEffect(() => {\n    void loadHomeAssets();');
     const assetLogic = sourceBetween(app, 'const openHomeAssetForm =', 'const signedHomeAssetUrl =');
     const assetSource = sourceBetween(app, 'const renderHomeAssetForm =', 'const renderSharedHomeShellsPanel =');
 
-    expect(dataSource).toContain(".from('home_assets')");
-    expect(dataSource).toContain(".is('archived_at', null)");
-    expect(dataSource).toContain(".order('asset_category'");
-    expect(dataSource).toContain(".order('name'");
+    expect(dataSource).toContain('propertyAssetAdapter.list(homeIds)');
+    expect(adapter).toContain(".from('home_assets')");
+    expect(adapter).toContain(".is('archived_at', null)");
+    expect(adapter).toContain(".order('asset_category'");
+    expect(adapter).toContain(".order('name'");
     expect(dataSource).toContain("'Unable to load Assets & Systems.'");
     expect(assetSource).toContain('Assets &amp; Systems');
     expect(assetSource).toContain('Add asset');
     expect(assetSource).toContain('Edit asset/system');
     expect(assetSource).toContain('Archive');
-    expect(assetLogic).toContain('archived_at: new Date().toISOString()');
-    expect(assetLogic).toContain('home_room_id: homeAssetDraft.home_room_id || null');
-    expect(assetLogic).toContain('created_by: profile.id');
+    expect(assetLogic).toContain('propertyAssetAdapter.archive(asset)');
+    expect(assetLogic).toContain('homeRoomId: homeAssetDraft.home_room_id || null');
+    expect(assetLogic).toContain('actorUserId: profile.id');
     expect(assetLogic).toContain("'Unable to save asset.'");
     expect(assetLogic).toContain("'Unable to archive asset.'");
     expect(assetSource).toContain('No active assets or systems yet.');
     expect(assetSource).toContain('flex flex-col gap-3 sm:flex-row');
     expect(assetLogic).not.toContain('.delete()');
+    expect(app).not.toContain(".from('home_assets')");
   });
 
   test('uses safe asset fields, optional room links, manager-only notes, and no sensitive access fields', () => {

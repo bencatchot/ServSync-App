@@ -82,18 +82,24 @@ test.describe('Property Asset Bridge v1', () => {
     }
   });
 
-  test('keeps the bridge hidden while Production and Demo retain the legacy asset client contract', () => {
+  test('keeps the bridge hidden behind an exact missing-RPC compatibility boundary', () => {
     const app = source('src/App.tsx');
+    const adapter = source('src/propertyAssetAdapter.ts');
     const start = app.indexOf('const loadHomeAssets = useCallback(async () => {');
     const end = app.indexOf('const signedHomeAssetUrl =', start);
     const assetLogic = app.slice(start, end);
 
-    expect(assetLogic).toContain("from('home_assets')");
-    expect(assetLogic).toContain(".is('archived_at', null)");
-    expect(assetLogic).not.toContain("rpc('servsync_list_property_assets'");
-    expect(assetLogic).not.toContain("rpc('servsync_create_property_asset'");
-    expect(assetLogic).not.toContain("rpc('servsync_update_property_asset'");
-    expect(assetLogic).not.toContain("rpc('servsync_set_property_asset_lifecycle'");
+    expect(assetLogic).toContain('propertyAssetAdapter.list(homeIds)');
+    expect(assetLogic).toContain('propertyAssetAdapter.create(assetInput)');
+    expect(assetLogic).toContain('propertyAssetAdapter.update({');
+    expect(assetLogic).toContain('propertyAssetAdapter.archive(asset)');
+    expect(adapter).toContain("client.rpc('servsync_list_property_assets'");
+    expect(adapter).toContain("client.rpc('servsync_create_property_asset'");
+    expect(adapter).toContain("client.rpc('servsync_update_property_asset'");
+    expect(adapter).toContain("client.rpc('servsync_set_property_asset_lifecycle'");
+    expect(adapter).toContain("client.from('home_assets')");
+    expect(adapter).toContain("error.code !== 'PGRST202'");
+    expect(adapter).not.toMatch(/production|demo|sandbox|project[_-]?ref|feature[_-]?flag/i);
     expect(app).not.toContain('Property Asset Bridge');
   });
 });

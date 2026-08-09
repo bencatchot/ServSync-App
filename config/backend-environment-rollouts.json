@@ -229,11 +229,11 @@
         },
         "production": {
           "status": "Pending",
-          "reason": "The hidden bridge and its shared home_assets security/definition changes require a later separately authorized Production migration and validation."
+          "reason": "The RPC-first compatibility client preserves the current Production Assets & Systems workflow through an exact PGRST202 missing-routine-only legacy fallback. The hidden bridge and its shared home_assets security/definition changes still require a separately authorized migration and validation; client compatibility is not proof of rollout."
         },
         "demo": {
           "status": "Pending",
-          "reason": "Demo should follow the Production-supported schema only after a separately authorized Production/Demo bridge rollout."
+          "reason": "The RPC-first compatibility client preserves the current Demo Assets & Systems workflow and its legacy asset through the exact missing-routine-only fallback. Demo bridge status remains Pending until a separately authorized Demo-first, Production-second foundation rollout and validation."
         }
       }
     },

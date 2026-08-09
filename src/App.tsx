@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { supabase, supabaseConfigured } from './supabaseClient';
+import { createPropertyAssetAdapter, type PropertyAssetDataClient } from './propertyAssetAdapter';
 import {
   APP_ROUTE_NAMES,
   appHashRoute,
@@ -813,6 +814,7 @@ type HomeAssetDraft = {
   install_date: string;
   warranty_expires_on: string;
   notes: string;
+  revision_number: number | null;
 };
 type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
 type FieldWorkTemplateSource = 'blank' | 'starter' | 'custom';
@@ -7119,6 +7121,9 @@ const HOME_MAP_ZOOM_MAX = 3;
 const CONTRACTOR_HOME_MAP_DRAFT_MAX_POSITION_FEET = 48;
 const CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET = 24;
 const HOME_ASSET_CATEGORIES = ['HVAC', 'Plumbing', 'Electrical', 'Appliance', 'Roof', 'Exterior', 'Garage', 'Safety', 'Other'];
+const propertyAssetAdapter = supabase
+  ? createPropertyAssetAdapter(supabase as unknown as PropertyAssetDataClient)
+  : null;
 
 type ManualHomeDocumentPrepareResponse = {
   reservation_id?: string;
@@ -10315,6 +10320,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     install_date: '',
     warranty_expires_on: '',
     notes: '',
+    revision_number: null,
   });
 
   const cleanHomeMapOptionalText = (value: string) => {
@@ -10648,7 +10654,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   }, [loadHomeRoomLayouts]);
 
   const loadHomeAssets = useCallback(async () => {
-    if (!supabase) return;
+    if (!propertyAssetAdapter) return;
     const homeIds = Array.from(new Set(knownHomeRoomIdKey.split('|').map(id => id.trim()).filter(Boolean)));
     if (homeIds.length === 0) {
       setHomeAssetsByHomeId({});
@@ -10657,18 +10663,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
     setLoadingHomeAssets(true);
     try {
-      const { data, error: assetsError } = await supabase
-        .from('home_assets')
-        .select('id, home_id, home_room_id, asset_category, asset_type, name, manufacturer, model, install_date, warranty_expires_on, notes, archived_at, created_by, created_at, updated_at')
-        .in('home_id', homeIds)
-        .is('archived_at', null)
-        .order('asset_category', { ascending: true })
-        .order('name', { ascending: true });
-      if (assetsError) throw assetsError;
-
-      const grouped = (data || []).reduce<Record<string, HomeAsset[]>>((groups, asset) => {
-        const typedAsset = asset as HomeAsset;
-        groups[typedAsset.home_id] = [...(groups[typedAsset.home_id] || []), typedAsset];
+      const assets = await propertyAssetAdapter.list(homeIds);
+      const grouped = assets.reduce<Record<string, HomeAsset[]>>((groups, asset) => {
+        groups[asset.home_id] = [...(groups[asset.home_id] || []), asset];
         return groups;
       }, {});
       setHomeAssetsByHomeId(grouped);
@@ -11225,12 +11222,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           install_date: asset.install_date || '',
           warranty_expires_on: asset.warranty_expires_on || '',
           notes: asset.notes || '',
+          revision_number: asset.revision_number ?? null,
         }
       : { ...emptyHomeAssetDraft(homeId), home_room_id: roomId });
   };
 
   const saveHomeAsset = async () => {
-    if (!supabase || !homeAssetDraft) return;
+    if (!propertyAssetAdapter || !homeAssetDraft) return;
     const name = cleanHumanLabelText(homeAssetDraft.name).trim();
     const assetCategory = cleanHumanLabelText(homeAssetDraft.asset_category).trim();
     if (!name) {
@@ -11246,34 +11244,36 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setError('');
     setNotice('');
     try {
-      const assetPayload = {
-        home_room_id: homeAssetDraft.home_room_id || null,
-        asset_category: assetCategory,
-        asset_type: cleanHomeMapOptionalText(homeAssetDraft.asset_type),
+      const existingAsset = homeAssetDraft.id
+        ? (homeAssetsByHomeId[homeAssetDraft.home_id] || []).find(asset => asset.id === homeAssetDraft.id)
+        : null;
+      const assetInput = {
+        homeId: homeAssetDraft.home_id,
+        homeRoomId: homeAssetDraft.home_room_id || null,
+        assetCategory,
+        assetType: cleanHomeMapOptionalText(homeAssetDraft.asset_type),
         name,
         manufacturer: cleanHomeMapOptionalText(homeAssetDraft.manufacturer),
         model: cleanHomeMapOptionalText(homeAssetDraft.model),
-        install_date: homeAssetDraft.install_date || null,
-        warranty_expires_on: homeAssetDraft.warranty_expires_on || null,
+        installDate: homeAssetDraft.install_date || null,
+        warrantyExpiresOn: homeAssetDraft.warranty_expires_on || null,
         notes: cleanHomeMapNoteText(homeAssetDraft.notes),
+        actorUserId: profile.id,
       };
 
       if (homeAssetDraft.id) {
-        const { error: updateError } = await supabase
-          .from('home_assets')
-          .update(assetPayload)
-          .eq('id', homeAssetDraft.id);
-        if (updateError) throw updateError;
+        await propertyAssetAdapter.update({
+          ...assetInput,
+          assetId: homeAssetDraft.id,
+          expectedRevision: homeAssetDraft.revision_number,
+          locationLabel: existingAsset?.location_label ?? null,
+          serialIdentifier: existingAsset?.serial_identifier ?? null,
+          approximateAgeYears: existingAsset?.approximate_age_years ?? null,
+          customerSafeDescription: existingAsset?.customer_safe_description ?? null,
+        });
         setNotice('Asset updated.');
       } else {
-        const { error: insertError } = await supabase
-          .from('home_assets')
-          .insert({
-            home_id: homeAssetDraft.home_id,
-            created_by: profile.id,
-            ...assetPayload,
-          });
-        if (insertError) throw insertError;
+        await propertyAssetAdapter.create(assetInput);
         setNotice('Asset added.');
       }
       setHomeAssetDraft(null);
@@ -11286,16 +11286,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
 
   const archiveHomeAsset = async (asset: HomeAsset) => {
-    if (!supabase) return;
+    if (!propertyAssetAdapter) return;
     setArchivingHomeAssetId(asset.id);
     setError('');
     setNotice('');
     try {
-      const { error: archiveError } = await supabase
-        .from('home_assets')
-        .update({ archived_at: new Date().toISOString() })
-        .eq('id', asset.id);
-      if (archiveError) throw archiveError;
+      await propertyAssetAdapter.archive(asset);
       if (homeAssetDraft?.id === asset.id) setHomeAssetDraft(null);
       setNotice('Asset archived.');
       await loadHomeAssets();
