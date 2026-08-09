@@ -32,6 +32,7 @@ import {
   Mail,
   MapPin,
   Maximize2,
+  Megaphone,
   Menu,
   MessageSquare,
   Mic,
@@ -140,6 +141,8 @@ import {
 } from './features/referrals/statusPresentation';
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
+import { InternalMarketingWorkspace } from './features/marketing/MarketingWorkspace';
+import { buildInternalMarketingOverview } from './features/marketing/marketingDomain';
 import { FilterSummary } from './features/search/FilterSummary';
 import {
   canCreateContractorLocalCustomersUi,
@@ -7472,7 +7475,7 @@ function AppContent() {
           onSignOut={signOut}
         />
       )}
-      {profile.role === 'platform_admin' && <PlatformAdminDashboard onSignOut={signOut} />}
+      {profile.role === 'platform_admin' && <PlatformAdminDashboard profile={profile} onSignOut={signOut} />}
     </>
   );
 }
@@ -44903,7 +44906,7 @@ function ContractorDashboard({
   );
 }
 
-function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> }) {
+function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
   const [overview, setOverview] = useState<PlatformOverview | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [contractors, setContractors] = useState<ContractorProfile[]>([]);
@@ -44926,7 +44929,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing'>('overview');
   const [reviewModerationFilter, setReviewModerationFilter] = useState<AdminReviewModerationFilter>('pending');
   const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
@@ -45549,6 +45552,11 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     { label: 'Review Moderation', value: pendingReviewModerationCount, icon: Star },
     { label: 'Open Support', value: openSupportCount, icon: MessageSquare },
   ];
+  const marketingOverview = buildInternalMarketingOverview({
+    contractors: overview?.contractors ?? null,
+    homeowners: overview?.homeowners ?? null,
+    activeInvites: overview?.active_invites ?? null,
+  });
   const connectionStatusCounts = connectionOverviews.reduce<Record<string, number>>((counts, connection) => {
     counts[connection.status] = (counts[connection.status] || 0) + 1;
     return counts;
@@ -45629,13 +45637,14 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         { id: 'reviews',      label: 'Reviews',     icon: <Star size={17} />, badge: pendingReviewModerationCount || undefined },
         { id: 'support',      label: 'Support',     icon: <MessageSquare size={17} />, badge: openSupportCount },
         { id: 'reports',      label: 'Reports',     icon: <Receipt size={17} /> },
+        { id: 'marketing',    label: 'Marketing',   icon: <Megaphone size={17} />, group: 'Internal Workspace' },
       ]}
       activeTab={adminTab}
       onChange={tab => {
         setAdminTab(tab as typeof adminTab);
         if (tab === 'reports' && !reportsLoaded) void loadReports();
       }}
-      profile={{ id: '', email: '', role: 'platform_admin', full_name: 'Admin', email_notifications_enabled: false, created_at: '', updated_at: '' }}
+      profile={profile}
       onSignOut={onSignOut}
     >
       {loading && <Notice tone="info" text="Loading platform overview..." />}
@@ -45662,6 +45671,10 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
           />
         ))}
       </div>
+      )}
+
+      {adminTab === 'marketing' && (
+        <InternalMarketingWorkspace role={profile.role} overview={marketingOverview} />
       )}
 
       {adminTab === 'homeowners' && (
