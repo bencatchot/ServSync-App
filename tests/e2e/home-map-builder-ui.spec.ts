@@ -282,12 +282,48 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('data-testid="home-map-builder-add-existing"');
     expect(builder).toContain('data-testid="home-map-builder-room-list-panel"');
     expect(builder).toContain('Rooms not on map');
-    expect(builder).toContain('Add {room.name} to map');
+    expect(builder).toContain('Add to map');
     expect(addExisting).toContain(".from('home_room_layouts')");
     expect(addExisting).toContain('const flushed = await flushHomeMapPendingSaves(homeId)');
     expect(addExisting).toContain('home_room_id: room.id');
     expect(addExisting).toContain('setSelectedHomeRoomDetailId(room.id)');
     expect(addExisting).not.toContain(".from('home_rooms')");
+  });
+
+  test('unmapped rooms open the existing detail drawer without creating a map layout', () => {
+    const app = appSource();
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+    const viewStart = builder.indexOf('data-testid="home-map-builder-view-unmapped"');
+    const addStart = builder.indexOf('data-testid="home-map-builder-add-existing"', viewStart);
+    const viewAction = builder.slice(viewStart, addStart);
+
+    expect(builder).toContain('data-testid="home-map-builder-unmapped-room"');
+    expect(builder).toContain('data-testid="home-map-builder-view-unmapped"');
+    expect(viewAction).toContain('setSelectedHomeRoomDetailId(room.id)');
+    expect(viewAction).toContain('setHomeMapDetailPanelOpen(true)');
+    expect(viewAction).toContain('setHomeMapRoomsPanelOpen(false)');
+    expect(viewAction).not.toContain('addExistingRoomToHomeMap');
+    expect(viewAction).not.toContain(".from('home_room_layouts')");
+    expect(viewAction).not.toContain('supabase');
+    expect(builder).toContain('data-testid="home-map-builder-add-existing"');
+    expect(builder).toContain('addExistingRoomToHomeMap(homeId, room)');
+    expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
+  });
+
+  test('unmapped-room details use the same responsive drawer as mapped rooms', () => {
+    const app = appSource();
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+    const detail = sourceBetween(app, 'const renderHomeRoomDetailPanel =', 'const renderHomeRoomForm =');
+
+    expect(builder).toContain('mt-2 grid gap-2 sm:grid-cols-2');
+    expect(builder).toContain('fixed inset-0 z-[60] flex items-end');
+    expect(builder).toContain('max-h-[88vh] w-full overflow-auto rounded-t-3xl');
+    expect(builder).toContain('lg:h-full lg:max-h-none lg:w-[440px]');
+    expect(detail).toContain('linkedAssets.length === 0');
+    expect(detail).toContain('No assets are assigned to this room.');
+    expect(detail).toContain('linkedAssets.slice(0, 5).map(asset =>');
+    expect(detail).toContain('{asset.name}');
+    expect(detail).toContain('{asset.asset_category}');
   });
 
   test('room selection is explicit and Edit opens the room details drawer', () => {

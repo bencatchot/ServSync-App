@@ -16646,17 +16646,35 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     {unmappedRooms.length === 0 ? (
                       <p className="rounded-xl border border-dashed border-slate-300 bg-white p-3 text-xs leading-5 text-slate-500">Every active room is on the map.</p>
                     ) : unmappedRooms.map(room => (
-                      <button
-                        key={room.id}
-                        type="button"
-                        className={buttonClass('secondary')}
-                        data-testid="home-map-builder-add-existing"
-                        onClick={() => void addExistingRoomToHomeMap(homeId, room)}
-                        disabled={savingHomeRoomLayout}
-                      >
-                        <Plus size={14} />
-                        Add {room.name} to map
-                      </button>
+                      <div key={room.id} className="rounded-xl border border-slate-200 bg-white p-2" data-testid="home-map-builder-unmapped-room">
+                        <p className="break-words px-1 text-sm font-semibold text-slate-800">{room.name}</p>
+                        {room.room_type && <p className="px-1 text-xs text-slate-500">{room.room_type}</p>}
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            className={buttonClass('secondary')}
+                            data-testid="home-map-builder-view-unmapped"
+                            onClick={() => {
+                              setSelectedHomeRoomDetailId(room.id);
+                              setHomeMapDetailPanelOpen(true);
+                              setHomeMapRoomsPanelOpen(false);
+                            }}
+                          >
+                            <ClipboardList size={14} />
+                            View details
+                          </button>
+                          <button
+                            type="button"
+                            className={buttonClass('secondary')}
+                            data-testid="home-map-builder-add-existing"
+                            onClick={() => void addExistingRoomToHomeMap(homeId, room)}
+                            disabled={savingHomeRoomLayout}
+                          >
+                            <Plus size={14} />
+                            Add to map
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </details>

@@ -4,6 +4,27 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-09
+
+- Branch: `codex/primary-home-asset-visibility-v1`
+- Starting main SHA: `d61a9c9e23405cd795efe6803f31a753f6acab2c`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-assets-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds a non-mutating View details action for an authorized primary homeowner's active room when that room is not yet on the Home Map. The existing room detail drawer can therefore show already-linked assets, documents, reminders, and manager notes without requiring a layout record; the separate optional Add to map action remains available and mapped-room behavior is unchanged.
+- Security and compatibility boundary: The view action changes only local selected-room/drawer state and performs no database write. Existing homeowner management authority remains authoritative, shared-member/viewer and contractor surfaces are unchanged, and the finalized Property Asset Bridge adapter retains its exact named-`PGRST202` missing-RPC-only legacy fallback. No SQL, migration, data, environment, flag, capability, work type, Trade Pack content, Stripe, billing, or Production/Demo rollout is included.
+- Tests/checks run: Focused Home Map Builder and Assets & Systems source-contract coverage; Property Asset adapter compatibility regression; typecheck; Production build; desktop/mobile exact-head browser validation; sensitive-value and changed-scope scans; and `git diff --check`.
+- Known risks and follow-up: The three Trade Pack backend foundations remain applied in Demo and pending in Production. The coordinated rollout resumes only after the corrected deployment passes immediate and delayed read-only Demo observation without creating a Home Map layout.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records the non-mutating primary-home visibility correction while keeping Production rollout and visible Trade Pack runtime work pending.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This restores an already-supported homeowner asset workflow without changing product direction, permissions, or roadmap scope.
+
 ## 2026-08-08
 
 - Branch: `codex/property-asset-category-compatibility-v1`
