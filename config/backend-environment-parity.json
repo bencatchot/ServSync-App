@@ -107,6 +107,37 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
+      },
+      {
+        "id": "internal-marketing-content-approval-v1",
+        "reason": "Approved Sandbox-only durable internal Marketing content and approval foundation; Production and Demo rollout remains pending.",
+        "selectors": {
+          "relationScopes": [
+            "public.marketing_content_items",
+            "public.marketing_content_status_events",
+            "public.marketing_workspaces"
+          ],
+          "functionScopes": [
+            "public.servsync_create_internal_marketing_content(uuid, text, text, text, text)",
+            "public.servsync_list_internal_marketing_content(text)",
+            "public.servsync_private_guard_marketing_status_event()",
+            "public.servsync_transition_internal_marketing_content(uuid, bigint, text, text)",
+            "public.servsync_update_internal_marketing_content(uuid, bigint, text, text, text, text)"
+          ],
+          "exactObjects": []
+        },
+        "expectedCounts": {
+          "relations": 3,
+          "columns": 33,
+          "constraints": 31,
+          "indexes": 10,
+          "triggers": 2,
+          "functions": 5,
+          "functionGrants": 9,
+          "tableGrants": 24
+        },
+        "expectedKeyFingerprint": "sha256:8f42f99bff5f8785c9964b96dad7c370393eccd8d020999430e65ace4dc3cc4e",
+        "expectedCatalogFingerprint": "sha256:c6c745e43e82a742cb80e76f43e19f0fce60769f055d5d597c319728bcba4636"
       }
     ]
   }
