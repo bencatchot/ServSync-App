@@ -87,4 +87,27 @@ test.describe('Assets & Systems v1 UI', () => {
     expect(contractorSource).not.toContain('home_room_layouts');
     expect(contractorSource).not.toContain('Assets & Systems');
   });
+
+  test('primary-home unmapped room visibility stays adapter-backed and authorization-neutral', () => {
+    const app = appSource();
+    const adapter = sourceFile('src/propertyAssetAdapter.ts');
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+    const detail = sourceBetween(app, 'const renderHomeRoomDetailPanel =', 'const renderHomeRoomForm =');
+    const sharedSource = sourceBetween(
+      app,
+      '<Card title="Homes shared with me" icon={<Home size={18} />}>',
+      '<Card title="Home Access" icon={<Users size={18} />}>',
+    );
+
+    expect(builder).toContain('data-testid="home-map-builder-view-unmapped"');
+    expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
+    expect(detail).toContain('homeAssetsByHomeId[room.home_id]');
+    expect(detail).toContain('asset.home_room_id === room.id');
+    expect(adapter).toContain("client.rpc('servsync_list_property_assets'");
+    expect(adapter).toContain("error.code !== 'PGRST202'");
+    expect(adapter).toContain('details.startsWith(`Searched for the function public.${rpcName} `)');
+    expect(adapter).toContain('message.startsWith(`Could not find the function public.${rpcName}(`)');
+    expect(app).not.toContain(".from('home_assets')");
+    expect(sharedSource).not.toContain('home-map-builder-view-unmapped');
+  });
 });
