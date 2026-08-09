@@ -51,7 +51,18 @@ export type PropertyAssetUpdateInput = PropertyAssetWriteInput & {
 
 const LEGACY_SELECT = 'id, home_id, home_room_id, asset_category, asset_type, name, manufacturer, model, install_date, warranty_expires_on, notes, archived_at, created_by, created_at, updated_at';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ASSET_KINDS = new Set(['hvac', 'plumbing', 'electrical', 'appliance', 'roof', 'exterior', 'garage', 'safety', 'other']);
+const ASSET_CATEGORY_BY_KIND = {
+  hvac: 'HVAC',
+  plumbing: 'Plumbing',
+  electrical: 'Electrical',
+  appliance: 'Appliance',
+  roof: 'Roof',
+  exterior: 'Exterior',
+  garage: 'Garage',
+  safety: 'Safety',
+  other: 'Other',
+} as const;
+const ASSET_KINDS = new Set(Object.keys(ASSET_CATEGORY_BY_KIND));
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -133,6 +144,9 @@ const normalizeAsset = (
 
   const assetKind = requireString(value.asset_kind, 'asset kind').toLowerCase();
   if (!ASSET_KINDS.has(assetKind)) throw new Error('Property asset response has an unknown asset kind.');
+  if (normalized.asset_category !== ASSET_CATEGORY_BY_KIND[assetKind as keyof typeof ASSET_CATEGORY_BY_KIND]) {
+    throw new Error('Property asset response has a conflicting asset kind and category.');
+  }
   const revisionNumber = value.revision_number;
   if (typeof revisionNumber !== 'number' || !Number.isSafeInteger(revisionNumber) || revisionNumber < 1) {
     throw new Error('Property asset response has an invalid revision number.');
@@ -157,6 +171,10 @@ const normalizeAsset = (
   normalized.location_label = nullableString(value.location_label, 'location');
   normalized.serial_identifier = nullableString(value.serial_identifier, 'serial identifier');
   normalized.approximate_age_years = nullableNumber(value.approximate_age_years, 'approximate age');
+  if (normalized.approximate_age_years !== null
+    && (normalized.approximate_age_years < 0 || normalized.approximate_age_years > 200)) {
+    throw new Error('Property asset response has an invalid approximate age.');
+  }
   normalized.customer_safe_description = nullableString(value.customer_safe_description, 'customer-safe description');
   return normalized;
 };

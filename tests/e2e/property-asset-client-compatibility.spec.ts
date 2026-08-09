@@ -196,6 +196,14 @@ test.describe('Property Asset Bridge client compatibility', () => {
     const malformed = mockClient({ rpc: () => ({ data: [bridgeAsset({ home_id: OTHER_HOME_ID })], error: null }) });
     await expect(createPropertyAssetAdapter(malformed.client).list([HOME_ID])).rejects.toThrow('does not match');
     expect(legacyCalls(malformed.calls)).toHaveLength(0);
+
+    const conflictingKind = mockClient({ rpc: () => ({ data: [bridgeAsset({ asset_category: 'Plumbing' })], error: null }) });
+    await expect(createPropertyAssetAdapter(conflictingKind.client).list([HOME_ID])).rejects.toThrow('conflicting asset kind');
+    expect(legacyCalls(conflictingKind.calls)).toHaveLength(0);
+
+    const invalidAge = mockClient({ rpc: () => ({ data: [bridgeAsset({ approximate_age_years: 201 })], error: null }) });
+    await expect(createPropertyAssetAdapter(invalidAge.client).list([HOME_ID])).rejects.toThrow('invalid approximate age');
+    expect(legacyCalls(invalidAge.calls)).toHaveLength(0);
   });
 
   test('creates through the bridge, derives the kind, and never asks for revision history', async () => {
