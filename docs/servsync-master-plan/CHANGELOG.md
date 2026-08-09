@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-09
 
+- Branch: `codex/durable-trade-section-runtime-slice-1b`
+- Starting main SHA: `dfe66250a323198409ffb063601f1026da6dc071`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Durable_Trade_Section_Instances_v1.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Records the completed Durable Trade Section Runtime Slice 1B controlled Sandbox validation. One fictional scalar-only work type, one exact capability grant, and temporary exact-Job section activity were enabled for existing disposable Sandbox contractor `8d47192c-17c7-4c3c-a3d9-f990e00384b9` and existing Job `ea9ea21a-d9b4-4106-86e9-b204ee496541`. An isolated branch-only Preview at exact source `dfe66250a323198409ffb063601f1026da6dc071` exercised the hidden Slice 1A UI against Sandbox only; the Preview deployment, alias, and three branch-scoped variables were removed afterward.
+- Validation evidence: Temporary activation began at `2026-08-09T16:05:09.740Z`; the first browser/concurrency pass was removed at `2026-08-09T16:23:13.057Z` before a separate final role-mutation pass. Owner, active Admin, and Office loaded and edited the exact Job section; Viewer received read-only exact-Job access; Field Technician, inactive member, homeowner, foreign contractor, cross-Job, and closed/finalized Job paths failed closed. All four supported scalar contracts passed. Idempotent create retained one identity without rewriting original values, changed binding conflicted, revisions remained contiguous, stale writes preserved unsaved input, an interrupted committed response was not retried, and mounted capability revocation denied further mutation. Desktop and `390x844` mobile had no overflow or material application errors. Only the four approved Slice 1A RPCs were used; no direct table, legacy fallback, asset, lifecycle, history, billing, Stripe, or homeowner projection path was introduced.
+- Cleanup and preservation: Two sequential section identities and 13 total revision snapshots across the browser/concurrency and final Admin/Office/Owner mutation passes, the exact revoked grant, neutral trade/capability/work-type/version records, branch variables, alias, and Preview deployment were removed through exact predicates. Final cleanup completed at `2026-08-09T16:33:34.918Z`. Sandbox returned to one disabled skeletal work type/version/capability/trade, zero enabled work types, zero capability grants, zero Trade Section instances, and zero revisions, with fixture residue zero and `session_replication_role=origin`. The existing Job/customer/property identities and state were unchanged. Production and Demo remained gate-off and database/configuration unchanged with zero enabled work types, grants, sections, and revisions; all three public aliases returned HTTP 200.
+- Tests/checks run: Live authenticated Sandbox role/tenant/Job/RPC/browser matrix; exact before/after catalog and fingerprint checks; 23 focused Trade Section Playwright checks; Durable Trade Section disposable PostgreSQL validation; 41 passing Property Asset and Home Map regressions; backend parity tests and rollout ledger; live parity (`Production vs Demo: PASS WITH INTENTIONAL DIFFERENCES`; `Production vs Sandbox: FAIL` with the existing 297 approved Project Collaboration additions and same 22 unrelated findings); typecheck; Production build; sensitive-value/configuration scans; exact changed-file scope; and `git diff --check`. The historical Home Map changed-file allowlist and stale source-marker assertions remain inherited test-maintenance failures; this documentation-only branch does not alter their source.
+- Known risks and follow-up: Slice 1B proves the hidden generic runtime in Sandbox only; it is not released. The gate remains unset, no ordinary capability is granted, and no work type is enabled in Sandbox, Demo, or Production. Qualified professional content, controlled exposure, Field Technician assignment authority, homeowner-safe projections, lifecycle/history UI, findings/recommendations, and FB-007's other active work remain separately reviewed slices.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records completed Sandbox runtime proof while preserving every release, content, role, and customer-visibility gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Replaces the pending neutral-proof wording with exact completed validation and restored-baseline evidence without claiming product availability.
+
 - Branch: `codex/durable-trade-section-runtime-slice-1a`
 - Starting main SHA: `d2738f0d146c0fc486a88bb00099253a65f59f6f`
 - Files changed:
