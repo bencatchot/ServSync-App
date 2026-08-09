@@ -142,6 +142,14 @@ The intended mental model is:
 
 The current technical implementation may evolve incrementally, but future design should move toward this consistent mental model.
 
+## Marketing Workspaces
+
+ServSync Marketing should develop as one shared Marketing Engine/domain with audience-specific workspaces, not as unrelated internal and contractor products. The first audience is the private ServSync internal workspace for operating ServSync's own marketing. A later, separately authorized Business Marketing workspace may reuse the same bounded domain contracts for contractor tenants while deriving its authorization and data from the exact contractor context. Homeowners are not a Marketing workspace audience.
+
+Marketing Foundation Slice 1 is source-only and private to the existing `platform_admin` application shell. It establishes reusable audience, navigation, metric-state, approval, schedule, and recommendation contracts plus an honest Overview and foundation destinations for Content, Campaigns, Prospects, Growth, and Settings. Current contractor/homeowner account totals and active invite counts may appear only from existing exact platform data; publishing activity is zero for this workspace, while website visits and acquisition attribution remain explicitly not connected or unavailable. No marketing persistence, social or email provider, scheduled worker, prospecting, outreach, AI-generated content, analytics integration, contractor-facing UI, homeowner-facing UI, billing, or Production configuration is introduced.
+
+The intended eventual operating loop is: system prepares marketing work, the user reviews meaningful decisions, approved work is scheduled or published, and real results support recommendations. Each capability must be introduced through a separately reviewed slice that preserves truthful data states, internal-versus-tenant authorization, provider boundaries, auditability, and fail-closed behavior. The initial workspace must not imply that those automations already exist.
+
 # 3. Plain-Language Product Definition
 
 ServSync connects homeowners with local service contractors and keeps requests, estimates, jobs, invoices, communication, and home service history organized in one place.

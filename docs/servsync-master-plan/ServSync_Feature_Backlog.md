@@ -1,8 +1,8 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-08-07
+Last updated: 2026-08-09
 
-Last reconciled against `origin/main` at `4498494fb03fd8e39636275624b9e0513be2a0d9`.
+Last reconciled against `origin/main` at `a7643c1f0387c105f7c90671fed60579dc4999f3`.
 
 ## Purpose
 
@@ -95,6 +95,7 @@ Important guardrails:
 | FB-034A | Demo Mode Extended Scenario Coverage | Demo data, marketing capture, QA support | Later / Future | Medium | The request-to-job capture milestone is archived. Demo now matches the current Production-supported backend schema except for its intentional private scenario foundation, while Demo Presentation remains enabled and Draft UI/rollout gates remain off. This does not claim visible/full operational parity: request-free delivery server configuration, Project Collaboration, external providers, and future scenario coverage remain separate. Future scenarios may cover invoices, Home History, report finalization, reminders, media, role switching, or browser controls only in approved demo environments. |
 | FB-035 | Draft-First Work Rollout | Contractor Jobs, Drafts, estimates, jobs, invoices | Implementation In Progress | High | Keep active. The redesigned Jobs landing and Draft-first workspace are now the standard Production experience for authorized contractors under the reviewed `all_contractors` server mode and three enabled global gates. Existing save/launch RPCs, tenant checks, output-specific role authority, and fail-closed fallback remain authoritative. Mutating Production workflow smoke, optional role-account coverage, telemetry, and later Draft-first maturity remain follow-ups. See the rollout matrix below. |
 | FB-036 | Claim-Link Expected-Error Presentation Polish | Local-customer claim invitations, error UX | Backlog | Low | P3 polish only. Keep the clear handled unavailable-invite message, but suppress raw RPC/JSON detail from the user-facing page for expected stale, invalid, expired, or already-used claim links. Preserve useful internal/runtime diagnostics and do not change replay protection, lookup rejection, token containment, or acceptance behavior. |
+| FB-037 | Shared Marketing Engine and Workspaces | Platform growth, internal operations, future contractor business marketing | Implementation In Progress | Medium | Marketing Foundation Slice 1 adds a source-only private ServSync internal workspace inside the existing platform-admin shell with reusable audience-aware domain contracts, honest sourced/unavailable/not-connected metrics, approval/upcoming/recommendation empty states, and Overview, Content, Campaigns, Prospects, Growth, and Settings destinations. It creates no marketing records, integrations, publishing, outreach, AI output, analytics connection, or contractor/homeowner exposure. Continue through bounded slices for the shared Marketing Engine, content generation, meaningful-decision approval, scheduling/publishing, social-account integrations, campaign management, prospecting/outreach, acquisition analytics, referral/growth-loop measurement, and a separately authorized contractor-facing Business Marketing workspace. Every automation and external integration remains future work and must fail closed until its data, authorization, provider, and rollout boundary is approved. |
 
 ## FB-035 Rollout Status Matrix
 
@@ -149,6 +150,7 @@ Important guardrails:
 | FB-034 | Archived: Demo Mode request-to-job capture milestone. | FB-034A demo extended scenario coverage if later prioritized. |
 | FB-035 | Retained. | FB-035 Draft-first Work rollout. |
 | FB-036 | New focused follow-up. | FB-036 claim-link expected-error presentation polish. |
+| FB-037 | New active workstream. | FB-037 shared Marketing Engine, internal ServSync Marketing workspace, and future contractor Business Marketing workspace. |
 
 ## Current Work Snapshot
 

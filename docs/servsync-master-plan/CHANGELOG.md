@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-09
 
+- Branch: `codex/marketing-foundation-slice-1`
+- Starting main SHA: `a7643c1f0387c105f7c90671fed60579dc4999f3`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/marketing/marketingDomain.ts`
+  - `src/features/marketing/MarketingWorkspace.tsx`
+  - `tests/e2e/internal-marketing-workspace.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Adds Marketing Foundation Slice 1 as a source-only private destination in the existing platform-admin shell. A reusable audience-aware Marketing domain supports an internal workspace now and a separately authorized contractor tenant context later. The internal Overview presents Published, Website Visits, Signups, Contractors, Homeowners, and Invites with only exact existing platform counts or explicit zero, unavailable, and not-connected states; Needs Your Approval, Upcoming, and Recommended Next Action remain honest empty states. Content, Campaigns, Prospects, Growth, and Settings are intentional foundation destinations rather than simulated functionality.
+- Authorization and data boundary: Only a `platform_admin` profile can mount the admin shell, and the internal Marketing wrapper independently returns no UI for contractor, homeowner, missing, or unknown roles. No route, database object, RPC, RLS policy, marketing record, provider, secret, environment variable, job, worker, analytics source, fake metric, contractor UI, or homeowner UI is added.
+- Tests/checks run: Focused Marketing domain/component/source-contract Playwright coverage (7 passed) across authorized and excluded roles, direct-shell placement, exact metric and load-failure states, all six destinations, and desktop plus `390x844` overflow; 17 selected existing admin and mobile-shell regression checks passed. TypeScript, Production build, backend parity tests, rollout-ledger validation, repository scope and sensitive-value scans, and `git diff --check` passed. The inherited FB-026 source-marker assertion still expects the long-removed in-file `function EmptyState`, and focused ESLint still fails at startup on both changed and unchanged files because the installed ESLint 9 / typescript-eslint rule versions are incompatible.
+- Known risks and follow-up: Platform counts depend on the existing admin overview load and remain unavailable on load failure. Publishing, approval workflow, scheduling, social/email integrations, campaigns, prospecting/outreach, acquisition analytics, growth-loop measurement, AI preparation, and contractor Business Marketing remain future bounded slices. The existing monolithic admin data load and inherited test/lint maintenance issues remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 establishes the active shared Marketing Engine/internal-workspace/future-contractor direction while leaving every persistence, automation, provider, and external-audience capability unfinished.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the new Marketing workspace product direction, audience architecture, truthful-data rule, and staged automation boundary.
+
 - Branch: `codex/durable-trade-section-runtime-slice-1b`
 - Starting main SHA: `dfe66250a323198409ffb063601f1026da6dc071`
 - Files changed:
