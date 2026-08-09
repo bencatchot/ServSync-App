@@ -334,26 +334,6 @@ test('fingerprinted Project Collaboration additions remain approved Sandbox expe
   assert.equal(result.status, 'PASS WITH APPROVED SANDBOX EXPERIMENTS');
 });
 
-test('fingerprinted internal Marketing additions remain bounded Sandbox experiments', () => {
-  const reference = snapshot();
-  const candidate = snapshot({
-    relations: [...reference.relations, entry('public.marketing_content_items', 'public.marketing_content_items', { rls_enabled: true })],
-    columns: [...reference.columns, entry('public.marketing_content_items.id', 'public.marketing_content_items', { data_type: 'uuid' })],
-    functions: [...reference.functions, entry('public.servsync_list_internal_marketing_content(text)', 'public.servsync_list_internal_marketing_content(text)', {
-      security_definer: true,
-      definition: canonicalFunctionDefinition.replaceAll('list_customers', 'servsync_list_internal_marketing_content'),
-    })],
-  });
-  const group = additionGroup('marketing-test', 'Reviewed internal Marketing experiment.', {
-    relationScopes: ['public.marketing_content_items'],
-    functionScopes: ['public.servsync_list_internal_marketing_content(text)'],
-    exactObjects: [],
-  }, additionsBetween(reference, candidate));
-  const result = compareCatalogs(reference, candidate, configWithGroups([], [group]), 'sandbox');
-  assert.equal(result.unexplained.length, 0);
-  assert.equal(result.status, 'PASS WITH APPROVED SANDBOX EXPERIMENTS');
-});
-
 test('function comments and formatting are separated from logical definition drift', () => {
   const reference = snapshot();
   const formatted = canonicalFunctionDefinition

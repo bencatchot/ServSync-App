@@ -67,15 +67,14 @@ Each is `postgres`-owned, `SECURITY DEFINER`, and fixed-path. The server derives
 
 ## Rollout State
 
-Exact migration `servsync-internal-marketing-content-approval.sql`, SHA-256 `325befc738a373f431b52019c25b5018d31efd3e21c473cdf81a9d1fca721944`, is applied only to Sandbox `zpzdkoaubyjtsomccxya`.
+Exact migration `servsync-internal-marketing-content-approval.sql`, SHA-256 `325befc738a373f431b52019c25b5018d31efd3e21c473cdf81a9d1fca721944`, is applied to Sandbox `zpzdkoaubyjtsomccxya`, Demo `bdytwgejqnlblhrnqxkp`, and Production `uqgtheclhxqlnjpfmheq`.
 
-Production and Demo remain pending and contain none of this foundation. Therefore a branch Preview connected to Sandbox can validate the durable workflow, while merged Production/Demo clients must remain fail-closed until a separately authorized migration rollout. No environment variables or provider configuration are required.
+Demo application completed on 2026-08-09 from `20:02:56Z` through `20:02:57Z`; Production followed from `20:06:04Z` through `20:06:05Z` only after Demo passed. Both environments retain one deterministic internal workspace and zero content/status-event rows. Catalog, role denial, platform-admin workflow, idempotency, transition, stale-write, rollback-only cleanup, and business-data preservation checks passed. No environment variables, provider configuration, Marketing fixture, publishing path, or contractor/homeowner exposure was added.
 
 ## Future Slices
 
 Separately reviewed work remains required for:
 
-- Production/Demo schema rollout;
 - content preparation or AI generation;
 - revision workflow for approved content;
 - scheduling and publishing;

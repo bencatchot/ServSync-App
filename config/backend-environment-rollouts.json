@@ -264,12 +264,12 @@
           "reason": "Exact SHA-256 325befc738a373f431b52019c25b5018d31efd3e21c473cdf81a9d1fca721944 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-09 from 19:39:23Z through 19:39:25Z. Catalog, forced-RLS/policy-free tables, exact RPC grants, platform-admin workflow, contractor/homeowner denial, optimistic concurrency, transition invariants, rollback-only fixtures, and zero content/event residue passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Production SQL is not authorized in Slice 2; the internal Marketing runtime must remain fail-closed there until the exact migration receives a separate rollout approval."
+          "status": "Applied",
+          "reason": "Exact SHA-256 325befc738a373f431b52019c25b5018d31efd3e21c473cdf81a9d1fca721944 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-09 from 20:06:04Z through 20:06:05Z. Catalog, forced-RLS/policy-free tables, exact RPC grants, platform-admin workflow, contractor/homeowner denial, idempotency, invalid-transition and review-reason enforcement, stale-write rejection, rollback-only cleanup, and business-data preservation passed with one internal workspace and zero content or status-event rows."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo schema rollout is deferred with Production; no Demo SQL or Marketing fixture is included in Slice 2."
+          "status": "Applied",
+          "reason": "Exact SHA-256 325befc738a373f431b52019c25b5018d31efd3e21c473cdf81a9d1fca721944 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-09 from 20:02:56Z through 20:02:57Z. Catalog, forced-RLS/policy-free tables, exact RPC grants, contractor/homeowner denial, transaction-local platform-admin workflow, idempotency, invalid-transition and review-reason enforcement, stale-write rejection, rollback-only cleanup, and business-data preservation passed with one internal workspace and zero content or status-event rows."
         }
       }
     }
