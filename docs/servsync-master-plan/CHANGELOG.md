@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-09
 
+- Branch: `codex/durable-trade-section-runtime-slice-1a`
+- Starting main SHA: `d2738f0d146c0fc486a88bb00099253a65f59f6f`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/trade-sections/tradeSectionAvailability.ts`
+  - `src/features/trade-sections/tradeSectionContracts.ts`
+  - `src/features/trade-sections/tradeSectionAdapter.ts`
+  - `src/features/trade-sections/TradeSectionJobPanel.tsx`
+  - `tests/e2e/durable-trade-section-instances.spec.ts`
+  - `tests/e2e/durable-trade-section-runtime.spec.ts`
+  - `tests/e2e/durable-trade-section-runtime-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Durable_Trade_Section_Instances_v1.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implements Durable Trade Section Runtime Slice 1A as hidden, default-off source integration in eligible contractor Job detail. A strict unset `VITE_DURABLE_TRADE_SECTIONS_UI_ENABLED` gate prevents mounting and RPC calls in every deployed environment. When explicitly enabled in a local test harness, Owner/Admin/Office may load, create, and update exact-Job scalar reading/test fields; Viewer receives exact-Job read-only presentation; Field Technician, inactive, homeowner, closed, and finalized contexts remain excluded.
+- Security and failure boundary: The client uses only server-authoritative work-type discovery plus exact-Job list, idempotent create, and expected-revision update RPCs. Unsupported/malformed definitions and responses fail closed, stale input remains unsaved until explicit reload, and ambiguous mutations are never automatically retried. Property Asset selection remains null; lifecycle, revision history, findings, recommendations, homeowner projections, professional content, and missing-RPC fallback are absent.
+- Tests/checks run: Focused contract, adapter, source-boundary, component, desktop/mobile, role, empty/error/stale/ambiguous, and exact-RPC coverage; Durable Trade Section PostgreSQL validation; backend parity and rollout-ledger checks; TypeScript; Production build; relevant Draft/Job/Property Asset/Home Map regressions; sensitive-value scan; exact changed-file scope; and `git diff --check`.
+- Known risks and follow-up: This is not live runtime proof. No work type or capability is enabled, and the gate is not configured anywhere. A separately reviewed Slice 1B must define a neutral Sandbox-only activation fixture and prove the provider-backed Job workflow before any environment exposure or professional content is considered.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records the completed hidden client foundation while keeping runtime activation, content, capability grants, Field Technician authority, and customer projection active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the new default-off application boundary and the separate activation gate without claiming availability.
+
 - Branch: `codex/trade-pack-foundation-rollout-reconciliation`
 - Starting main SHA: `25ac4e5c13a7f7041f7f1467695a96b029c7913f`
 - Files changed:

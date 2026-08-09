@@ -260,6 +260,11 @@ import { DraftJobComposer } from './features/jobs/DraftJobComposer';
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
+import { TradeSectionJobPanel } from './features/trade-sections/TradeSectionJobPanel';
+import {
+  DURABLE_TRADE_SECTIONS_UI_ENABLED,
+  shouldMountTradeSectionJobPanel,
+} from './features/trade-sections/tradeSectionAvailability';
 import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
 import { contractorJobsNeedsAttentionCount } from './features/work/contractorWorkSelectors';
@@ -42398,6 +42403,29 @@ function ContractorDashboard({
               : null;
             const linkedCalendarOccurrenceForJob = linkedCalendarEventJobLinkForJob?.occurrence_starts_at ?? linkedStandaloneCalendarEventForJob?.starts_at ?? null;
             const scheduledAtForJob = linkedVisitEventForJob?.scheduled_at ?? linkedCalendarOccurrenceForJob ?? null;
+            const activeTradeSectionJobStatus = inspectionJobStatus(activeInspection);
+            const renderTradeSectionJobPanel = () => (
+              supabase
+              && contractor?.id
+              && shouldMountTradeSectionJobPanel({
+                enabled: DURABLE_TRADE_SECTIONS_UI_ENABLED,
+                role: currentContractorTeamRole,
+                jobStatus: activeTradeSectionJobStatus,
+                recordStatus: activeInspection.status,
+              })
+                ? (
+                    <TradeSectionJobPanel
+                      client={supabase}
+                      contractorId={contractor.id}
+                      jobId={activeInspection.id}
+                      jobStatus={activeTradeSectionJobStatus}
+                      recordStatus={activeInspection.status}
+                      role={currentContractorTeamRole}
+                      enabled={DURABLE_TRADE_SECTIONS_UI_ENABLED}
+                    />
+                  )
+                : null
+            );
             const renderJobCardHeader = () => (
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 sm:px-5">
@@ -42671,6 +42699,8 @@ function ContractorDashboard({
 
                   {renderJobCardHeader()}
 
+                  {renderTradeSectionJobPanel()}
+
                   <div className="space-y-4">
                     {renderContractorJobWorkflowThread(activeInspection)}
 
@@ -42886,6 +42916,8 @@ function ContractorDashboard({
                 </button>
 
                 {renderJobCardHeader()}
+
+                {renderTradeSectionJobPanel()}
 
                 {renderContractorJobWorkflowThread(activeInspection)}
 

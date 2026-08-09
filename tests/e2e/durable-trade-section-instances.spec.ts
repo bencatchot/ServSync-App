@@ -72,21 +72,24 @@ test.describe('Durable Trade Section Instances v1', () => {
     expect(sql).toContain('and revision.contractor_id = v_contractor_id');
   });
 
-  test('keeps the foundation hidden and compatible with unmigrated Production and Demo clients', () => {
+  test('keeps the runtime behind its strict source gate and outside shared types', () => {
     const app = source('src/App.tsx');
     const clientSource = source('src/types.ts');
+    const availability = source('src/features/trade-sections/tradeSectionAvailability.ts');
+    const adapter = source('src/features/trade-sections/tradeSectionAdapter.ts');
 
     for (const rpc of [
       'servsync_create_trade_section_instance',
       'servsync_list_trade_section_instances',
-      'servsync_list_trade_section_revisions',
-      'servsync_set_trade_section_lifecycle',
       'servsync_update_trade_section_values',
     ]) {
-      expect(app).not.toContain(rpc);
+      expect(adapter).toContain(rpc);
       expect(clientSource).not.toContain(rpc);
     }
-    expect(app).not.toContain('Trade Section');
+    expect(adapter).not.toContain('servsync_list_trade_section_revisions');
+    expect(adapter).not.toContain('servsync_set_trade_section_lifecycle');
+    expect(availability).toContain("VITE_DURABLE_TRADE_SECTIONS_UI_ENABLED === 'true'");
+    expect(app).toContain('DURABLE_TRADE_SECTIONS_UI_ENABLED');
     expect(app).not.toContain('No Cooling');
   });
 

@@ -60,6 +60,14 @@ The first zero-history Sandbox application exposed Supabase's trusted `extension
 
 All three environments now share the exact foundation. Demo and Production each retained zero section instances, zero section revisions, zero capability grants, and zero enabled work types; Sandbox remains equally inert. Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES` with the exact Demo scenario group. Production versus Sandbox remains the expected `FAIL` with only Project Collaboration's 297 approved additions and the same 22 unrelated supported-schema findings. The former durable-section Sandbox exception group was retired after exact catalog/security correspondence was verified.
 
+## Runtime Slice 1A
+
+Runtime Slice 1A adds a hidden Job-detail client integration behind exact source gate `VITE_DURABLE_TRADE_SECTIONS_UI_ENABLED === 'true'`. The gate defaults off and is not configured in Sandbox, Demo, Production, Preview, or local repository configuration. Gate-off, Field Technician, inactive, homeowner, closed, completed, and finalized contexts do not mount the panel or issue Trade Section RPCs.
+
+The client uses only available-work-type discovery, exact-Job instance listing, idempotent Job creation, and expected-revision value updates. Owner, active Admin, and Office receive mutation controls; Viewer receives exact-Job read-only presentation. Schema-v1 `readings` and `tests` support number, text, boolean, and choice fields. Findings, recommendations, lifecycle actions, revision-history UI, Draft/Estimate/property-only entry points, and Property Asset selection are not included. Unsupported or malformed definitions and responses fail closed. Stale updates preserve unsaved local input until explicit reload, and an ambiguous mutation is never automatically retried.
+
+This source integration is not runtime activation. No work type or capability is enabled, no professional content exists, and the gate remains unset. A later Slice 1B requires separate approval for a neutral Sandbox-only definition/capability fixture, authenticated browser proof, cleanup, and any exposure decision.
+
 ## Deferred Work
 
-This slice does not implement visible Trade Pack or Property Asset controls, professional HVAC content, Field Technician assignment access, homeowner/customer projections, reports, PDFs, readings UI, findings/recommendation conversion, equipment passports, reminders, service plans, or runtime client adoption. Those remain later bounded product slices.
+The foundation and hidden Slice 1A do not implement visible Trade Pack or Property Asset controls, professional HVAC content, Field Technician assignment access, homeowner/customer projections, reports, PDFs, findings/recommendation conversion, equipment passports, reminders, service plans, or activated runtime access. Those remain later bounded product slices.
