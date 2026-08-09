@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-08
 
+- Branch: `codex/property-asset-category-compatibility-v1`
+- Starting main SHA: `7336ec4d735fe64f9a4e775b51518c7b78887235`
+- Files changed:
+  - `src/propertyAssetAdapter.ts`
+  - `tests/e2e/property-asset-client-compatibility.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Property_Asset_Bridge_v1.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Corrected the hidden Property Asset compatibility adapter so a recognized historical `asset_category` is compared with `asset_kind` through the same case-insensitive, trim-aware mapping used by the reviewed bridge migration. The adapter preserves the exact returned category string while continuing to reject unknown categories, unknown kinds, conflicting recognized identities, malformed bridge payloads, and every non-exact fallback condition.
+- Compatibility boundary: The live Demo asset remains unchanged at UUID `dd0b383d-5583-49eb-9edf-69443fb5cd35`, category `plumbing`, type `water_heater`, and legacy fingerprint `a298adf8759f4e1c384804b071a68a94`; its expected migrated bridge payload now validates without rewriting category casing. Exact named `PGRST202` remains the only legacy-table fallback, so current unmigrated Production and Demo behavior is unchanged and ambiguous mutations are never replayed.
+- Tests/checks run: Focused 28-case adapter regression; 21 Property Asset, Assets & Systems, home-assets foundation, and Durable Trade Section source-contract checks; all three disposable PostgreSQL 16 foundation validators; backend parity tests; rollout-ledger validation; typecheck; Production build; focused lint with the inherited incompatible rule disabled; migration hashes; exact changed-file scope; sensitive-value scan; and `git diff --check`.
+- Known risks and follow-up: Production and Demo still lack all three foundation migrations. A read-only post-deployment readiness review must re-prove the exact migration chain, live catalogs, Demo asset preservation, and inert capability state before any separately authorized SQL rollout.
+- Scope boundary: Source, focused tests, and active planning documentation only. No migration, SQL application, database data, environment, flag, capability, work type, Trade Pack UI, Stripe configuration, or manual deployment is included. The three-foundation Demo/Production rollout remains separately approval-gated after post-deployment read-only readiness review.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 records the corrected historical-category compatibility guard while retaining the separate controlled foundation rollout and all visible Trade Pack work as active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the adapter's category-preservation and strict normalized identity comparison required before the separately authorized database rollout.
+
 - Branch: `codex/property-asset-bridge-client-compatibility-v1`
 - Starting main SHA: `0c9b1d69251384f8fc4c7f40df85b4e9401baed4`
 - Files changed:

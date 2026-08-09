@@ -4,6 +4,8 @@
 
 Property Asset Bridge v1 is a hidden backend foundation installed only in ServSync Sandbox. It extends the existing canonical `public.home_assets` identity; it does not create a second customer, property, asset, Draft, Job, or history system. The unchanged Assets & Systems UI now uses a temporary dual-schema adapter: each operation attempts the bridge RPC first and uses the historical direct-table contract only when PostgREST conclusively reports that exact RPC absent. Sandbox therefore uses the bridge path, while Production and Demo remain compatible through the legacy fallback until their rollout is separately authorized.
 
+The compatibility adapter validates a bridge row's historical `asset_category` against `asset_kind` through the migration's existing case-insensitive, trim-aware category mapping and preserves the exact category string returned by the database. This accepts recognized historical casing such as Demo's lowercase `plumbing` row without turning category and kind into independent allowlist checks: unknown categories, unknown kinds, conflicting recognized identities, missing values, and malformed successful RPC payloads still fail closed and never enter the legacy fallback.
+
 The bridge establishes this future-safe relationship:
 
 `Customer -> Property -> Property Asset -> future Draft/Job association -> historical work record`
