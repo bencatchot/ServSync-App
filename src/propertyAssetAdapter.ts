@@ -144,7 +144,7 @@ const normalizeAsset = (
 
   const assetKind = requireString(value.asset_kind, 'asset kind').toLowerCase();
   if (!ASSET_KINDS.has(assetKind)) throw new Error('Property asset response has an unknown asset kind.');
-  if (normalized.asset_category !== ASSET_CATEGORY_BY_KIND[assetKind as keyof typeof ASSET_CATEGORY_BY_KIND]) {
+  if (assetKindFromCategory(normalized.asset_category) !== assetKind) {
     throw new Error('Property asset response has a conflicting asset kind and category.');
   }
   const revisionNumber = value.revision_number;

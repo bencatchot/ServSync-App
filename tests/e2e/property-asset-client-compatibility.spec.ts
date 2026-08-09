@@ -12,6 +12,10 @@ const HOME_ID = '10000000-0000-4000-8000-000000000001';
 const OTHER_HOME_ID = '10000000-0000-4000-8000-000000000002';
 const ASSET_ID = '50000000-0000-4000-8000-000000000001';
 const ACTOR_ID = '20000000-0000-4000-8000-000000000001';
+const DEMO_HOME_ID = '05b838dd-6642-48f0-a0f1-90812911a8d5';
+const DEMO_ROOM_ID = 'dbad485e-8651-41e4-b17b-521fc3c1cb8a';
+const DEMO_ASSET_ID = 'dd0b383d-5583-49eb-9edf-69443fb5cd35';
+const DEMO_ACTOR_ID = '313767d5-7183-422e-9200-ceea6c42870b';
 
 type Result = { data: unknown; error: unknown };
 type Call = { kind: 'rpc' | 'legacy'; name: string; args: unknown[] };
@@ -66,6 +70,33 @@ const legacyAsset = (overrides: Record<string, unknown> = {}) => {
   }
   return value;
 };
+
+const migratedDemoAsset = (overrides: Record<string, unknown> = {}) => ({
+  id: DEMO_ASSET_ID,
+  home_id: DEMO_HOME_ID,
+  local_home_id: null,
+  home_room_id: DEMO_ROOM_ID,
+  asset_kind: 'plumbing',
+  asset_category: 'plumbing',
+  asset_type: 'water_heater',
+  name: 'Existing 40-gallon water heater',
+  location_label: null,
+  manufacturer: 'DemoHome',
+  model: 'WH-40-FICTIONAL',
+  serial_identifier: null,
+  install_date: '2019-07-15',
+  approximate_age_years: null,
+  warranty_expires_on: '2029-07-12',
+  customer_safe_description: null,
+  notes: 'Fictional asset record for Demo Mode. Serial numbers and real property details are intentionally omitted.',
+  lifecycle_status: 'active',
+  archived_at: null,
+  revision_number: 1,
+  created_by: DEMO_ACTOR_ID,
+  created_at: '2026-04-29T16:29:25.588+00:00',
+  updated_at: '2026-04-29T16:29:25.588+00:00',
+  ...overrides,
+});
 
 const writeInput = (overrides: Partial<PropertyAssetWriteInput> = {}): PropertyAssetWriteInput => ({
   homeId: HOME_ID,
@@ -133,6 +164,101 @@ test.describe('Property Asset Bridge client compatibility', () => {
     expect(assets[0]).toMatchObject({ id: ASSET_ID, revision_number: 3, lifecycle_status: 'active' });
     expect(rpcCalls(calls, 'servsync_list_property_assets')).toHaveLength(1);
     expect(legacyCalls(calls)).toHaveLength(0);
+  });
+
+  test('accepts the exact migrated Demo asset while preserving its historical category identity', async () => {
+    const { client, calls } = mockClient({ rpc: () => ({ data: [migratedDemoAsset()], error: null }) });
+    const assets = await createPropertyAssetAdapter(client).list([DEMO_HOME_ID]);
+
+    expect(assets).toEqual([expect.objectContaining({
+      id: DEMO_ASSET_ID,
+      home_id: DEMO_HOME_ID,
+      home_room_id: DEMO_ROOM_ID,
+      asset_category: 'plumbing',
+      asset_kind: 'plumbing',
+      asset_type: 'water_heater',
+      name: 'Existing 40-gallon water heater',
+      manufacturer: 'DemoHome',
+      model: 'WH-40-FICTIONAL',
+      install_date: '2019-07-15',
+      warranty_expires_on: '2029-07-12',
+      notes: 'Fictional asset record for Demo Mode. Serial numbers and real property details are intentionally omitted.',
+      lifecycle_status: 'active',
+      archived_at: null,
+      revision_number: 1,
+      created_at: '2026-04-29T16:29:25.588+00:00',
+      updated_at: '2026-04-29T16:29:25.588+00:00',
+    })]);
+    expect(legacyCalls(calls)).toHaveLength(0);
+  });
+
+  for (const category of ['Plumbing', 'PLUMBING', 'pLuMbInG', ' plumbing ']) {
+    test(`accepts recognized category mapping ${JSON.stringify(category)} and preserves the returned value`, async () => {
+      const { client, calls } = mockClient({
+        rpc: () => ({ data: [migratedDemoAsset({ asset_category: category })], error: null }),
+      });
+      const [asset] = await createPropertyAssetAdapter(client).list([DEMO_HOME_ID]);
+
+      expect(asset.asset_category).toBe(category);
+      expect(asset.asset_kind).toBe('plumbing');
+      expect(legacyCalls(calls)).toHaveLength(0);
+    });
+  }
+
+  test('keeps recognized category and kind identities strictly paired', async () => {
+    for (const [payload, message] of [
+      [{ asset_category: 'Plumbing', asset_kind: 'hvac' }, 'conflicting asset kind'],
+      [{ asset_category: 'Boiler', asset_kind: 'plumbing' }, 'not supported'],
+      [{ asset_category: 'Plumbing', asset_kind: 'steam' }, 'unknown asset kind'],
+      [{ asset_category: 'Plumb-ing', asset_kind: 'plumbing' }, 'not supported'],
+    ] as const) {
+      const { client, calls } = mockClient({
+        rpc: () => ({ data: [migratedDemoAsset(payload)], error: null }),
+      });
+      await expect(createPropertyAssetAdapter(client).list([DEMO_HOME_ID])).rejects.toThrow(message);
+      expect(legacyCalls(calls)).toHaveLength(0);
+    }
+  });
+
+  test('rejects missing, null, non-string, and blank category or kind values without fallback', async () => {
+    const invalidPayloads: Record<string, unknown>[] = [
+      { asset_category: null },
+      { asset_category: 42 },
+      { asset_category: '   ' },
+      { asset_kind: null },
+      { asset_kind: 42 },
+      { asset_kind: '   ' },
+    ];
+    const missingCategory = migratedDemoAsset();
+    delete missingCategory.asset_category;
+    const missingKind = migratedDemoAsset();
+    delete missingKind.asset_kind;
+    invalidPayloads.push(missingCategory, missingKind);
+
+    for (const payload of invalidPayloads) {
+      const data = 'id' in payload ? payload : migratedDemoAsset(payload);
+      const { client, calls } = mockClient({ rpc: () => ({ data: [data], error: null }) });
+      await expect(createPropertyAssetAdapter(client).list([DEMO_HOME_ID])).rejects.toThrow(/invalid asset (category|kind)/);
+      expect(legacyCalls(calls)).toHaveLength(0);
+    }
+  });
+
+  test('accepts exact empty bridge results and retains asset-age bounds', async () => {
+    const empty = mockClient({ rpc: () => ({ data: [], error: null }) });
+    await expect(createPropertyAssetAdapter(empty.client).list([HOME_ID])).resolves.toEqual([]);
+    expect(legacyCalls(empty.calls)).toHaveLength(0);
+
+    for (const age of [0, 200]) {
+      const valid = mockClient({ rpc: () => ({ data: [bridgeAsset({ approximate_age_years: age })], error: null }) });
+      await expect(createPropertyAssetAdapter(valid.client).list([HOME_ID])).resolves.toEqual([
+        expect.objectContaining({ approximate_age_years: age }),
+      ]);
+    }
+    for (const age of [-1, 201]) {
+      const invalid = mockClient({ rpc: () => ({ data: [bridgeAsset({ approximate_age_years: age })], error: null }) });
+      await expect(createPropertyAssetAdapter(invalid.client).list([HOME_ID])).rejects.toThrow('invalid approximate age');
+      expect(legacyCalls(invalid.calls)).toHaveLength(0);
+    }
   });
 
   test('uses one legacy multi-property list only for the exact missing-RPC response', async () => {
