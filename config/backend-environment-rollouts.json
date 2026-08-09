@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-08",
+  "updatedOn": "2026-08-09",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -210,12 +210,12 @@
           "reason": "Exact SHA-256 419d27426b7d336927642ae6a2a2632db4be564937849c58ad25ef60a923073c was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 18:44:15Z through 18:44:17Z. Catalog, role, tenant, downgrade, rollback, and zero-grant validation passed; no work type is enabled."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Hidden provider-neutral foundation requires a later separately authorized Production rollout."
+          "status": "Applied",
+          "reason": "Exact SHA-256 419d27426b7d336927642ae6a2a2632db4be564937849c58ad25ef60a923073c was applied independently to Production uqgtheclhxqlnjpfmheq on 2026-08-09 from 13:53:15.549Z through 13:53:16.156Z. Catalog, postgres ownership, forced-RLS/policy-free tables, fixed-path RPC grants, inert counts, and captured business-data fingerprints were preserved; no capability grant or work type was enabled."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo should follow the Production-supported schema only in a later separately authorized parity rollout."
+          "status": "Applied",
+          "reason": "Exact SHA-256 419d27426b7d336927642ae6a2a2632db4be564937849c58ad25ef60a923073c was applied independently to Demo bdytwgejqnlblhrnqxkp on 2026-08-09; the database statement was accepted at 11:24:04.861Z. Catalog/security correspondence and inert-state validation passed with zero capability grants and zero enabled work types."
         }
       }
     },
@@ -228,12 +228,12 @@
           "reason": "Final corrected SHA-256 31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 21:52:44Z through 21:52:47Z after the zero-row prior bridge was safely rolled back. Catalog, ownership, forced-RLS, ACL, active/archived legacy timestamp preservation, role/property/tenant, local-claim continuity, revision immutability, concurrency, lifecycle, service_role direct-write/truncate denial, rollback-only behavior, and zero-residue validation passed; no Trade Pack capability or work type was enabled."
         },
         "production": {
-          "status": "Pending",
-          "reason": "The RPC-first compatibility client preserves the current Production Assets & Systems workflow through an exact PGRST202 missing-routine-only legacy fallback. The hidden bridge and its shared home_assets security/definition changes still require a separately authorized migration and validation; client compatibility is not proof of rollout."
+          "status": "Applied",
+          "reason": "Final corrected SHA-256 31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b was applied independently to Production uqgtheclhxqlnjpfmheq on 2026-08-09 from 13:53:40.456Z through 13:53:41.000Z. Production retained zero assets and zero asset revisions; the bridge RPC returned the expected empty result, direct authenticated table access was denied, and captured business-data fingerprints were unchanged."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "The RPC-first compatibility client preserves the current Demo Assets & Systems workflow and its legacy asset through the exact missing-routine-only fallback. Demo bridge status remains Pending until a separately authorized Demo-first, Production-second foundation rollout and validation."
+          "status": "Applied",
+          "reason": "Final corrected SHA-256 31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b was applied independently to Demo bdytwgejqnlblhrnqxkp on 2026-08-09; the database statement was accepted at 11:24:45.347Z. Curated asset dd0b383d-5583-49eb-9edf-69443fb5cd35 retained its UUID, home/room links, lowercase plumbing category, water_heater type, active lifecycle, revision 1, and exact legacy-field fingerprint a298adf8759f4e1c384804b071a68a94. Immediate and delayed RPC-first UI observations passed without layout mutation or legacy fallback."
         }
       }
     },
@@ -246,12 +246,12 @@
           "reason": "Final independently reviewed SHA-256 49c8b82a5b7af622178929a12f1d6519b00c2c95d71f0969efa2c2345824bb75 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-08 at 23:07:24Z through 23:07:25Z after the zero-history prior version was removed through the guarded rollback. Catalog, RPC/role, contractor-bound exact-work listing, cross-contractor/cross-property lineage denial, Estimate/Job rewrite denial, idempotent workflow retry, value, concurrency, lifecycle, capability downgrade/revocation, and rollback-only behavior passed; zero instances, revisions, ordinary capability grants, and enabled work types remain."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Hidden Trade Pack and Property Asset prerequisites plus this durable runtime foundation require a later separately authorized Production migration sequence. The current client has no section-RPC dependency."
+          "status": "Applied",
+          "reason": "Final independently reviewed SHA-256 49c8b82a5b7af622178929a12f1d6519b00c2c95d71f0969efa2c2345824bb75 was applied independently to Production uqgtheclhxqlnjpfmheq on 2026-08-09 from 13:56:43.234Z through 13:56:43.853Z. Ownership, forced RLS, ACL/RPC boundaries, and inert counts passed with zero section instances, revisions, capability grants, or enabled work types; no visible or billable behavior was activated."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo should follow the Production-supported Trade Pack, Property Asset, and durable section schema only through a later separately authorized parity rollout."
+          "status": "Applied",
+          "reason": "Final independently reviewed SHA-256 49c8b82a5b7af622178929a12f1d6519b00c2c95d71f0969efa2c2345824bb75 was applied independently to Demo bdytwgejqnlblhrnqxkp on 2026-08-09; the database statement was accepted at 11:25:23.320Z. Ownership, forced RLS, ACL/RPC boundaries, and immediate plus delayed inert-state observations passed with zero section instances, revisions, capability grants, or enabled work types."
         }
       }
     }

@@ -2,7 +2,7 @@
 
 ## Status And Boundary
 
-Property Asset Bridge v1 is a hidden backend foundation installed only in ServSync Sandbox. It extends the existing canonical `public.home_assets` identity; it does not create a second customer, property, asset, Draft, Job, or history system. The unchanged Assets & Systems UI now uses a temporary dual-schema adapter: each operation attempts the bridge RPC first and uses the historical direct-table contract only when PostgREST conclusively reports that exact RPC absent. Sandbox therefore uses the bridge path, while Production and Demo remain compatible through the legacy fallback until their rollout is separately authorized.
+Property Asset Bridge v1 is a hidden backend foundation installed in ServSync Sandbox, Demo, and Production. It extends the existing canonical `public.home_assets` identity; it does not create a second customer, property, asset, Draft, Job, or history system. Assets & Systems uses a temporary dual-schema adapter: each operation attempts the bridge RPC first and uses the historical direct-table contract only when PostgREST conclusively reports that exact RPC absent. All three environments now use the bridge path; the exact fallback remains only as a compatibility guard.
 
 The compatibility adapter validates a bridge row's historical `asset_category` against `asset_kind` through the migration's existing case-insensitive, trim-aware category mapping and preserves the exact category string returned by the database. This accepts recognized historical casing such as Demo's lowercase `plumbing` row without turning category and kind into independent allowlist checks: unknown categories, unknown kinds, conflicting recognized identities, missing values, and malformed successful RPC payloads still fail closed and never enter the legacy fallback.
 
@@ -83,23 +83,23 @@ Future Trade Section creation may require an active exact capability. Existing a
 
 ## Rollout And Rollback
 
-Final corrected migration `servsync-property-asset-bridge.sql` SHA-256 `31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b` was applied only to Sandbox `zpzdkoaubyjtsomccxya` on 2026-08-08 at `21:52:44Z` through `21:52:47Z`, after the zero-row prior bridge was safely rolled back. The correction preserves original active and archived legacy timestamps during schema backfill, binds direct table mutation guards to the actual invoking database role, and blocks non-owner truncation, so preserved `service_role` ACLs cannot forge private RPC context or erase durable history. Production and Demo remain Pending. The compatibility client works before and after that migration, but its legacy fallback must remain until a separately authorized rollout and post-deployment review prove both environments migrated.
+Final corrected migration `servsync-property-asset-bridge.sql` SHA-256 `31e787b0d9317a84ed93e94dee3f98af7ffba379f80b06b31a0b7eee76473d8b` was applied to Sandbox `zpzdkoaubyjtsomccxya` on 2026-08-08 at `21:52:44Z` through `21:52:47Z`, to Demo `bdytwgejqnlblhrnqxkp` on 2026-08-09 with the statement accepted at `11:24:45.347Z`, and to Production `uqgtheclhxqlnjpfmheq` from `13:53:40.456Z` through `13:53:41.000Z`. The correction preserves original active and archived legacy timestamps during schema backfill, binds direct table mutation guards to the actual invoking database role, and blocks non-owner truncation, so preserved `service_role` ACLs cannot forge private RPC context or erase durable history. Demo's curated asset retained UUID `dd0b383d-5583-49eb-9edf-69443fb5cd35`, lowercase category `plumbing`, type `water_heater`, room/property binding, active lifecycle, revision 1, and fingerprint `a298adf8759f4e1c384804b071a68a94`; Production retained zero assets and revisions. Immediate and delayed Demo observations and Production empty-state checks used the bridge RPC without legacy fallback or layout mutation.
 
 The exact rollback is appropriate only before durable bridge data exists. It refuses to proceed when assets or revisions exist and restores the historical `home_assets` ownership, ACL, policy, trigger, and foreign-key contract only from the exact expected bridge state. After durable use begins, corrections must be additive forward migrations; history must not be destroyed to roll back a feature.
 
-Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`. After Durable Trade Section Instances v1, Production versus Sandbox remains `FAIL`: 761 exact approved additions include Project Collaboration, Trade Pack Domain Contracts, Property Asset Bridge, and Durable Trade Section additions, while the same 34 findings remain visible. Twelve are expected shared `home_assets` definition/security differences caused by this Sandbox-only bridge; the prior 22 unrelated Stripe, function, and policy findings remain unresolved.
+Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`. Production versus Sandbox remains `FAIL`: only Project Collaboration's 297 additions remain approved, while the same 22 unrelated function, policy, and legacy-schema findings remain visible. The former 12 Property Asset differences are now supported schema and the bridge exception group was removed.
 
 ## Deferred Work
 
 This slice does not implement:
 
 - visible runtime Draft or Job Trade Section controls;
-- Production/Demo bridge SQL rollout, post-rollout verification, and eventual removal of the temporary legacy fallback;
+- eventual removal of the temporary legacy fallback after a separately reviewed compatibility window;
 - Field Technician assignment-scoped mutation;
 - visible Property Asset or HVAC workflows;
 - HVAC No Cooling fields or professional content;
 - readings, tests, findings, recommendations, conversion, reports, PDFs, reminders, service plans, or equipment passports;
 - duplicate-asset correction or merge;
-- Production or Demo migration.
+- visible runtime integration or capability activation.
 
-Durable Trade Section Instances v1 now provides the hidden Sandbox-only optional asset association while preserving accepted asset revision history. The next action is an independent post-deployment compatibility readiness review followed by a separately authorized Demo-first, Production-second foundation rollout. Visible runtime integration remains pending and is not started by the compatibility client. PR #256 must rebase onto the finalized adapter and preserve it before that unrelated Invoice work can be considered for merge.
+Durable Trade Section Instances v1 provides the hidden optional asset association while preserving accepted asset revision history. Visible runtime integration remains pending and is not started by the compatibility client or backend rollout. PR #256 must rebase onto the finalized adapter and preserve it before that unrelated Invoice work can be considered for merge.

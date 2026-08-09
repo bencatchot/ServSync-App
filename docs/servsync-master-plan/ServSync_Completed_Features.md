@@ -1,8 +1,8 @@
 # ServSync Completed Features
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
-Last reconciled against `origin/main` at `22502bd7c48912c49fbf1ad5ded90b5796609a31`.
+Last reconciled against `origin/main` at `25ac4e5c13a7f7041f7f1467695a96b029c7913f`.
 
 ## Purpose
 
@@ -43,7 +43,7 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 - FB-002 and FB-024: Estimate Defaults & Templates v1 is complete; Price Book / Reusable Estimate Content Maturity remains active.
 - FB-004 and FB-027: Follow-Up Lite is complete; reporting beyond existing attention queues remains active.
 - FB-007: Draft-first Inspection Path Completion v1 is complete in Production; broader inspection/checklist maturity remains active under FB-007.
-- FB-007 Trade Pack boundary: Trade Pack Domain Contracts v1, Property Asset Bridge v1, and Durable Trade Section Instances v1 are hidden Sandbox-only foundations within the active backlog, not completed user-facing Trade Pack milestones. The section foundation preserves exact definition/asset snapshots, canonical Draft/Estimate/Job and claim lineage, strict values, append-only revisions, concurrency, and capability downgrade behavior. The Property Asset compatibility client is complete: it uses bridge RPCs where installed and falls back to the legacy table only for the exact missing-routine response, without changing the visible Assets & Systems UI. Production/Demo foundation rollout, eventual fallback removal, reviewed HVAC content, assignment-scoped Field Technician access, visible workflows, and customer projections remain active work.
+- FB-007 Trade Pack boundary: Trade Pack Domain Contracts v1, Property Asset Bridge v1, and Durable Trade Section Instances v1 are completed hidden backend foundations in Sandbox, Demo, and Production, not completed user-facing Trade Pack milestones. The exact ordered rollout preserved Demo's curated asset and Production's zero-asset state, left all capability/work-type/section counts inert, and kept direct-table and homeowner raw-section access denied. The Property Asset compatibility client uses bridge RPCs in every environment and retains the exact missing-routine-only legacy fallback as a temporary guard. Reviewed HVAC content, assignment-scoped Field Technician access, visible workflows, customer projections, runtime activation, and eventual fallback removal remain active work.
 - FB-006, FB-021, and FB-022: Appointment Confirmation foundation v1 is complete; true contractor-controlled online booking remains active.
 - FB-010 and FB-025: workflow communication foundations exist; broader workflow-scoped communication remains active.
 - FB-013 and FB-028: provider-neutral integration foundations exist; accounting export and QuickBooks readiness remains active.

@@ -87,12 +87,12 @@ Owner, active Admin, Office, Field Technician, and Viewer members may read their
 
 ## Durable Instance Rules
 
-Durable Trade Section Instances v1 now preserves these boundaries in its hidden Sandbox-only runtime foundation:
+Durable Trade Section Instances v1 preserves these boundaries in the hidden backend foundation now shared by Sandbox, Demo, and Production:
 
 - sections are ordered children of the existing Draft or Job;
 - multiple trades may coexist in one Draft, Estimate, Job, and Invoice;
 - Property Asset Bridge v1 extends the canonical `home_assets` identity with generic customer-safe fields, local-property claim continuity, append-only revisions, exact-revision concurrency, and property-derived authorization;
-- the unchanged Assets & Systems UI uses an RPC-first compatibility adapter with an exact missing-routine-only legacy fallback until the coordinated Production/Demo bridge rollout is complete;
+- Assets & Systems uses an RPC-first compatibility adapter; all three environments now resolve the bridge RPC, while the exact missing-routine-only legacy fallback remains a temporary compatibility guard;
 - a section may reference an exact asset UUID and accepted revision without making the asset capability-dependent;
 - property assets and history remain independent of Trade Pack entitlement and billing;
 - Field Technician access remains deferred until the canonical Work model provides an assignment-scoped boundary; contractor-wide access is not substituted;
@@ -110,8 +110,8 @@ The following remain outside the combined hidden foundations:
 - recommendation conversion;
 - reports, PDFs, or history projection;
 - Stripe product/price mapping or Trade Pack billing;
-- Production or Demo rollout.
+- visible runtime activation or contractor capability rollout.
 
-Property Asset Bridge v1 and Durable Trade Section Instances v1 remain separate hidden Sandbox-only foundations. The compatibility client does not activate either foundation. An independent post-deployment readiness review and separately authorized Demo-first, Production-second foundation rollout remain required before removing the legacy asset fallback or beginning visible runtime integration.
+Property Asset Bridge v1 and Durable Trade Section Instances v1 remain separate hidden foundations. On 2026-08-09 the exact reviewed chain was observed in Demo, then applied independently to Production. Demo preserved its curated asset and initial revision; Production remained at zero assets and revisions. Both environments retained zero Trade Section instances, revisions, capability grants, and enabled work types. The compatibility client does not activate visible Trade Pack behavior, and the legacy fallback remains until a later bounded removal is justified.
 
-Current parity evidence remains explicit: Production versus Demo is `PASS WITH INTENTIONAL DIFFERENCES`; Production versus Sandbox is `FAIL` with 761 exact approved additions and the same 34 visible findings. Durable sections add an exact-fingerprinted Sandbox group without hiding the 12 Property Asset bridge differences or 22 unrelated existing findings.
+Current parity evidence remains explicit: Production versus Demo is `PASS WITH INTENTIONAL DIFFERENCES`; Production versus Sandbox is `FAIL` with only Project Collaboration's 297 additions approved and the same 22 unrelated supported-schema findings visible. The three Trade Pack foundation exception groups were retired after exact three-environment correspondence was verified.
