@@ -67,11 +67,14 @@ $$;
 
 begin;
 
-select set_config(
-  'request.jwt.claim.sub',
-  (select id::text from public.profiles where role = 'contractor' order by id limit 1),
-  true
-);
+do $$
+declare v_user_id uuid;
+begin
+  select id into v_user_id from public.profiles where role = 'contractor' order by id limit 1;
+  if v_user_id is null then raise exception 'Sandbox contractor validation identity is unavailable.'; end if;
+  perform set_config('request.jwt.claim.sub', v_user_id::text, true);
+end;
+$$;
 set local role authenticated;
 
 do $$
@@ -97,11 +100,14 @@ end;
 $$;
 
 reset role;
-select set_config(
-  'request.jwt.claim.sub',
-  (select id::text from public.profiles where role = 'homeowner' order by id limit 1),
-  true
-);
+do $$
+declare v_user_id uuid;
+begin
+  select id into v_user_id from public.profiles where role = 'homeowner' order by id limit 1;
+  if v_user_id is null then raise exception 'Sandbox homeowner validation identity is unavailable.'; end if;
+  perform set_config('request.jwt.claim.sub', v_user_id::text, true);
+end;
+$$;
 set local role authenticated;
 do $$
 begin
@@ -114,11 +120,14 @@ end;
 $$;
 
 reset role;
-select set_config(
-  'request.jwt.claim.sub',
-  (select id::text from public.profiles where role = 'platform_admin' order by id limit 1),
-  true
-);
+do $$
+declare v_user_id uuid;
+begin
+  select id into v_user_id from public.profiles where role = 'platform_admin' order by id limit 1;
+  if v_user_id is null then raise exception 'Sandbox platform-admin validation identity is unavailable.'; end if;
+  perform set_config('request.jwt.claim.sub', v_user_id::text, true);
+end;
+$$;
 set local role authenticated;
 
 do $$
