@@ -344,6 +344,24 @@
           "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 21:07:08.739Z through 21:07:09.034Z. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-v2 creation/replay, omitted-version v1 compatibility, conflicting/unsupported-version rejection, expanded-audience Truth Pack v3 ingestion, platform-admin authority, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Demo retained one internal profile and revision with zero plans, plan revisions, packages, content records, status events, or validation residue."
         }
       }
+    },
+    {
+      "id": "marketing-planner-coherence-relevance-v3",
+      "artifact": "servsync-marketing-planner-coherence-relevance-v3.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-10 from 21:44:21.151Z through 21:44:21.574Z. The additive postgres-owned fixed-path SECURITY DEFINER v3 RPC, exact authenticated-only grant, v1/v2 function preservation, version enforcement, platform-admin creation/replay, contractor denial, rollback-only cleanup, and zero Marketing data residue passed."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Planner v3 SQL and runtime remain unavailable until a separately authorized migration-first Production rollout."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Planner v3 SQL and runtime remain unavailable until a separately authorized Demo-first rollout."
+        }
+      }
     }
   ]
 }

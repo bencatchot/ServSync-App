@@ -134,6 +134,8 @@ The local validator rejects malformed directions, uncorrected competitor assumpt
 
 Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. Historical v2 packages remain replay-valid with their exact Marketing Direction. New packages may use v3 only in environments whose catalog still matches the exact planner-quality migration; environment rollout alone does not authorize ingestion.
 
+Planner Coherence + Relevance v3 is a planning-only contract and is currently Sandbox-only. It improves which audiences, topics, and roles are recommended but does not create a Marketing Direction or content package. A user must still inspect and deliberately accept or revise the plan, establish the bounded Marketing Direction, validate against the applicable Truth Pack and recipe, and separately authorize ingestion. Demo and Production remain on planner v2 until the additive v3 RPC receives a separately approved migration-first rollout.
+
 ## Fail-Closed Rules
 
 - Never treat a provider/model response as trusted or ready for approval.
