@@ -17,23 +17,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `scripts/validation/validate-marketing-planner-coherence-relevance-v3.sh`
   - `package.json`
   - `config/backend-environment-rollouts.json`
-  - `config/backend-environment-parity.json`
   - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
   - `docs/servsync-master-plan/ServSync_Business_Marketing_Profile_Planning_v1.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Marketing Slice 4B adds deterministic planner v3 so recommendation relevance and specificity precede bounded variety. Generic filler topics fail closed, trade-specific audiences require explicit Profile evidence, recent coverage distinguishes exact from related topics, roles must fit the selected idea, and rationales state the audience/topic reason and role purpose without exposing scores. Historical planner v1/v2 records and the owner-directed plan path remain unchanged.
 - Architecture and security: New recommended plans use one additive `servsync_create_internal_marketing_plan_v3` RPC that derives the internal workspace, actor, current profile, and latest-20 content context server-side. It is `postgres`-owned, `SECURITY DEFINER`, fixed-path, authenticated/platform-admin-only, replay-safe, and unavailable to anon or service-role. The existing planning RPC remains the authority for owner-directed and historical v1/v2 behavior. No direct-table privileges, Plan-to-Direction/content authority, provider, approval, scheduling, or publishing behavior is added.
-- Environment rollout: Exact migration SHA-256 `c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b` was applied only to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T21:44:21.151Z` through `21:44:21.574Z`. Catalog/security and rollback-only v3 create/replay/conflict/version/authorization validation passed with zero residue. Sandbox retained zero plans, revisions, packages, content records, and events. Demo and Production remain pending on planner v2; no configuration or business data changed.
+- Environment rollout: Exact migration SHA-256 `c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b` was applied to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T21:44:21.151Z` through `21:44:21.574Z`, Demo `bdytwgejqnlblhrnqxkp` from `22:07:54Z` through `22:08:02Z`, and Production `uqgtheclhxqlnjpfmheq` from `22:11:21Z` through `22:11:30Z`. Demo passed before Production was touched. Catalog/security and rollback-only v3 create/replay/conflict/version/mode/authorization validation passed with zero residue. Demo retained zero plans, revisions, packages, content records, and events. Production retained exact planner-v1/v2 plans and revisions, two packages, ten content records, sixteen events, and every recorded Marketing and unrelated-business fingerprint. No configuration or business data changed.
 - Tests/checks run: TypeScript; Production build; focused planner/UI Playwright; planner v1/v2 regression; clean PostgreSQL 16 migration chain, historical preservation, ownership/RLS/ACL/RPC, version/replay, contractor denial, repeat-application, and rollback-residue validation; live Sandbox catalog/security and rollback-only checks; backend parity and rollout-ledger validation; JSON/Bash parsing; sensitive-value/scope scans; and `git diff --check`.
-- Known risks and follow-up: Planner v3 is deterministic assistance, not product truth or content generation. Its taxonomy and semantic-overlap rules are intentionally bounded and require future maintenance as strategy vocabulary changes. Demo/Production migration, real plan evaluation, Plan-to-Direction/content handoff, contractor activation, providers, publishing, scheduling, integrations, campaigns, outreach, and analytics remain separately approval-gated.
+- Known risks and follow-up: Planner v3 is deterministic assistance, not product truth or content generation. Its taxonomy and semantic-overlap rules are intentionally bounded and require future maintenance as strategy vocabulary changes. Real plan evaluation, Plan-to-Direction/content handoff, contractor activation, providers, publishing, scheduling, integrations, campaigns, outreach, and analytics remain separately approval-gated.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-037 now records the Sandbox-only planner-v3 quality boundary and the still-pending all-environment rollout and execution capabilities.
+  - REASON: FB-037 now records planner v3 as applied in all environments while keeping every execution capability pending.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
-  - REASON: Records the relevance-first recommendation contract without implying Demo/Production or contractor availability.
+  - REASON: Records the all-environment relevance-first recommendation contract without implying contractor availability or execution authority.
 
 - Branch: `codex/marketing-planner-quality-v2`
 - Starting main SHA: `6cd6f82040c23a0813d62f57c48394dd7a07e3b1`
