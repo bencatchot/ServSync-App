@@ -19,7 +19,6 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `tests/marketing/codex-marketing-package-contract.test.mjs`
   - `tests/sql/codex-assisted-marketing-drafts-validation.sql`
   - `config/backend-environment-rollouts.json`
-  - `config/backend-environment-parity.json`
   - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
   - `docs/MARKETING_PRODUCT_INVENTORY.md`
   - `docs/servsync-master-plan/ServSync_Codex_Assisted_Marketing_Drafts_v1.md`
