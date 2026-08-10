@@ -8,10 +8,33 @@ export const MARKETING_CONTENT_STATUSES = [
 
 export const MARKETING_CONTENT_TYPES = ['social_post', 'email', 'website_copy', 'other'] as const;
 export const MARKETING_CHANNEL_CATEGORIES = ['social', 'email', 'website', 'other'] as const;
+export const MARKETING_PREPARATION_SOURCES = ['manual', 'codex_assisted', 'runtime_ai'] as const;
+export const MARKETING_PREPARATION_AUDIENCES = [
+  'small_contractors',
+  'hvac_contractors',
+  'plumbers',
+  'electricians',
+  'homeowners',
+] as const;
+export const MARKETING_CONTENT_ROLES = [
+  'facebook_instagram_post',
+  'linkedin_post',
+  'educational_post',
+  'feature_highlight',
+  'short_video_concept',
+  'problem_solution_post',
+  'local_contractor_connection',
+  'feature_announcement',
+  'contractor_benefit',
+  'homeowner_benefit',
+] as const;
 
 export type MarketingContentStatus = (typeof MARKETING_CONTENT_STATUSES)[number];
 export type MarketingContentType = (typeof MARKETING_CONTENT_TYPES)[number];
 export type MarketingChannelCategory = (typeof MARKETING_CHANNEL_CATEGORIES)[number];
+export type MarketingPreparationSource = (typeof MARKETING_PREPARATION_SOURCES)[number];
+export type MarketingPreparationAudience = (typeof MARKETING_PREPARATION_AUDIENCES)[number];
+export type MarketingContentRole = (typeof MARKETING_CONTENT_ROLES)[number];
 
 export type MarketingContentItem = {
   id: string;
@@ -34,6 +57,14 @@ export type MarketingContentItem = {
   reviewedBy: string | null;
   reviewedByName: string | null;
   reviewNote: string | null;
+  preparationSource: MarketingPreparationSource;
+  preparationRequestId: string | null;
+  preparationRecipeKey: string | null;
+  truthPackVersion: string | null;
+  preparedAt: string | null;
+  preparationSequence: number | null;
+  intendedAudience: MarketingPreparationAudience | null;
+  contentRole: MarketingContentRole | null;
 };
 
 type RpcResult = { data: unknown; error: unknown };
@@ -91,6 +122,9 @@ function parseItem(value: unknown): MarketingContentItem {
   const status = value.status;
   const contentType = value.content_type;
   const channelCategory = value.channel_category;
+  const preparationSource = value.preparation_source;
+  const intendedAudience = value.intended_audience;
+  const contentRole = value.content_role;
   if (
     typeof value.content_id !== 'string'
     || !UUID_PATTERN.test(value.content_id)
@@ -118,6 +152,19 @@ function parseItem(value: unknown): MarketingContentItem {
     || !isNullableUuid(value.reviewed_by)
     || !isNullableString(value.reviewed_by_name)
     || !isNullableString(value.review_note)
+    || !MARKETING_PREPARATION_SOURCES.includes(preparationSource as MarketingPreparationSource)
+    || !isNullableUuid(value.preparation_request_id)
+    || !isNullableString(value.preparation_recipe_key)
+    || !isNullableString(value.truth_pack_version)
+    || !isNullableTimestamp(value.prepared_at)
+    || !(value.preparation_sequence === null || (
+      typeof value.preparation_sequence === 'number'
+      && Number.isSafeInteger(value.preparation_sequence)
+      && value.preparation_sequence >= 1
+      && value.preparation_sequence <= 7
+    ))
+    || !(intendedAudience === null || MARKETING_PREPARATION_AUDIENCES.includes(intendedAudience as MarketingPreparationAudience))
+    || !(contentRole === null || MARKETING_CONTENT_ROLES.includes(contentRole as MarketingContentRole))
   ) {
     throw malformedError();
   }
@@ -125,6 +172,27 @@ function parseItem(value: unknown): MarketingContentItem {
   if ((value.submitted_at === null) !== (value.submitted_by === null)) throw malformedError();
   if ((value.reviewed_at === null) !== (value.reviewed_by === null)) throw malformedError();
   if (value.review_note !== null && (value.review_note.length < 3 || value.review_note.length > 1000)) throw malformedError();
+  const hasPreparation = preparationSource !== 'manual';
+  if (hasPreparation !== (
+    value.preparation_request_id !== null
+    && typeof value.preparation_recipe_key === 'string'
+    && value.preparation_recipe_key.length > 0
+    && typeof value.truth_pack_version === 'string'
+    && /^servsync-marketing-truth-v[1-9][0-9]*$/.test(value.truth_pack_version)
+    && value.prepared_at !== null
+    && value.preparation_sequence !== null
+    && intendedAudience !== null
+    && contentRole !== null
+  )) throw malformedError();
+  if (!hasPreparation && (
+    value.preparation_request_id !== null
+    || value.preparation_recipe_key !== null
+    || value.truth_pack_version !== null
+    || value.prepared_at !== null
+    || value.preparation_sequence !== null
+    || intendedAudience !== null
+    || contentRole !== null
+  )) throw malformedError();
 
   return {
     id: value.content_id,
@@ -147,6 +215,14 @@ function parseItem(value: unknown): MarketingContentItem {
     reviewedBy: value.reviewed_by,
     reviewedByName: value.reviewed_by_name,
     reviewNote: value.review_note,
+    preparationSource: preparationSource as MarketingPreparationSource,
+    preparationRequestId: value.preparation_request_id,
+    preparationRecipeKey: value.preparation_recipe_key,
+    truthPackVersion: value.truth_pack_version,
+    preparedAt: value.prepared_at,
+    preparationSequence: value.preparation_sequence,
+    intendedAudience: intendedAudience as MarketingPreparationAudience | null,
+    contentRole: contentRole as MarketingContentRole | null,
   };
 }
 

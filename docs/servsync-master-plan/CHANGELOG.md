@@ -6,6 +6,44 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-09
 
+- Branch: `codex/codex-assisted-marketing-drafts-v1`
+- Starting main SHA: `ac7dfbd761f5cf1c74e52a0560575914196e397c`
+- Files changed:
+  - `servsync-codex-assisted-marketing-drafts.sql`
+  - `config/marketing/servsync-marketing-truth-pack.v1.json`
+  - `config/marketing/servsync-marketing-recipes.v1.json`
+  - `config/marketing/codex-marketing-package.schema.json`
+  - `scripts/marketing/marketing-package-contract.mjs`
+  - `scripts/marketing/ingest-codex-marketing-package.mjs`
+  - `scripts/validation/validate-codex-assisted-marketing-drafts.sh`
+  - `src/features/marketing/marketingContent.ts`
+  - `src/features/marketing/MarketingContentWorkspace.tsx`
+  - `tests/marketing/codex-marketing-package-contract.test.mjs`
+  - `tests/sql/codex-assisted-marketing-drafts-validation.sql`
+  - `tests/e2e/internal-marketing-content-approval.spec.ts`
+  - `package.json`
+  - `config/backend-environment-rollouts.json`
+  - `config/backend-environment-parity.json`
+  - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Codex_Assisted_Marketing_Drafts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Marketing_Content_Approval_Foundation_v1.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Slice 3 pivots from in-app provider generation to Codex-assisted draft preparation. A versioned Marketing Truth Pack and coordinated recipes constrain copy preparation; one exact JSON package contract and a guarded authenticated operator validate untrusted output before one platform-admin-only RPC atomically creates durable drafts with immutable provenance and idempotent replay. The Content workspace labels Codex-prepared work for human review. No generation button, fake fallback, approval automation, scheduling, publishing, provider integration, or external Marketing workspace is introduced.
+- Architecture and security: The preparation table is `postgres`-owned, forced-RLS, policy-free, immutable, and unavailable through direct browser/service-role grants. The RPC derives actor/workspace, accepts 1-7 exact-shape items, enforces recipe/audience/role/type correspondence, bounds content, rejects duplicates, secret-like material, unsupported claim classes, malformed fields, and conflicting replay, and writes package/items/status events transactionally as `draft`. Existing human status transitions remain authoritative.
+- Environment rollout: Final migration SHA-256 `e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2` corresponds to Sandbox `zpzdkoaubyjtsomccxya` after base application at `2026-08-10T00:32:57Z` and exact ingestion-function hardening at `00:40:55Z` through `00:40:56Z`. The correction closes duplicate recipe-role ingestion found during detached review. Rollback-only authenticated validation passed and left zero preparation packages, content rows, and status events. Demo and Production remain pending and unchanged; the parity guard intentionally continues to report the changed list RPC as pre-rollout supported-schema drift.
+- Tests/checks run: Clean PostgreSQL 16 migration-over-Slice-2, role/ACL/RLS, atomicity, replay, malformed/unsafe input, recipe correspondence, append-only provenance, approval-regression, repeated-install, missing-prerequisite, and residue checks; live Sandbox catalog, anonymous PostgREST denial, and rollback-only platform-admin/unauthorized validation; local Truth Pack/recipe/package/operator tests; focused Marketing Playwright on desktop and `390x844`; TypeScript; Production build; backend parity/rollout validation; JSON/Bash parsing; sensitive-value/scope scans; and `git diff --check`. Focused ESLint still fails before linting changed and unchanged TypeScript files because the inherited ESLint 9 / typescript-eslint `no-unused-expressions` versions are incompatible.
+- Known risks and follow-up: Demo/Production migration-first rollout is required before this source can merge safely because the list RPC return contract changes. The Truth Pack is a bounded maintained snapshot and requires versioned review as product claims change. Runtime AI generation, approval automation, publishing, scheduling, integrations, campaigns, outreach, analytics, and contractor Business Marketing remain future slices.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records the Sandbox-only Codex-assisted preparation foundation and exact remaining rollout/automation boundaries.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the provider-neutral preparation loop, human authority, and Sandbox-only deployment state without claiming runtime generation or publishing.
+
 - Branch: `codex/marketing-content-approval-slice-2`
 - Starting main SHA: `2b0b9763c22259aeb1b085c0ac6cb7c14243de21`
 - Files changed:

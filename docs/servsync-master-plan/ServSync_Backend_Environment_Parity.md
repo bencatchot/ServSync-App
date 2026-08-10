@@ -64,7 +64,9 @@ Current Demo exceptions are limited to:
 - the six exact trusted `servsync_demo_*` operator overloads;
 - the exact fingerprinted supporting columns, constraints, indexes, triggers, and ACLs for those objects.
 
-Project Collaboration is absent from Production and Demo, so it is not part of supported parity. Sandbox's six Project Collaboration tables, nine exact functions, `inspections.project_id` link, and exact 297-object catalog fingerprint are recorded as an approved Sandbox-only experiment. The manifest does not hide missing or changed Production-supported objects.
+Project Collaboration is absent from Production and Demo, so it is not part of supported parity. Sandbox's six Project Collaboration tables, nine exact functions, `inspections.project_id` link, and exact 297-object catalog fingerprint are recorded as an approved Sandbox-only experiment.
+
+Codex-Assisted Marketing Draft Preparation v1 is also Sandbox-only pending a separately authorized Demo/Production rollout. Its one preparation-package table, five existing-content provenance columns, three private/new functions, ingestion grant, supporting constraints/indexes/triggers/ACLs, and exact 54-object catalog fingerprint are recorded as an approved Sandbox addition. The changed `servsync_list_internal_marketing_content(text)` contract remains visible as Production-supported logical drift because intentional additions cannot hide a changed supported object. The manifest does not convert this pre-rollout state into supported parity.
 
 Results mean:
 

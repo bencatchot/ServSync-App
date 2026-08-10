@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "truthPackVersion": "servsync-marketing-truth-v1",
+  "updatedOn": "2026-08-09",
+  "purpose": "Bounded product truth for preparing ServSync internal marketing drafts without inventing capabilities or results.",
+  "audiences": [
+    "small_contractors",
+    "hvac_contractors",
+    "plumbers",
+    "electricians",
+    "homeowners"
+  ],
+  "positioningConcepts": [
+    "Keep customer service work organized from request through estimate, job, report, invoice, Home History, and follow-up.",
+    "Help small service contractors present clearer customer workflows without claiming enterprise automation.",
+    "Help homeowners keep service requests, decisions, documents, and completed work connected to the right home."
+  ],
+  "terminology": [
+    {
+      "use": "Home History",
+      "avoid": "Maintenance log",
+      "rule": "Use the current homeowner-facing product name."
+    },
+    {
+      "use": "Customer",
+      "avoid": "Homeowner",
+      "rule": "Use Customer in contractor-facing commercial workflows unless specifically discussing a connected homeowner account."
+    },
+    {
+      "use": "Not connected Customer",
+      "avoid": "Guest user",
+      "rule": "Describe secure request-free document access without implying a separate guest account or broad portal."
+    },
+    {
+      "use": "Secure guest acceptance",
+      "avoid": "Electronic signature",
+      "rule": "Estimate acceptance through a secure delivery session is not verified identity or a signature."
+    },
+    {
+      "use": "Manual or offline payment",
+      "avoid": "Online payment",
+      "rule": "Production Stripe payments and Pay Online are not active."
+    }
+  ],
+  "marketableCapabilities": [
+    {
+      "key": "service_requests",
+      "status": "available_beta",
+      "claim": "Customers can start service work with a request tied to the relevant home and contractor workflow.",
+      "boundaries": "Do not promise emergency dispatch, guaranteed response, automated matching, or full external messaging."
+    },
+    {
+      "key": "estimates",
+      "status": "available_beta",
+      "claim": "Contractors can prepare, send, and track estimates tied to customer and work context.",
+      "boundaries": "Secure guest acceptance and bounded responses are not electronic signatures, negotiation, or payment."
+    },
+    {
+      "key": "not_connected_estimate_delivery",
+      "status": "available",
+      "claim": "Eligible Not connected Customers can receive a secure, expiring Estimate link and respond to that exact delivered version without creating an account.",
+      "boundaries": "Do not claim verified identity, signatures, guaranteed inbox delivery, SMS, replies, or a broad guest portal."
+    },
+    {
+      "key": "jobs_and_reports",
+      "status": "available_beta",
+      "claim": "Contractors can keep jobs and finalized customer-facing work reports connected to the originating service workflow.",
+      "boundaries": "Do not claim code compliance, third-party certification, enterprise dispatch, or automated diagnostics."
+    },
+    {
+      "key": "not_connected_report_delivery",
+      "status": "available",
+      "claim": "Eligible finalized customer-facing reports can be delivered through a secure document-scoped link to a Not connected Customer.",
+      "boundaries": "Do not claim report acknowledgment, unrestricted document browsing, or access to private/internal content."
+    },
+    {
+      "key": "invoices",
+      "status": "available_beta",
+      "claim": "Contractors can create, review, send, and track invoices in the same customer service workflow.",
+      "boundaries": "Do not claim accounting synchronization, automatic collections, or live online payment processing."
+    },
+    {
+      "key": "deposit_and_manual_payments",
+      "status": "available",
+      "claim": "Accepted Estimates can produce a deliberate draft Deposit Invoice, and authorized contractors can record manual or offline partial and full payments.",
+      "boundaries": "Job creation is not blocked by deposit state. Do not claim refunds, chargebacks, payouts, or Pay Online."
+    },
+    {
+      "key": "home_history",
+      "status": "available_beta",
+      "claim": "Homeowners can keep eligible completed work, reports, invoice records, documents, and manual reminders organized around their home.",
+      "boundaries": "Do not promise automatic timeline intelligence, recurring reminders, email, SMS, push alerts, or unlimited storage."
+    },
+    {
+      "key": "contractor_business_profile",
+      "status": "available_beta",
+      "claim": "Contractors can maintain a recognizable business profile with supported business and service information.",
+      "boundaries": "Do not imply license, insurance, background-check, or credential verification unless separately verified."
+    }
+  ],
+  "unavailableOrRestrictedCapabilities": [
+    "Production online payments or Pay Online",
+    "Automatic social publishing or scheduling",
+    "Social account integrations or OAuth",
+    "Automated email campaigns, SMS, or cold outreach",
+    "AI-generated recommendations, diagnostics, or autonomous approval",
+    "Guaranteed leads, marketplace ranking, or contractor performance claims",
+    "Contractor-facing Marketing workspace",
+    "Public Trade Pack or professional HVAC content",
+    "Accounting, calendar, advertising, or CRM integrations unless later documented as active"
+  ],
+  "prohibitedClaimPolicy": {
+    "categories": [
+      "Invented customer, contractor, homeowner, signup, revenue, or usage counts",
+      "Invented savings, conversion, growth, performance, or time-reduction metrics",
+      "Testimonials, ratings, awards, rankings, guarantees, or unverified trust claims",
+      "Unsupported integrations, competitive comparisons, or unavailable functionality",
+      "Legal, licensing, certification, safety, or identity-assurance claims not established by the product"
+    ],
+    "prohibitedPhrases": [
+      "guaranteed",
+      "award-winning",
+      "five-star",
+      "top-rated",
+      "best-in-class",
+      "#1",
+      "QuickBooks integration",
+      "Google Calendar sync",
+      "Outlook Calendar sync",
+      "live Stripe payments",
+      "automatic SMS",
+      "automated email campaign",
+      "AI-powered diagnostics"
+    ],
+    "prohibitedPatterns": [
+      "percentage performance claims",
+      "numeric trust or customer-count claims",
+      "numeric savings or improvement claims"
+    ]
+  },
+  "evidenceSources": [
+    "docs/MARKETING_PRODUCT_INVENTORY.md",
+    "docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md",
+    "docs/servsync-master-plan/ServSync_Completed_Features.md",
+    "docs/servsync-master-plan/CHANGELOG.md"
+  ]
+}

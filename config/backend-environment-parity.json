@@ -107,6 +107,46 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
+      },
+      {
+        "id": "codex-assisted-marketing-drafts-v1",
+        "reason": "Approved Sandbox-only Codex-assisted Marketing draft preparation foundation.",
+        "selectors": {
+          "relationScopes": [
+            "public.marketing_content_preparation_packages"
+          ],
+          "functionScopes": [
+            "public.servsync_ingest_internal_marketing_package(uuid, text, text, text, jsonb)",
+            "public.servsync_private_guard_marketing_preparation_package()",
+            "public.servsync_private_marketing_copy_is_claim_safe(text)"
+          ],
+          "exactObjects": [
+            "columns:public.marketing_content_items.content_role",
+            "columns:public.marketing_content_items.intended_audience",
+            "columns:public.marketing_content_items.preparation_package_id",
+            "columns:public.marketing_content_items.preparation_sequence",
+            "columns:public.marketing_content_items.preparation_source",
+            "constraints:public.marketing_content_items.marketing_content_items_audience_check",
+            "constraints:public.marketing_content_items.marketing_content_items_preparation_package_id_fkey",
+            "constraints:public.marketing_content_items.marketing_content_items_preparation_sequence_check",
+            "constraints:public.marketing_content_items.marketing_content_items_preparation_shape_check",
+            "constraints:public.marketing_content_items.marketing_content_items_preparation_source_check",
+            "constraints:public.marketing_content_items.marketing_content_items_role_check",
+            "indexes:public.marketing_content_items_package_sequence_idx"
+          ]
+        },
+        "expectedCounts": {
+          "relations": 1,
+          "columns": 16,
+          "constraints": 16,
+          "indexes": 4,
+          "triggers": 2,
+          "functions": 3,
+          "functionGrants": 4,
+          "tableGrants": 8
+        },
+        "expectedKeyFingerprint": "sha256:024e1cc89e21f9a9b760a7057c903082d50b02a819296edf490c11a96b4ad19a",
+        "expectedCatalogFingerprint": "sha256:dcad409f3b1354fedf476f1596fc59536e6ff322a08a7f4c57a9d6b30ddbf59a"
       }
     ]
   }

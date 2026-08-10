@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "recipeSetVersion": "servsync-marketing-recipes-v1",
+  "truthPackVersion": "servsync-marketing-truth-v1",
+  "recipes": [
+    {
+      "key": "contractor_acquisition",
+      "displayName": "Contractor acquisition",
+      "purpose": "Introduce ServSync to small service contractors through a coordinated set of distinct content roles.",
+      "allowedAudiences": [
+        "small_contractors",
+        "hvac_contractors",
+        "plumbers",
+        "electricians"
+      ],
+      "items": [
+        { "role": "facebook_instagram_post", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "linkedin_post", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "educational_post", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "feature_highlight", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "short_video_concept", "contentType": "other", "channelCategory": "social" }
+      ]
+    },
+    {
+      "key": "homeowner_awareness",
+      "displayName": "Homeowner awareness",
+      "purpose": "Explain practical home-service organization without implying automated maintenance or guaranteed contractor outcomes.",
+      "allowedAudiences": ["homeowners"],
+      "items": [
+        { "role": "educational_post", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "problem_solution_post", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "feature_highlight", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "local_contractor_connection", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "short_video_concept", "contentType": "other", "channelCategory": "social" }
+      ]
+    },
+    {
+      "key": "feature_promotion",
+      "displayName": "Feature promotion",
+      "purpose": "Explain one currently marketable ServSync capability from distinct contractor, homeowner, educational, and demonstration angles where applicable.",
+      "allowedAudiences": [
+        "small_contractors",
+        "hvac_contractors",
+        "plumbers",
+        "electricians",
+        "homeowners"
+      ],
+      "items": [
+        { "role": "feature_announcement", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "contractor_benefit", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "homeowner_benefit", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "educational_post", "contentType": "social_post", "channelCategory": "social" },
+        { "role": "short_video_concept", "contentType": "other", "channelCategory": "social" }
+      ]
+    }
+  ]
+}

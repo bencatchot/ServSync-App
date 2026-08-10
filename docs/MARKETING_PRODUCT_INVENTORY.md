@@ -4,6 +4,8 @@ Source-of-truth brief for marketing planning, brochures, social ads, landing-pag
 
 This document describes what ServSync can honestly say during the controlled private beta. It separates live/beta/manual capabilities from future roadmap items so marketing work stays useful without overpromising.
 
+For Codex-assisted internal draft preparation, use the machine-readable `config/marketing/servsync-marketing-truth-pack.v1.json` contract. That versioned pack is a conservative bounded projection of this inventory and current governed product documentation; it does not turn roadmap entries into marketable claims. Runtime AI generation, autonomous approval, publishing, and provider integrations remain unavailable.
+
 ## Product Overview
 
 ServSync is a homeowner-contractor service workflow app for keeping home service work organized from first request through estimate, job/report, invoice, Home History, and follow-up reminders.

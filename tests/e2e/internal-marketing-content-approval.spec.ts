@@ -30,6 +30,14 @@ function contentItem(overrides: Partial<MarketingContentItem> = {}): MarketingCo
     reviewedBy: null,
     reviewedByName: null,
     reviewNote: null,
+    preparationSource: 'manual',
+    preparationRequestId: null,
+    preparationRecipeKey: null,
+    truthPackVersion: null,
+    preparedAt: null,
+    preparationSequence: null,
+    intendedAudience: null,
+    contentRole: null,
     ...overrides,
   };
 }
@@ -56,6 +64,14 @@ function rpcRow(item: MarketingContentItem) {
     reviewed_by: item.reviewedBy,
     reviewed_by_name: item.reviewedByName,
     review_note: item.reviewNote,
+    preparation_source: item.preparationSource,
+    preparation_request_id: item.preparationRequestId,
+    preparation_recipe_key: item.preparationRecipeKey,
+    truth_pack_version: item.truthPackVersion,
+    prepared_at: item.preparedAt,
+    preparation_sequence: item.preparationSequence,
+    intended_audience: item.intendedAudience,
+    content_role: item.contentRole,
   };
 }
 
@@ -104,6 +120,14 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
             reviewed_by: null,
             reviewed_by_name: null,
             review_note: null,
+            preparation_source: 'manual',
+            preparation_request_id: null,
+            preparation_recipe_key: null,
+            truth_pack_version: null,
+            prepared_at: null,
+            preparation_sequence: null,
+            intended_audience: null,
+            content_role: null,
           });
           return { data: { content_id: id, status: 'idea', revision_number: 1 }, error: null };
         }
@@ -177,6 +201,12 @@ test.describe('internal Marketing content approval', () => {
 
     const malformed = createMarketingContentAdapter({ rpc: async () => ({ data: [{ ...rpcRow(item), workspace_key: 'contractor_1' }], error: null }) });
     await expect(malformed.list()).rejects.toMatchObject({ kind: 'malformed' });
+
+    const malformedProvenance = createMarketingContentAdapter({ rpc: async () => ({
+      data: [{ ...rpcRow(item), preparation_source: 'codex_assisted' }],
+      error: null,
+    }) });
+    await expect(malformedProvenance.list()).rejects.toMatchObject({ kind: 'malformed' });
 
     const unauthorized = createMarketingContentAdapter({ rpc: async () => ({ data: null, error: { code: '42501', message: 'Not authorized.' } }) });
     await expect(unauthorized.list()).rejects.toMatchObject({ kind: 'unauthorized' });
@@ -257,17 +287,57 @@ test.describe('internal Marketing content approval', () => {
     await expect(page.getByTestId('marketing-content-detail')).toContainText('This direction is not approved.');
   });
 
+  test('Codex-prepared drafts show bounded provenance and remain human-controlled drafts', async ({ page }) => {
+    const prepared = contentItem({
+      status: 'draft',
+      revisionNumber: 1,
+      submittedAt: null,
+      submittedBy: null,
+      submittedByName: null,
+      preparationSource: 'codex_assisted',
+      preparationRequestId: '41000000-0000-4000-8000-000000000010',
+      preparationRecipeKey: 'contractor_acquisition',
+      truthPackVersion: 'servsync-marketing-truth-v1',
+      preparedAt: '2026-08-09T18:00:00.000Z',
+      preparationSequence: 1,
+      intendedAudience: 'hvac_contractors',
+      contentRole: 'linkedin_post',
+    });
+    await installHarness(page, [prepared]);
+    await page.getByTestId('marketing-nav-content').click();
+    await expect(page.getByTestId('marketing-codex-source-badge')).toHaveText(/Codex-prepared/);
+    await page.getByRole('button', { name: /Review the launch message/ }).click();
+    await expect(page.getByTestId('marketing-preparation-provenance')).toContainText('Codex-prepared draft');
+    await expect(page.getByTestId('marketing-preparation-provenance')).toContainText('HVAC contractors');
+    await expect(page.getByTestId('marketing-preparation-provenance')).toContainText('LinkedIn post');
+    await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+  });
+
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },
     { name: 'mobile', width: 390, height: 844 },
   ]) {
     test(`${viewport.name} content review remains usable without horizontal overflow`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await installHarness(page, [contentItem()]);
+      await installHarness(page, [contentItem({
+        status: 'draft',
+        submittedAt: null,
+        submittedBy: null,
+        submittedByName: null,
+        preparationSource: 'codex_assisted',
+        preparationRequestId: '41000000-0000-4000-8000-000000000010',
+        preparationRecipeKey: 'contractor_acquisition',
+        truthPackVersion: 'servsync-marketing-truth-v1',
+        preparedAt: '2026-08-09T18:00:00.000Z',
+        preparationSequence: 1,
+        intendedAudience: 'small_contractors',
+        contentRole: 'educational_post',
+      })]);
       await page.getByTestId('marketing-nav-content').click();
-      await page.getByRole('tab', { name: 'Needs approval' }).click();
       await page.getByRole('button', { name: /Review the launch message/ }).click();
-      await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
+      await expect(page.getByTestId('marketing-preparation-provenance')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
     });
