@@ -107,23 +107,6 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
-      },
-      {
-        "id": "marketing-direction-copy-guardrails-v1",
-        "reason": "Approved Sandbox-only Marketing Direction helper while the reviewed ingestion-function correction remains pending Demo and Production rollout.",
-        "selectors": {
-          "relationScopes": [],
-          "functionScopes": [
-            "public.servsync_private_marketing_direction_is_safe(text)"
-          ],
-          "exactObjects": []
-        },
-        "expectedCounts": {
-          "functions": 1,
-          "functionGrants": 1
-        },
-        "expectedKeyFingerprint": "sha256:05f2055357966f101c30ac898c59f1cef62dce578c7e9b50707f9d41ee9a9268",
-        "expectedCatalogFingerprint": "sha256:40247449ffa6d7f84ede3d2226b42ef8138e4461071e6b53e404849cd6433c73"
       }
     ]
   }

@@ -14,7 +14,7 @@ The active contracts are:
 
 The immutable v1 files remain available only for exact replay or audit of packages prepared before Marketing Direction was introduced. Do not rewrite either historical contract.
 
-Truth Pack v2 ingestion also requires `servsync-marketing-direction-copy-guardrails.sql` in the target environment. It is currently Sandbox-only. Do not target Demo or Production with a v2 package until the exact migration is separately authorized, applied, validated, and the source PR is approved for merge.
+Truth Pack v2 ingestion requires `servsync-marketing-direction-copy-guardrails.sql` in the target environment. Exact SHA-256 `c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda` is applied and validated in Sandbox, Demo, and Production. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
 
 ## Marketing Direction
 

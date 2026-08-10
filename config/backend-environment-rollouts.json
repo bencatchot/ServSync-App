@@ -300,12 +300,12 @@
           "reason": "Exact SHA-256 c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-10 from 14:44:11Z through 14:44:19Z. Transactional preflight/postflight validated the complete Slice 3 foundation, postgres ownership, fixed search paths, exact grants, v1 compatibility, v2-only direction/copy guards, and PostgREST reload. Local PostgreSQL validation covered authorized v2 ingestion, historical v1 replay, unsupported contrast rejection, idempotency, atomicity, authorization, and zero rollback-only residue; Sandbox retains zero preparation packages, content rows, and status events."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Production rollout is not authorized in Slice 3A. The existing v1 RPC remains active until the exact reviewed migration receives separate migration-first rollout approval."
+          "status": "Applied",
+          "reason": "Exact SHA-256 c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-10 from 15:16:30.723Z through 15:16:31.191Z after Demo passed. Catalog, postgres ownership, fixed search paths, exact grants, v1 replay, owner-led/recommended v2 packages, immutable direction brief, competitor-framing rejection, atomicity, idempotency, draft-only status, platform-admin authority, contractor/homeowner/anonymous and direct-table denial, rollback-only cleanup, and unrelated business-data preservation passed. Historical Package 64c587ca-800e-4b9d-ad39-5ff88544e00c retained its exact package/content/event fingerprints, Truth Pack v1 identity, five drafts, and five initial draft events."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo rollout is not authorized in Slice 3A. Apply and validate the exact reviewed migration in Demo before any later Production stage."
+          "status": "Applied",
+          "reason": "Exact SHA-256 c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 15:12:41.963Z through 15:12:42.143Z. Catalog, postgres ownership, fixed search paths, exact grants, v1 replay, owner-led/recommended v2 packages, immutable direction brief, competitor-framing rejection, atomicity, idempotency, draft-only status, platform-admin authority, contractor/homeowner/anonymous and direct-table denial, rollback-only cleanup, and unrelated business-data preservation passed with one internal workspace and zero packages, content rows, or status events."
         }
       }
     }
