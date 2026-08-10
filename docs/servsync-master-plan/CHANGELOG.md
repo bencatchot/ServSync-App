@@ -6,6 +6,43 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-10
 
+- Branch: `codex/marketing-planner-quality-v2`
+- Starting main SHA: `6cd6f82040c23a0813d62f57c48394dd7a07e3b1`
+- Files changed:
+  - `servsync-marketing-planner-quality-v2.sql`
+  - `src/features/marketing/marketingTaxonomy.ts`
+  - `src/features/marketing/marketingPlanning.ts`
+  - `src/features/marketing/MarketingPlanningWorkspace.tsx`
+  - `src/features/marketing/marketingContent.ts`
+  - `src/features/marketing/MarketingContentWorkspace.tsx`
+  - `config/marketing/servsync-marketing-truth-pack.v3.json`
+  - `config/marketing/servsync-marketing-recipes.v3.json`
+  - `config/marketing/codex-marketing-package.v3.schema.json`
+  - `scripts/marketing/marketing-package-contract.mjs`
+  - `scripts/validation/validate-marketing-planner-quality-v2.sh`
+  - `tests/sql/marketing-planner-quality-v2-validation.sql`
+  - `tests/e2e/internal-marketing-planning.spec.ts`
+  - `tests/marketing/codex-marketing-package-contract.test.mjs`
+  - `package.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Business_Marketing_Profile_Planning_v1.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Slice 4A adds deterministic planner v2 with canonical audience identities and bounded topic families, false-novelty suppression, tenant-specific five-to-seven-item diversity, accurate evidence-based rationales, and explicit recommendation-contract versioning. Truth Pack/recipe/schema v3 expand supported contractor audiences without changing product claims. Historical plans and package contracts remain immutable and replayable.
+- Architecture and security: The server-owned planning context stores planner version 2 for new recommended plans while omitted historical calls remain v1. Owner-directed plans carry no recommendation version. The existing platform-admin-only RPC, forced-RLS/policy-free storage, optimistic concurrency, immutable revisions, replay protection, and contractor/homeowner denial remain intact. No Plan-to-Direction/content creation, approval, publishing, provider, or external-workspace authority is added.
+- Environment rollout: Exact migration SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800` was applied only to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T18:55:42.015Z` through `18:55:42.590Z`. Rollback-only v2 planning, historical v1 compatibility, v3 ingestion, authorization, and zero-residue checks passed. Demo and Production were not changed and require a separate migration-first authorization before merge.
+- Tests/checks run: TypeScript; focused Marketing planning/workspace/content Playwright; package-contract tests; disposable PostgreSQL 16 migration chain, security, historical-row preservation, replay/versioning, expanded-audience ingestion, authorization, repeat-application, and zero-residue validation; live Sandbox catalog/security and rollback-only checks; Production build; parity and rollout-ledger validation; JSON/Bash parsing; sensitive-value/scope scans; and `git diff --check`.
+- Known risks and follow-up: Recommendation quality is deterministic assistance, not AI or factual product truth. Canonical aliases are intentionally bounded and custom tenant inputs remain custom. Demo/Production rollout, contractor profile composition and authorization/UI, Plan-to-Direction/content handoff, publishing, scheduling, integrations, campaigns, outreach, and analytics remain pending.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records planner v2/taxonomy quality, explicit rollout state, and the still-deferred contractor and execution capabilities.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the planner-quality contract and prevents Sandbox-only behavior from being mistaken for all-environment availability.
+
 - Branch: `codex/marketing-business-profile-plan-v1`
 - Starting main SHA: `325372c239c7ed95e70ccf0b381040f79a90837e`
 - Files changed:

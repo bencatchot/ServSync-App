@@ -4,17 +4,17 @@
 
 Use this runbook only to prepare draft content for ServSync's internal Marketing workspace. It does not authorize approval, publishing, scheduling, outreach, provider configuration, or contractor/homeowner Marketing access.
 
-The active contracts are:
+The repository-current contracts are:
 
-- Truth Pack: `config/marketing/servsync-marketing-truth-pack.v2.json`
-- recipes: `config/marketing/servsync-marketing-recipes.v2.json`
-- package schema: `config/marketing/codex-marketing-package.v2.schema.json`
+- Truth Pack: `config/marketing/servsync-marketing-truth-pack.v3.json`
+- recipes: `config/marketing/servsync-marketing-recipes.v3.json`
+- package schema: `config/marketing/codex-marketing-package.v3.schema.json`
 - local validator: `scripts/marketing/marketing-package-contract.mjs`
 - authenticated operator: `scripts/marketing/ingest-codex-marketing-package.mjs`
 
-The immutable v1 files remain available only for exact replay or audit of packages prepared before Marketing Direction was introduced. Do not rewrite either historical contract.
+The immutable v1 and v2 files remain available for exact replay or audit. Do not rewrite a historical contract.
 
-Truth Pack v2 ingestion requires `servsync-marketing-direction-copy-guardrails.sql` in the target environment. Exact SHA-256 `c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda` is applied and validated in Sandbox, Demo, and Production. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
+Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/landscaping, pressure washing, and handyman businesses without adding new product claims. It requires `servsync-marketing-planner-quality-v2.sql` in the target environment. Exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800` is applied only in Sandbox. Until separately authorized Demo/Production rollout completes, Production and Demo package preparation must continue to use immutable v2 contracts. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
 
 ## Marketing Direction
 
@@ -101,7 +101,7 @@ Password authentication is also supported through the approved secret-only `SERV
 
 ## Package Contract
 
-The current v2 top-level object has exactly:
+The current v3 top-level object has exactly:
 
 - `preparation_request_id`
 - `recipe_key`
@@ -132,7 +132,7 @@ Every item has exactly:
 
 The local validator rejects malformed directions, uncorrected competitor assumptions, unsupported public contrasts, audience conflicts, malformed values, unexpected keys, out-of-range counts, unknown enums, duplicate roles/titles/bodies, secret-like material, and bounded prohibited claims. The existing server boundary then revalidates the persisted direction statement and content. A failed package creates no durable package or content records.
 
-Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. New packages must use v2.
+Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. Historical v2 packages remain replay-valid with their exact Marketing Direction. New packages may use v3 only when the target environment has the planner-quality migration; otherwise use v2.
 
 ## Fail-Closed Rules
 

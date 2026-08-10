@@ -43,6 +43,7 @@
     "test:stripe-connect-online-payments": "scripts/validation/validate-stripe-connect-online-payments-foundation.sh",
     "test:codex-marketing-drafts": "bash scripts/validation/validate-codex-assisted-marketing-drafts.sh && node --test tests/marketing/codex-marketing-package-contract.test.mjs",
     "test:business-marketing-planning": "bash scripts/validation/validate-business-marketing-profile-plan.sh",
+    "test:marketing-planner-quality-v2": "bash scripts/validation/validate-marketing-planner-quality-v2.sh",
     "marketing:ingest-codex-package": "node scripts/marketing/ingest-codex-marketing-package.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },

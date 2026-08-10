@@ -77,15 +77,23 @@ const validV2Package = {
 
 test('Truth Pack and coordinated recipe contracts are internally consistent', async () => {
   const contracts = await loadMarketingContracts();
-  const schema = JSON.parse(await readFile(new URL('config/marketing/codex-marketing-package.v2.schema.json', ROOT), 'utf8'));
+  const schema = JSON.parse(await readFile(new URL('config/marketing/codex-marketing-package.v3.schema.json', ROOT), 'utf8'));
   assert.doesNotThrow(() => validateMarketingContracts(contracts.truthPack, contracts.recipeSet));
-  assert.equal(contracts.truthPack.truthPackVersion, 'servsync-marketing-truth-v2');
-  assert.equal(contracts.recipeSet.recipeSetVersion, 'servsync-marketing-recipes-v2');
+  assert.equal(contracts.truthPack.truthPackVersion, 'servsync-marketing-truth-v3');
+  assert.equal(contracts.truthPack.audienceTaxonomyVersion, 1);
+  assert.equal(contracts.recipeSet.recipeSetVersion, 'servsync-marketing-recipes-v3');
   assert.equal(contracts.recipeSet.recipes.length, 3);
+  assert.deepEqual(
+    contracts.truthPack.audiences.slice(0, 9),
+    [
+      'small_contractors', 'hvac_contractors', 'plumbers', 'electricians', 'carpentry_contractors',
+      'lawn_landscaping_contractors', 'pressure_washing_contractors', 'handyman_contractors', 'homeowners',
+    ],
+  );
   assert.ok(contracts.truthPack.unavailableOrRestrictedCapabilities.includes('Production online payments or Pay Online'));
   assert.match(contracts.truthPack.competitiveFramingPolicy.rule, /own merits/i);
   assert.match(contracts.truthPack.guestAndConnectedHomeownerTruth.plainLanguageSummary, /document-specific customer interactions/i);
-  assert.equal(schema.properties.truth_pack_version.const, 'servsync-marketing-truth-v2');
+  assert.equal(schema.properties.truth_pack_version.const, 'servsync-marketing-truth-v3');
   assert.deepEqual(schema.required, ['preparation_request_id', 'recipe_key', 'truth_pack_version', 'marketing_direction', 'items']);
 });
 
@@ -96,6 +104,22 @@ test('the historical v1 package remains replay-valid without changing Package #1
   assert.equal(result.items[0].content_role, 'facebook_instagram_post');
   assert.equal('status' in result, false);
   assert.equal('provider' in result, false);
+});
+
+test('the historical v2 package remains replay-valid while v3 accepts the expanded supported audiences', async () => {
+  const v2Contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
+  assert.doesNotThrow(() => validateMarketingPackage(validV2Package, v2Contracts));
+
+  const v3Contracts = await loadMarketingContracts();
+  const carpentryPackage = {
+    ...validV2Package,
+    preparation_request_id: '42000000-0000-4000-8000-000000000099',
+    truth_pack_version: 'servsync-marketing-truth-v3',
+    marketing_direction: { ...validDirection, audience: 'carpentry_contractors' },
+    items: validV2Package.items.map(item => ({ ...item, intended_audience: 'carpentry_contractors' })),
+  };
+  assert.doesNotThrow(() => validateMarketingPackage(carpentryPackage, v3Contracts));
+  assert.throws(() => validateMarketingPackage(carpentryPackage, v2Contracts));
 });
 
 test('unknown fields, malformed values, recipe conflicts, and duplicate roles fail closed', async () => {
@@ -132,7 +156,7 @@ test('secret-like material and bounded prohibited claim classes are rejected', a
 });
 
 test('owner-led Marketing Direction becomes the durable package brief without approval authority', async () => {
-  const contracts = await loadMarketingContracts();
+  const contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
   const result = validateMarketingPackage(validV2Package, contracts);
   assert.equal(result.brief_summary, validDirection.statement);
   assert.equal(result.marketing_direction.owner_input, validDirection.owner_input);
@@ -144,7 +168,7 @@ test('owner-led Marketing Direction becomes the durable package brief without ap
 });
 
 test('recommended direction requires no invented owner input and an inspectable rationale', async () => {
-  const contracts = await loadMarketingContracts();
+  const contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
   const recommended = {
     ...validV2Package,
     preparation_request_id: '42000000-0000-4000-8000-000000000011',
@@ -167,7 +191,7 @@ test('recommended direction requires no invented owner input and an inspectable 
 });
 
 test('unsupported competitor assumptions must be corrected while valid owner intent is preserved', async () => {
-  const contracts = await loadMarketingContracts();
+  const contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
   const unsafeInput = "Tell contractors they won't have to force customers to download an app anymore.";
   assert.deepEqual(analyzeMarketingDirectionInput(unsafeInput), ['competitor_app_download_requirement']);
   assert.throws(() => validateMarketingPackage({
@@ -199,7 +223,7 @@ test('direction analysis identifies the bounded competitor-assumption classes', 
 });
 
 test('unsupported competitor contrast is rejected from direction and prepared copy', async () => {
-  const contracts = await loadMarketingContracts();
+  const contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
   assert.throws(() => validateMarketingPackage({
     ...validV2Package,
     marketing_direction: {
@@ -217,7 +241,7 @@ test('unsupported competitor contrast is rejected from direction and prepared co
 });
 
 test('the package stays focused on one direction and recipe roles remain deliberately distinct', async () => {
-  const contracts = await loadMarketingContracts();
+  const contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
   const result = validateMarketingPackage(validV2Package, contracts);
   assert.ok(result.items.every(item => item.intended_audience === result.marketing_direction.audience));
   const recipe = contracts.recipeSet.recipes.find(candidate => candidate.key === 'contractor_acquisition');
@@ -235,7 +259,7 @@ test('prescribed v2 fixtures use public language rather than internal implementa
 });
 
 test('v2 direction shape, audience conflicts, and uncorrected assumptions fail closed', async () => {
-  const contracts = await loadMarketingContracts();
+  const contracts = await loadMarketingContracts(undefined, 'servsync-marketing-truth-v2');
   const cases = [
     { ...validV2Package, brief_summary: 'unsupported duplicate direction' },
     { ...validV2Package, marketing_direction: { ...validDirection, unknown: true } },

@@ -14,6 +14,10 @@ export const MARKETING_PREPARATION_AUDIENCES = [
   'hvac_contractors',
   'plumbers',
   'electricians',
+  'carpentry_contractors',
+  'lawn_landscaping_contractors',
+  'pressure_washing_contractors',
+  'handyman_contractors',
   'homeowners',
 ] as const;
 export const MARKETING_CONTENT_ROLES = [
