@@ -16,6 +16,8 @@ The immutable v1 and v2 files remain available for exact replay or audit. Do not
 
 Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/landscaping, pressure washing, and handyman businesses without adding new product claims. Its required migration `servsync-marketing-planner-quality-v2.sql`, exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800`, is applied in Sandbox, Demo, and Production. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
 
+Planner v3 migration `servsync-marketing-planner-coherence-relevance-v3.sql`, exact SHA-256 `c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b`, is applied in Sandbox, Demo, and Production. It improves deterministic recommendation coherence and relevance only. A recommendation remains a draft plan; it does not create Marketing Direction, content, approvals, schedules, or published work.
+
 ## Marketing Direction
 
 An accepted Business Marketing Plan may inform a later Marketing Direction, but it does not replace the direction contract and does not create a preparation package. The plan's workspace, source profile version, audience/topic mix, and owner edits are planning context only. Before package preparation, select one exact plan item or another separately authorized owner direction and run the full Truth Pack and package validation below.
@@ -133,6 +135,8 @@ Every item has exactly:
 The local validator rejects malformed directions, uncorrected competitor assumptions, unsupported public contrasts, audience conflicts, malformed values, unexpected keys, out-of-range counts, unknown enums, duplicate roles/titles/bodies, secret-like material, and bounded prohibited claims. The existing server boundary then revalidates the persisted direction statement and content. A failed package creates no durable package or content records.
 
 Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. Historical v2 packages remain replay-valid with their exact Marketing Direction. New packages may use v3 only in environments whose catalog still matches the exact planner-quality migration; environment rollout alone does not authorize ingestion.
+
+Planner Coherence + Relevance v3 is a planning-only contract and is currently Sandbox-only. It improves which audiences, topics, and roles are recommended but does not create a Marketing Direction or content package. A user must still inspect and deliberately accept or revise the plan, establish the bounded Marketing Direction, validate against the applicable Truth Pack and recipe, and separately authorize ingestion. Demo and Production remain on planner v2 until the additive v3 RPC receives a separately approved migration-first rollout.
 
 ## Fail-Closed Rules
 

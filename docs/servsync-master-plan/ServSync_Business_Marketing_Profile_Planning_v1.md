@@ -2,7 +2,7 @@
 
 ## Status
 
-Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The v1 foundation and Planner Quality v2 compatibility migration are applied and validated in Sandbox, Demo, and Production. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
+Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The v1 foundation and Planner Quality v2 compatibility migration are applied and validated in Sandbox, Demo, and Production. Planner Coherence + Relevance v3 is implemented and validated in Sandbox only; Demo and Production remain on planner v2 pending a separate migration-first rollout. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
 
 ## Architecture
 
@@ -54,6 +54,16 @@ Recommended plans now use the profile's goals, audiences, service focus, emphasi
 
 The recommendation contract is persisted explicitly. Historical recommended plans without the field parse as planner v1; new recommended plans store `recommendation_contract_version = 2` in the server-owned recent-content context. Owner-directed plans do not claim a recommendation version. Existing records and revisions are unchanged.
 
+### Planner Coherence + Relevance v3
+
+Planner v3 ranks tenant relevance and topic specificity before variety. It rejects generic filler topics, requires explicit profile support before selecting a trade-specific audience, distinguishes exact recent coverage from related coverage, and chooses a content role for its semantic fit before considering channel preference. A feature-announcement role is unavailable unless the Profile supplies an actual announcement or launch context.
+
+The plan is selected in a deliberate order: primary-goal fit, bounded secondary-goal support, tenant-profile evidence, topic specificity, recent exact/related coverage, then limited audience/topic/theme repetition control. Diversity balances strong tenant-relevant recommendations; it does not require maximizing unique audiences, trades, topics, roles, or channels. A coherent plan may therefore repeat a well-supported audience or role when that is more useful than introducing a weak new one.
+
+Each rationale now states why the topic and audience fit the Profile, whether recent content is exact, related, or new, and what the selected role contributes. Scores and internal ranking metadata are not persisted or displayed. Planner v3 remains deterministic assistance rather than product truth; Marketing Direction, Truth Pack validation, human review, approval, scheduling, and publishing boundaries are unchanged.
+
+Recommended v3 plans use the additive `servsync_create_internal_marketing_plan_v3` RPC and persist `recommendation_contract_version = 3`. The existing `servsync_create_internal_marketing_plan` RPC remains unchanged for owner-directed plans and historical planner v1/v2 compatibility. Historical plan rows and revisions are not rewritten.
+
 ## Current Authorization
 
 Only an authenticated `platform_admin` can call:
@@ -63,6 +73,8 @@ Only an authenticated `platform_admin` can call:
 - `servsync_create_internal_marketing_plan`
 - `servsync_update_internal_marketing_plan`
 - `servsync_accept_internal_marketing_plan`
+
+Sandbox also exposes `servsync_create_internal_marketing_plan_v3` to authenticated platform administrators only. It derives the workspace, actor, current profile, and recent-content context server-side and retains the same replay, tenant, mode, and version checks as the established planning boundary.
 
 Workspace, actor, recent-content context, and current profile version are derived server-side. Contractor and homeowner calls fail closed. No contractor-facing profile/plan RPC or UI exists in this slice.
 
@@ -79,6 +91,8 @@ The final additive migration has SHA-256 `60ec19e374004cf4e87c2794e99095bc7a9982
 No environment variable, provider secret, Stripe setting, billing behavior, capability flag, external account, business record, or approved Production Marketing content is changed by this slice.
 
 Planner Quality v2 migration `servsync-marketing-planner-quality-v2.sql` has exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800`. It was applied to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T18:55:42.015Z` through `18:55:42.590Z`, Demo `bdytwgejqnlblhrnqxkp` from `21:07:08.739Z` through `21:07:09.034Z`, and Production `uqgtheclhxqlnjpfmheq` from `21:09:14.501Z` through `21:09:14.871Z`. Demo passed before Production was touched. Rollback-only planner-v2 creation/replay, omitted-version v1 compatibility, conflicting and unsupported version rejection, expanded-audience Truth Pack v3 ingestion, authorization denial, and zero-residue checks passed in both target environments. Demo retained zero plans, plan revisions, preparation packages, content records, and status events. Production retained its exact historical planner-v1 plan and revision, two packages, ten content records, and sixteen status events with unchanged Marketing and unrelated-business fingerprints. No environment configuration or provider state changed.
+
+Planner Coherence + Relevance v3 migration `servsync-marketing-planner-coherence-relevance-v3.sql` has exact SHA-256 `c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b`. It was applied to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T21:44:21.151Z` through `21:44:21.574Z`, Demo `bdytwgejqnlblhrnqxkp` from `22:07:54Z` through `22:08:02Z`, and Production `uqgtheclhxqlnjpfmheq` from `22:11:21Z` through `22:11:30Z`. Demo passed before Production was touched. Catalog/security and rollback-only planner-v3 creation, exact replay, conflicting replay rejection, version/mode enforcement, historical v1/v2 preservation, and contractor/homeowner/anonymous denial passed with zero residue. Demo retained its zero-plan/content baseline. Production retained exact historical planner-v1 and planner-v2 plans and revisions, two packages, ten content records, sixteen status events, and unchanged Marketing and unrelated-business fingerprints. No provider, environment variable, content, approval, publishing, scheduling, Stripe, billing, or unrelated business state changed.
 
 ## Deferred
 
