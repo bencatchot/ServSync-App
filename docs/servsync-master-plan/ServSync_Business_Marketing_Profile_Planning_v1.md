@@ -2,7 +2,7 @@
 
 ## Status
 
-Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The v1 foundation is applied and validated in Sandbox, Demo, and Production. Planner Quality v2 is source-complete and applied only in Sandbox; Demo and Production continue to use planner v1 until a separately authorized rollout. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
+Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The v1 foundation and Planner Quality v2 compatibility migration are applied and validated in Sandbox, Demo, and Production. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
 
 ## Architecture
 
@@ -78,7 +78,7 @@ The final additive migration has SHA-256 `60ec19e374004cf4e87c2794e99095bc7a9982
 
 No environment variable, provider secret, Stripe setting, billing behavior, capability flag, external account, business record, or approved Production Marketing content is changed by this slice.
 
-Planner Quality v2 migration `servsync-marketing-planner-quality-v2.sql` has exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800`. It was applied only to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T18:55:42.015Z` through `18:55:42.590Z`. Rollback-only planner-v2 creation/replay, historical-v1 compatibility, expanded-audience Truth Pack v3 ingestion, authorization denial, and zero-residue checks passed. Sandbox retained zero plans, plan revisions, preparation packages, content records, and status events after validation. Demo and Production received no SQL or configuration change and require a separate migration-first authorization before this client can merge safely.
+Planner Quality v2 migration `servsync-marketing-planner-quality-v2.sql` has exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800`. It was applied to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T18:55:42.015Z` through `18:55:42.590Z`, Demo `bdytwgejqnlblhrnqxkp` from `21:07:08.739Z` through `21:07:09.034Z`, and Production `uqgtheclhxqlnjpfmheq` from `21:09:14.501Z` through `21:09:14.871Z`. Demo passed before Production was touched. Rollback-only planner-v2 creation/replay, omitted-version v1 compatibility, conflicting and unsupported version rejection, expanded-audience Truth Pack v3 ingestion, authorization denial, and zero-residue checks passed in both target environments. Demo retained zero plans, plan revisions, preparation packages, content records, and status events. Production retained its exact historical planner-v1 plan and revision, two packages, ten content records, and sixteen status events with unchanged Marketing and unrelated-business fingerprints. No environment configuration or provider state changed.
 
 ## Deferred
 

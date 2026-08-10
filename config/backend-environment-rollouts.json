@@ -333,15 +333,15 @@
       "environments": {
         "sandbox": {
           "status": "Applied",
-          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-10 from 18:55:42.015Z through 18:55:42.590Z. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-version compatibility, platform-admin v2 creation/replay, contractor denial, Truth Pack v3 ingestion, rollback-only cleanup, and zero package/content/event/plan residue passed. Demo and Production were not changed."
+          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-10 from 18:55:42.015Z through 18:55:42.590Z. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-version compatibility, platform-admin v2 creation/replay, contractor denial, Truth Pack v3 ingestion, rollback-only cleanup, and zero package/content/event/plan residue passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Requires a separate authorized migration-first rollout after exact-head review; Production remains on planner v1 and Truth Pack/recipe v2 support."
+          "status": "Applied",
+          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-10 from 21:09:14.501Z through 21:09:14.871Z after Demo passed. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-v2 creation/replay, omitted-version v1 compatibility, conflicting/unsupported-version rejection, expanded-audience Truth Pack v3 ingestion, platform-admin authority, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Production retained one historical planner-v1 plan and revision, two packages, ten content records (three approved and seven draft), sixteen status events, and exact Marketing and unrelated-business fingerprints."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Requires a separate authorized migration-first rollout before Production; Demo remains on planner v1 and Truth Pack/recipe v2 support."
+          "status": "Applied",
+          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 21:07:08.739Z through 21:07:09.034Z. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-v2 creation/replay, omitted-version v1 compatibility, conflicting/unsupported-version rejection, expanded-audience Truth Pack v3 ingestion, platform-admin authority, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Demo retained one internal profile and revision with zero plans, plan revisions, packages, content records, status events, or validation residue."
         }
       }
     }

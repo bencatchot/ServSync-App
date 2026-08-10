@@ -14,7 +14,7 @@ The repository-current contracts are:
 
 The immutable v1 and v2 files remain available for exact replay or audit. Do not rewrite a historical contract.
 
-Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/landscaping, pressure washing, and handyman businesses without adding new product claims. It requires `servsync-marketing-planner-quality-v2.sql` in the target environment. Exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800` is applied only in Sandbox. Until separately authorized Demo/Production rollout completes, Production and Demo package preparation must continue to use immutable v2 contracts. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
+Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/landscaping, pressure washing, and handyman businesses without adding new product claims. Its required migration `servsync-marketing-planner-quality-v2.sql`, exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800`, is applied in Sandbox, Demo, and Production. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
 
 ## Marketing Direction
 
@@ -132,7 +132,7 @@ Every item has exactly:
 
 The local validator rejects malformed directions, uncorrected competitor assumptions, unsupported public contrasts, audience conflicts, malformed values, unexpected keys, out-of-range counts, unknown enums, duplicate roles/titles/bodies, secret-like material, and bounded prohibited claims. The existing server boundary then revalidates the persisted direction statement and content. A failed package creates no durable package or content records.
 
-Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. Historical v2 packages remain replay-valid with their exact Marketing Direction. New packages may use v3 only when the target environment has the planner-quality migration; otherwise use v2.
+Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. Historical v2 packages remain replay-valid with their exact Marketing Direction. New packages may use v3 only in environments whose catalog still matches the exact planner-quality migration; environment rollout alone does not authorize ingestion.
 
 ## Fail-Closed Rules
 
