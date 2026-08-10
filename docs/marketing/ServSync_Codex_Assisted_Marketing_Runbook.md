@@ -18,6 +18,10 @@ Truth Pack v2 ingestion requires `servsync-marketing-direction-copy-guardrails.s
 
 ## Marketing Direction
 
+An accepted Business Marketing Plan may inform a later Marketing Direction, but it does not replace the direction contract and does not create a preparation package. The plan's workspace, source profile version, audience/topic mix, and owner edits are planning context only. Before package preparation, select one exact plan item or another separately authorized owner direction and run the full Truth Pack and package validation below.
+
+ServSync internal plans use the ServSync internal Business Marketing Profile. Never reuse that profile or its recommended audience/topic mix as the default for a contractor Business Marketing workspace.
+
 Every new package must answer one question before copy is prepared:
 
 > What specific story are these pieces supposed to communicate?

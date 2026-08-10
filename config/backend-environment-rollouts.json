@@ -308,6 +308,24 @@
           "reason": "Exact SHA-256 c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 15:12:41.963Z through 15:12:42.143Z. Catalog, postgres ownership, fixed search paths, exact grants, v1 replay, owner-led/recommended v2 packages, immutable direction brief, competitor-framing rejection, atomicity, idempotency, draft-only status, platform-admin authority, contractor/homeowner/anonymous and direct-table denial, rollback-only cleanup, and unrelated business-data preservation passed with one internal workspace and zero packages, content rows, or status events."
         }
       }
+    },
+    {
+      "id": "business-marketing-profile-plan-v1",
+      "artifact": "servsync-business-marketing-profile-plan.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Final SHA-256 60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5 corresponds to Sandbox zpzdkoaubyjtsomccxya after the base application before 17:09:45Z and the narrow concurrent-replay RPC correction on 2026-08-10. Catalog, postgres ownership, forced-RLS/policy-free tables, exact authenticated RPC grants, platform-admin profile/plan workflow, contractor/homeowner denial, sequential and concurrent idempotency, optimistic concurrency, immutable revisions, accepted-plan immutability, rollback-only cleanup, and content/package/event preservation passed with one internal profile, one initial profile revision, and zero plans or plan revisions."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Requires a separately authorized migration-first rollout before the Slice 4 planning runtime can be merged for Production use. No SQL or configuration was changed."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Requires a separately authorized migration-first rollout before the Slice 4 planning runtime can be merged for Demo use. No SQL or configuration was changed."
+        }
+      }
     }
   ]
 }
