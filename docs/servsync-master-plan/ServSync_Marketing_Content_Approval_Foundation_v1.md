@@ -84,4 +84,4 @@ Separately reviewed work remains required for:
 - acquisition analytics and referral measurement;
 - contractor Business Marketing workspaces and tenant authorization.
 
-Codex-assisted external preparation is now a separately documented Sandbox-only foundation; in-app runtime AI generation remains pending.
+Codex-assisted external preparation is now a separately documented foundation applied in Sandbox, Demo, and Production; in-app runtime AI generation remains pending.

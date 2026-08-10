@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-09",
+  "updatedOn": "2026-08-10",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -282,12 +282,12 @@
           "reason": "Final SHA-256 e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2 corresponds to Sandbox zpzdkoaubyjtsomccxya after the base application at 2026-08-10T00:32:57Z and exact ingestion-function hardening at 00:40:55Z through 00:40:56Z. Catalog, ownership, forced-RLS/policy-free provenance, exact RPC grants, platform-admin atomic ingestion, idempotent replay, duplicate-role, malformed/unsafe rejection, unauthorized denial, rollback-only cleanup, and zero package/content/event residue passed."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Separate migration-first rollout authorization is required; Codex-assisted preparation remains unavailable."
+          "status": "Applied",
+          "reason": "Exact SHA-256 e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-10 at 00:53:21Z. Catalog, postgres ownership, forced-RLS/policy-free private storage, exact RPC grants, platform-admin atomic ingestion, unauthorized denial, replay and malformed/unsafe-input rejection, immutable provenance, existing approval-workflow regression, rollback-only cleanup, and unrelated business-data preservation passed with one internal workspace and zero preparation packages, content rows, or status events."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Separate migration-first rollout authorization is required; Codex-assisted preparation remains unavailable."
+          "status": "Applied",
+          "reason": "Exact SHA-256 e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 at 00:50:55Z. Catalog, postgres ownership, forced-RLS/policy-free private storage, exact RPC grants, transaction-local platform-admin atomic ingestion, unauthorized denial, replay and malformed/unsafe-input rejection, immutable provenance, existing approval-workflow regression, rollback-only cleanup, and unrelated business-data preservation passed with one internal workspace and zero preparation packages, content rows, or status events."
         }
       }
     }

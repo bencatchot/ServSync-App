@@ -66,7 +66,7 @@ Current Demo exceptions are limited to:
 
 Project Collaboration is absent from Production and Demo, so it is not part of supported parity. Sandbox's six Project Collaboration tables, nine exact functions, `inspections.project_id` link, and exact 297-object catalog fingerprint are recorded as an approved Sandbox-only experiment.
 
-Codex-Assisted Marketing Draft Preparation v1 is also Sandbox-only pending a separately authorized Demo/Production rollout. Its one preparation-package table, five existing-content provenance columns, three private/new functions, ingestion grant, supporting constraints/indexes/triggers/ACLs, and exact 54-object catalog fingerprint are recorded as an approved Sandbox addition. The changed `servsync_list_internal_marketing_content(text)` contract remains visible as Production-supported logical drift because intentional additions cannot hide a changed supported object. The manifest does not convert this pre-rollout state into supported parity.
+Codex-Assisted Marketing Draft Preparation v1 is part of the supported schema in Sandbox, Demo, and Production after the exact migration-first rollout on 2026-08-10. Its former Sandbox-only intentional-addition group is retired. The preparation-package table, content provenance columns, ingestion/private functions, grants, supporting objects, and changed `servsync_list_internal_marketing_content(text)` contract must now compare as ordinary supported schema; the manifest does not hide future drift in these objects.
 
 Results mean:
 

@@ -51,7 +51,7 @@ The ingestion operator uses an ordinary authenticated platform-admin session and
 
 ## Environment Boundary
 
-The migration is Sandbox-only for this slice. Demo and Production retain the Slice 2 schema and cannot ingest or display preparation provenance until a separately authorized migration-first rollout occurs. This branch does not alter provider credentials, OpenAI configuration, Vercel variables, publishing configuration, or any Production/Demo data.
+The exact migration is applied in Sandbox, Demo, and Production. Demo received SHA-256 `e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2` at `2026-08-10T00:50:55Z`; Production received the same artifact at `2026-08-10T00:53:21Z`. Catalog, authorization, atomic ingestion, replay, validation, immutable provenance, and existing approval-workflow checks passed in rollback-only transactions. Each environment retains one internal workspace and zero preparation packages, content rows, or status events. No provider credentials, OpenAI configuration, Vercel variables, publishing configuration, or unrelated business data changed.
 
 ## Deferred Work
 
