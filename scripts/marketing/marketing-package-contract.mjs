@@ -5,13 +5,33 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = join(scriptDirectory, '..', '..');
 
-const PACKAGE_KEYS = [
+const CURRENT_TRUTH_PACK_VERSION = 'servsync-marketing-truth-v2';
+const PACKAGE_KEYS_V1 = [
   'brief_summary',
   'items',
   'preparation_request_id',
   'recipe_key',
   'truth_pack_version',
 ];
+const PACKAGE_KEYS_V2 = [
+  'items',
+  'marketing_direction',
+  'preparation_request_id',
+  'recipe_key',
+  'truth_pack_version',
+];
+const DIRECTION_KEYS = [
+  'audience',
+  'central_message',
+  'corrected_assumptions',
+  'mode',
+  'objective',
+  'owner_input',
+  'recommendation_rationale',
+  'statement',
+  'supporting_points',
+];
+const CORRECTION_KEYS = ['code', 'correction'];
 const ITEM_KEYS = [
   'body',
   'channel_category',
@@ -38,6 +58,34 @@ const CLAIM_PATTERNS = [
   /(?:save|saves|saved|reduce|reduces|increase|increases)[^.!?]{0,60}\d+/i,
   /(?:quickbooks integration|google calendar sync|outlook calendar sync|live stripe payments|automatic sms|automated email campaign|ai-powered diagnostics)/i,
 ];
+const COMPETITOR_ASSUMPTION_PATTERNS = [
+  {
+    code: 'competitor_account_requirement',
+    pattern: /(?:competitors?|competing|other)\s+(?:apps?|software|platforms?|tools?)?[^.!?]{0,80}(?:require|force|make)[^.!?]{0,60}(?:account|sign[ -]?up|register)/i,
+  },
+  {
+    code: 'competitor_app_download_requirement',
+    pattern: /(?:competitors?|competing|other)\s+(?:apps?|software|platforms?|tools?)?[^.!?]{0,80}(?:require|force|make)[^.!?]{0,60}(?:download|install|app)/i,
+  },
+  {
+    code: 'competitor_app_download_requirement',
+    pattern: /(?:force|make)[^.!?]{0,50}(?:customers?|homeowners?)[^.!?]{0,50}(?:download|install)(?:[^.!?]{0,20}app)?/i,
+  },
+  {
+    code: 'competitor_subscription_requirement',
+    pattern: /(?:competitors?|competing|other)\s+(?:apps?|software|platforms?|tools?)?[^.!?]{0,80}(?:require|force|make)[^.!?]{0,60}(?:subscription|subscribe|monthly fee)/i,
+  },
+  {
+    code: 'competitor_inferiority',
+    pattern: /(?:unlike|compared (?:with|to))\s+(?:competitors?|competing|other)|(?:competitors?|competing|other)\s+(?:apps?|software|platforms?|tools?)[^.!?]{0,80}(?:inferior|harder|difficult|expensive|fragmented|lack|cannot|can't|don't|doesn't)/i,
+  },
+];
+const UNSUPPORTED_CONTRAST_PATTERNS = [
+  /\b(?:unlike|compared (?:with|to))\s+(?:competitors?|competing|other)\b/i,
+  /\b(?:competitors?|competing|other)\s+(?:apps?|software|platforms?|tools?)\b[^.!?]{0,100}\b(?:force|require|make|lack|cannot|can't|don't|doesn't|inferior|harder|difficult|expensive|fragmented)\b/i,
+  /\bno more (?:being )?forced to\b/i,
+  /\bwithout forcing\b/i,
+];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -57,10 +105,22 @@ function boundedText(value, minimum, maximum, label) {
   return normalized;
 }
 
-export async function loadMarketingContracts(root = repositoryRoot) {
+export async function loadMarketingContracts(root = repositoryRoot, truthPackVersion = CURRENT_TRUTH_PACK_VERSION) {
+  const versions = {
+    'servsync-marketing-truth-v1': {
+      truth: 'servsync-marketing-truth-pack.v1.json',
+      recipes: 'servsync-marketing-recipes.v1.json',
+    },
+    'servsync-marketing-truth-v2': {
+      truth: 'servsync-marketing-truth-pack.v2.json',
+      recipes: 'servsync-marketing-recipes.v2.json',
+    },
+  };
+  const files = versions[truthPackVersion];
+  assert(files, 'Marketing package references an unsupported Truth Pack version.');
   const [truthPack, recipeSet] = await Promise.all([
-    readFile(join(root, 'config/marketing/servsync-marketing-truth-pack.v1.json'), 'utf8').then(JSON.parse),
-    readFile(join(root, 'config/marketing/servsync-marketing-recipes.v1.json'), 'utf8').then(JSON.parse),
+    readFile(join(root, 'config/marketing', files.truth), 'utf8').then(JSON.parse),
+    readFile(join(root, 'config/marketing', files.recipes), 'utf8').then(JSON.parse),
   ]);
   validateMarketingContracts(truthPack, recipeSet);
   return { truthPack, recipeSet };
@@ -68,14 +128,17 @@ export async function loadMarketingContracts(root = repositoryRoot) {
 
 export function validateMarketingContracts(truthPack, recipeSet) {
   assert(truthPack?.schemaVersion === 1, 'Marketing Truth Pack schema version must be 1.');
-  assert(truthPack?.truthPackVersion === 'servsync-marketing-truth-v1', 'Unexpected Marketing Truth Pack version.');
+  assert(['servsync-marketing-truth-v1', 'servsync-marketing-truth-v2'].includes(truthPack?.truthPackVersion), 'Unexpected Marketing Truth Pack version.');
   assert(Array.isArray(truthPack.audiences) && truthPack.audiences.length > 0, 'Marketing Truth Pack audiences are missing.');
   assert(Array.isArray(truthPack.marketableCapabilities) && truthPack.marketableCapabilities.length > 0, 'Marketing capabilities are missing.');
   assert(Array.isArray(truthPack.unavailableOrRestrictedCapabilities), 'Restricted Marketing capabilities are missing.');
   assert(Array.isArray(truthPack.prohibitedClaimPolicy?.categories), 'Marketing prohibited-claim policy is missing.');
 
   assert(recipeSet?.schemaVersion === 1, 'Marketing recipe schema version must be 1.');
-  assert(recipeSet?.recipeSetVersion === 'servsync-marketing-recipes-v1', 'Unexpected Marketing recipe version.');
+  const expectedRecipeVersion = truthPack.truthPackVersion === 'servsync-marketing-truth-v2'
+    ? 'servsync-marketing-recipes-v2'
+    : 'servsync-marketing-recipes-v1';
+  assert(recipeSet?.recipeSetVersion === expectedRecipeVersion, 'Unexpected Marketing recipe version.');
   assert(recipeSet?.truthPackVersion === truthPack.truthPackVersion, 'Marketing recipes reference the wrong Truth Pack.');
   assert(Array.isArray(recipeSet.recipes) && recipeSet.recipes.length === 3, 'Exactly three Marketing recipes are required in v1.');
 
@@ -92,17 +155,97 @@ export function validateMarketingContracts(truthPack, recipeSet) {
       roles.add(item.role);
       assert(['social_post', 'email', 'website_copy', 'other'].includes(item.contentType), `Recipe ${recipe.key} has an invalid content type.`);
       assert(['social', 'email', 'website', 'other'].includes(item.channelCategory), `Recipe ${recipe.key} has an invalid channel.`);
+      if (truthPack.truthPackVersion === 'servsync-marketing-truth-v2') {
+        assert(typeof item.directionPurpose === 'string' && item.directionPurpose.trim().length > 0, `Recipe ${recipe.key} is missing role direction guidance.`);
+      }
     }
+  }
+
+  if (truthPack.truthPackVersion === 'servsync-marketing-truth-v2') {
+    assert(recipeSet.directionContractVersion === 1, 'Marketing Direction contract version must be 1.');
+    assert(typeof truthPack.competitiveFramingPolicy?.rule === 'string', 'Competitive framing policy is missing.');
+    assert(typeof truthPack.guestAndConnectedHomeownerTruth?.plainLanguageSummary === 'string', 'Guest and connected-homeowner truth is missing.');
+    assert(Array.isArray(truthPack.copyQualityGuidance?.prefer), 'Marketing copy-quality guidance is missing.');
   }
 }
 
+export function analyzeMarketingDirectionInput(value) {
+  if (typeof value !== 'string') return [];
+  return COMPETITOR_ASSUMPTION_PATTERNS
+    .filter(candidate => candidate.pattern.test(value))
+    .map(candidate => candidate.code)
+    .filter((code, index, values) => values.indexOf(code) === index);
+}
+
+export function validateMarketingDirection(input, contracts) {
+  exactKeys(input, DIRECTION_KEYS, 'Marketing Direction');
+  assert(input.mode === 'owner_led' || input.mode === 'recommended', 'Marketing Direction mode is invalid.');
+  const ownerInput = input.owner_input === null
+    ? null
+    : boundedText(input.owner_input, 1, 1000, 'Marketing Direction owner input');
+  if (input.mode === 'owner_led') assert(ownerInput, 'Owner-led Marketing Direction requires owner input.');
+  if (input.mode === 'recommended') assert(ownerInput === null, 'Recommended Marketing Direction must not invent owner input.');
+
+  assert(contracts.truthPack.audiences.includes(input.audience), 'Marketing Direction audience is invalid.');
+  const objective = boundedText(input.objective, 1, 240, 'Marketing Direction objective');
+  const statement = boundedText(input.statement, 1, 500, 'Marketing Direction statement');
+  const centralMessage = boundedText(input.central_message, 1, 500, 'Marketing Direction central message');
+  assert(Array.isArray(input.supporting_points) && input.supporting_points.length <= 4, 'Marketing Direction supporting points are invalid.');
+  const supportingPoints = input.supporting_points.map((value, index) => boundedText(value, 1, 300, `Marketing Direction supporting point ${index + 1}`));
+  assert(new Set(supportingPoints.map(value => value.toLowerCase())).size === supportingPoints.length, 'Marketing Direction supporting points must be unique.');
+
+  assert(Array.isArray(input.corrected_assumptions) && input.corrected_assumptions.length <= 4, 'Marketing Direction corrected assumptions are invalid.');
+  const correctionCodes = new Set();
+  const correctedAssumptions = input.corrected_assumptions.map((value, index) => {
+    exactKeys(value, CORRECTION_KEYS, `Marketing Direction correction ${index + 1}`);
+    assert(COMPETITOR_ASSUMPTION_PATTERNS.some(candidate => candidate.code === value.code), `Marketing Direction correction ${index + 1} has an unknown code.`);
+    assert(!correctionCodes.has(value.code), 'Marketing Direction correction codes must be unique.');
+    correctionCodes.add(value.code);
+    return {
+      code: value.code,
+      correction: boundedText(value.correction, 1, 300, `Marketing Direction correction ${index + 1}`),
+    };
+  });
+
+  const detectedAssumptions = analyzeMarketingDirectionInput(ownerInput);
+  assert(detectedAssumptions.every(code => correctionCodes.has(code)), 'Marketing Direction must explicitly correct every detected unsupported competitor assumption.');
+
+  const recommendationRationale = input.recommendation_rationale === null
+    ? null
+    : boundedText(input.recommendation_rationale, 1, 500, 'Marketing Direction recommendation rationale');
+  if (input.mode === 'recommended') assert(recommendationRationale, 'Recommended Marketing Direction requires a rationale.');
+  if (input.mode === 'owner_led') assert(recommendationRationale === null, 'Owner-led Marketing Direction must not claim a system recommendation.');
+
+  const publicDirection = [statement, centralMessage, ...supportingPoints].join('\n');
+  assert(!SECRET_PATTERNS.some(pattern => pattern.test(publicDirection)), 'Marketing Direction contains secret-like material.');
+  assert(!CLAIM_PATTERNS.some(pattern => pattern.test(publicDirection)), 'Marketing Direction contains a prohibited or unsupported claim pattern.');
+  assert(!UNSUPPORTED_CONTRAST_PATTERNS.some(pattern => pattern.test(publicDirection)), 'Marketing Direction contains an unsupported competitor contrast.');
+
+  return {
+    mode: input.mode,
+    owner_input: ownerInput,
+    audience: input.audience,
+    objective,
+    statement,
+    central_message: centralMessage,
+    supporting_points: supportingPoints,
+    corrected_assumptions: correctedAssumptions,
+    recommendation_rationale: recommendationRationale,
+  };
+}
+
 export function validateMarketingPackage(input, contracts) {
-  exactKeys(input, PACKAGE_KEYS, 'Marketing package');
+  const usesDirection = input?.truth_pack_version === 'servsync-marketing-truth-v2';
+  exactKeys(input, usesDirection ? PACKAGE_KEYS_V2 : PACKAGE_KEYS_V1, 'Marketing package');
   assert(UUID_PATTERN.test(input.preparation_request_id), 'Preparation request ID must be a UUID.');
   assert(input.truth_pack_version === contracts.truthPack.truthPackVersion, 'Marketing package references the wrong Truth Pack.');
-  const briefSummary = boundedText(input.brief_summary, 1, 500, 'Brief summary');
+  const marketingDirection = usesDirection ? validateMarketingDirection(input.marketing_direction, contracts) : null;
+  const briefSummary = usesDirection
+    ? marketingDirection.statement
+    : boundedText(input.brief_summary, 1, 500, 'Brief summary');
   const recipe = contracts.recipeSet.recipes.find(candidate => candidate.key === input.recipe_key);
   assert(recipe, 'Marketing package references an unknown recipe.');
+  if (marketingDirection) assert(recipe.allowedAudiences.includes(marketingDirection.audience), 'Marketing Direction audience is not allowed by the recipe.');
   assert(Array.isArray(input.items) && input.items.length >= 1 && input.items.length <= 7, 'Marketing package must contain 1-7 items.');
 
   const recipeRoles = new Map(recipe.items.map(item => [item.role, item]));
@@ -119,6 +262,7 @@ export function validateMarketingPackage(input, contracts) {
     assert(role.contentType === item.content_type, `${label} content type conflicts with its recipe role.`);
     assert(role.channelCategory === item.channel_category, `${label} channel conflicts with its recipe role.`);
     assert(recipe.allowedAudiences.includes(item.intended_audience), `${label} audience is not allowed by the recipe.`);
+    if (marketingDirection) assert(item.intended_audience === marketingDirection.audience, `${label} audience conflicts with the Marketing Direction.`);
     seenRoles.add(item.content_role);
 
     const normalizedTitle = title.toLowerCase().replace(/\s+/g, ' ');
@@ -131,6 +275,7 @@ export function validateMarketingPackage(input, contracts) {
     const combined = `${title}\n${body}`;
     assert(!SECRET_PATTERNS.some(pattern => pattern.test(combined)), `${label} contains secret-like material.`);
     assert(!CLAIM_PATTERNS.some(pattern => pattern.test(combined)), `${label} contains a prohibited or unsupported claim pattern.`);
+    assert(!UNSUPPORTED_CONTRAST_PATTERNS.some(pattern => pattern.test(combined)), `${label} contains an unsupported competitor contrast.`);
 
     return {
       title,
@@ -147,24 +292,26 @@ export function validateMarketingPackage(input, contracts) {
     recipe_key: recipe.key,
     truth_pack_version: input.truth_pack_version,
     brief_summary: briefSummary,
+    ...(marketingDirection ? { marketing_direction: marketingDirection } : {}),
     items,
   };
 }
 
 export const marketingPackageContract = {
-  packageKeys: PACKAGE_KEYS,
+  packageKeysV1: PACKAGE_KEYS_V1,
+  packageKeysV2: PACKAGE_KEYS_V2,
   itemKeys: ITEM_KEYS,
   claimPatterns: CLAIM_PATTERNS,
+  competitorAssumptionPatterns: COMPETITOR_ASSUMPTION_PATTERNS,
+  unsupportedContrastPatterns: UNSUPPORTED_CONTRAST_PATTERNS,
   secretPatterns: SECRET_PATTERNS,
 };
 
 async function runCli() {
   const inputPath = process.argv[2];
   if (!inputPath) throw new Error('Usage: marketing-package-contract.mjs <package.json>');
-  const [contracts, input] = await Promise.all([
-    loadMarketingContracts(),
-    readFile(inputPath, 'utf8').then(value => JSON.parse(value)),
-  ]);
+  const input = await readFile(inputPath, 'utf8').then(value => JSON.parse(value));
+  const contracts = await loadMarketingContracts(repositoryRoot, input.truth_pack_version);
   const result = validateMarketingPackage(input, contracts);
   process.stdout.write(`${JSON.stringify({
     valid: true,

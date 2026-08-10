@@ -69,6 +69,7 @@ SQL
 psql_run --file "$ROOT_DIR/servsync-internal-marketing-content-approval.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/internal-marketing-content-approval-validation.sql" >/dev/null
 psql_run --file "$ROOT_DIR/servsync-codex-assisted-marketing-drafts.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-marketing-direction-copy-guardrails.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/codex-assisted-marketing-drafts-validation.sql" >/dev/null
 
 before_fingerprint="$(psql_run --quiet --tuples-only --no-align <<'SQL'
@@ -101,6 +102,11 @@ if [[ "$before_fingerprint" != "$after_fingerprint" ]]; then
   exit 1
 fi
 
+if psql_run --file "$ROOT_DIR/servsync-marketing-direction-copy-guardrails.sql" >/dev/null 2>&1; then
+  echo "Repeated Marketing Direction migration unexpectedly succeeded." >&2
+  exit 1
+fi
+
 psql_run --command "create database marketing_preflight" >/dev/null
 PREFLIGHT_URL="postgresql://postgres@/marketing_preflight?host=$PGSOCKET&port=$PGPORT"
 if "$PSQL_BIN" "$PREFLIGHT_URL" --set=ON_ERROR_STOP=1 --file "$ROOT_DIR/servsync-codex-assisted-marketing-drafts.sql" >/dev/null 2>&1; then
@@ -108,9 +114,20 @@ if "$PSQL_BIN" "$PREFLIGHT_URL" --set=ON_ERROR_STOP=1 --file "$ROOT_DIR/servsync
   exit 1
 fi
 
+if "$PSQL_BIN" "$PREFLIGHT_URL" --set=ON_ERROR_STOP=1 --file "$ROOT_DIR/servsync-marketing-direction-copy-guardrails.sql" >/dev/null 2>&1; then
+  echo "Missing-prerequisite Marketing Direction migration unexpectedly succeeded." >&2
+  exit 1
+fi
+
 preflight_residue="$("$PSQL_BIN" "$PREFLIGHT_URL" --set=ON_ERROR_STOP=1 --tuples-only --no-align --command "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = 'marketing_content_preparation_packages';")"
 if [[ "$preflight_residue" != "0" ]]; then
   echo "Failed preflight left Codex-assisted Marketing residue." >&2
+  exit 1
+fi
+
+direction_residue="$("$PSQL_BIN" "$PREFLIGHT_URL" --set=ON_ERROR_STOP=1 --tuples-only --no-align --command "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'servsync_private_marketing_direction_is_safe';")"
+if [[ "$direction_residue" != "0" ]]; then
+  echo "Failed Marketing Direction preflight left function residue." >&2
   exit 1
 fi
 

@@ -79,6 +79,23 @@ begin
     raise exception 'Marketing ingestion RPC search path mismatch.';
   end if;
 
+  if (select pg_get_userbyid(proowner) <> 'postgres'
+             or prosecdef
+             or proconfig <> array['search_path=pg_catalog']
+        from pg_proc
+       where oid = 'public.servsync_private_marketing_direction_is_safe(text)'::regprocedure)
+     or has_function_privilege('anon', 'public.servsync_private_marketing_direction_is_safe(text)', 'execute')
+     or has_function_privilege('authenticated', 'public.servsync_private_marketing_direction_is_safe(text)', 'execute')
+     or has_function_privilege('service_role', 'public.servsync_private_marketing_direction_is_safe(text)', 'execute') then
+    raise exception 'Private Marketing Direction guard security mismatch.';
+  end if;
+
+  if not public.servsync_private_marketing_copy_is_claim_safe('Send an estimate without forcing an account signup')
+     or public.servsync_private_marketing_direction_is_safe('Send an estimate without forcing an account signup')
+     or not public.servsync_private_marketing_direction_is_safe('Customers can review an eligible estimate through a secure ServSync link.') then
+    raise exception 'Versioned Marketing copy-safety boundary mismatch.';
+  end if;
+
   if exists (
     select 1 from public.marketing_content_items
      where preparation_source <> 'manual'
@@ -139,9 +156,9 @@ do $$
 declare
   v_request_id constant uuid := '41000000-0000-4000-8000-000000000010';
   v_items constant jsonb := '[
-    {"title":"Keep estimate follow-up organized","content_type":"social_post","body":"Keep an Estimate tied to the Customer and work it describes, then send the exact version for review.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"facebook_instagram_post"},
-    {"title":"A clearer path from request to Estimate","content_type":"social_post","body":"ServSync helps small service teams keep requests, Estimates, and the next contractor action connected in one workflow.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"linkedin_post"},
-    {"title":"What secure Estimate delivery means","content_type":"social_post","body":"An eligible Not connected Customer can review and respond to the exact securely delivered Estimate without creating an account.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"educational_post"}
+    {"title":"A customer can review the estimate before joining ServSync","content_type":"social_post","body":"Send an eligible estimate through a secure link and keep the exact response connected to the work.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"facebook_instagram_post"},
+    {"title":"Two useful ways to serve a customer","content_type":"social_post","body":"A document-specific interaction can help with the work in front of you. A connected homeowner relationship can support the service relationship that follows.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"linkedin_post"},
+    {"title":"What the two customer paths mean","content_type":"social_post","body":"A customer can use certain secure ServSync documents without an account, while a connected homeowner can use supported ongoing home-service experiences.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"educational_post"}
   ]'::jsonb;
   v_first jsonb;
   v_replay jsonb;
@@ -151,15 +168,15 @@ begin
   v_first := public.servsync_ingest_internal_marketing_package(
     v_request_id,
     'contractor_acquisition',
-    'servsync-marketing-truth-v1',
-    'Three coordinated Estimate workflow drafts for HVAC contractors.',
+    'servsync-marketing-truth-v2',
+    'Show HVAC contractors that ServSync supports immediate customer interactions and an optional longer-term connected homeowner relationship.',
     v_items
   );
   v_replay := public.servsync_ingest_internal_marketing_package(
     v_request_id,
     'contractor_acquisition',
-    'servsync-marketing-truth-v1',
-    'Three coordinated Estimate workflow drafts for HVAC contractors.',
+    'servsync-marketing-truth-v2',
+    'Show HVAC contractors that ServSync supports immediate customer interactions and an optional longer-term connected homeowner relationship.',
     v_items
   );
 
@@ -178,7 +195,7 @@ begin
        and (
          preparation_source <> 'codex_assisted'
          or preparation_recipe_key <> 'contractor_acquisition'
-         or truth_pack_version <> 'servsync-marketing-truth-v1'
+         or truth_pack_version <> 'servsync-marketing-truth-v2'
          or intended_audience <> 'hvac_contractors'
          or preparation_sequence not between 1 and 3
        )
@@ -204,7 +221,7 @@ begin
     perform public.servsync_ingest_internal_marketing_package(
       v_request_id,
       'contractor_acquisition',
-      'servsync-marketing-truth-v1',
+      'servsync-marketing-truth-v2',
       'Conflicting replay.',
       v_items
     );
@@ -215,6 +232,50 @@ end;
 $$;
 
 reset role;
+
+begin;
+set role authenticated;
+set request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+do $$
+begin
+  if (public.servsync_ingest_internal_marketing_package(
+    '41000000-0000-4000-8000-000000000090',
+    'contractor_acquisition',
+    'servsync-marketing-truth-v1',
+    'Historical package replay compatibility.',
+    '[{"title":"Send an estimate without forcing an account signup","content_type":"social_post","body":"Historical v1 draft copy remains replay-compatible.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"feature_highlight"}]'::jsonb
+  ) ->> 'status') <> 'draft' then
+    raise exception 'Historical v1 package compatibility failed.';
+  end if;
+
+  begin
+    perform public.servsync_ingest_internal_marketing_package(
+      '41000000-0000-4000-8000-000000000091',
+      'contractor_acquisition',
+      'servsync-marketing-truth-v2',
+      'Unlike competitors, ServSync gives customers a better estimate experience.',
+      '[{"title":"A safe title","content_type":"social_post","body":"Customers can review an eligible estimate through a secure link.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"feature_highlight"}]'::jsonb
+    );
+    raise exception 'Unsafe v2 Marketing Direction unexpectedly succeeded.';
+  exception when invalid_parameter_value then null;
+  end;
+
+  begin
+    perform public.servsync_ingest_internal_marketing_package(
+      '41000000-0000-4000-8000-000000000092',
+      'contractor_acquisition',
+      'servsync-marketing-truth-v2',
+      'Explain one current ServSync estimate interaction on its own merits.',
+      '[{"title":"Send an estimate without forcing an account signup","content_type":"social_post","body":"Customers can review an eligible estimate through a secure link.","channel_category":"social","intended_audience":"hvac_contractors","content_role":"feature_highlight"}]'::jsonb
+    );
+    raise exception 'Unsafe v2 Marketing copy unexpectedly succeeded.';
+  exception when invalid_parameter_value then null;
+  end;
+end;
+$$;
+
+rollback;
 
 do $$
 begin

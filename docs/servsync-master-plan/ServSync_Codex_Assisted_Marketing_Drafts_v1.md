@@ -13,23 +13,28 @@ draft -> needs_approval -> approved
 
 Codex cannot submit, approve, return, reject, schedule, publish, contact prospects, or alter analytics. The application contains no generation button, provider call, canned-copy fallback, publishing path, or contractor/homeowner Marketing access.
 
-## Truth And Recipe Contracts
+## Truth, Direction, And Recipe Contracts
 
-`config/marketing/servsync-marketing-truth-pack.v1.json` is the bounded source used for claims in this workflow. It records:
+The immutable v1 contracts remain available for historical Package #1 replay and audit. New preparation uses `config/marketing/servsync-marketing-truth-pack.v2.json`, which records:
 
 - current marketable capabilities and their limits;
 - canonical ServSync terminology;
 - unavailable or restricted capabilities;
 - prohibited unsupported claim classes, phrases, and numeric patterns;
-- the repository evidence used to maintain the pack.
+- the repository evidence used to maintain the pack;
+- the accurate distinction between document-scoped interaction without a registered account and an optional connected-homeowner relationship;
+- an explicit rule against manufacturing competitor account, app-download, subscription, capability, difficulty, expense, fragmentation, or superiority claims;
+- plain-language copy guidance that starts from one customer/contractor problem rather than a feature inventory.
 
-`config/marketing/servsync-marketing-recipes.v1.json` defines three coordinated package recipes: contractor acquisition, homeowner awareness, and feature promotion. Recipes constrain audience, role, content type, and channel category without containing publish-provider identifiers or behavior.
+`config/marketing/servsync-marketing-recipes.v2.json` defines the same three provider-neutral package recipes while giving every role a distinct purpose within one focused Marketing Direction. Recipes constrain audience, role, content type, channel category, and differentiation guidance without containing publish-provider identifiers or behavior.
+
+Every v2 package contains an owner-led or recommended Marketing Direction with one audience, objective, statement, central message, bounded supporting points, explicit corrected assumptions, and a recommendation rationale only when Codex proposed the direction. The local contract detects bounded unsupported competitor assumptions in owner input, requires an explicit correction, and rejects those contrasts from the direction or prepared copy. It does not store hidden reasoning.
 
 Changing a current capability, product term, claim boundary, recipe role, audience, or allowed output contract requires a reviewed version change. Historical preparation records retain the exact Truth Pack version and recipe key they used.
 
 ## Durable Model
 
-`marketing_content_preparation_packages` stores immutable package provenance: internal workspace, stable client request UUID, source, recipe, Truth Pack version, brief, item count, request fingerprint, actor, and preparation time.
+`marketing_content_preparation_packages` stores immutable package provenance: internal workspace, stable client request UUID, source, recipe, Truth Pack version, direction statement in the existing `brief_summary`, item count, request fingerprint, actor, and preparation time. This reuses the deployed provider-neutral table shape without adding a table or column; the separately documented RPC compatibility migration is still required before v2 ingestion. Package #1 and its five records remain unchanged.
 
 The existing `marketing_content_items` table receives nullable preparation provenance. Manual records remain `manual` with no package metadata. Prepared records require a package identity, sequence, audience, and content role. Existing content status and optimistic revision behavior is unchanged.
 
@@ -51,7 +56,7 @@ The ingestion operator uses an ordinary authenticated platform-admin session and
 
 ## Environment Boundary
 
-The exact migration is applied in Sandbox, Demo, and Production. Demo received SHA-256 `e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2` at `2026-08-10T00:50:55Z`; Production received the same artifact at `2026-08-10T00:53:21Z`. Catalog, authorization, atomic ingestion, replay, validation, immutable provenance, and existing approval-workflow checks passed in rollback-only transactions. Each environment retains one internal workspace and zero preparation packages, content rows, or status events. No provider credentials, OpenAI configuration, Vercel variables, publishing configuration, or unrelated business data changed.
+The exact migration is applied in Sandbox, Demo, and Production. Demo received SHA-256 `e062367a4e060820dbdf0cbe73f4d961d9d3e3891717abd46d058b3945e51ce2` at `2026-08-10T00:50:55Z`; Production received the same artifact at `2026-08-10T00:53:21Z`. Catalog, authorization, atomic ingestion, replay, validation, immutable provenance, and existing approval-workflow checks passed in rollback-only transactions. The rollout baseline retained one internal workspace and zero preparation packages, content rows, or status events in each environment. A later authorized operational run created the first Production package and five drafts; Slice 3A does not modify those historical records. No provider credentials, OpenAI configuration, Vercel variables, publishing configuration, or unrelated business data changed.
 
 ## Deferred Work
 
@@ -65,3 +70,5 @@ Still separate and unavailable:
 - campaigns, prospecting, outreach, and analytics;
 - contractor Business Marketing workspaces;
 - provider-specific content or delivery records.
+
+Marketing Direction Slice 3A uses one additive compatibility migration because the deployed ingestion RPC intentionally pinned Truth Pack v1. Exact SHA-256 `c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda` is applied and validated in Sandbox, Demo, and Production after the controlled Demo-first/Production-second rollout on 2026-08-10. It permits historical v1 replay plus v2 ingestion, applies the new competitor-framing guard only to v2 direction/copy, and retains the same platform-admin-only RPC, tables, transaction, roles, and grants. Production Package #1 retained exact package/content/event fingerprints, Truth Pack v1 identity, five drafts, and its five initial draft events. No runtime generation UI or new authorization surface is included.
