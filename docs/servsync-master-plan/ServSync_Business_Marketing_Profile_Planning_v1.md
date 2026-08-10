@@ -2,7 +2,7 @@
 
 ## Status
 
-Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The exact migration is applied and validated in Sandbox only. Demo and Production rollout require separate authorization. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
+Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The exact migration is applied and validated in Sandbox, Demo, and Production. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
 
 ## Architecture
 
@@ -66,7 +66,7 @@ Loading, error, incomplete-profile, stale-write, and accepted-plan states remain
 
 ## Rollout Boundary
 
-The final additive migration has SHA-256 `60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5`. It is applied and transactionally validated in Sandbox `zpzdkoaubyjtsomccxya`, including a narrow post-application correction that serializes concurrent first-use replay for one request UUID. Sandbox retains one internal profile, one initial profile revision, zero plans, zero plan revisions, and unchanged Marketing content/package/event counts. Demo and Production remain pending until a separately authorized migration-first rollout. Until then, those environments retain their existing Marketing content/approval behavior; the unmerged Slice 4 client is not Production runtime.
+The final additive migration has SHA-256 `60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5`. It is applied and transactionally validated in Sandbox `zpzdkoaubyjtsomccxya`, Demo `bdytwgejqnlblhrnqxkp` (`2026-08-10T17:31:33Z` through `17:31:42Z`), and Production `uqgtheclhxqlnjpfmheq` (`2026-08-10T17:33:46Z` through `17:34:02Z`). The final definition serializes concurrent first-use replay for one request UUID. Each environment retains one internal profile, one initial profile revision, and zero plans or plan revisions. Production's two preparation packages, ten content records (three approved and seven draft), sixteen status events, and package/content/event fingerprints remained exact; Demo's zero-content baseline and unrelated business fingerprints also remained exact. Rollback-only workflow and tenant-isolation validation left no residue.
 
 No environment variable, provider secret, Stripe setting, billing behavior, capability flag, external account, business record, or approved Production Marketing content is changed by this slice.
 

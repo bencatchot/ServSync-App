@@ -107,42 +107,6 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
-      },
-      {
-        "id": "business-marketing-profile-plan-v1",
-        "reason": "Reviewed Sandbox-only Business Marketing Profile + Planning foundation pending separately authorized Demo and Production rollout.",
-        "selectors": {
-          "relationScopes": [
-            "public.marketing_business_profile_revisions",
-            "public.marketing_business_profiles",
-            "public.marketing_plan_revisions",
-            "public.marketing_plans"
-          ],
-          "functionScopes": [
-            "public.servsync_accept_internal_marketing_plan(uuid, bigint)",
-            "public.servsync_create_internal_marketing_plan(uuid, bigint, text, text, date, date, text, jsonb)",
-            "public.servsync_get_internal_marketing_planning()",
-            "public.servsync_private_internal_marketing_recent_context(uuid)",
-            "public.servsync_private_marketing_plan_items_valid(jsonb)",
-            "public.servsync_private_marketing_planning_revision_guard()",
-            "public.servsync_private_marketing_text_array_valid(text[], integer, integer, integer)",
-            "public.servsync_update_internal_marketing_plan(uuid, bigint, text, date, date, text, jsonb)",
-            "public.servsync_update_internal_marketing_profile(bigint, text, text[], text[], text, text[], text, text, text[], text[], text[], text[], text)"
-          ],
-          "exactObjects": []
-        },
-        "expectedCounts": {
-          "relations": 4,
-          "columns": 52,
-          "constraints": 48,
-          "indexes": 11,
-          "triggers": 4,
-          "functions": 9,
-          "functionGrants": 14,
-          "tableGrants": 32
-        },
-        "expectedKeyFingerprint": "sha256:21877726cd4633b9019b41b061de1719c281bdde8f3d02527c87fa637bc23fb2",
-        "expectedCatalogFingerprint": "sha256:8548e2d0747b06ebc2d46514176da277cee79e642eca013b7a88a0c2ba788280"
       }
     ]
   }

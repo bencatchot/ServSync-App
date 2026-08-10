@@ -318,12 +318,12 @@
           "reason": "Final SHA-256 60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5 corresponds to Sandbox zpzdkoaubyjtsomccxya after the base application before 17:09:45Z and the narrow concurrent-replay RPC correction on 2026-08-10. Catalog, postgres ownership, forced-RLS/policy-free tables, exact authenticated RPC grants, platform-admin profile/plan workflow, contractor/homeowner denial, sequential and concurrent idempotency, optimistic concurrency, immutable revisions, accepted-plan immutability, rollback-only cleanup, and content/package/event preservation passed with one internal profile, one initial profile revision, and zero plans or plan revisions."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Requires a separately authorized migration-first rollout before the Slice 4 planning runtime can be merged for Production use. No SQL or configuration was changed."
+          "status": "Applied",
+          "reason": "Exact SHA-256 60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-10 from 17:33:46Z through 17:34:02Z after Demo passed. Catalog, postgres ownership, forced-RLS/policy-free storage, exact RPC grants, rollback-only platform-admin profile/plan workflows, stale-write and conflicting-replay rejection, concurrent first-use idempotency, immutable revisions, tenant-strategy isolation, contractor/homeowner/anonymous and direct-table denial, and zero validation residue passed. Production retains exactly one internal profile and initial revision, zero plans/revisions, two preparation packages, ten content records (three approved and seven draft), sixteen status events, and exact pre-rollout package/content/event and unrelated-business fingerprints."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Requires a separately authorized migration-first rollout before the Slice 4 planning runtime can be merged for Demo use. No SQL or configuration was changed."
+          "status": "Applied",
+          "reason": "Exact SHA-256 60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 17:31:33Z through 17:31:42Z. Catalog, postgres ownership, forced-RLS/policy-free storage, exact RPC grants, transaction-local platform-admin profile/plan workflows, stale-write and conflicting-replay rejection, concurrent first-use idempotency, immutable revisions, tenant-strategy isolation, contractor/homeowner/anonymous and direct-table denial, and zero validation residue passed. Demo retains exactly one internal profile and initial revision, zero plans/revisions, and unchanged zero preparation-package, content, and status-event counts."
         }
       }
     }
