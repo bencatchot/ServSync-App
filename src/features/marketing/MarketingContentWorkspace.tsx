@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Save,
   Send,
+  Sparkles,
   XCircle,
 } from 'lucide-react';
 import {
@@ -50,6 +51,32 @@ const STATUS_STYLES: Record<MarketingContentStatus, string> = {
   approved: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-rose-50 text-rose-700',
 };
+
+const AUDIENCE_LABELS: Record<NonNullable<MarketingContentItem['intendedAudience']>, string> = {
+  small_contractors: 'Small contractors',
+  hvac_contractors: 'HVAC contractors',
+  plumbers: 'Plumbers',
+  electricians: 'Electricians',
+  homeowners: 'Homeowners',
+};
+
+const ROLE_LABELS: Record<NonNullable<MarketingContentItem['contentRole']>, string> = {
+  facebook_instagram_post: 'Facebook / Instagram post',
+  linkedin_post: 'LinkedIn post',
+  educational_post: 'Educational post',
+  feature_highlight: 'Feature highlight',
+  short_video_concept: 'Short-video concept',
+  problem_solution_post: 'Problem / solution post',
+  local_contractor_connection: 'Local-contractor connection',
+  feature_announcement: 'Feature announcement',
+  contractor_benefit: 'Contractor benefit',
+  homeowner_benefit: 'Homeowner benefit',
+};
+
+function recipeLabel(value: string | null) {
+  if (!value) return 'Prepared package';
+  return value.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
 
 type ContentFormValue = {
   title: string;
@@ -269,7 +296,7 @@ export function MarketingContentWorkspace(props: Props) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-950">Content</h2>
-          <p className="mt-1 text-sm text-slate-500">Prepare content and move only review-ready work into the approval queue.</p>
+          <p className="mt-1 text-sm text-slate-500">Review manual ideas and Codex-prepared drafts, then submit only ready work for approval.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -347,9 +374,17 @@ export function MarketingContentWorkspace(props: Props) {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="min-w-0 truncate text-sm font-bold text-slate-900">{item.title}</p>
                       <StatusBadge status={item.status} />
+                      {item.preparationSource === 'codex_assisted' && (
+                        <span
+                          data-testid="marketing-codex-source-badge"
+                          className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-1 text-xs font-bold text-cyan-800"
+                        >
+                          <Sparkles size={12} aria-hidden="true" /> Codex-prepared
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 truncate text-xs text-slate-500">
-                      {TYPE_LABELS[item.contentType]} · Updated {formatDate(item.updatedAt)}
+                      {item.contentRole ? ROLE_LABELS[item.contentRole] : TYPE_LABELS[item.contentType]} · Updated {formatDate(item.updatedAt)}
                     </p>
                   </div>
                   <ChevronRight size={17} className="shrink-0 text-slate-400" aria-hidden="true" />
@@ -393,6 +428,23 @@ export function MarketingContentWorkspace(props: Props) {
                 <div><dt className="font-semibold text-slate-500">Submitted</dt><dd className="mt-1 text-slate-800">{auditLabel(selected.submittedAt, selected.submittedByName)}</dd></div>
                 <div><dt className="font-semibold text-slate-500">Reviewed</dt><dd className="mt-1 text-slate-800">{auditLabel(selected.reviewedAt, selected.reviewedByName)}</dd></div>
               </dl>
+
+              {selected.preparationSource !== 'manual' && (
+                <div data-testid="marketing-preparation-provenance" className="border-y border-cyan-200 bg-cyan-50 px-3 py-3 text-sm text-cyan-950">
+                  <div className="flex items-center gap-2 font-bold">
+                    <Sparkles size={16} aria-hidden="true" />
+                    {selected.preparationSource === 'codex_assisted' ? 'Codex-prepared draft' : 'AI-prepared draft'}
+                  </div>
+                  <p className="mt-1 leading-5">
+                    {recipeLabel(selected.preparationRecipeKey)}
+                    {selected.intendedAudience ? ` · ${AUDIENCE_LABELS[selected.intendedAudience]}` : ''}
+                    {selected.contentRole ? ` · ${ROLE_LABELS[selected.contentRole]}` : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-cyan-800">
+                    Prepared {formatDate(selected.preparedAt)} · {selected.truthPackVersion}
+                  </p>
+                </div>
+              )}
 
               {selected.reviewNote && (
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">

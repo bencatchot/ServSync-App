@@ -28,7 +28,7 @@ It does not publish, schedule, generate, recommend, email, post, attribute, anal
 
 The migration seeds only deterministic empty workspace `servsync_internal`. It creates no content or activity fixture.
 
-`marketing_content_items` stores provider-neutral content and review state. It deliberately excludes publishing state, provider identifiers, schedules, campaign identity, analytics, AI provenance, and external-delivery details.
+`marketing_content_items` stores provider-neutral content and review state. Slice 2 deliberately excluded publishing state, provider identifiers, schedules, campaign identity, analytics, preparation provenance, and external-delivery details. The separately reviewed Codex-Assisted Marketing Draft Preparation v1 slice may add bounded provider-neutral preparation provenance without changing this approval contract.
 
 `marketing_content_status_events` is append-only transition evidence. It records the exact content revision, prior and resulting status, actor, timestamp, and bounded review reason. There is no revision-history UI in this slice.
 
@@ -83,3 +83,5 @@ Separately reviewed work remains required for:
 - prospecting and outreach;
 - acquisition analytics and referral measurement;
 - contractor Business Marketing workspaces and tenant authorization.
+
+Codex-assisted external preparation is now a separately documented foundation applied in Sandbox, Demo, and Production; in-app runtime AI generation remains pending.

@@ -41,6 +41,8 @@
     "test:public-signup-role-hardening": "scripts/validation/validate-public-signup-role-hardening.sh",
     "test:accepted-estimate-deposit-workflow": "scripts/validation/validate-accepted-estimate-deposit-workflow.sh",
     "test:stripe-connect-online-payments": "scripts/validation/validate-stripe-connect-online-payments-foundation.sh",
+    "test:codex-marketing-drafts": "bash scripts/validation/validate-codex-assisted-marketing-drafts.sh && node --test tests/marketing/codex-marketing-package-contract.test.mjs",
+    "marketing:ingest-codex-package": "node scripts/marketing/ingest-codex-marketing-package.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
