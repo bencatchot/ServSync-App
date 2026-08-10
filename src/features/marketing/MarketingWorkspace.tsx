@@ -29,6 +29,15 @@ import {
   type MarketingContentStatus,
 } from './marketingContent';
 import { MarketingContentWorkspace } from './MarketingContentWorkspace';
+import {
+  createMarketingPlanningAdapter,
+  type MarketingBusinessProfile,
+  type MarketingPlan,
+  type MarketingPlanCreateInput,
+  type MarketingPlanningRpcClient,
+  type MarketingPlanningState,
+} from './marketingPlanning';
+import { MarketingPlanningWorkspace } from './MarketingPlanningWorkspace';
 
 const SECTION_PRESENTATION: Record<MarketingWorkspaceSection, { label: string; icon: typeof BarChart3 }> = {
   overview: { label: 'Overview', icon: BarChart3 },
@@ -57,11 +66,10 @@ const METRIC_ACCENTS: Record<MarketingMetric['id'], string> = {
   invites: 'bg-slate-100 text-slate-700',
 };
 
-const EMPTY_SECTION_COPY: Record<Exclude<MarketingWorkspaceSection, 'overview' | 'content'>, { title: string; body: string }> = {
+const EMPTY_SECTION_COPY: Record<Exclude<MarketingWorkspaceSection, 'overview' | 'content' | 'settings'>, { title: string; body: string }> = {
   campaigns: { title: 'No campaigns yet', body: 'Campaign planning is not connected in this foundation.' },
   prospects: { title: 'No prospects yet', body: 'Prospecting and outreach are not enabled.' },
   growth: { title: 'Acquisition analytics are not connected', body: 'Growth reporting will remain unavailable until a real data source is approved.' },
-  settings: { title: 'No marketing integrations configured', body: 'Publishing and analytics connections are not enabled.' },
 };
 
 function metricValue(metric: MarketingMetric) {
@@ -220,7 +228,7 @@ function MarketingOverview({
   );
 }
 
-function MarketingFoundationState({ section }: { section: Exclude<MarketingWorkspaceSection, 'overview' | 'content'> }) {
+function MarketingFoundationState({ section }: { section: Exclude<MarketingWorkspaceSection, 'overview' | 'content' | 'settings'> }) {
   const copy = EMPTY_SECTION_COPY[section];
   const Icon = SECTION_PRESENTATION[section].icon;
   return (
@@ -241,6 +249,7 @@ export function MarketingWorkspace({
   audience,
   overview,
   content,
+  planning,
 }: {
   audience: MarketingWorkspaceAudience;
   overview: MarketingOverviewData;
@@ -253,6 +262,7 @@ export function MarketingWorkspace({
     onUpdate: Parameters<typeof MarketingContentWorkspace>[0]['onUpdate'];
     onTransition: Parameters<typeof MarketingContentWorkspace>[0]['onTransition'];
   };
+  planning: Parameters<typeof MarketingPlanningWorkspace>[0];
 }) {
   const [section, setSection] = useState<MarketingWorkspaceSection>('overview');
   const [contentFocus, setContentFocus] = useState<{
@@ -318,7 +328,9 @@ export function MarketingWorkspace({
               onTransition={content.onTransition}
             />
           )
-          : <MarketingFoundationState section={section} />}
+          : section === 'settings'
+            ? <MarketingPlanningWorkspace {...planning} />
+            : <MarketingFoundationState section={section} />}
     </div>
   );
 }
@@ -328,12 +340,17 @@ function AuthorizedInternalMarketingWorkspace({
   client,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient;
 }) {
   const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
+  const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
   const [items, setItems] = useState<MarketingContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [planningState, setPlanningState] = useState<MarketingPlanningState | null>(null);
+  const [planningLoading, setPlanningLoading] = useState(true);
+  const [planningSaving, setPlanningSaving] = useState(false);
+  const [planningError, setPlanningError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -349,6 +366,31 @@ function AuthorizedInternalMarketingWorkspace({
   }, [adapter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const loadPlanning = useCallback(async (showLoading = true) => {
+    if (showLoading) setPlanningLoading(true);
+    setPlanningError(null);
+    try {
+      setPlanningState(await planningAdapter.get());
+    } catch (loadError) {
+      setPlanningState(null);
+      setPlanningError(loadError instanceof Error ? loadError.message : 'ServSync could not load Marketing planning.');
+    } finally {
+      setPlanningLoading(false);
+    }
+  }, [planningAdapter]);
+
+  useEffect(() => { void loadPlanning(); }, [loadPlanning]);
+
+  const withPlanningSave = async (operation: () => Promise<unknown>) => {
+    setPlanningSaving(true);
+    try {
+      await operation();
+      await loadPlanning(false);
+    } finally {
+      setPlanningSaving(false);
+    }
+  };
 
   const content = {
     items,
@@ -396,7 +438,19 @@ function AuthorizedInternalMarketingWorkspace({
     },
   };
 
-  return <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} />;
+  const planning = {
+    state: planningState,
+    loading: planningLoading,
+    error: planningError,
+    saving: planningSaving,
+    onReload: () => loadPlanning(true),
+    onSaveProfile: (profile: MarketingBusinessProfile) => withPlanningSave(() => planningAdapter.saveProfile(profile)),
+    onCreatePlan: (input: MarketingPlanCreateInput) => withPlanningSave(() => planningAdapter.createPlan(input)),
+    onUpdatePlan: (plan: MarketingPlan) => withPlanningSave(() => planningAdapter.updatePlan(plan)),
+    onAcceptPlan: (plan: MarketingPlan) => withPlanningSave(() => planningAdapter.acceptPlan(plan)),
+  };
+
+  return <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} planning={planning} />;
 }
 
 export function InternalMarketingWorkspace({
@@ -406,7 +460,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;

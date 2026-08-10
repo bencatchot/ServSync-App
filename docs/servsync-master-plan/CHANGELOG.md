@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-10
 
+- Branch: `codex/marketing-business-profile-plan-v1`
+- Starting main SHA: `325372c239c7ed95e70ccf0b381040f79a90837e`
+- Files changed:
+  - `servsync-business-marketing-profile-plan.sql`
+  - `src/features/marketing/marketingPlanning.ts`
+  - `src/features/marketing/MarketingPlanningWorkspace.tsx`
+  - `src/features/marketing/MarketingWorkspace.tsx`
+  - `tests/sql/business-marketing-profile-plan-validation.sql`
+  - `tests/sql/business-marketing-profile-plan-sandbox-validation.sql`
+  - `tests/e2e/internal-marketing-planning.spec.ts`
+  - `tests/e2e/internal-marketing-workspace.spec.ts`
+  - `scripts/validation/validate-business-marketing-profile-plan.sh`
+  - `package.json`
+  - `config/backend-environment-rollouts.json`
+  - `config/backend-environment-parity.json`
+  - `docs/servsync-master-plan/ServSync_Business_Marketing_Profile_Planning_v1.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Slice 4 adds a tenant-specific Business Marketing Profile and bounded Marketing Plan layer to the shared Marketing workspace domain. The ServSync internal profile is one tenant-specific strategy, never a contractor default. Platform administrators can edit that profile, prepare owner-directed or deterministic profile-and-recent-content recommendations, revise draft plans, and accept a plan. Plan acceptance creates no content and grants no approval, scheduling, publishing, campaign, or provider authority.
+- Architecture and security: Four `postgres`-owned forced-RLS/policy-free tables preserve current profile/plan state and append-only exact revisions. Five authenticated RPCs derive the internal workspace and actor server-side; contractors and homeowners fail closed, browser roles have no direct table privileges, and private helpers are non-delegable. Plan creation is replay-safe, mutations use optimistic concurrency, accepted plans are immutable, and recommendation inputs preserve the exact profile version and server-derived latest-20 content context. The shared schema is contractor-shaped, but contractor APIs and UI remain deferred.
+- Environment rollout: Final migration SHA-256 `60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5` is applied and validated in Sandbox `zpzdkoaubyjtsomccxya`, Demo `bdytwgejqnlblhrnqxkp` (`2026-08-10T17:31:33Z` through `17:31:42Z`), and Production `uqgtheclhxqlnjpfmheq` (`2026-08-10T17:33:46Z` through `17:34:02Z`). Demo passed before Production was touched. Catalog/security, rollback-only profile/plan workflows, concurrency/idempotency, tenant-strategy isolation, authorization denial, and zero-residue checks passed with one internal profile, one initial revision, and zero plans/revisions in each environment. Production retained exactly two preparation packages, ten content records (three approved and seven draft), sixteen status events, and exact pre-rollout package/content/event and unrelated-business fingerprints. Production versus Demo remains `PASS WITH INTENTIONAL DIFFERENCES`; only the temporary Slice 4 Sandbox parity group was retired.
+- Tests/checks run: Clean PostgreSQL 16 Slice 2 -> Slice 3 -> Direction -> Slice 4 chain; ownership/RLS/ACL/RPC, platform-admin workflow, contractor/homeowner denial, contractor-shaped profile isolation, idempotency, stale-write, append-only revision, accepted-plan immutability, rollback, repeat/preflight, and zero-residue checks; live Sandbox catalog/security and rollback-only validation; focused Marketing Playwright on desktop and `390x844`; TypeScript; Production build; backend parity/rollout validation; JSON/Bash parsing; sensitive-value and exact-scope scans; and `git diff --check`.
+- Known risks and follow-up: Recommendations are deterministic planning assistance, not runtime AI or product truth, and must still pass the existing Marketing Direction/Truth Pack preparation contract. Contractor profile composition, contractor authorization/UI, plan-to-content handoff, publishing, scheduling, integrations, campaigns, outreach, and analytics remain pending.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records the shared tenant-specific profile/plan foundation, internal-only runtime boundary, and the remaining contractor/provider/execution work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records where business-specific strategy and bounded planning sit in the shared Marketing architecture without claiming contractor availability or execution authority.
+
 - Branch: `codex/marketing-direction-copy-guardrails-v1`
 - Starting main SHA: `60ba8299cdcd537bd057a79bb01afd63557b1126`
 - Files changed:

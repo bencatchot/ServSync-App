@@ -14,9 +14,36 @@ const overview = buildInternalMarketingOverview({
   activeInvites: 2,
 });
 
+const planningState = {
+  profile: {
+    profile_id: '00000000-0000-4000-8000-000000000038',
+    workspace_key: 'servsync_internal',
+    workspace_kind: 'internal',
+    contractor_id: null,
+    business_name: 'ServSync',
+    business_summary: 'ServSync internal Marketing strategy.',
+    audience_segments: ['Small contractors'],
+    service_focus: ['Contractor software'],
+    primary_goal: 'Increase qualified awareness.',
+    secondary_goals: [],
+    geographic_focus: null,
+    tone_style: 'Practical and approachable.',
+    offers: [],
+    preferred_channels: ['social'],
+    emphasized_topics: ['Estimates and approvals'],
+    avoided_topics: ['Unsupported claims'],
+    owner_notes: 'Internal only.',
+    profile_status: 'ready',
+    profile_version: 1,
+    updated_at: '2026-08-10T12:00:00.000Z',
+  },
+  plan: null,
+  recent_content: { window_limit: 20, item_count: 0, items: [] },
+};
+
 async function installMarketingHarness(page: Page, role: UserRole) {
   await page.goto('/');
-  await page.evaluate(async ({ role, overview }) => {
+  await page.evaluate(async ({ role, overview, planningState }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as {
       createElement: (...args: unknown[]) => unknown;
@@ -26,13 +53,17 @@ async function installMarketingHarness(page: Page, role: UserRole) {
     }).createRoot;
     const module = await dynamicImport('/src/features/marketing/MarketingWorkspace.tsx');
     const Workspace = module.InternalMarketingWorkspace as (...args: unknown[]) => unknown;
-    const client = { rpc: async () => ({ data: [], error: null }) };
+    const client = {
+      rpc: async (name: string) => name === 'servsync_get_internal_marketing_planning'
+        ? { data: planningState, error: null }
+        : { data: [], error: null },
+    };
 
     document.body.innerHTML = '<main class="mx-auto max-w-6xl bg-slate-50 p-4"><div id="marketing-test-root"></div></main>';
     createRoot(document.getElementById('marketing-test-root') as HTMLElement).render(
       React.createElement(Workspace, { role, overview, client }),
     );
-  }, { role, overview });
+  }, { role, overview, planningState });
 }
 
 test.describe('internal Marketing workspace', () => {
@@ -102,6 +133,7 @@ test.describe('internal Marketing workspace', () => {
       await expect(tab).toHaveAttribute('aria-selected', 'true');
       if (section === 'overview') await expect(page.getByTestId('marketing-overview')).toBeVisible();
       else if (section === 'content') await expect(page.getByTestId('marketing-content-workspace')).toBeVisible();
+      else if (section === 'settings') await expect(page.getByTestId('marketing-planning-workspace')).toBeVisible();
       else await expect(page.getByTestId(`marketing-section-${section}`)).toBeVisible();
     }
   });
