@@ -4,6 +4,41 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-10
+
+- Branch: `codex/marketing-direction-copy-guardrails-v1`
+- Starting main SHA: `60ba8299cdcd537bd057a79bb01afd63557b1126`
+- Files changed:
+  - `servsync-marketing-direction-copy-guardrails.sql`
+  - `config/marketing/servsync-marketing-truth-pack.v2.json`
+  - `config/marketing/servsync-marketing-recipes.v2.json`
+  - `config/marketing/codex-marketing-package.v2.schema.json`
+  - `scripts/marketing/marketing-package-contract.mjs`
+  - `scripts/marketing/ingest-codex-marketing-package.mjs`
+  - `scripts/validation/validate-codex-assisted-marketing-drafts.sh`
+  - `tests/marketing/codex-marketing-package-contract.test.mjs`
+  - `tests/sql/codex-assisted-marketing-drafts-validation.sql`
+  - `config/backend-environment-rollouts.json`
+  - `config/backend-environment-parity.json`
+  - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/ServSync_Codex_Assisted_Marketing_Drafts_v1.md`
+  - `docs/servsync-master-plan/ServSync_Backend_Environment_Parity.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Slice 3A inserts an inspectable, provider-neutral Marketing Direction contract between Truth Pack and coordinated recipe preparation. Owner-led packages preserve valid intent while recording concise corrected assumptions; recommended-direction packages record their rationale without inventing owner input. Truth Pack v2 defines the supported document-specific and optional connected-homeowner paths, prohibits manufactured competitor contrast, and adds natural-language copy guidance. Recipe v2 keeps one central direction while assigning distinct scenario, relationship, educational, focused-feature, and visual roles. Existing v1 artifacts and Production Package `64c587ca-800e-4b9d-ad39-5ff88544e00c` remain unchanged.
+- Architecture and security: Direction metadata is validated locally as untrusted package input; the concise approved direction is persisted through the existing immutable preparation-package brief instead of adding a second strategy store. The additive migration admits exact v1/v2 Truth Pack identities and applies the stricter direction guard only to v2 briefs and copy, preserving historical v1 replay. The existing platform-admin-derived ingestion authorization, atomic draft creation, idempotency, forced-RLS tables, direct-table denial, and human-only approval boundary remain unchanged. The new helper is `postgres`-owned, fixed-path, non-delegable, and unavailable to browser and service roles.
+- Environment rollout: Exact migration SHA-256 `c6417504384a78f7ed41da83b214702a36e71749ea4fae8ed26f99d66bf29cda` was applied only to Sandbox `zpzdkoaubyjtsomccxya` from `2026-08-10T14:44:11Z` through `14:44:19Z`. Live catalog checks and rollback-only platform-admin v2 ingestion/replay, historical v1 compatibility, unsafe-direction rejection, contractor/homeowner denial, and direct-table denial passed. Sandbox returned to one internal workspace and zero preparation packages, content rows, and status events. Demo and Production remain pending and unchanged; the PR must remain unmerged until separately authorized migration-first rollout completes.
+- Tests/checks run: Disposable PostgreSQL 16 migration and role/RLS/ACL/RPC regression coverage; deterministic Truth Pack, direction, recipe, package, operator, replay, and copy-safety tests; live Sandbox catalog/security and rollback-only authorization validation; backend parity and rollout-ledger validation; TypeScript; Production build; JSON and Bash parsing/execution; sensitive-value and exact-scope scans; and `git diff --check`.
+- Known risks and follow-up: Direction quality remains human/Codex authored rather than autonomous runtime AI. Truth Pack v2 is a maintained product-truth snapshot and requires versioned review as capabilities change. Demo/Production migration rollout is required before merge and any v2 Production ingestion. Package #2, runtime generation, approval automation, publishing, scheduling, integrations, campaigns, outreach, analytics, and contractor Business Marketing remain future work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records the Marketing Direction contract, accurate guest/connected framing, and copy-quality boundary while retaining every publishing, automation, provider, analytics, outreach, and contractor-workspace item as pending.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the provider-neutral direction layer and guarded v2 preparation architecture without claiming runtime AI, publishing, or external Marketing availability.
+
 ## 2026-08-09
 
 - Branch: `codex/codex-assisted-marketing-drafts-v1`

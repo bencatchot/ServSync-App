@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "truthPackVersion": "servsync-marketing-truth-v2",
+  "updatedOn": "2026-08-10",
+  "purpose": "Bounded product truth and copy direction for preparing ServSync internal marketing drafts without inventing capabilities, results, or competitor problems.",
+  "audiences": [
+    "small_contractors",
+    "hvac_contractors",
+    "plumbers",
+    "electricians",
+    "homeowners"
+  ],
+  "positioningConcepts": [
+    "Start with a recognizable customer or contractor problem, then explain one concrete way ServSync can help.",
+    "Keep customer service work organized from request through estimate, job, report, invoice, Home History, and follow-up without making every piece summarize the entire sequence.",
+    "Help small service contractors present clear customer experiences without claiming enterprise automation.",
+    "Help homeowners keep service requests, decisions, documents, and completed work connected to the right home."
+  ],
+  "terminology": [
+    {
+      "use": "Home History",
+      "avoid": "Maintenance log",
+      "rule": "Use the current homeowner-facing product name."
+    },
+    {
+      "use": "customer",
+      "avoid": "Customer",
+      "rule": "Use normal sentence capitalization in public copy. Use homeowner only when specifically discussing a homeowner account or homeowner experience."
+    },
+    {
+      "use": "customer without a ServSync account",
+      "avoid": "Not connected Customer or eligible customer",
+      "rule": "Use plain public language for document-scoped interactions that do not require a registered account. Keep internal status and authorization terminology out of public copy."
+    },
+    {
+      "use": "secure guest acceptance",
+      "avoid": "electronic signature",
+      "rule": "Estimate acceptance through a secure delivery session is not verified identity or a signature."
+    },
+    {
+      "use": "manual or offline payment",
+      "avoid": "online payment",
+      "rule": "Production Stripe payments and Pay Online are not active."
+    },
+    {
+      "use": "estimate, job, invoice, customer, homeowner",
+      "avoid": "Estimate, Job, Invoice, Customer, Homeowner",
+      "rule": "Do not capitalize internal ServSync object names in public copy unless normal grammar requires it."
+    }
+  ],
+  "guestAndConnectedHomeownerTruth": {
+    "plainLanguageSummary": "ServSync supports both immediate document-specific customer interactions and an optional longer-term connected homeowner relationship.",
+    "withoutRegisteredAccount": {
+      "claim": "For eligible work, a customer can use a secure, expiring link to review an estimate, respond to that exact estimate version, view an invoice, or view a finalized customer-facing report without first creating a ServSync account.",
+      "boundaries": "This is document-scoped access, not a broad guest portal, verified identity, unrestricted property history, or a claim that another product forces account creation or app downloads."
+    },
+    "connectedHomeowner": {
+      "claim": "A homeowner may create a ServSync account and connect with a contractor to use ongoing authenticated experiences such as service requests, estimate and invoice review, property-linked records, Documents, Home History, and manual reminders where currently supported.",
+      "boundaries": "Do not imply automatic sharing of all home information, universal notification delivery, unlimited storage, or access outside the homeowner's choices and current product permissions."
+    },
+    "relationshipValue": {
+      "claim": "The connected path can help both parties keep future service activity and eligible records organized around an ongoing homeowner-contractor relationship.",
+      "boundaries": "Describe this as an available choice and product benefit, not a requirement, guarantee, measured outcome, or reason to disparage the document-specific path."
+    }
+  },
+  "copyQualityGuidance": {
+    "prefer": [
+      "one primary message per piece",
+      "recognizable customer or contractor situations",
+      "specific hooks and short readable sentences",
+      "plain trade-relevant language",
+      "one concrete ServSync capability or benefit",
+      "natural calls to action"
+    ],
+    "avoidWhenPlainLanguageWorks": [
+      "workflow",
+      "customer-facing",
+      "work context",
+      "eligible customer",
+      "practical foundation",
+      "organized workflow"
+    ],
+    "rule": "These are contextual writing cautions, not a banned-word list. Use product terminology only when it helps a normal reader."
+  },
+  "marketableCapabilities": [
+    {
+      "key": "service_requests",
+      "status": "available_beta",
+      "claim": "Customers can start service work with a request tied to the relevant home and contractor workflow.",
+      "boundaries": "Do not promise emergency dispatch, guaranteed response, automated matching, or full external messaging."
+    },
+    {
+      "key": "estimates",
+      "status": "available_beta",
+      "claim": "Contractors can prepare, send, and track estimates tied to customer and work context.",
+      "boundaries": "Secure guest acceptance and bounded responses are not electronic signatures, negotiation, or payment."
+    },
+    {
+      "key": "not_connected_estimate_delivery",
+      "status": "available",
+      "claim": "For eligible work, customers can receive a secure, expiring estimate link and respond to that exact delivered version without first creating a ServSync account.",
+      "boundaries": "Do not claim verified identity, signatures, guaranteed inbox delivery, SMS, replies, a broad guest portal, or that competitors require accounts or app downloads."
+    },
+    {
+      "key": "jobs_and_reports",
+      "status": "available_beta",
+      "claim": "Contractors can keep jobs and finalized customer-facing work reports connected to the originating service workflow.",
+      "boundaries": "Do not claim code compliance, third-party certification, enterprise dispatch, or automated diagnostics."
+    },
+    {
+      "key": "not_connected_report_delivery",
+      "status": "available",
+      "claim": "Eligible finalized customer-facing reports can be delivered through a secure document-scoped link to a customer without a ServSync account.",
+      "boundaries": "Do not claim report acknowledgment, unrestricted document browsing, access to private/internal content, or competitor account requirements."
+    },
+    {
+      "key": "invoices",
+      "status": "available_beta",
+      "claim": "Contractors can create, review, send, and track invoices in the same customer service workflow.",
+      "boundaries": "Do not claim accounting synchronization, automatic collections, or live online payment processing."
+    },
+    {
+      "key": "deposit_and_manual_payments",
+      "status": "available",
+      "claim": "Accepted estimates can produce a deliberate draft deposit invoice, and authorized contractors can record manual or offline partial and full payments.",
+      "boundaries": "Job creation is not blocked by deposit state. Do not claim refunds, chargebacks, payouts, or Pay Online."
+    },
+    {
+      "key": "home_history",
+      "status": "available_beta",
+      "claim": "Homeowners can keep eligible completed work, reports, invoice records, documents, and manual reminders organized around their home.",
+      "boundaries": "Do not promise automatic timeline intelligence, recurring reminders, email, SMS, push alerts, or unlimited storage."
+    },
+    {
+      "key": "contractor_business_profile",
+      "status": "available_beta",
+      "claim": "Contractors can maintain a recognizable business profile with supported business and service information.",
+      "boundaries": "Do not imply license, insurance, background-check, or credential verification unless separately verified."
+    }
+  ],
+  "unavailableOrRestrictedCapabilities": [
+    "Production online payments or Pay Online",
+    "Automatic social publishing or scheduling",
+    "Social account integrations or OAuth",
+    "Automated email campaigns, SMS, or cold outreach",
+    "AI-generated recommendations, diagnostics, or autonomous approval",
+    "Guaranteed leads, marketplace ranking, or contractor performance claims",
+    "Contractor-facing Marketing workspace",
+    "Public Trade Pack or professional HVAC content",
+    "Accounting, calendar, advertising, or CRM integrations unless later documented as active"
+  ],
+  "competitiveFramingPolicy": {
+    "rule": "Describe ServSync on its own merits. Do not manufacture a competitor problem to make ServSync look better.",
+    "requiresVerifiedEvidenceAndApproval": [
+      "competitors require homeowners to create accounts",
+      "competitors require app downloads or subscriptions",
+      "competitors make customers perform unnecessary steps",
+      "competitors lack a ServSync capability",
+      "competitors are more difficult, expensive, fragmented, or inferior"
+    ],
+    "avoidExamples": [
+      "Unlike other apps...",
+      "No more being forced to...",
+      "Other software makes customers..."
+    ],
+    "preferredApproach": [
+      "state what ServSync enables",
+      "explain how the current ServSync experience works",
+      "describe why that choice can be useful",
+      "describe guest and connected-homeowner paths without treating either as a burden"
+    ]
+  },
+  "prohibitedClaimPolicy": {
+    "categories": [
+      "Invented customer, contractor, homeowner, signup, revenue, or usage counts",
+      "Invented savings, conversion, growth, performance, or time-reduction metrics",
+      "Testimonials, ratings, awards, rankings, guarantees, or unverified trust claims",
+      "Unsupported integrations, competitive comparisons, competitor requirements, or unavailable functionality",
+      "Legal, licensing, certification, safety, or identity-assurance claims not established by the product"
+    ],
+    "prohibitedPhrases": [
+      "guaranteed",
+      "award-winning",
+      "five-star",
+      "top-rated",
+      "best-in-class",
+      "#1",
+      "QuickBooks integration",
+      "Google Calendar sync",
+      "Outlook Calendar sync",
+      "live Stripe payments",
+      "automatic SMS",
+      "automated email campaign",
+      "AI-powered diagnostics"
+    ],
+    "prohibitedPatterns": [
+      "percentage performance claims",
+      "numeric trust or customer-count claims",
+      "numeric savings or improvement claims",
+      "unsupported competitor requirements or superiority claims"
+    ]
+  },
+  "evidenceSources": [
+    "docs/MARKETING_PRODUCT_INVENTORY.md",
+    "docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md",
+    "docs/servsync-master-plan/ServSync_Completed_Features.md",
+    "docs/servsync-master-plan/CHANGELOG.md"
+  ]
+}

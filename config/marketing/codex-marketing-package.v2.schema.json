@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://servsync.app/schemas/codex-marketing-package-v2.json",
+  "title": "ServSync Codex-assisted Marketing package v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "preparation_request_id",
+    "recipe_key",
+    "truth_pack_version",
+    "marketing_direction",
+    "items"
+  ],
+  "properties": {
+    "preparation_request_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "recipe_key": {
+      "type": "string",
+      "enum": [
+        "contractor_acquisition",
+        "homeowner_awareness",
+        "feature_promotion"
+      ]
+    },
+    "truth_pack_version": {
+      "const": "servsync-marketing-truth-v2"
+    },
+    "marketing_direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "owner_input",
+        "audience",
+        "objective",
+        "statement",
+        "central_message",
+        "supporting_points",
+        "corrected_assumptions",
+        "recommendation_rationale"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "owner_led",
+            "recommended"
+          ]
+        },
+        "owner_input": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "audience": {
+          "type": "string",
+          "enum": [
+            "small_contractors",
+            "hvac_contractors",
+            "plumbers",
+            "electricians",
+            "homeowners"
+          ]
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "central_message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "supporting_points": {
+          "type": "array",
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "corrected_assumptions": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "correction"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "competitor_account_requirement",
+                  "competitor_app_download_requirement",
+                  "competitor_subscription_requirement",
+                  "competitor_inferiority"
+                ]
+              },
+              "correction": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "recommendation_rationale": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "content_type",
+          "body",
+          "channel_category",
+          "intended_audience",
+          "content_role"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "social_post",
+              "email",
+              "website_copy",
+              "other"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "channel_category": {
+            "type": "string",
+            "enum": [
+              "social",
+              "email",
+              "website",
+              "other"
+            ]
+          },
+          "intended_audience": {
+            "type": "string",
+            "enum": [
+              "small_contractors",
+              "hvac_contractors",
+              "plumbers",
+              "electricians",
+              "homeowners"
+            ]
+          },
+          "content_role": {
+            "type": "string",
+            "enum": [
+              "facebook_instagram_post",
+              "linkedin_post",
+              "educational_post",
+              "feature_highlight",
+              "short_video_concept",
+              "problem_solution_post",
+              "local_contractor_connection",
+              "feature_announcement",
+              "contractor_benefit",
+              "homeowner_benefit"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

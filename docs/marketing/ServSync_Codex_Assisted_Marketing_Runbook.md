@@ -6,28 +6,82 @@ Use this runbook only to prepare draft content for ServSync's internal Marketing
 
 The active contracts are:
 
-- Truth Pack: `config/marketing/servsync-marketing-truth-pack.v1.json`
-- recipes: `config/marketing/servsync-marketing-recipes.v1.json`
-- package schema: `config/marketing/codex-marketing-package.schema.json`
+- Truth Pack: `config/marketing/servsync-marketing-truth-pack.v2.json`
+- recipes: `config/marketing/servsync-marketing-recipes.v2.json`
+- package schema: `config/marketing/codex-marketing-package.v2.schema.json`
 - local validator: `scripts/marketing/marketing-package-contract.mjs`
 - authenticated operator: `scripts/marketing/ingest-codex-marketing-package.mjs`
+
+The immutable v1 files remain available only for exact replay or audit of packages prepared before Marketing Direction was introduced. Do not rewrite either historical contract.
+
+Truth Pack v2 ingestion also requires `servsync-marketing-direction-copy-guardrails.sql` in the target environment. It is currently Sandbox-only. Do not target Demo or Production with a v2 package until the exact migration is separately authorized, applied, validated, and the source PR is approved for merge.
+
+## Marketing Direction
+
+Every new package must answer one question before copy is prepared:
+
+> What specific story are these pieces supposed to communicate?
+
+The answer is the package's Marketing Direction. It is provider-neutral, inspectable, and bounded to:
+
+- owner-led or system-recommended mode;
+- one audience and objective;
+- one concise direction statement and central message;
+- up to four supporting points;
+- explicit corrections for detected unsupported competitor assumptions;
+- a short recommendation rationale only when Codex proposed the direction.
+
+The approved `statement` is persisted through the existing immutable preparation-package `brief_summary`. The richer direction object remains part of the validated package artifact used by the operator. Hidden reasoning, chain-of-thought, provider metadata, and secrets are never stored.
+
+### Owner-led direction
+
+When the owner provides a thought, preserve its useful intent, compare it with the Truth Pack, and turn it into one concise direction. If the thought contains an unsupported implication, identify the issue before preparing copy and record the bounded correction in `corrected_assumptions`.
+
+Example request:
+
+> Prepare a ServSync marketing package for small HVAC contractors. Focus on customers being able to interact without immediately creating an account, while connected homeowners get additional ongoing value.
+
+Codex should validate the two current ServSync paths, state any material correction, select a recipe, and prepare the package from the approved direction.
+
+### Recommended direction
+
+When no meaningful direction is supplied, Codex recommends one focused direction and gives a short practical rationale. If the task explicitly authorizes autonomous direction selection, Codex may use that safe recommendation and report it. Otherwise, present the recommendation for owner choice before preparing or ingesting content.
+
+Example request:
+
+> Prepare this week's ServSync marketing content for small HVAC contractors.
+
+An appropriate recommendation may focus on one current contractor problem, one product capability, or the distinction between immediate document-specific customer interactions and the optional connected-homeowner relationship. It must not default to a full feature inventory.
+
+### Direction safety check
+
+Before preparing any item:
+
+1. Compare the owner input, direction statement, central message, and supporting points with the current Truth Pack.
+2. Detect unsupported assumptions about competitor account requirements, app downloads, subscriptions, missing features, difficulty, expense, fragmentation, or inferiority.
+3. Preserve the useful underlying owner intent while removing the unsupported contrast.
+4. Record each detected correction using the exact bounded correction code.
+5. Stop if a safe grounded direction cannot be established.
+
+For example, do not develop `Tell contractors they won't have to force customers to download an app anymore.` Instead, correct the unsupported competitor implication and use a direction such as: `Explain that customers can use certain secure ServSync-delivered documents without immediately becoming registered users, while a connected homeowner account supports additional ongoing service experiences.`
 
 ## Preparation Procedure
 
 1. Start from current `origin/main` and confirm the target environment is authorized and has the matching migration.
-2. Read the complete Truth Pack and recipe set. Treat the Truth Pack as authoritative over generic model knowledge.
-3. Choose one recipe, one allowed audience, one current capability/topic, and a bounded item count from 1 through the recipe's available roles, with a maximum of 7.
-4. Prepare distinct items that satisfy each selected recipe role. Do not insert status, provider, publishing, analytics, or approval fields.
-5. Use one newly generated UUID as `preparation_request_id`. Keep it stable across retries of the same exact package.
-6. Validate locally before any network action:
+2. Read the complete current Truth Pack and recipe set. Treat the Truth Pack as authoritative over generic model knowledge.
+3. Establish and validate one owner-led or recommended Marketing Direction using the procedure above.
+4. Choose one recipe allowed for the direction audience and a bounded item count from 1 through the recipe's available roles, with a maximum of 7.
+5. Prepare distinct items that express the same direction through each role's `directionPurpose`. Do not insert status, provider, publishing, analytics, or approval fields.
+6. Use one newly generated UUID as `preparation_request_id`. Keep it stable across retries of the same exact package.
+7. Validate locally before any network action:
 
 ```bash
 node scripts/marketing/marketing-package-contract.mjs path/to/package.json
 ```
 
-7. Review the output as untrusted draft copy. Confirm every product statement against the Truth Pack and reject the complete package if any statement is unsupported or ambiguous.
-8. Authenticate with an existing platform-admin account through approved secret configuration. Never place credentials in the package, command history, repository, screenshot, or report.
-9. Ingest through the guarded operator. Sandbox example:
+8. Review the output as untrusted draft copy. Confirm every product statement against the Truth Pack, confirm the roles are meaningfully differentiated, and reject the complete package if any statement is unsupported or ambiguous.
+9. Authenticate with an existing platform-admin account through approved secret configuration. Never place credentials in the package, command history, repository, screenshot, or report.
+10. Ingest through the guarded operator. Sandbox example:
 
 ```bash
 SERVSYNC_MARKETING_TARGET=sandbox \
@@ -38,18 +92,30 @@ npm run marketing:ingest-codex-package -- path/to/package.json
 ```
 
 Password authentication is also supported through the approved secret-only `SERVSYNC_MARKETING_ADMIN_EMAIL` and `SERVSYNC_MARKETING_ADMIN_PASSWORD` variables. Never print them.
-10. Verify the receipt reports `status: draft`, the requested count, and only non-secret record identifiers. A replay of the same UUID and exact package must return the same records with `replayed: true`.
-11. Open Marketing -> Content and review the `Codex-prepared` drafts. Human workflow actions begin here; Codex must not invoke approval transitions.
+11. Verify the receipt reports `status: draft`, the requested count, and only non-secret record identifiers. A replay of the same UUID and exact package must return the same records with `replayed: true`.
+12. Open Marketing -> Content and review the `Codex-prepared` drafts. Human workflow actions begin here; Codex must not invoke approval transitions.
 
 ## Package Contract
 
-The top-level object has exactly:
+The current v2 top-level object has exactly:
 
 - `preparation_request_id`
 - `recipe_key`
 - `truth_pack_version`
-- `brief_summary`
+- `marketing_direction`
 - `items`
+
+`marketing_direction` has exactly:
+
+- `mode`
+- `owner_input`
+- `audience`
+- `objective`
+- `statement`
+- `central_message`
+- `supporting_points`
+- `corrected_assumptions`
+- `recommendation_rationale`
 
 Every item has exactly:
 
@@ -60,11 +126,15 @@ Every item has exactly:
 - `intended_audience`
 - `content_role`
 
-The local validator and server both reject malformed values, unexpected keys, out-of-range counts, unknown enums, duplicate roles/titles/bodies, secret-like material, and bounded prohibited claims. A failed package creates no durable package or content records.
+The local validator rejects malformed directions, uncorrected competitor assumptions, unsupported public contrasts, audience conflicts, malformed values, unexpected keys, out-of-range counts, unknown enums, duplicate roles/titles/bodies, secret-like material, and bounded prohibited claims. The existing server boundary then revalidates the persisted direction statement and content. A failed package creates no durable package or content records.
+
+Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. New packages must use v2.
 
 ## Fail-Closed Rules
 
 - Never treat a provider/model response as trusted or ready for approval.
+- Never prepare copy before one Marketing Direction passes the Truth Pack safety check.
+- Never use competitor behavior as the problem statement without current verified evidence and deliberate approval.
 - Never substitute hard-coded sample copy after a preparation failure.
 - Never split a failed package into unexplained partial persistence.
 - Never change the UUID while retrying an ambiguous result until the existing request is checked.
@@ -74,4 +144,8 @@ The local validator and server both reject malformed values, unexpected keys, ou
 
 ## Maintenance
 
-Update the Truth Pack through a reviewed versioned change whenever a marketable capability or limitation changes. Update recipes through a reviewed versioned change when roles, audiences, types, or channel categories change. Do not rewrite a historical version in place after it has prepared durable records.
+Update the Truth Pack through a reviewed versioned change whenever a marketable capability, limitation, guest/connected relationship, or competitive-framing rule changes. Update recipes through a reviewed versioned change when roles, audiences, types, channel categories, or differentiation guidance changes. Do not rewrite a historical version in place after it has prepared durable records.
+
+## Future Prepare Content UX
+
+A later, separately reviewed in-app experience may offer an optional `What do you want to promote?` thought field plus `Suggest a direction`. Owner input should be refined and checked while preserving intent. Blank input should return one recommendation, a short rationale, and use/edit/another-suggestion choices. This should remain a guided preparation step, not a general-purpose chatbot, and it must not add approval or publishing authority.

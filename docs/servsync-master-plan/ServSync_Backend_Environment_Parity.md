@@ -68,6 +68,8 @@ Project Collaboration is absent from Production and Demo, so it is not part of s
 
 Codex-Assisted Marketing Draft Preparation v1 is part of the supported schema in Sandbox, Demo, and Production after the exact migration-first rollout on 2026-08-10. Its former Sandbox-only intentional-addition group is retired. The preparation-package table, content provenance columns, ingestion/private functions, grants, supporting objects, and changed `servsync_list_internal_marketing_content(text)` contract must now compare as ordinary supported schema; the manifest does not hide future drift in these objects.
 
+Marketing Direction + Copy Guardrails v1 is applied only in Sandbox pending a separately authorized Demo/Production rollout. The new private `servsync_private_marketing_direction_is_safe(text)` helper and its postgres-only grant are exact fingerprinted Sandbox additions. The changed supported `servsync_ingest_internal_marketing_package(uuid,text,text,text,jsonb)` definition intentionally remains visible as logical drift; the manifest does not classify or hide that changed Production-owned object as an addition. Production and Demo continue to support only Truth Pack v1 until rollout.
+
 Results mean:
 
 - `PASS — supported schema parity`: exact supported contract with no additions.
