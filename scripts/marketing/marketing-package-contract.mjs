@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = join(scriptDirectory, '..', '..');
 
-const CURRENT_TRUTH_PACK_VERSION = 'servsync-marketing-truth-v2';
+const CURRENT_TRUTH_PACK_VERSION = 'servsync-marketing-truth-v3';
 const PACKAGE_KEYS_V1 = [
   'brief_summary',
   'items',
@@ -115,6 +115,10 @@ export async function loadMarketingContracts(root = repositoryRoot, truthPackVer
       truth: 'servsync-marketing-truth-pack.v2.json',
       recipes: 'servsync-marketing-recipes.v2.json',
     },
+    'servsync-marketing-truth-v3': {
+      truth: 'servsync-marketing-truth-pack.v3.json',
+      recipes: 'servsync-marketing-recipes.v3.json',
+    },
   };
   const files = versions[truthPackVersion];
   assert(files, 'Marketing package references an unsupported Truth Pack version.');
@@ -128,16 +132,21 @@ export async function loadMarketingContracts(root = repositoryRoot, truthPackVer
 
 export function validateMarketingContracts(truthPack, recipeSet) {
   assert(truthPack?.schemaVersion === 1, 'Marketing Truth Pack schema version must be 1.');
-  assert(['servsync-marketing-truth-v1', 'servsync-marketing-truth-v2'].includes(truthPack?.truthPackVersion), 'Unexpected Marketing Truth Pack version.');
+  assert(['servsync-marketing-truth-v1', 'servsync-marketing-truth-v2', 'servsync-marketing-truth-v3'].includes(truthPack?.truthPackVersion), 'Unexpected Marketing Truth Pack version.');
   assert(Array.isArray(truthPack.audiences) && truthPack.audiences.length > 0, 'Marketing Truth Pack audiences are missing.');
   assert(Array.isArray(truthPack.marketableCapabilities) && truthPack.marketableCapabilities.length > 0, 'Marketing capabilities are missing.');
   assert(Array.isArray(truthPack.unavailableOrRestrictedCapabilities), 'Restricted Marketing capabilities are missing.');
   assert(Array.isArray(truthPack.prohibitedClaimPolicy?.categories), 'Marketing prohibited-claim policy is missing.');
+  if (truthPack.truthPackVersion === 'servsync-marketing-truth-v3') {
+    assert(truthPack.audienceTaxonomyVersion === 1, 'Marketing audience taxonomy version must be 1.');
+  }
 
   assert(recipeSet?.schemaVersion === 1, 'Marketing recipe schema version must be 1.');
-  const expectedRecipeVersion = truthPack.truthPackVersion === 'servsync-marketing-truth-v2'
-    ? 'servsync-marketing-recipes-v2'
-    : 'servsync-marketing-recipes-v1';
+  const expectedRecipeVersion = {
+    'servsync-marketing-truth-v1': 'servsync-marketing-recipes-v1',
+    'servsync-marketing-truth-v2': 'servsync-marketing-recipes-v2',
+    'servsync-marketing-truth-v3': 'servsync-marketing-recipes-v3',
+  }[truthPack.truthPackVersion];
   assert(recipeSet?.recipeSetVersion === expectedRecipeVersion, 'Unexpected Marketing recipe version.');
   assert(recipeSet?.truthPackVersion === truthPack.truthPackVersion, 'Marketing recipes reference the wrong Truth Pack.');
   assert(Array.isArray(recipeSet.recipes) && recipeSet.recipes.length === 3, 'Exactly three Marketing recipes are required in v1.');
@@ -155,13 +164,13 @@ export function validateMarketingContracts(truthPack, recipeSet) {
       roles.add(item.role);
       assert(['social_post', 'email', 'website_copy', 'other'].includes(item.contentType), `Recipe ${recipe.key} has an invalid content type.`);
       assert(['social', 'email', 'website', 'other'].includes(item.channelCategory), `Recipe ${recipe.key} has an invalid channel.`);
-      if (truthPack.truthPackVersion === 'servsync-marketing-truth-v2') {
+      if (truthPack.truthPackVersion !== 'servsync-marketing-truth-v1') {
         assert(typeof item.directionPurpose === 'string' && item.directionPurpose.trim().length > 0, `Recipe ${recipe.key} is missing role direction guidance.`);
       }
     }
   }
 
-  if (truthPack.truthPackVersion === 'servsync-marketing-truth-v2') {
+  if (truthPack.truthPackVersion !== 'servsync-marketing-truth-v1') {
     assert(recipeSet.directionContractVersion === 1, 'Marketing Direction contract version must be 1.');
     assert(typeof truthPack.competitiveFramingPolicy?.rule === 'string', 'Competitive framing policy is missing.');
     assert(typeof truthPack.guestAndConnectedHomeownerTruth?.plainLanguageSummary === 'string', 'Guest and connected-homeowner truth is missing.');
@@ -235,7 +244,7 @@ export function validateMarketingDirection(input, contracts) {
 }
 
 export function validateMarketingPackage(input, contracts) {
-  const usesDirection = input?.truth_pack_version === 'servsync-marketing-truth-v2';
+  const usesDirection = ['servsync-marketing-truth-v2', 'servsync-marketing-truth-v3'].includes(input?.truth_pack_version);
   exactKeys(input, usesDirection ? PACKAGE_KEYS_V2 : PACKAGE_KEYS_V1, 'Marketing package');
   assert(UUID_PATTERN.test(input.preparation_request_id), 'Preparation request ID must be a UUID.');
   assert(input.truth_pack_version === contracts.truthPack.truthPackVersion, 'Marketing package references the wrong Truth Pack.');

@@ -57,6 +57,10 @@ const AUDIENCE_LABELS: Record<NonNullable<MarketingContentItem['intendedAudience
   hvac_contractors: 'HVAC contractors',
   plumbers: 'Plumbers',
   electricians: 'Electricians',
+  carpentry_contractors: 'Carpentry contractors',
+  lawn_landscaping_contractors: 'Lawn care and landscaping contractors',
+  pressure_washing_contractors: 'Pressure washing contractors',
+  handyman_contractors: 'Handyman and general maintenance contractors',
   homeowners: 'Homeowners',
 };
 

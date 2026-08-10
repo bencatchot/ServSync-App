@@ -326,6 +326,24 @@
           "reason": "Exact SHA-256 60ec19e374004cf4e87c2794e99095bc7a99823a463a60b60e326433137077c5 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 17:31:33Z through 17:31:42Z. Catalog, postgres ownership, forced-RLS/policy-free storage, exact RPC grants, transaction-local platform-admin profile/plan workflows, stale-write and conflicting-replay rejection, concurrent first-use idempotency, immutable revisions, tenant-strategy isolation, contractor/homeowner/anonymous and direct-table denial, and zero validation residue passed. Demo retains exactly one internal profile and initial revision, zero plans/revisions, and unchanged zero preparation-package, content, and status-event counts."
         }
       }
+    },
+    {
+      "id": "marketing-planner-quality-v2",
+      "artifact": "servsync-marketing-planner-quality-v2.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-10 from 18:55:42.015Z through 18:55:42.590Z. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-version compatibility, platform-admin v2 creation/replay, contractor denial, Truth Pack v3 ingestion, rollback-only cleanup, and zero package/content/event/plan residue passed."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-10 from 21:09:14.501Z through 21:09:14.871Z after Demo passed. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-v2 creation/replay, omitted-version v1 compatibility, conflicting/unsupported-version rejection, expanded-audience Truth Pack v3 ingestion, platform-admin authority, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Production retained one historical planner-v1 plan and revision, two packages, ten content records (three approved and seven draft), sixteen status events, and exact Marketing and unrelated-business fingerprints."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 21:07:08.739Z through 21:07:09.034Z. Catalog ownership, fixed-path SECURITY DEFINER RPC grants, planner-v2 creation/replay, omitted-version v1 compatibility, conflicting/unsupported-version rejection, expanded-audience Truth Pack v3 ingestion, platform-admin authority, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Demo retained one internal profile and revision with zero plans, plan revisions, packages, content records, status events, or validation residue."
+        }
+      }
     }
   ]
 }

@@ -1,10 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  MARKETING_RECOMMENDATION_CONTRACT_VERSION,
   buildRecommendedMarketingPlan,
   createMarketingPlanningAdapter,
   type MarketingBusinessProfile,
   type MarketingRecentContentContext,
 } from '../../src/features/marketing/marketingPlanning';
+import {
+  canonicalMarketingAudience,
+  canonicalMarketingTopic,
+} from '../../src/features/marketing/marketingTaxonomy';
 
 const overview = {
   metrics: [],
@@ -86,6 +91,9 @@ function rawRecent(value = recent) {
       content_role: item.contentRole,
       updated_at: item.updatedAt,
     })),
+    ...(value.recommendationContractVersion === undefined
+      ? {}
+      : { recommendation_contract_version: value.recommendationContractVersion }),
   };
 }
 
@@ -142,7 +150,12 @@ async function installHarness(page: Page, role = 'platform_admin') {
             planning_end: args.p_planning_end,
             owner_direction: args.p_owner_direction,
             profile_version: args.p_profile_version,
-            recent_content_context: structuredClone(state.recent_content),
+            recent_content_context: {
+              ...structuredClone(state.recent_content),
+              ...(args.p_mode === 'recommended'
+                ? { recommendation_contract_version: args.p_recommendation_contract_version ?? 1 }
+                : {}),
+            },
             items: args.p_items,
             revision_number: 1,
             created_at: now,
@@ -186,6 +199,141 @@ async function installHarness(page: Page, role = 'platform_admin') {
 }
 
 test.describe('internal Business Marketing Profile and Plan', () => {
+  test('canonical taxonomy resolves supported label/code variants without collapsing conflicts', () => {
+    for (const value of ['HVAC', 'HVAC contractors', 'hvac_contractors', 'hVaC CoNtRaCtOrS']) {
+      expect(canonicalMarketingAudience(value).key).toBe('hvac_contractors');
+    }
+    expect(canonicalMarketingAudience('Plumbing contractors').key).toBe('plumbers');
+    expect(canonicalMarketingAudience('Carpentry').key).toBe('carpentry_contractors');
+    expect(canonicalMarketingAudience('Pressure washing').key).toBe('pressure_washing_contractors');
+    expect(canonicalMarketingAudience('Property managers').key).not.toBe(canonicalMarketingAudience('Homeowners').key);
+
+    for (const value of ['estimate', 'estimates', 'Estimate approvals', 'Estimates and approvals']) {
+      expect(canonicalMarketingTopic(value).key).toBe('estimates_and_approvals');
+    }
+    expect(canonicalMarketingTopic('Customer request').key).toBe('customer_requests');
+    expect(canonicalMarketingTopic('Active jobs').key).toBe('jobs');
+    expect(canonicalMarketingTopic('Estimate templates').key).not.toBe(canonicalMarketingTopic('Invoices').key);
+  });
+
+  test('planner v2 uses profile goals and tenant-specific diversity for a ServSync-like profile', () => {
+    const servSyncPlan = buildRecommendedMarketingPlan({
+      ...profile,
+      audienceSegments: [
+        'Small contractors', 'HVAC', 'Plumbing contractors', 'Electrical contractors', 'Carpentry',
+        'Lawn care and landscaping', 'Pressure washing', 'Handyman/general maintenance', 'Homeowners',
+      ],
+      serviceFocus: ['Contractor workflow software', 'Homeowner-contractor connections', 'Product education', 'Feature demonstrations'],
+      primaryGoal: 'Increase qualified small-contractor awareness, consideration, and signups for ServSync.',
+      secondaryGoals: ['Increase homeowner adoption', 'Educate contractors and homeowners', 'Explain current product workflows'],
+      emphasizedTopics: [
+        'Customer requests', 'Estimates and approvals', 'Jobs', 'Invoices', 'Customer communication',
+        'Home History', 'Secure document links', 'Connected homeowner relationships', 'Product demonstrations',
+      ],
+      ownerNotes: 'Balance contractor acquisition with homeowner adoption and practical product education.',
+    }, {
+      windowLimit: 20,
+      itemCount: 2,
+      items: [
+        { ...recent.items[0], intendedAudience: 'hvac_contractors', title: 'Estimate follow-up for HVAC contractors' },
+        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000002', intendedAudience: 'small_contractors', title: 'Customer requests in one place' },
+      ],
+    });
+
+    expect(servSyncPlan).toHaveLength(7);
+    expect(servSyncPlan.map(item => canonicalMarketingAudience(item.audience).kind)).toContain('homeowner');
+    expect(new Set(servSyncPlan.map(item => canonicalMarketingAudience(item.audience).key)).size).toBeGreaterThan(2);
+    expect(new Set(servSyncPlan.map(item => canonicalMarketingTopic(item.topic).key)).size).toBeGreaterThan(4);
+    expect(servSyncPlan.some(item => item.direction.includes('ServSync'))).toBe(true);
+  });
+
+  test('single-trade contractor diversity comes from its services and topics, not ServSync audiences', () => {
+    const contractorPlan = buildRecommendedMarketingPlan({
+      ...profile,
+      id: '42000000-0000-4000-8000-000000000020',
+      workspaceKey: 'contractor_fixture',
+      workspaceKind: 'contractor',
+      contractorId: '42000000-0000-4000-8000-000000000021',
+      businessName: 'Fixture Plumbing',
+      businessSummary: 'A local plumbing contractor serving homeowners.',
+      audienceSegments: ['Local homeowners'],
+      serviceFocus: ['Water heater repair', 'Leak repair', 'Drain cleaning'],
+      primaryGoal: 'Generate qualified local plumbing leads.',
+      secondaryGoals: ['Educate homeowners about maintenance'],
+      toneStyle: 'Direct and helpful.',
+      preferredChannels: ['social', 'website'],
+      emphasizedTopics: ['Water heater maintenance', 'Leak warning signs', 'Seasonal plumbing care'],
+      avoidedTopics: ['Discount-heavy messaging'],
+      ownerNotes: 'Focus on useful local homeowner education.',
+    }, { windowLimit: 20, itemCount: 0, items: [] });
+
+    expect(contractorPlan.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(contractorPlan.map(item => item.audience))).toEqual(new Set(['Homeowners']));
+    expect(new Set(contractorPlan.map(item => item.topic)).size).toBe(contractorPlan.length);
+    expect(contractorPlan.flatMap(item => [item.audience, item.topic, item.direction]).join(' ')).not.toMatch(/ServSync|small contractors|Home History/i);
+  });
+
+  test('a genuinely narrow profile explains why the recommended period has fewer than five items', () => {
+    const narrowPlan = buildRecommendedMarketingPlan({
+      ...profile,
+      audienceSegments: ['Local homeowners'],
+      serviceFocus: ['Water heaters'],
+      emphasizedTopics: ['Maintenance', 'Education'],
+      avoidedTopics: [],
+    }, { windowLimit: 20, itemCount: 0, items: [] });
+
+    expect(narrowPlan).toHaveLength(3);
+    expect(narrowPlan[0].rationale).toContain('the Profile supplies only 3 distinct eligible audience/topic combinations');
+    expect(narrowPlan.slice(1).every(item => !item.rationale.includes('this plan contains'))).toBe(true);
+  });
+
+  test('recent semantic topic matches suppress false novelty and profile ordering does not control selection', () => {
+    const candidateProfile = {
+      ...profile,
+      audienceSegments: ['Homeowners', 'HVAC contractors', 'Small contractors'],
+      serviceFocus: ['Product demonstrations', 'Customer communication'],
+      primaryGoal: 'Increase contractor signups while educating homeowners.',
+      secondaryGoals: ['Explain estimate approvals'],
+      emphasizedTopics: ['Estimates and approvals', 'Customer requests', 'Home History', 'Invoices', 'Jobs'],
+    };
+    const context: MarketingRecentContentContext = {
+      windowLimit: 20,
+      itemCount: 1,
+      items: [{ ...recent.items[0], title: 'Three ways to follow up on an estimate', intendedAudience: 'hvac_contractors' }],
+    };
+    const normal = buildRecommendedMarketingPlan(candidateProfile, context);
+    const reordered = buildRecommendedMarketingPlan({
+      ...candidateProfile,
+      audienceSegments: [...candidateProfile.audienceSegments].reverse(),
+      emphasizedTopics: [...candidateProfile.emphasizedTopics].reverse(),
+      serviceFocus: [...candidateProfile.serviceFocus].reverse(),
+    }, context);
+    const identities = (items: typeof normal) => items.map(item => `${canonicalMarketingAudience(item.audience).key}:${canonicalMarketingTopic(item.topic).key}`).sort();
+    expect(identities(reordered)).toEqual(identities(normal));
+    const estimateItem = normal.find(item => canonicalMarketingTopic(item.topic).key === 'estimates_and_approvals');
+    expect(estimateItem?.rationale).toContain('topic is recent');
+    expect(estimateItem?.rationale).not.toContain('no matching estimates');
+  });
+
+  test('goals, avoid topics, channels, and owner context materially affect bounded recommendations', () => {
+    const base = {
+      ...profile,
+      audienceSegments: ['Small contractors', 'Homeowners'],
+      serviceFocus: ['Product demonstrations', 'Customer communication'],
+      emphasizedTopics: ['Customer requests', 'Home History', 'Invoices', 'Jobs', 'Estimates and approvals'],
+      avoidedTopics: ['Invoices'],
+      preferredChannels: ['video'] as MarketingBusinessProfile['preferredChannels'],
+      ownerNotes: 'Prioritize practical demonstrations.',
+    };
+    const contractorFirst = buildRecommendedMarketingPlan({ ...base, primaryGoal: 'Increase contractor signups.' }, { windowLimit: 20, itemCount: 0, items: [] });
+    const homeownerFirst = buildRecommendedMarketingPlan({ ...base, primaryGoal: 'Increase homeowner adoption.' }, { windowLimit: 20, itemCount: 0, items: [] });
+    expect(canonicalMarketingAudience(contractorFirst[0].audience).kind).toBe('contractor');
+    expect(canonicalMarketingAudience(homeownerFirst[0].audience).kind).toBe('homeowner');
+    expect(contractorFirst.some(item => canonicalMarketingTopic(item.topic).key === 'invoices')).toBe(false);
+    expect(contractorFirst.some(item => item.contentRoles[0] === 'short_video_concept')).toBe(true);
+    expect(contractorFirst.every(item => /recent window|topic is recent/.test(item.rationale))).toBe(true);
+  });
+
   test('recommendations are profile-specific and do not copy ServSync strategy into contractor context', () => {
     const internal = buildRecommendedMarketingPlan(profile, recent);
     const contractor = buildRecommendedMarketingPlan({
@@ -206,7 +354,7 @@ test.describe('internal Business Marketing Profile and Plan', () => {
     }, { windowLimit: 20, itemCount: 0, items: [] });
 
     expect(internal.map(item => item.audience)).toContain('Homeowners');
-    expect(contractor.map(item => item.audience)).toContain('Local homeowners');
+    expect(contractor.map(item => item.audience)).toContain('Homeowners');
     expect(contractor.flatMap(item => [item.audience, item.topic]).join(' ')).not.toMatch(/ServSync|contractors|Home History/i);
   });
 
@@ -259,6 +407,50 @@ test.describe('internal Business Marketing Profile and Plan', () => {
     await expect(oversized.get()).rejects.toMatchObject({ kind: 'malformed' });
   });
 
+  test('historical recommended plans remain identifiable as v1 while new evidence reads v2', async () => {
+    const planValue = {
+      plan_id: '42000000-0000-4000-8000-000000000030',
+      workspace_key: 'servsync_internal',
+      plan_mode: 'recommended',
+      plan_status: 'draft',
+      title: 'Historical recommendation',
+      planning_start: '2026-08-10',
+      planning_end: '2026-09-09',
+      owner_direction: null,
+      profile_version: 2,
+      recent_content_context: rawRecent(),
+      items: [{
+        audience: 'Small contractors',
+        topic: 'Customer requests',
+        direction: 'Explain customer requests in practical language.',
+        rationale: 'Historical planner evidence.',
+        content_roles: ['educational_post'],
+      }],
+      revision_number: 1,
+      created_at: '2026-08-10T13:00:00.000Z',
+      updated_at: '2026-08-10T13:00:00.000Z',
+      accepted_at: null,
+    };
+    const historical = createMarketingPlanningAdapter({ rpc: async () => ({
+      data: { profile: rawProfile(), plan: planValue, recent_content: rawRecent() },
+      error: null,
+    }) });
+    await expect(historical.get()).resolves.toMatchObject({ plan: { recommendationContractVersion: 1 } });
+
+    const current = createMarketingPlanningAdapter({ rpc: async () => ({
+      data: {
+        profile: rawProfile(),
+        plan: {
+          ...planValue,
+          recent_content_context: { ...rawRecent(), recommendation_contract_version: 2 },
+        },
+        recent_content: rawRecent(),
+      },
+      error: null,
+    }) });
+    await expect(current.get()).resolves.toMatchObject({ plan: { recommendationContractVersion: 2 } });
+  });
+
   test('an ambiguous create result is not retried by the adapter', async () => {
     let calls = 0;
     const adapter = createMarketingPlanningAdapter({ rpc: async () => {
@@ -274,6 +466,7 @@ test.describe('internal Business Marketing Profile and Plan', () => {
       planningStart: '2026-08-10',
       planningEnd: '2026-09-09',
       ownerDirection: null,
+      recommendationContractVersion: MARKETING_RECOMMENDATION_CONTRACT_VERSION,
       items: buildRecommendedMarketingPlan(profile, recent),
     })).rejects.toMatchObject({ kind: 'ambiguous' });
     expect(calls).toBe(1);
@@ -290,6 +483,7 @@ test.describe('internal Business Marketing Profile and Plan', () => {
     await page.getByRole('tab', { name: 'Plan' }).click();
     await page.getByRole('button', { name: 'Recommend plan' }).click();
     await expect(page.getByTestId('marketing-plan-editor')).toContainText('Draft plan');
+    await expect(page.getByTestId('marketing-plan-editor')).toContainText('planner v2');
     await expect(page.getByTestId('marketing-plan-item-1')).toBeVisible();
     await page.getByTestId('marketing-plan-item-1').getByLabel('Direction').fill('Give homeowners a clear explanation of Home History.');
     await page.getByRole('button', { name: 'Save draft' }).click();
@@ -301,6 +495,7 @@ test.describe('internal Business Marketing Profile and Plan', () => {
     const calls = await page.evaluate(() => (window as unknown as { __marketingPlanningCalls: Array<{ name: string; args: Record<string, unknown> }> }).__marketingPlanningCalls);
     expect(calls.map(call => call.name)).toContain('servsync_update_internal_marketing_profile');
     expect(calls.map(call => call.name)).toContain('servsync_create_internal_marketing_plan');
+    expect(calls.find(call => call.name === 'servsync_create_internal_marketing_plan')?.args.p_recommendation_contract_version).toBe(2);
     expect(calls.map(call => call.name)).toContain('servsync_update_internal_marketing_plan');
     expect(calls.map(call => call.name)).toContain('servsync_accept_internal_marketing_plan');
     expect(calls.some(call => Object.keys(call.args).some(key => /workspace|contractor|actor/.test(key)))).toBe(false);

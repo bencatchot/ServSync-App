@@ -1,3 +1,12 @@
+import {
+  canonicalMarketingAudience,
+  canonicalMarketingTopic,
+  marketingAudienceLabel,
+  normalizeMarketingIdentity,
+} from './marketingTaxonomy';
+
+export const MARKETING_RECOMMENDATION_CONTRACT_VERSION = 2;
+
 export const MARKETING_PLAN_CONTENT_ROLES = [
   'facebook_instagram_post',
   'linkedin_post',
@@ -55,6 +64,7 @@ export type MarketingRecentContentContext = {
   windowLimit: number;
   itemCount: number;
   items: MarketingRecentContentItem[];
+  recommendationContractVersion?: number;
 };
 
 export type MarketingPlanItem = {
@@ -75,6 +85,7 @@ export type MarketingPlan = {
   planningEnd: string;
   ownerDirection: string | null;
   profileVersion: number;
+  recommendationContractVersion: number | null;
   recentContentContext: MarketingRecentContentContext;
   items: MarketingPlanItem[];
   revisionNumber: number;
@@ -97,6 +108,7 @@ export type MarketingPlanCreateInput = {
   planningStart: string;
   planningEnd: string;
   ownerDirection: string | null;
+  recommendationContractVersion: number | null;
   items: MarketingPlanItem[];
 };
 
@@ -154,7 +166,16 @@ function malformedError() {
 }
 
 function parseRecentContent(value: unknown): MarketingRecentContentContext {
-  if (!isRecord(value) || value.window_limit !== 20 || !Array.isArray(value.items) || value.item_count !== value.items.length) {
+  if (
+    !isRecord(value)
+    || value.window_limit !== 20
+    || !Array.isArray(value.items)
+    || value.item_count !== value.items.length
+    || !(
+      value.recommendation_contract_version === undefined
+      || (Number.isSafeInteger(value.recommendation_contract_version) && Number(value.recommendation_contract_version) >= 1)
+    )
+  ) {
     throw malformedError();
   }
   const items = value.items.map(item => {
@@ -177,7 +198,14 @@ function parseRecentContent(value: unknown): MarketingRecentContentContext {
       updatedAt: item.updated_at,
     };
   });
-  return { windowLimit: 20, itemCount: items.length, items };
+  return {
+    windowLimit: 20,
+    itemCount: items.length,
+    items,
+    ...(value.recommendation_contract_version === undefined
+      ? {}
+      : { recommendationContractVersion: Number(value.recommendation_contract_version) }),
+  };
 }
 
 function parseProfile(value: unknown): MarketingBusinessProfile {
@@ -285,6 +313,10 @@ function parsePlan(value: unknown): MarketingPlan | null {
     || !isTimestamp(value.updated_at)
     || !(value.accepted_at === null || isTimestamp(value.accepted_at))
   ) throw malformedError();
+  const recentContentContext = parseRecentContent(value.recent_content_context);
+  const recommendationContractVersion = value.plan_mode === 'recommended'
+    ? recentContentContext.recommendationContractVersion ?? 1
+    : null;
   return {
     id: value.plan_id,
     workspaceKey: value.workspace_key,
@@ -295,7 +327,8 @@ function parsePlan(value: unknown): MarketingPlan | null {
     planningEnd: value.planning_end as string,
     ownerDirection: value.owner_direction,
     profileVersion: Number(value.profile_version),
-    recentContentContext: parseRecentContent(value.recent_content_context),
+    recommendationContractVersion,
+    recentContentContext,
     items: value.items.map(parsePlanItem),
     revisionNumber: Number(value.revision_number),
     createdAt: value.created_at,
@@ -366,6 +399,7 @@ export function createMarketingPlanningAdapter(client: MarketingPlanningRpcClien
         p_planning_start: input.planningStart,
         p_planning_end: input.planningEnd,
         p_owner_direction: input.ownerDirection,
+        p_recommendation_contract_version: input.recommendationContractVersion,
         p_items: input.items.map(item => ({
           audience: item.audience,
           topic: item.topic,
@@ -404,11 +438,131 @@ export function createMarketingPlanningAdapter(client: MarketingPlanningRpcClien
   };
 }
 
-const normalize = (value: string) => value.trim().toLocaleLowerCase();
+const normalize = normalizeMarketingIdentity;
 
-function recentCount(values: Array<string | null>, target: string) {
-  const normalized = normalize(target);
-  return values.filter(value => value !== null && normalize(value) === normalized).length;
+function textIncludesIdentity(text: string, identity: string) {
+  const normalizedText = normalize(text);
+  const normalizedIdentity = normalize(identity);
+  return normalizedIdentity.length > 0 && (` ${normalizedText} `).includes(` ${normalizedIdentity} `);
+}
+
+function recentRoleCount(recentContent: MarketingRecentContentContext, role: MarketingPlanContentRole) {
+  return recentContent.items.filter(item => item.contentRole === role).length;
+}
+
+function recentAudienceCount(recentContent: MarketingRecentContentContext, audience: string) {
+  const key = canonicalMarketingAudience(audience).key;
+  return recentContent.items.filter(item => (
+    item.intendedAudience !== null && canonicalMarketingAudience(item.intendedAudience).key === key
+  )).length;
+}
+
+function recentTopicCount(recentContent: MarketingRecentContentContext, topic: string) {
+  const key = canonicalMarketingTopic(topic).key;
+  return recentContent.items.filter(item => canonicalMarketingTopic(item.title).key === key).length;
+}
+
+function goalAffinity(goal: string, audience: string, topic: string) {
+  const normalizedGoal = normalize(goal);
+  const canonicalAudience = canonicalMarketingAudience(audience);
+  const canonicalTopic = canonicalMarketingTopic(topic);
+  let score = 0;
+  if (textIncludesIdentity(normalizedGoal, canonicalAudience.label) || textIncludesIdentity(normalizedGoal, canonicalAudience.key)) score += 3;
+  if (textIncludesIdentity(normalizedGoal, canonicalTopic.label) || textIncludesIdentity(normalizedGoal, canonicalTopic.key)) score += 3;
+  if (canonicalAudience.kind === 'contractor' && /\b(contractor|business|signup|lead|acquisition|consideration)\b/.test(normalizedGoal)) score += 2;
+  if (canonicalAudience.kind === 'homeowner' && /\b(homeowner|home owner|home|property)\b/.test(normalizedGoal)) score += 2;
+  return score;
+}
+
+function profileTextAffinity(profile: MarketingBusinessProfile, audience: string, topic: string) {
+  const context = `${profile.businessSummary} ${profile.ownerNotes}`;
+  const canonicalAudience = canonicalMarketingAudience(audience);
+  const canonicalTopic = canonicalMarketingTopic(topic);
+  return Number(textIncludesIdentity(context, canonicalAudience.label))
+    + Number(textIncludesIdentity(context, canonicalTopic.label));
+}
+
+function topicIsAvoided(topic: string, avoidedTopics: string[]) {
+  const canonical = canonicalMarketingTopic(topic);
+  return avoidedTopics.some(avoided => {
+    const avoidedCanonical = canonicalMarketingTopic(avoided);
+    return canonical.key === avoidedCanonical.key
+      || textIncludesIdentity(topic, avoided)
+      || textIncludesIdentity(avoided, topic);
+  });
+}
+
+function roleChannelScore(role: MarketingPlanContentRole, channels: MarketingProfileChannel[]) {
+  let score = 0;
+  if (channels.includes('social') && [
+    'facebook_instagram_post', 'linkedin_post', 'educational_post', 'problem_solution_post',
+    'local_contractor_connection', 'feature_announcement', 'contractor_benefit', 'homeowner_benefit',
+  ].includes(role)) score += 2;
+  if (channels.includes('video') && role === 'short_video_concept') score += 4;
+  if (channels.includes('website') && ['educational_post', 'feature_highlight', 'feature_announcement'].includes(role)) score += 2;
+  if (channels.includes('email') && ['educational_post', 'contractor_benefit', 'homeowner_benefit'].includes(role)) score += 2;
+  if (channels.includes('other')) score += 1;
+  return score;
+}
+
+function chooseRole(
+  profile: MarketingBusinessProfile,
+  recentContent: MarketingRecentContentContext,
+  audience: string,
+  topic: string,
+  selectedRoles: MarketingPlanContentRole[],
+) {
+  const audienceKind = canonicalMarketingAudience(audience).kind;
+  const topicKey = canonicalMarketingTopic(topic).key;
+  const goalText = normalize([profile.primaryGoal, ...profile.secondaryGoals].join(' '));
+  return MARKETING_PLAN_CONTENT_ROLES
+    .map(role => {
+      let score = roleChannelScore(role, profile.preferredChannels);
+      score -= recentRoleCount(recentContent, role) * 2;
+      score -= selectedRoles.filter(value => value === role).length * 4;
+      if (!selectedRoles.includes(role)) score += 3;
+      if (audienceKind === 'homeowner' && ['homeowner_benefit', 'local_contractor_connection'].includes(role)) score += 3;
+      if (audienceKind === 'contractor' && ['contractor_benefit', 'problem_solution_post', 'linkedin_post'].includes(role)) score += 2;
+      if (/\beducat/.test(goalText) && role === 'educational_post') score += 3;
+      if (/\b(signup|lead|acquisition|consideration|awareness)\b/.test(goalText) && ['contractor_benefit', 'homeowner_benefit', 'problem_solution_post'].includes(role)) score += 2;
+      if (topicKey === 'product_demonstrations' && ['short_video_concept', 'feature_highlight'].includes(role)) score += 4;
+      return { role, score };
+    })
+    .sort((left, right) => right.score - left.score || left.role.localeCompare(right.role))[0].role;
+}
+
+function recommendationDirection(profile: MarketingBusinessProfile, audience: string, topic: string) {
+  const canonicalTopic = canonicalMarketingTopic(topic);
+  const focus = canonicalTopic.planningFocus
+    ?? `develop one focused ${topic.toLowerCase()} idea grounded in ${profile.businessName}'s approved business context`;
+  const tone = profile.toneStyle.trim().replace(/[.!?]+$/, '').toLowerCase();
+  return `${marketingAudienceLabel(audience)}: ${focus}. Use a ${tone} tone and keep the piece specific to ${profile.businessName}.`;
+}
+
+function recommendationRationale(
+  profile: MarketingBusinessProfile,
+  recentContent: MarketingRecentContentContext,
+  audience: string,
+  topic: string,
+  role: MarketingPlanContentRole,
+  selectedAudiences: string[],
+  planShortfallReason: string | null,
+) {
+  const primary = goalAffinity(profile.primaryGoal, audience, topic);
+  const secondary = profile.secondaryGoals.some(goal => goalAffinity(goal, audience, topic) > 0);
+  const topicCount = recentTopicCount(recentContent, topic);
+  const reasons: string[] = [];
+  if (primary > 0) reasons.push('Supports the primary goal');
+  else if (secondary) reasons.push('Supports an approved secondary goal');
+  if (!selectedAudiences.some(value => canonicalMarketingAudience(value).key === canonicalMarketingAudience(audience).key)) {
+    reasons.push('adds another Profile audience');
+  }
+  reasons.push(topicCount === 0
+    ? `no matching ${canonicalMarketingTopic(topic).label.toLowerCase()} topic appears in the recent window`
+    : `the topic is recent, so the plan rotates audience or format`);
+  if (roleChannelScore(role, profile.preferredChannels) > 0) reasons.push('fits an approved channel');
+  if (planShortfallReason) reasons.push(planShortfallReason);
+  return `${reasons.join('; ')}.`;
 }
 
 export function buildRecommendedMarketingPlan(
@@ -419,45 +573,78 @@ export function buildRecommendedMarketingPlan(
     throw new Error('Complete the Marketing Profile before requesting a plan.');
   }
 
-  const recentAudiences = recentContent.items.map(item => item.intendedAudience);
-  const recentRoles = recentContent.items.map(item => item.contentRole);
-  const recentTitles = recentContent.items.map(item => normalize(item.title));
-  const candidates = profile.audienceSegments.flatMap((audience, audienceIndex) => (
-    profile.emphasizedTopics.map((topic, topicIndex) => ({
-      audience,
-      topic,
-      audienceIndex,
-      topicIndex,
-      repetition: recentCount(recentAudiences, audience)
-        + recentTitles.filter(title => title.includes(normalize(topic))).length,
-    }))
-  ));
+  const topics = [...profile.emphasizedTopics, ...profile.serviceFocus]
+    .filter(topic => !topicIsAvoided(topic, profile.avoidedTopics))
+    .filter((topic, index, values) => values.findIndex(value => canonicalMarketingTopic(value).key === canonicalMarketingTopic(topic).key) === index);
+  if (topics.length === 0) throw new Error('The Marketing Profile does not contain an eligible planning topic.');
 
-  candidates.sort((left, right) => (
-    left.repetition - right.repetition
-    || left.audienceIndex - right.audienceIndex
-    || left.topicIndex - right.topicIndex
-  ));
+  const candidates = profile.audienceSegments.flatMap(audience => topics.map(topic => ({
+    audience,
+    topic,
+    audienceKey: canonicalMarketingAudience(audience).key,
+    audienceKind: canonicalMarketingAudience(audience).kind,
+    topicKey: canonicalMarketingTopic(topic).key,
+    baseScore:
+      goalAffinity(profile.primaryGoal, audience, topic) * 5
+      + profile.secondaryGoals.reduce((sum, goal) => sum + goalAffinity(goal, audience, topic) * 2, 0)
+      + profileTextAffinity(profile, audience, topic) * 2
+      + (profile.emphasizedTopics.some(value => canonicalMarketingTopic(value).key === canonicalMarketingTopic(topic).key) ? 4 : 2)
+      - recentAudienceCount(recentContent, audience)
+      - recentTopicCount(recentContent, topic) * 4,
+  })));
 
-  const roles = MARKETING_PLAN_CONTENT_ROLES
-    .map((role, index) => ({ role, index, count: recentCount(recentRoles, role) }))
-    .sort((left, right) => left.count - right.count || left.index - right.index);
-
+  const audienceCount = new Set(candidates.map(candidate => candidate.audienceKey)).size;
+  const topicCount = new Set(candidates.map(candidate => candidate.topicKey)).size;
+  const targetCount = candidates.length < 5
+    ? candidates.length
+    : Math.min(7, 5 + Number(audienceCount >= 3) + Number(topicCount >= 6));
   const selected: typeof candidates = [];
-  for (const candidate of candidates) {
-    if (selected.some(item => normalize(item.audience) === normalize(candidate.audience) && normalize(item.topic) === normalize(candidate.topic))) continue;
-    selected.push(candidate);
-    if (selected.length === Math.min(3, candidates.length)) break;
+  const selectedRoles: MarketingPlanContentRole[] = [];
+  const planShortfallReason = targetCount < 5
+    ? `the Profile supplies only ${targetCount} distinct eligible audience/topic combination${targetCount === 1 ? '' : 's'}, so this plan contains ${targetCount} item${targetCount === 1 ? '' : 's'}`
+    : null;
+
+  while (selected.length < targetCount) {
+    const next = candidates
+      .filter(candidate => !selected.some(item => item.audienceKey === candidate.audienceKey && item.topicKey === candidate.topicKey))
+      .map(candidate => {
+        const selectedAudienceUses = selected.filter(item => item.audienceKey === candidate.audienceKey).length;
+        const selectedTopicUses = selected.filter(item => item.topicKey === candidate.topicKey).length;
+        const selectedKindUses = selected.filter(item => item.audienceKind === candidate.audienceKind).length;
+        return {
+          candidate,
+          score: candidate.baseScore
+            + (selectedTopicUses === 0 ? 9 : 0)
+            + (audienceCount > 1 && selectedAudienceUses === 0 ? 5 : 0)
+            + (new Set(candidates.map(item => item.audienceKind)).size > 1 && selectedKindUses === 0 ? 3 : 0)
+            - selectedTopicUses * 8
+            - selectedAudienceUses * 3,
+        };
+      })
+      .sort((left, right) => (
+        right.score - left.score
+        || `${left.candidate.audienceKey}:${left.candidate.topicKey}`.localeCompare(`${right.candidate.audienceKey}:${right.candidate.topicKey}`)
+      ))[0]?.candidate;
+    if (!next) break;
+    const role = chooseRole(profile, recentContent, next.audience, next.topic, selectedRoles);
+    selected.push(next);
+    selectedRoles.push(role);
   }
 
   return selected.map((candidate, index) => ({
-    audience: candidate.audience,
-    topic: candidate.topic,
-    direction: `Help ${candidate.audience} understand ${candidate.topic} in practical, plain language.`,
-    rationale: candidate.repetition > 0
-      ? 'This keeps the profile priority in the plan while changing the recent emphasis.'
-      : 'This profile priority has not appeared in the recent content window.',
-    contentRoles: [roles[index % roles.length].role],
+    audience: marketingAudienceLabel(candidate.audience),
+    topic: canonicalMarketingTopic(candidate.topic).label,
+    direction: recommendationDirection(profile, candidate.audience, candidate.topic),
+    rationale: recommendationRationale(
+      profile,
+      recentContent,
+      candidate.audience,
+      candidate.topic,
+      selectedRoles[index],
+      selected.slice(0, index).map(item => item.audience),
+      index === 0 ? planShortfallReason : null,
+    ),
+    contentRoles: [selectedRoles[index]],
   }));
 }
 

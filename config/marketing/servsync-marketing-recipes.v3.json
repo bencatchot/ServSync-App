@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "recipeSetVersion": "servsync-marketing-recipes-v3",
+  "truthPackVersion": "servsync-marketing-truth-v3",
+  "directionContractVersion": 1,
+  "packageGuidance": {
+    "rule": "Every package develops one approved Marketing Direction. Each role must approach that direction from its own purpose rather than summarizing the full ServSync feature inventory.",
+    "differentiationChecks": [
+      "distinct hook",
+      "distinct angle",
+      "role-appropriate length",
+      "one primary message",
+      "no repeated request-to-estimate-to-job-to-invoice summary unless the role specifically requires it"
+    ]
+  },
+  "recipes": [
+    {
+      "key": "contractor_acquisition",
+      "displayName": "Contractor acquisition",
+      "purpose": "Introduce ServSync to small service contractors through one focused direction expressed by distinct content roles.",
+      "allowedAudiences": [
+        "small_contractors",
+        "hvac_contractors",
+        "plumbers",
+        "electricians",
+        "carpentry_contractors",
+        "lawn_landscaping_contractors",
+        "pressure_washing_contractors",
+        "handyman_contractors"
+      ],
+      "items": [
+        {
+          "role": "facebook_instagram_post",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Open with a realistic contractor/customer moment and one immediate practical benefit."
+        },
+        {
+          "role": "linkedin_post",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Develop the business philosophy or relationship value behind the direction without repeating the scenario post."
+        },
+        {
+          "role": "educational_post",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Explain the central distinction or choice clearly in plain language."
+        },
+        {
+          "role": "feature_highlight",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Demonstrate one specific current ServSync interaction that supports the direction."
+        },
+        {
+          "role": "short_video_concept",
+          "contentType": "other",
+          "channelCategory": "social",
+          "directionPurpose": "Show the direction visually through a short sequence that is not a narrated feature list."
+        }
+      ]
+    },
+    {
+      "key": "homeowner_awareness",
+      "displayName": "Homeowner awareness",
+      "purpose": "Explain one practical home-service organization idea without implying automated maintenance or guaranteed contractor outcomes.",
+      "allowedAudiences": [
+        "homeowners"
+      ],
+      "items": [
+        {
+          "role": "educational_post",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Explain one useful home-service concept in plain homeowner language."
+        },
+        {
+          "role": "problem_solution_post",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Start from one recognizable homeowner problem and connect it to one current ServSync benefit."
+        },
+        {
+          "role": "feature_highlight",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Demonstrate one current homeowner interaction that supports the direction."
+        },
+        {
+          "role": "local_contractor_connection",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Focus on the optional ongoing contractor relationship without promising leads, response, or automatic sharing."
+        },
+        {
+          "role": "short_video_concept",
+          "contentType": "other",
+          "channelCategory": "social",
+          "directionPurpose": "Show one homeowner story visually without turning it into a complete product tour."
+        }
+      ]
+    },
+    {
+      "key": "feature_promotion",
+      "displayName": "Feature promotion",
+      "purpose": "Explain one currently marketable ServSync capability through distinct, audience-relevant angles.",
+      "allowedAudiences": [
+        "small_contractors",
+        "hvac_contractors",
+        "plumbers",
+        "electricians",
+        "carpentry_contractors",
+        "lawn_landscaping_contractors",
+        "pressure_washing_contractors",
+        "handyman_contractors",
+        "homeowners"
+      ],
+      "items": [
+        {
+          "role": "feature_announcement",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "State what the current capability enables and why it matters without competitor contrast."
+        },
+        {
+          "role": "contractor_benefit",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Describe one contractor situation improved by the capability."
+        },
+        {
+          "role": "homeowner_benefit",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Describe one homeowner or customer choice supported by the capability."
+        },
+        {
+          "role": "educational_post",
+          "contentType": "social_post",
+          "channelCategory": "social",
+          "directionPurpose": "Clarify the capability's scope and boundaries in normal language."
+        },
+        {
+          "role": "short_video_concept",
+          "contentType": "other",
+          "channelCategory": "social",
+          "directionPurpose": "Demonstrate the capability through one short visual story rather than a feature inventory."
+        }
+      ]
+    }
+  ]
+}

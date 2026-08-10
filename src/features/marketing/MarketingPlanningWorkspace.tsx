@@ -3,6 +3,7 @@ import { Check, Plus, RefreshCw, Save, Sparkles, Trash2 } from 'lucide-react';
 import {
   MARKETING_PLAN_CONTENT_ROLES,
   MARKETING_PROFILE_CHANNELS,
+  MARKETING_RECOMMENDATION_CONTRACT_VERSION,
   buildOwnerDirectedMarketingPlan,
   buildRecommendedMarketingPlan,
   type MarketingBusinessProfile,
@@ -276,6 +277,7 @@ function PlanEditor({
         planningStart: period.start,
         planningEnd: period.end,
         ownerDirection: mode === 'owner_directed' ? ownerDirection.trim() : null,
+        recommendationContractVersion: mode === 'recommended' ? MARKETING_RECOMMENDATION_CONTRACT_VERSION : null,
         items,
       });
       setNotice(mode === 'recommended' ? 'Recommended draft plan prepared.' : 'Owner-directed draft plan prepared.');
@@ -355,7 +357,11 @@ function PlanEditor({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-base font-bold text-slate-950">{plan.title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{plan.mode === 'recommended' ? 'Recommended' : 'Owner-directed'} from profile version {plan.profileVersion}. Revision {plan.revisionNumber}.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {plan.mode === 'recommended'
+              ? `Recommended with planner v${plan.recommendationContractVersion ?? 1}`
+              : 'Owner-directed'} from profile version {plan.profileVersion}. Revision {plan.revisionNumber}.
+          </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${editable ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>
           {editable ? 'Draft plan' : 'Accepted plan'}
