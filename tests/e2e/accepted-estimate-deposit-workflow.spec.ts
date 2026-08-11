@@ -167,7 +167,7 @@ test.describe('Accepted Estimate Deposit Workflow', () => {
     expect(migration).toContain("'finalized_from_draft', v_finalizing_draft");
     expect(migration).not.toMatch(/service_role.*grant|stripe|payment_intent|checkout_session/i);
     expect(app).toContain("['draft', 'sent', 'viewed', 'overdue', 'partially_paid', 'paid'].includes(invoice.status)");
-    expect(app).toContain("invoice.status === 'paid' ? 'Payment history' : 'Mark Paid'");
+    expect(app).toContain("invoice.status === 'paid' ? 'Payment history' : invoice.status === 'draft' ? 'Mark Paid' : 'Record payment'");
     expect(dialog).toContain('Marking this Draft paid finalizes the Invoice.');
     expect(dialog).toContain('readOnly={finalizingDraft}');
   });

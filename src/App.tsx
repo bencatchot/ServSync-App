@@ -40158,7 +40158,7 @@ function ContractorDashboard({
                                           className={mobileButtonClass('primary')}
                                         >
                                           <CheckCircle2 size={15} />
-                                          {invoice.status === 'paid' ? 'Payment history' : 'Mark Paid'}
+                                          {invoice.status === 'paid' ? 'Payment history' : invoice.status === 'draft' ? 'Mark Paid' : 'Record payment'}
                                         </button>
                                         {invoice.status !== 'draft' && invoiceCanVoid(invoice.status) && (
                                           <button

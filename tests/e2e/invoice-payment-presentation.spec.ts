@@ -185,7 +185,7 @@ test.describe('Invoice payment presentation', () => {
     expect(appSource).toContain('<InvoicePaymentSummary invoice={invoice} variant="detail" showStatus');
     expect(appSource).toContain('<InvoicePaymentSummary invoice={linkedInvoiceForJob}');
     expect(appSource).toContain('Pay online when available, or contact your contractor for payment instructions.');
-    expect(appSource).toContain('Mark Paid');
+    expect(appSource).toContain("invoice.status === 'draft' ? 'Mark Paid' : 'Record payment'");
     expect(appSource).toContain('Payment history');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-compact"');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-detail"');
@@ -208,7 +208,7 @@ test.describe('Invoice payment presentation', () => {
     const helperSource = sourceFile('src/features/invoices/paymentPresentation.ts');
 
     expect(paymentDialogSource).toContain("['draft', 'sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)");
-    expect(paymentDialogSource).toContain("fullBalancePayment ? 'Mark Paid' : 'Record payment'");
+    expect(paymentDialogSource).toContain("finalizingDraft ? 'Mark Paid' : 'Record payment'");
     expect(paymentDialogSource).toContain('Record money received outside ServSync.');
     expect(appSource).toContain('recordOfflineInvoicePayment');
     expect(appSource).toContain('voidInvoice(invoice)');
