@@ -12,6 +12,7 @@ import {
   type PriceBookStatusView,
   type PriceBookTypeFilter,
 } from './priceBookView';
+import { derivePriceBookMargin, formatGrossMarginPercent, formatSignedMoney } from './priceBookMargin';
 
 export type ContractorPriceBookItemDraft = {
   title: string;
@@ -23,6 +24,7 @@ export type ContractorPriceBookItemDraft = {
   line_type: EstimateLineType;
   unit: string;
   default_unit_price: string;
+  internal_cost: string;
   taxable: boolean;
   labor_hours: string;
   sku: string;
@@ -74,6 +76,15 @@ function priceLabel(item: ContractorPriceBookItem) {
   return item.default_unit_price_cents === null || item.default_unit_price_cents === undefined
     ? 'Price Required'
     : formatMoney(item.default_unit_price_cents);
+}
+
+function marginLabel(item: ContractorPriceBookItem) {
+  if (item.internal_cost_cents === null || item.internal_cost_cents === undefined) {
+    return 'Cost not set';
+  }
+  const margin = derivePriceBookMargin(item.default_unit_price_cents, item.internal_cost_cents);
+  if (!margin) return `Cost ${formatMoney(item.internal_cost_cents)} · Margin unavailable`;
+  return `Cost ${formatMoney(item.internal_cost_cents)} · ${formatSignedMoney(margin.grossProfitCents)} profit · ${formatGrossMarginPercent(margin.grossMarginPercent)}`;
 }
 
 export function ContractorPriceBookWorkspace({
@@ -538,6 +549,7 @@ export function ContractorPriceBookWorkspace({
                       <div className="flex items-center justify-between gap-3 sm:justify-end">
                         <div className="text-right">
                           <p className={`${item.default_unit_price_cents == null ? 'text-amber-700' : 'text-slate-950'} text-sm font-bold`}>{priceLabel(item)}</p>
+                          {canManage ? <p className={`${(derivePriceBookMargin(item.default_unit_price_cents, item.internal_cost_cents)?.grossProfitCents ?? 0) < 0 ? 'text-amber-700' : 'text-slate-500'} mt-0.5 text-xs`} data-testid="price-book-margin-summary">{marginLabel(item)}</p> : null}
                           <p className="mt-0.5 text-xs text-slate-500">{item.unit || 'No unit'}</p>
                         </div>
                         {canMutate ? (
@@ -586,6 +598,9 @@ export function ContractorPriceBookWorkspace({
             </Field>
             <Field label="Selling price">
               <input className={inputClass} inputMode="decimal" value={draft.default_unit_price} onChange={event => setDraft(current => ({ ...current, default_unit_price: event.target.value }))} placeholder="Blank = Price Required" />
+            </Field>
+            <Field label="Internal cost">
+              <input className={inputClass} inputMode="decimal" value={draft.internal_cost} onChange={event => setDraft(current => ({ ...current, internal_cost: event.target.value }))} placeholder="Optional private cost" />
             </Field>
             <Field label="Unit">
               <input className={inputClass} value={draft.unit} onChange={event => setDraft(current => ({ ...current, unit: event.target.value }))} placeholder="each" />
