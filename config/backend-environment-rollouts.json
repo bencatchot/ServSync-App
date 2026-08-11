@@ -364,6 +364,24 @@
       }
     },
     {
+      "id": "draft-invoice-mark-paid-v1",
+      "artifact": "servsync-draft-invoice-mark-paid.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 ac6ceeb8b834dab923ac65824c3d1d184a42d418a1733c66ac36fc7eec2998c3 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-11 from 18:33:13Z through 18:33:14Z. Catalog ownership, fixed-path SECURITY DEFINER authority, authenticated-only grant, exact Draft full-balance guard, replay/concurrency, existing payment states, and provider independence passed. Actual browser Scenario D created a local Customer Draft Invoice, recorded one full offline check payment without send or Stripe traffic, reloaded Paid with zero balance and one immutable history row, downloaded its PDF, and removed the exact fixture; Sandbox returned to 84 Invoices, zero offline payments, and zero invoice-paid events."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 ac6ceeb8b834dab923ac65824c3d1d184a42d418a1733c66ac36fc7eec2998c3 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-11 from 18:48:33Z through 18:48:35Z after Demo passed. Catalog ownership, fixed-path SECURITY DEFINER authority, authenticated-only grant, and exact Draft full-balance guard match Sandbox. Production retained 12 Invoices with exact financial fingerprint 21f0ad23c21e09b9226dcea1260b23e8, zero offline payments, zero invoice-paid events, and zero Stripe accounts, payment attempts, or events; no workflow fixture was created."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 ac6ceeb8b834dab923ac65824c3d1d184a42d418a1733c66ac36fc7eec2998c3 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 18:47:50Z through 18:47:51Z. Catalog ownership, fixed-path SECURITY DEFINER authority, authenticated-only grant, and exact Draft full-balance guard match Sandbox. Demo retained zero Invoices, offline payments, invoice-paid events, Stripe accounts, payment attempts, or events; no workflow fixture was created."
+        }
+      }
+    },
+    {
       "id": "accepted-plan-marketing-directions-v1",
       "artifact": "servsync-accepted-plan-marketing-directions.sql",
       "environments": {

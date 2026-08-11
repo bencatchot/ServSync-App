@@ -40148,7 +40148,7 @@ function ContractorDashboard({
                                         </div>
                                       </div>
                                     )}
-                                    {canManageInvoicePayments && ['sent', 'viewed', 'overdue', 'partially_paid', 'paid'].includes(invoice.status) && (
+                                    {canManageInvoicePayments && ['draft', 'sent', 'viewed', 'overdue', 'partially_paid', 'paid'].includes(invoice.status) && (
                                       <div className={`mt-3 ${mobileActionRowClass()}`}>
                                         <button
                                           type="button"
@@ -40158,9 +40158,9 @@ function ContractorDashboard({
                                           className={mobileButtonClass('primary')}
                                         >
                                           <CheckCircle2 size={15} />
-                                          {invoice.status === 'paid' ? 'Payment history' : 'Record payment'}
+                                          {invoice.status === 'paid' ? 'Payment history' : invoice.status === 'draft' ? 'Mark Paid' : 'Record payment'}
                                         </button>
-                                        {invoiceCanVoid(invoice.status) && (
+                                        {invoice.status !== 'draft' && invoiceCanVoid(invoice.status) && (
                                           <button
                                             type="button"
                                             onClick={() => void voidInvoice(invoice)}

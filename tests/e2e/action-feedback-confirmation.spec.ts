@@ -91,7 +91,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(invoiceSource).toContain("'Draft invoice saved'");
     expect(invoiceSource).toContain('It remains private until you send it to the homeowner.');
     expect(invoiceSource).toContain("'Invoice sent'");
-    expect(invoiceSource).toContain('Payment is handled directly with the contractor.');
+    expect(invoiceSource).toContain('Online payment appears only when the contractor has completed Stripe test setup; offline payment remains available.');
     expect(invoiceSource).toContain("'Invoice marked paid'");
     expect(invoiceSource).toContain('ServSync did not process a payment.');
     expect(invoiceSource).toContain("'Invoice voided'");
@@ -106,7 +106,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(reportSource).toContain("'Job completed'");
 
     expect(invoiceSource).toContain("supabase.rpc('servsync_send_invoice'");
-    expect(invoiceSource).toContain("supabase.rpc('servsync_mark_invoice_paid'");
+    expect(invoiceSource).toContain("supabase.rpc('servsync_record_offline_invoice_payment'");
     expect(invoiceSource).toContain("supabase.rpc('servsync_void_invoice'");
     expect(homeMapSource).toContain("supabase.rpc('servsync_submit_home_map_draft'");
     expect(homeMapSource).toContain("supabase.rpc('servsync_revoke_home_map_draft'");

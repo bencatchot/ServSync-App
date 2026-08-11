@@ -168,6 +168,32 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     expect(invoicePdf.fileName).toMatch(/servsync-test-contractor-invoice-inv-1001\.pdf/i);
   });
 
+  test('paid Invoice PDF is generated from persisted paid status and payment fields', async () => {
+    const paidInvoice: Invoice = {
+      ...sampleInvoice(),
+      status: 'paid',
+      amount_paid_cents: 16500,
+      paid_at: '2026-08-11T12:00:00.000Z',
+    };
+    const result = await createInvoicePdf(paidInvoice, {
+      contractorName: 'ServSync Test Contractor',
+      customerName: 'Local Customer',
+      customerAddress: '200 Local Ave',
+      contractorLogoUrl: null,
+    });
+
+    await expectValidPdf(result.blob);
+    const pdfBytes = Buffer.from(await result.blob.arrayBuffer()).toString('latin1');
+    expect(pdfBytes).toContain('(PAID)');
+    expect(pdfBytes).toContain('(Invoice Total)');
+    expect(pdfBytes).toContain('(Amount Paid)');
+    expect(pdfBytes).toContain('(Balance Due)');
+    expect(pdfBytes).toContain('($165.00)');
+    expect(pdfBytes).toContain('($0.00)');
+    expect(pdfBytes).toContain('(Aug 11, 2026)');
+    expect(pdfBytes).toContain('(Paid in full on Aug 11, 2026. No balance remains.)');
+  });
+
   test('download and preview helpers delay object URL revocation until after browser handoff', () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;

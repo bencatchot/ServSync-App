@@ -12,6 +12,7 @@ import {
 import {
   createOfflinePaymentDraft,
   normalizeOfflinePaymentRecords,
+  offlinePaymentDraftIsFullBalance,
   validateOfflinePaymentDraft,
 } from '../../src/features/invoices/offlinePayments';
 
@@ -117,6 +118,16 @@ test.describe('Accepted Estimate Deposit Workflow', () => {
     expect(validateOfflinePaymentDraft(target, { ...draft, amount: '500.001' }).error).toContain('two decimal places');
   });
 
+  test('defaults saved Draft Invoices to a full-balance Mark Paid submission', () => {
+    const target = invoice({ status: 'draft', amount_paid_cents: 0, total_cents: 200000 });
+    const draft = createOfflinePaymentDraft(target);
+
+    expect(draft.amount).toBe('2000.00');
+    expect(offlinePaymentDraftIsFullBalance(target, draft)).toBe(true);
+    expect(offlinePaymentDraftIsFullBalance(target, { ...draft, amount: '500.00' })).toBe(false);
+    expect(validateOfflinePaymentDraft(target, draft).submission?.amountCents).toBe(200000);
+  });
+
   test('normalizes only sanitized payment-history records', () => {
     const safe = {
       id: 'payment-1', invoice_id: 'invoice-1', amount_cents: 50000, payment_date: '2026-08-07',
@@ -142,5 +153,22 @@ test.describe('Accepted Estimate Deposit Workflow', () => {
     expect(app).toContain('Job creation remains available whether the deposit is unrequested, outstanding, partially paid, or paid.');
     expect(app).toContain('Deposit Invoice draft created. Review it before sending; no message was sent automatically.');
     expect(dialog).toContain('This does not process a payment or contact a payment provider.');
+  });
+
+  test('Draft Mark Paid UI stays on the existing offline-payment and billing-permission path', () => {
+    const migration = sourceFile('servsync-draft-invoice-mark-paid.sql');
+    const app = sourceFile('src/App.tsx');
+    const dialog = sourceFile('src/features/invoices/RecordInvoicePaymentDialog.tsx');
+
+    expect(migration).toContain("v_invoice.status not in ('draft', 'sent', 'viewed', 'overdue', 'partially_paid')");
+    expect(migration).toContain("v_finalizing_draft := v_invoice.status = 'draft';");
+    expect(migration).toContain('A Draft Invoice must be marked paid in full.');
+    expect(migration).toContain('current_user_can_manage_contractor_billing');
+    expect(migration).toContain("'finalized_from_draft', v_finalizing_draft");
+    expect(migration).not.toMatch(/service_role.*grant|stripe|payment_intent|checkout_session/i);
+    expect(app).toContain("['draft', 'sent', 'viewed', 'overdue', 'partially_paid', 'paid'].includes(invoice.status)");
+    expect(app).toContain("invoice.status === 'paid' ? 'Payment history' : invoice.status === 'draft' ? 'Mark Paid' : 'Record payment'");
+    expect(dialog).toContain('Marking this Draft paid finalizes the Invoice.');
+    expect(dialog).toContain('readOnly={finalizingDraft}');
   });
 });
