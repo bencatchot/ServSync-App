@@ -2,7 +2,7 @@
 
 ## Status
 
-Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The v1 foundation and Planner Quality v2 compatibility migration are applied and validated in Sandbox, Demo, and Production. Planner Coherence + Relevance v3 is implemented and validated in Sandbox only; Demo and Production remain on planner v2 pending a separate migration-first rollout. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
+Marketing Slice 4 is a private, provider-neutral foundation for business-specific Marketing strategy and bounded planning. The v1 foundation, Planner Quality v2 compatibility migration, and Planner Coherence + Relevance v3 migration are applied and validated in Sandbox, Demo, and Production. Runtime access remains limited to the ServSync internal platform-administrator workspace. No publishing, scheduling, campaign execution, paid AI, provider integration, contractor Marketing UI, or homeowner Marketing UI is included.
 
 ## Architecture
 
@@ -62,6 +62,8 @@ The plan is selected in a deliberate order: primary-goal fit, bounded secondary-
 
 Each rationale now states why the topic and audience fit the Profile, whether recent content is exact, related, or new, and what the selected role contributes. Scores and internal ranking metadata are not persisted or displayed. Planner v3 remains deterministic assistance rather than product truth; Marketing Direction, Truth Pack validation, human review, approval, scheduling, and publishing boundaries are unchanged.
 
+Planner v3 operational hardening keeps the same persisted version and RPC contract. Discovery/profile cautionary language avoids prohibited affirmative claim tokens while preserving the same truth boundary. Customer communication treats only the reviewed request, estimate/response, secure-link, and connected-homeowner families as related. A Product demonstrations recommendation dynamically chooses one named eligible interaction from current Profile priorities and recent-content evidence; if none exists, the generic demonstration candidate is excluded. These are source-only corrections and do not rewrite historical plans or weaken server validation.
+
 Recommended v3 plans use the additive `servsync_create_internal_marketing_plan_v3` RPC and persist `recommendation_contract_version = 3`. The existing `servsync_create_internal_marketing_plan` RPC remains unchanged for owner-directed plans and historical planner v1/v2 compatibility. Historical plan rows and revisions are not rewritten.
 
 ## Current Authorization
@@ -74,7 +76,7 @@ Only an authenticated `platform_admin` can call:
 - `servsync_update_internal_marketing_plan`
 - `servsync_accept_internal_marketing_plan`
 
-Sandbox also exposes `servsync_create_internal_marketing_plan_v3` to authenticated platform administrators only. It derives the workspace, actor, current profile, and recent-content context server-side and retains the same replay, tenant, mode, and version checks as the established planning boundary.
+Sandbox, Demo, and Production expose `servsync_create_internal_marketing_plan_v3` to authenticated platform administrators only. It derives the workspace, actor, current profile, and recent-content context server-side and retains the same replay, tenant, mode, and version checks as the established planning boundary.
 
 Workspace, actor, recent-content context, and current profile version are derived server-side. Contractor and homeowner calls fail closed. No contractor-facing profile/plan RPC or UI exists in this slice.
 

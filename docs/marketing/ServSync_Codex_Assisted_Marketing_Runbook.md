@@ -18,6 +18,8 @@ Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/la
 
 Planner v3 migration `servsync-marketing-planner-coherence-relevance-v3.sql`, exact SHA-256 `c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b`, is applied in Sandbox, Demo, and Production. It improves deterministic recommendation coherence and relevance only. A recommendation remains a draft plan; it does not create Marketing Direction, content, approvals, schedules, or published work.
 
+Planner v3 operational hardening is source-only: discovery/profile cautions use claim-safe wording without relaxing the server validator, customer-communication overlap recognizes bounded estimate/response/link/connection relationships, and Product demonstrations name one eligible supported interaction selected from the current Profile and recent-content evidence. Do not treat the planner as ready for Plan-to-Direction handoff until a real Production recommendation succeeds after this client correction is deployed.
+
 ## Marketing Direction
 
 An accepted Business Marketing Plan may inform a later Marketing Direction, but it does not replace the direction contract and does not create a preparation package. The plan's workspace, source profile version, audience/topic mix, and owner edits are planning context only. Before package preparation, select one exact plan item or another separately authorized owner direction and run the full Truth Pack and package validation below.

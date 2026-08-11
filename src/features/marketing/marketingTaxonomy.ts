@@ -142,7 +142,12 @@ const TOPIC_DEFINITIONS: TopicDefinition[] = [
     aliases: ['customer communication', 'customer communications', 'communicating with customers'],
     planningFocus: 'focus on giving the customer a clear next step and keeping the related work context together',
     theme: 'customer_relationship',
-    relatedKeys: ['customer_requests'],
+    relatedKeys: [
+      'customer_requests',
+      'estimates_and_approvals',
+      'secure_document_links',
+      'connected_homeowner_relationships',
+    ],
   },
   {
     key: 'home_history',
@@ -194,7 +199,7 @@ const TOPIC_DEFINITIONS: TopicDefinition[] = [
     key: 'contractor_discovery_profiles',
     label: 'Contractor discovery and profiles',
     aliases: ['contractor discovery', 'contractor discoveries', 'contractor profile', 'contractor profiles', 'contractor discovery and profiles'],
-    planningFocus: 'explain one supported contractor-profile or homeowner-discovery interaction without implying ranking, credential verification, or guaranteed leads',
+    planningFocus: 'explain one supported contractor-profile or homeowner-discovery interaction without claiming ranking, credential verification, or lead outcomes',
     theme: 'business_presence',
   },
 ];

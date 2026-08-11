@@ -544,6 +544,60 @@ function topicIsAvoided(topic: string, avoidedTopics: string[]) {
   });
 }
 
+const DEMONSTRATION_TOPIC_KEYS = new Set([
+  'customer_requests',
+  'estimates_and_approvals',
+  'jobs',
+  'invoices',
+  'home_history',
+  'secure_document_links',
+  'connected_homeowner_relationships',
+]);
+
+function selectDemonstrationTopic(
+  profile: MarketingBusinessProfile,
+  recentContent: MarketingRecentContentContext,
+  audience: string,
+  alreadySelectedTopicKeys: Set<string>,
+) {
+  const candidates = [...profile.emphasizedTopics, ...profile.serviceFocus]
+    .filter(topic => !topicIsAvoided(topic, profile.avoidedTopics))
+    .map((topic, profileOrder) => ({ topic, profileOrder, canonical: canonicalMarketingTopic(topic) }))
+    .filter(({ canonical }) => (
+      canonical.recognized
+      && DEMONSTRATION_TOPIC_KEYS.has(canonical.key)
+      && canonical.planningFocus !== null
+      && marketingTopicSpecificity(canonical.label) > 0
+    ))
+    .filter((candidate, index, values) => (
+      values.findIndex(value => value.canonical.key === candidate.canonical.key) === index
+    ))
+    .map(candidate => {
+      const coverage = recentTopicCoverage(recentContent, audience, candidate.topic);
+      const primary = goalAffinity(profile.primaryGoal, audience, candidate.topic);
+      const secondary = Math.max(0, ...profile.secondaryGoals.map(goal => goalAffinity(goal, audience, candidate.topic)));
+      const relationshipScore = coverage.relationship === 'new' ? 24 : coverage.relationship === 'related' ? 12 : 0;
+      return {
+        ...candidate,
+        alreadySelected: alreadySelectedTopicKeys.has(candidate.canonical.key),
+        score:
+          relationshipScore
+          - coverage.count * 2
+          + primary * 3
+          + secondary
+          + Number(profile.emphasizedTopics.some(topic => canonicalMarketingTopic(topic).key === candidate.canonical.key)) * 2,
+      };
+    })
+    .sort((left, right) => (
+      Number(left.alreadySelected) - Number(right.alreadySelected)
+      || right.score - left.score
+      || left.profileOrder - right.profileOrder
+      || left.canonical.key.localeCompare(right.canonical.key)
+    ));
+
+  return candidates[0]?.canonical ?? null;
+}
+
 function roleChannelScore(role: MarketingPlanContentRole, channels: MarketingProfileChannel[]) {
   let score = 0;
   if (channels.includes('social') && [
@@ -610,10 +664,21 @@ function chooseRole(
     .sort((left, right) => right.score - left.score || left.role.localeCompare(right.role))[0].role;
 }
 
-function recommendationDirection(profile: MarketingBusinessProfile, audience: string, topic: string) {
+function recommendationDirection(
+  profile: MarketingBusinessProfile,
+  recentContent: MarketingRecentContentContext,
+  audience: string,
+  topic: string,
+  selectedTopicKeys: Set<string>,
+) {
   const canonicalTopic = canonicalMarketingTopic(topic);
-  const focus = canonicalTopic.planningFocus
-    ?? `focus on one concrete ${topic.toLowerCase()} situation drawn from ${profile.businessName}'s stated services or priorities`;
+  const demonstrationTopic = canonicalTopic.key === 'product_demonstrations'
+    ? selectDemonstrationTopic(profile, recentContent, audience, selectedTopicKeys)
+    : null;
+  const focus = demonstrationTopic
+    ? `create a short, concrete product demonstration about ${demonstrationTopic.label}: ${demonstrationTopic.planningFocus}`
+    : canonicalTopic.planningFocus
+      ?? `focus on one concrete ${topic.toLowerCase()} situation drawn from ${profile.businessName}'s stated services or priorities`;
   const tone = profile.toneStyle.trim().replace(/[.!?]+$/, '').toLowerCase();
   return `${marketingAudienceLabel(audience)}: ${focus}. Use a ${tone} tone and keep the piece specific to ${profile.businessName}.`;
 }
@@ -688,7 +753,11 @@ export function buildRecommendedMarketingPlan(
 
   const candidates: RecommendationCandidate[] = profile.audienceSegments
     .filter(audience => profileSupportsTradeAudience(profile, audience))
-    .flatMap(audience => topics.map(topic => {
+    .flatMap(audience => topics.flatMap(topic => {
+      if (
+        canonicalMarketingTopic(topic).key === 'product_demonstrations'
+        && selectDemonstrationTopic(profile, recentContent, audience, new Set()) === null
+      ) return [];
       const primaryAffinity = goalAffinity(profile.primaryGoal, audience, topic);
       const secondaryAffinity = Math.max(0, ...profile.secondaryGoals.map(goal => goalAffinity(goal, audience, topic)));
       const coverage = recentTopicCoverage(recentContent, audience, topic);
@@ -699,7 +768,7 @@ export function buildRecommendedMarketingPlan(
         : coverage.relationship === 'related'
           ? 5 + Math.max(0, coverage.count - 1)
           : 0;
-      return {
+      return [{
         audience,
         topic,
         audienceKey: canonicalMarketingAudience(audience).key,
@@ -715,7 +784,7 @@ export function buildRecommendedMarketingPlan(
           + topicPriority
           - recentAudienceCount(recentContent, audience)
           - recentPenalty,
-      };
+      }];
     }));
 
   if (candidates.length === 0) {
@@ -762,10 +831,20 @@ export function buildRecommendedMarketingPlan(
     selectedRoles.push(role);
   }
 
+  const selectedTopicKeys = new Set(selected
+    .map(candidate => candidate.topicKey)
+    .filter(topicKey => topicKey !== 'product_demonstrations'));
+
   return selected.map((candidate, index) => ({
     audience: marketingAudienceLabel(candidate.audience),
     topic: canonicalMarketingTopic(candidate.topic).label,
-    direction: recommendationDirection(profile, candidate.audience, candidate.topic),
+    direction: recommendationDirection(
+      profile,
+      recentContent,
+      candidate.audience,
+      candidate.topic,
+      selectedTopicKeys,
+    ),
     rationale: recommendationRationale(
       profile,
       candidate.audience,

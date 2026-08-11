@@ -96,6 +96,66 @@ fi
 
 psql_run --file "$ROOT_DIR/tests/sql/marketing-planner-coherence-relevance-v3-validation.sql" >/dev/null
 
+planner_payload="$(node <<'NODE'
+(async () => {
+  const { createServer } = await import('vite');
+  const server = await createServer({
+    root: process.cwd(),
+    server: { middlewareMode: true },
+    appType: 'custom',
+    logLevel: 'silent',
+  });
+  try {
+    const { buildRecommendedMarketingPlan } = await server.ssrLoadModule('/src/features/marketing/marketingPlanning.ts');
+    const {
+      operationalPlannerV3Profile,
+      operationalPlannerV3RecentContent,
+    } = await server.ssrLoadModule('/tests/fixtures/marketingPlannerV3Operational.ts');
+    const items = buildRecommendedMarketingPlan(operationalPlannerV3Profile, operationalPlannerV3RecentContent);
+    process.stdout.write(JSON.stringify(items.map(item => ({
+      audience: item.audience,
+      topic: item.topic,
+      direction: item.direction,
+      rationale: item.rationale,
+      content_roles: item.contentRoles,
+    }))));
+  } finally {
+    await server.close();
+  }
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+NODE
+)"
+
+planner_payload_base64="$(printf '%s' "$planner_payload" | base64 | tr -d '\n')"
+package_valid="$(psql_run --quiet --tuples-only --no-align \
+  --set=planner_payload_base64="$planner_payload_base64" <<'SQL'
+select public.servsync_private_marketing_plan_items_valid(
+  convert_from(decode(:'planner_payload_base64', 'base64'), 'UTF8')::jsonb
+);
+SQL
+)"
+if [[ "$package_valid" != "t" ]]; then
+  echo "Deterministic operational planner v3 package failed the runtime validator." >&2
+  exit 1
+fi
+
+claim_guard_valid="$(psql_run --quiet --tuples-only --no-align --command "
+  select
+    public.servsync_private_marketing_direction_is_safe(
+      'Explain one supported contractor-profile interaction without claiming ranking, credential verification, or lead outcomes.'
+    )
+    and not public.servsync_private_marketing_direction_is_safe(
+      'ServSync guarantees contractor leads.'
+    );
+")"
+if [[ "$claim_guard_valid" != "t" ]]; then
+  echo "Marketing claim guard did not preserve safe caution and prohibited-claim rejection." >&2
+  exit 1
+fi
+
 before_repeat="$(psql_run --quiet --tuples-only --no-align --command "select md5(concat_ws('|', (select count(*) from public.marketing_plans), (select count(*) from public.marketing_plan_revisions), (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'servsync_create_internal_marketing_plan%')));")"
 if psql_run --file "$ROOT_DIR/servsync-marketing-planner-coherence-relevance-v3.sql" >/dev/null 2>&1; then
   echo "Repeated Marketing planner v3 migration unexpectedly succeeded." >&2
