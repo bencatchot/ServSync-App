@@ -52,6 +52,14 @@ The server requires all of the following before any Stripe API call:
 
 The project-ref and Supabase-host checks are immutable. A Production or Demo URL, a live key, a missing firewall rate-limit rule, or absent provider configuration fails closed. Browser bundles contain none of these secrets. Production cannot be activated by a client feature flag.
 
+## Sandbox Webhook Operations
+
+Stripe TEST Connect events use the dedicated Vercel project `servsync-stripe-sandbox` and the durable endpoint `https://servsync-stripe-sandbox.vercel.app/api/stripe-connect-webhook`. The deployment tracks reviewed `main` source and is configured only for Sandbox Supabase project `zpzdkoaubyjtsomccxya`; it is not a Production or Demo payment deployment.
+
+Stripe destination `we_1U3HrQLOR9Oxz0Uz26pT9N15` is named `ServSync Sandbox Connect`, receives events from connected accounts, and listens only for the payment/account events handled by the current reconciliation boundary: `account.updated`; Checkout completion, asynchronous result, and expiration events; PaymentIntent processing, success, failure, and cancellation events; and charge success, failure, refund, and dispute lifecycle events. Destination-specific signing material and all provider/database credentials remain server-only Vercel configuration.
+
+The previous destination used a protected PR Preview alias ending in `codex-str-1383fb` and returned Vercel authentication responses before the webhook handler ran. That preview alias is not an operational webhook target and is absent from the active Stripe destination list. Future webhook destinations must use a durable environment-specific server project or alias, must retain the exact Sandbox identity gates above, and must never point TEST events at Production or Demo.
+
 ## Rollout And Future Gate
 
 The repository foundation is `servsync-stripe-connect-online-payments-foundation.sql` (SHA-256 `41a6a6fcd69fa8a171d3a9477efc5513def40c3a3d3d3a05169f74f504b2a374`). Sandbox, Production, and Demo also have `servsync-stripe-connect-provider-payment-id-compatibility.sql` (SHA-256 `f03eb5b754132501629fc6594b78fd8c6708085f646187026489d3dd20f064df`), which accepts Stripe's current `py_` ACH payment record identifiers alongside canonical `ch_` charge identifiers while rejecting other prefixes and refusing to normalize an unvalidated or drifted prior constraint.
