@@ -6,6 +6,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/stripe-sandbox-webhook-reliability`
+- Starting main SHA: `6c4bb1f081b822ce50e395a99c5db4366edb7a67`
+- Files changed: Stripe Connect architecture/runbook, FB-014 backlog status, master plan, and changelog only.
+- Summary of change: Replaced the failed Stripe TEST Connect destination on a protected, ephemeral PR Preview alias with the dedicated durable `servsync-stripe-sandbox` Vercel project and `https://servsync-stripe-sandbox.vercel.app/api/stripe-connect-webhook`. The active Stripe destination receives connected-account events and uses destination-specific signing material with the existing Sandbox-only test key, Sandbox Supabase URL/service credential, exact project-ref check, explicit test mode, and explicit test enablement.
+- Root cause and security: The obsolete Preview deployment returned Vercel authentication responses before `api/stripe-connect-webhook.ts` ran, so the warning did not establish an application-handler defect. The durable endpoint remains fail closed: unsigned/invalid requests return `400`, missing or incompatible configuration returns `503`, and only exact Sandbox/test server configuration can reach reconciliation. Production, Demo, live mode, Stripe billing, and application fee behavior are unchanged.
+- Validation: The durable endpoint reached `READY`; `GET` returned `405`; a valid destination-signed supported event returned `200`; a valid signed irrelevant event returned safe `200`; a duplicate signed event remained safe and idempotent; and an invalid signature returned `400`. Focused Stripe tests passed 15/15, including account mapping, card/ACH state, refund/dispute reversal, duplicate/retry behavior, direct-charge responsibility, and immutable Sandbox configuration. Typecheck and Production build passed. The active Stripe destination list contains the durable destination and not the obsolete Preview URL.
+- Known risks and follow-up: Current Workbench fixtures cannot synthesize legacy `account.updated` for an Accounts v2-only integration; the signed account-update boundary and persisted-mapping behavior remain covered by the focused handler tests and prior provider-backed acceptance. Live activation and Production/Demo provider configuration remain separate owner gates.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-014 now records the durable Sandbox TEST webhook endpoint while preserving all live-money and Production/Demo gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the durable environment-specific Sandbox webhook boundary and retirement of the protected Preview target.
+
 - Branch: `codex/approved-direction-content-foundation-v1`
 - Starting main SHA: `27d5d24f262cf0d3887536d9519077282c90a849`
 - Files changed: approved-Direction preparation migration; provider-neutral schema, validator, operator, SQL/contract/UI tests; Marketing Content adapter and review UI; rollout ledger; Marketing architecture, Direction architecture, runbook, master plan, backlog, parity notes, and changelog.
