@@ -416,6 +416,24 @@
           "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 14:38:11Z through 14:38:13Z. Catalog, postgres ownership, forced-RLS/policy-free storage, zero direct-table grants, exact fixed-path RPC grants, rollback-only six-Direction ingestion/replay/conflict/stale/cross-workspace/role validation, PostgREST exposure, and zero-residue checks passed through 14:40:23Z. Demo retains one internal workspace/profile/revision and zero Plans, Directions/revisions, packages, content records, status events, or lineage rows."
         }
       }
+    },
+    {
+      "id": "price-book-import-batch-rollback-v1",
+      "artifact": "servsync-price-book-import-batch-rollback.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 5a2b32ca855dcfd6fc0e9796080f7b17bf5b4c8831cd78363082d97f8acf6179 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-11 at 21:03:51Z. Catalog/security, mixed Add/Update/Skip rollback, unrelated-edit preservation, canonical archive with stable mapping retention, role/tenant denial, replay, and rollback-only cleanup passed. Sandbox returned exactly to 41 Price Book items, 6 original import batches, 10 original batch rows, and zero rollback batches/rows with exact item and batch fingerprints."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 5a2b32ca855dcfd6fc0e9796080f7b17bf5b4c8831cd78363082d97f8acf6179 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-11 at 21:12:12Z after Sandbox and Demo passed. Catalog ownership, forced RLS, zero policies/direct browser grants, exact authenticated RPC grants, and clean zero Price Book/import/rollback baselines passed. The captured business fingerprint remained exact across 7 contractors, 18 profiles, 3 local customers, 12 properties, 22 Estimates/39 lines, 9 Jobs, and 12 Invoices; no rollback or business-data fixture was created."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 5a2b32ca855dcfd6fc0e9796080f7b17bf5b4c8831cd78363082d97f8acf6179 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 at 21:11:39Z because the complete Repeat-Import foundation is present and supported-schema parity requires the additive rollback objects before the shared client ships. Catalog/security passed with zero Price Book items, sources, import batches/rows, rollback batches/rows, Estimates, or Invoices and no business-data fixture."
+        }
+      }
     }
   ]
 }

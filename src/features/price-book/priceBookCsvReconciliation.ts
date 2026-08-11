@@ -125,6 +125,49 @@ export type PriceBookImportBatchSummary = {
   error_count: number;
   created_at: string;
   completed_at: string;
+  rollback: null | {
+    id: string;
+    completed_at: string;
+    restore_count: number;
+    archive_count: number;
+    unchanged_count: number;
+  };
+};
+
+export type PriceBookImportRollbackPreviewRow = {
+  original_batch_row_id: string;
+  row_number: number;
+  target_price_book_item_id: string | null;
+  title: string;
+  original_action: PriceBookImportAction;
+  rollback_action: 'restore_fields' | 'archive_item' | 'no_change';
+  restore_fields: string[];
+  conflict_fields: string[];
+  errors: string[];
+  outcome: 'restored' | 'archived' | 'unchanged';
+};
+
+export type PriceBookImportRollbackPreview = {
+  batch_id: string;
+  source_id: string;
+  original_filename: string;
+  completed_at: string;
+  already_rolled_back: boolean;
+  rollback_id: string | null;
+  rolled_back_at: string | null;
+  can_rollback: boolean;
+  counts: { restore: number; archive: number; unchanged: number; conflict: number };
+  rows: PriceBookImportRollbackPreviewRow[];
+};
+
+export type PriceBookImportRollbackResult = {
+  rollback_id: string;
+  batch_id: string;
+  status: 'completed';
+  restore_count: number;
+  archive_count: number;
+  unchanged_count: number;
+  idempotent: boolean;
 };
 
 export const PRICE_BOOK_CSV_FIELDS: Array<{

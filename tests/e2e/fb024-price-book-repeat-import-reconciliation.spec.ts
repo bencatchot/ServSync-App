@@ -20,7 +20,7 @@ async function installImportHarness(page: Page) {
     const React = reactModule.default as { createElement: (...args: unknown[]) => unknown };
     const createRoot = (reactDomModule.default as { createRoot: (element: HTMLElement) => { render: (node: unknown) => void } }).createRoot;
     const Panel = panelModule.PriceBookCsvReconciliationPanel as (...args: unknown[]) => unknown;
-    const state = { previewRows: [] as Array<Record<string, unknown>>, executeCalls: 0, completedCalls: 0, executeActions: {} as Record<string, string> };
+    const state = { previewRows: [] as Array<Record<string, unknown>>, executeCalls: 0, completedCalls: 0, rollbackPreviewCalls: 0, rollbackExecuteCalls: 0, rollbackCompletedCalls: 0, executeActions: {} as Record<string, string> };
     (window as typeof window & { __priceBookImportHarness?: typeof state }).__priceBookImportHarness = state;
     document.body.innerHTML = '<main id="price-book-import-root"></main>';
     createRoot(document.getElementById('price-book-import-root') as HTMLElement).render(React.createElement(Panel, {
@@ -60,9 +60,26 @@ async function installImportHarness(page: Page) {
           state.executeActions = input.actions;
           return { batch_id: 'batch-1', status: 'completed', source_id: 'source-1', row_count: 2, add_count: 1, update_count: 1, skip_count: 0, error_count: 0, idempotent: false };
         },
-        listBatches: async () => [],
+        listBatches: async () => [{ id: 'batch-1', source_id: 'source-1', source_name: 'Master catalog', status: 'completed', original_filename: 'catalog.csv', file_size_bytes: 120, row_count: 3, add_count: 1, update_count: 1, skip_count: 1, error_count: 0, created_at: '2026-08-02T12:00:00.000Z', completed_at: '2026-08-02T12:00:01.000Z', rollback: null }],
+        previewRollback: async () => {
+          state.rollbackPreviewCalls += 1;
+          return {
+            batch_id: 'batch-1', source_id: 'source-1', original_filename: 'catalog.csv', completed_at: '2026-08-02T12:00:01.000Z', already_rolled_back: false, rollback_id: null, rolled_back_at: null, can_rollback: true,
+            counts: { restore: 1, archive: 1, unchanged: 1, conflict: 0 },
+            rows: [
+              { original_batch_row_id: 'row-1', row_number: 2, target_price_book_item_id: 'item-1', title: 'Updated diagnostic', original_action: 'update', rollback_action: 'restore_fields', restore_fields: ['title'], conflict_fields: [], errors: [], outcome: 'restored' },
+              { original_batch_row_id: 'row-2', row_number: 3, target_price_book_item_id: 'item-2', title: 'Imported maintenance', original_action: 'add', rollback_action: 'archive_item', restore_fields: [], conflict_fields: [], errors: [], outcome: 'archived' },
+              { original_batch_row_id: 'row-3', row_number: 4, target_price_book_item_id: null, title: 'Skipped row', original_action: 'skip', rollback_action: 'no_change', restore_fields: [], conflict_fields: [], errors: [], outcome: 'unchanged' },
+            ],
+          };
+        },
+        executeRollback: async () => {
+          state.rollbackExecuteCalls += 1;
+          return { rollback_id: 'rollback-1', batch_id: 'batch-1', status: 'completed', restore_count: 1, archive_count: 1, unchanged_count: 1, idempotent: false };
+        },
       },
       onCompleted: async () => { state.completedCalls += 1; },
+      onRollbackCompleted: async () => { state.rollbackCompletedCalls += 1; },
     }));
   });
 }
@@ -107,7 +124,7 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
       .toThrow('CSV headers must be unique so every mapped field is deterministic.');
   });
 
-  test('migration creates private tenant audit and authenticated manager RPCs without rollback or provider delivery', () => {
+  test('reconciliation migration creates private tenant audit without embedding rollback or provider delivery', () => {
     const sql = sourceFile('servsync-price-book-repeat-import-reconciliation.sql');
 
     for (const table of ['contractor_price_book_import_sources', 'contractor_price_book_import_batches', 'contractor_price_book_import_batch_rows']) {
@@ -152,6 +169,23 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(sql).not.toMatch(/raw_file|file_contents|csv_contents/i);
   });
 
+  test('rollback migration is additive, private, conflict-aware, and preserves the original audit', () => {
+    const sql = sourceFile('servsync-price-book-import-batch-rollback.sql');
+    expect(sql).toContain('contractor_price_book_import_rollback_batches');
+    expect(sql).toContain('contractor_price_book_import_rollback_rows');
+    expect(sql).toContain('servsync_preview_price_book_import_rollback');
+    expect(sql).toContain('servsync_execute_price_book_import_rollback');
+    expect(sql).toContain('force row level security');
+    expect(sql).toContain('Price Book import rollback row audit is append-only.');
+    expect(sql).toContain("later_row.after_patch ? v_field");
+    expect(sql).toContain("set active = false");
+    expect(sql).not.toMatch(/delete from public\.contractor_price_book_items/i);
+    expect(sql).not.toMatch(/update public\.contractor_price_book_import_batch_rows/i);
+    expect(sql).toMatch(/grant execute on function public\.servsync_preview_price_book_import_rollback\(uuid\)[\s\S]*to authenticated/i);
+    expect(sql).toMatch(/grant execute on function public\.servsync_execute_price_book_import_rollback\(uuid, uuid\)[\s\S]*to authenticated/i);
+    expect(sql).not.toMatch(/uqgtheclhxqlnjpfmheq|zpzdkoaubyjtsomccxya|bdytwgejqnlblhrnqxkp/i);
+  });
+
   test('fails closed through canonical contractor management authority and private mappings', () => {
     const sql = sourceFile('servsync-price-book-repeat-import-reconciliation.sql');
     expect(sql).toContain('servsync_current_contractor_profile()');
@@ -189,5 +223,25 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     await expect(page.getByText('Import complete: 1 added, 1 updated, 0 skipped.')).toBeVisible();
     const calls = await page.evaluate(() => (window as typeof window & { __priceBookImportHarness?: { executeCalls: number; completedCalls: number; executeActions: Record<string, string> } }).__priceBookImportHarness);
     expect(calls).toMatchObject({ executeCalls: 1, completedCalls: 1, executeActions: { 2: 'add', 3: 'update' } });
+  });
+
+  test('previews a completed batch rollback and confirms one responsive mutation', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await installImportHarness(page);
+    await page.getByText('Recent import history').click();
+    await page.getByRole('button', { name: 'Preview rollback' }).click();
+    await expect(page.getByTestId('price-book-rollback-preview')).toBeVisible();
+    await expect(page.getByTestId('price-book-rollback-row')).toHaveCount(3);
+    await expect(page.getByText('Restore title')).toBeVisible();
+    await expect(page.getByText('Archive imported item')).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    page.once('dialog', dialog => void dialog.accept());
+    await page.getByRole('button', { name: 'Confirm rollback' }).click();
+    await expect(page.getByText('Rollback complete: 1 restored, 1 archived, 1 unchanged.')).toBeVisible();
+    const state = await page.evaluate(() => (window as typeof window & { __priceBookImportHarness?: { rollbackPreviewCalls: number; rollbackExecuteCalls: number; rollbackCompletedCalls: number } }).__priceBookImportHarness);
+    expect(state).toMatchObject({ rollbackPreviewCalls: 1, rollbackExecuteCalls: 1, rollbackCompletedCalls: 1 });
   });
 });

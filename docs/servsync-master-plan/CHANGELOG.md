@@ -6,6 +6,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/fb024-price-book-import-rollback-v1`
+- Starting main SHA: `c6630b7c0dad538cbcd011ac29df78a25ec9d271`
+- Files changed: additive guarded Price Book rollback migration; rollback-aware import history UI/types/RPC adapter; disposable PostgreSQL and authenticated Sandbox tests; backend rollout ledger; master plan; FB-024 backlog; completed-features ledger; changelog.
+- Summary of change: Completes FB-024 Guarded Price Book Import Batch Rollback v1. Owner/Admin/Office users can open a completed import batch, preview exact restorations/archives/unchanged rows/conflicts, and deliberately execute one server-authoritative all-or-nothing rollback. Update rows restore only original fields still equal to the recorded import result and untouched by later imports; unrelated edits survive. Added items are archived through the canonical inactive lifecycle without deletion or mapping removal. Skip rows remain audit-only. Same-field edits, later same-field imports, malformed evidence, missing items/mappings, stale state, cross-tenant access, duplicate requests, and races fail closed or reconcile idempotently. Original import audit remains unchanged and a separate append-only rollback audit records execution.
+- Environment rollout: Exact migration `servsync-price-book-import-batch-rollback.sql` SHA-256 `5a2b32ca855dcfd6fc0e9796080f7b17bf5b4c8831cd78363082d97f8acf6179` was applied to Sandbox at `2026-08-11T21:03:51Z`, Demo at `21:11:39Z`, and Production at `21:12:12Z`. Demo received the migration because its complete Repeat-Import foundation makes the new objects a normal supported-schema dependency for the shared client. Both target environments retained zero Price Book/import/rollback rows. Production's captured business fingerprint and exact counts remained unchanged; no Production rollback or fixture was executed.
+- Validation: Disposable PostgreSQL 16 applied the real prior reconciliation migration and proved mixed Add/Update/Skip rollback, field-scoped restoration, unrelated-edit preservation, stable mapping retention, deterministic repeat-import matching, same-field and later-import conflict denial, immutable audit, canonical archive, exact role/tenant denial, Estimate snapshot independence, repeat-install rejection, replay, and concurrent execution. Sandbox catalog/security and rollback-only role/workflow validation passed with exact cleanup and baseline fingerprints. The real Sandbox UI loaded history and server-authoritative rollback preview without mutation at `1440x900` and `390x844`. TypeScript, Production build, focused Playwright, backend parity/rollout validation, JSON/Bash validation, sensitive-value/scope checks, and exact-head review are merge gates.
+- Known risks and follow-up: Rollback is deliberately whole-batch only and provides no force or partial mode. Added items are archived rather than deleted; restoring them later remains a normal Price Book action. Production had no historical import batches, so Production behavior is established by exact deployed migration/source correspondence plus disposable PostgreSQL and rollback-only Sandbox evidence rather than a real financial/business mutation. XLSX, cost/margin, assemblies, export, provider APIs, scheduled sync, invoice selection, and generic undo remain out of scope.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records guarded batch rollback as completed while retaining broader Price Book maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the new deliberate rollback workflow, immutable audit boundary, conflict semantics, and environment rollout state.
+
 - Branch: `codex/cwa008-invoice-pdf-parity-v1`
 - Starting main SHA: `162e87f83d5812e67fbfe69c5657e26fd88ecae0`
 - Files changed: Invoice Preview/download artifact parity Playwright coverage; payment/PDF regression package; contractor workflow audit; FB-035 backlog; changelog.

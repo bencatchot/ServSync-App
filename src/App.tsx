@@ -282,6 +282,8 @@ import { PriceBookCsvReconciliationPanel } from './features/price-book/PriceBook
 import type {
   PriceBookImportBatchResult,
   PriceBookImportBatchSummary,
+  PriceBookImportRollbackPreview,
+  PriceBookImportRollbackResult,
   PriceBookImportPreview,
   PriceBookImportRequestRow,
   PriceBookImportSource,
@@ -26024,6 +26026,25 @@ function ContractorDashboard({
     return (data || []) as unknown as PriceBookImportBatchSummary[];
   };
 
+  const previewPriceBookImportRollback = async (batchId: string) => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_preview_price_book_import_rollback', {
+      p_import_batch_id: batchId,
+    });
+    if (rpcError) throw rpcError;
+    return data as unknown as PriceBookImportRollbackPreview;
+  };
+
+  const executePriceBookImportRollback = async (batchId: string, idempotencyKey: string) => {
+    requirePriceBookImportAccess();
+    const { data, error: rpcError } = await supabase!.rpc('servsync_execute_price_book_import_rollback', {
+      p_import_batch_id: batchId,
+      p_idempotency_key: idempotencyKey,
+    });
+    if (rpcError) throw rpcError;
+    return data as unknown as PriceBookImportRollbackResult;
+  };
+
   const expandEstimateLineGroup = (groupKey: EstimateLineGroupKey) => {
     setEstimateLineGroupCollapseState(prev => {
       const groups = prev.identity === estimateComposerCollapseIdentity ? prev.groups : {};
@@ -40899,9 +40920,15 @@ function ContractorDashboard({
                           preview: previewPriceBookImport,
                           execute: executePriceBookImport,
                           listBatches: listPriceBookImportBatches,
+                          previewRollback: previewPriceBookImportRollback,
+                          executeRollback: executePriceBookImportRollback,
                         }}
                         onCompleted={async result => {
                           setNotice(`Price Book import complete: ${result.add_count} added, ${result.update_count} updated, ${result.skip_count} skipped.`);
+                          await loadContractor();
+                        }}
+                        onRollbackCompleted={async result => {
+                          setNotice(`Price Book import rollback complete: ${result.restore_count} restored, ${result.archive_count} archived, ${result.unchanged_count} unchanged.`);
                           await loadContractor();
                         }}
                       />
