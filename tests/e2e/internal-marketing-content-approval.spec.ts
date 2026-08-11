@@ -38,6 +38,14 @@ function contentItem(overrides: Partial<MarketingContentItem> = {}): MarketingCo
     preparationSequence: null,
     intendedAudience: null,
     contentRole: null,
+    strategicSource: null,
+    sourcePlanId: null,
+    sourcePlanRevision: null,
+    sourcePlanItemIndex: null,
+    sourceDirectionId: null,
+    sourceDirectionRevision: null,
+    sourceDirectionTopic: null,
+    sourceDirectionStatus: null,
     ...overrides,
   };
 }
@@ -72,6 +80,14 @@ function rpcRow(item: MarketingContentItem) {
     preparation_sequence: item.preparationSequence,
     intended_audience: item.intendedAudience,
     content_role: item.contentRole,
+    strategic_source: item.strategicSource,
+    source_plan_id: item.sourcePlanId,
+    source_plan_revision: item.sourcePlanRevision,
+    source_plan_item_index: item.sourcePlanItemIndex,
+    source_direction_id: item.sourceDirectionId,
+    source_direction_revision: item.sourceDirectionRevision,
+    source_direction_topic: item.sourceDirectionTopic,
+    source_direction_status: item.sourceDirectionStatus,
   };
 }
 
@@ -129,6 +145,14 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
             preparation_sequence: null,
             intended_audience: null,
             content_role: null,
+            strategic_source: null,
+            source_plan_id: null,
+            source_plan_revision: null,
+            source_plan_item_index: null,
+            source_direction_id: null,
+            source_direction_revision: null,
+            source_direction_topic: null,
+            source_direction_status: null,
           });
           return { data: { content_id: id, status: 'idea', revision_number: 1 }, error: null };
         }
@@ -315,6 +339,40 @@ test.describe('internal Marketing content approval', () => {
     await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
   });
 
+  test('approved-Direction drafts show exact owner-readable lineage and remain drafts', async ({ page }) => {
+    const prepared = contentItem({
+      status: 'draft',
+      revisionNumber: 1,
+      submittedAt: null,
+      submittedBy: null,
+      submittedByName: null,
+      preparationSource: 'codex_assisted',
+      preparationRequestId: '41000000-0000-4000-8000-000000000011',
+      preparationRecipeKey: 'approved_direction_plan_v1',
+      truthPackVersion: 'servsync-marketing-truth-v3',
+      preparedAt: '2026-08-11T18:00:00.000Z',
+      preparationSequence: 1,
+      intendedAudience: 'small_contractors',
+      contentRole: 'contractor_benefit',
+      strategicSource: 'approved_direction',
+      sourcePlanId: '41000000-0000-4000-8000-000000000020',
+      sourcePlanRevision: 3,
+      sourcePlanItemIndex: 1,
+      sourceDirectionId: '41000000-0000-4000-8000-000000000021',
+      sourceDirectionRevision: 2,
+      sourceDirectionTopic: 'Invoices',
+      sourceDirectionStatus: 'approved',
+    });
+    await installHarness(page, [prepared]);
+    await page.getByTestId('marketing-nav-content').click();
+    await page.getByRole('button', { name: /Review the launch message/ }).click();
+    await expect(page.getByTestId('marketing-direction-lineage')).toContainText('From the approved Invoices Direction');
+    await expect(page.getByTestId('marketing-direction-lineage')).toContainText('Plan item 1');
+    await expect(page.getByTestId('marketing-direction-lineage')).toContainText('Direction revision 2');
+    await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+  });
+
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },
     { name: 'mobile', width: 390, height: 844 },
@@ -328,16 +386,25 @@ test.describe('internal Marketing content approval', () => {
         submittedByName: null,
         preparationSource: 'codex_assisted',
         preparationRequestId: '41000000-0000-4000-8000-000000000010',
-        preparationRecipeKey: 'contractor_acquisition',
-        truthPackVersion: 'servsync-marketing-truth-v1',
+        preparationRecipeKey: 'approved_direction_plan_v1',
+        truthPackVersion: 'servsync-marketing-truth-v3',
         preparedAt: '2026-08-09T18:00:00.000Z',
         preparationSequence: 1,
         intendedAudience: 'small_contractors',
-        contentRole: 'educational_post',
+        contentRole: 'contractor_benefit',
+        strategicSource: 'approved_direction',
+        sourcePlanId: '41000000-0000-4000-8000-000000000020',
+        sourcePlanRevision: 3,
+        sourcePlanItemIndex: 1,
+        sourceDirectionId: '41000000-0000-4000-8000-000000000021',
+        sourceDirectionRevision: 2,
+        sourceDirectionTopic: 'Invoices',
+        sourceDirectionStatus: 'approved',
       })]);
       await page.getByTestId('marketing-nav-content').click();
       await page.getByRole('button', { name: /Review the launch message/ }).click();
       await expect(page.getByTestId('marketing-preparation-provenance')).toBeVisible();
+      await expect(page.getByTestId('marketing-direction-lineage')).toContainText('approved Invoices Direction');
       await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);

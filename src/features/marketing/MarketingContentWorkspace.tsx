@@ -79,6 +79,7 @@ const ROLE_LABELS: Record<NonNullable<MarketingContentItem['contentRole']>, stri
 
 function recipeLabel(value: string | null) {
   if (!value) return 'Prepared package';
+  if (value === 'approved_direction_plan_v1') return 'Approved Direction plan';
   return value.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }
 
@@ -447,6 +448,14 @@ export function MarketingContentWorkspace(props: Props) {
                   <p className="mt-1 text-xs text-cyan-800">
                     Prepared {formatDate(selected.preparedAt)} · {selected.truthPackVersion}
                   </p>
+                  {selected.strategicSource === 'approved_direction' && (
+                    <div data-testid="marketing-direction-lineage" className="mt-3 border-t border-cyan-200 pt-3">
+                      <p className="font-bold">From the approved {selected.sourceDirectionTopic} Direction</p>
+                      <p className="mt-1 text-xs leading-5 text-cyan-800">
+                        Plan item {selected.sourcePlanItemIndex} · Direction revision {selected.sourceDirectionRevision} · Approved
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

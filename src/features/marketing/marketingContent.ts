@@ -39,6 +39,7 @@ export type MarketingChannelCategory = (typeof MARKETING_CHANNEL_CATEGORIES)[num
 export type MarketingPreparationSource = (typeof MARKETING_PREPARATION_SOURCES)[number];
 export type MarketingPreparationAudience = (typeof MARKETING_PREPARATION_AUDIENCES)[number];
 export type MarketingContentRole = (typeof MARKETING_CONTENT_ROLES)[number];
+export type MarketingStrategicSource = 'approved_direction';
 
 export type MarketingContentItem = {
   id: string;
@@ -69,6 +70,14 @@ export type MarketingContentItem = {
   preparationSequence: number | null;
   intendedAudience: MarketingPreparationAudience | null;
   contentRole: MarketingContentRole | null;
+  strategicSource: MarketingStrategicSource | null;
+  sourcePlanId: string | null;
+  sourcePlanRevision: number | null;
+  sourcePlanItemIndex: number | null;
+  sourceDirectionId: string | null;
+  sourceDirectionRevision: number | null;
+  sourceDirectionTopic: string | null;
+  sourceDirectionStatus: 'approved' | null;
 };
 
 type RpcResult = { data: unknown; error: unknown };
@@ -129,6 +138,8 @@ function parseItem(value: unknown): MarketingContentItem {
   const preparationSource = value.preparation_source;
   const intendedAudience = value.intended_audience;
   const contentRole = value.content_role;
+  const strategicSource = value.strategic_source;
+  const sourceDirectionStatus = value.source_direction_status;
   if (
     typeof value.content_id !== 'string'
     || !UUID_PATTERN.test(value.content_id)
@@ -169,6 +180,27 @@ function parseItem(value: unknown): MarketingContentItem {
     ))
     || !(intendedAudience === null || MARKETING_PREPARATION_AUDIENCES.includes(intendedAudience as MarketingPreparationAudience))
     || !(contentRole === null || MARKETING_CONTENT_ROLES.includes(contentRole as MarketingContentRole))
+    || !(strategicSource === null || strategicSource === 'approved_direction')
+    || !isNullableUuid(value.source_plan_id)
+    || !(value.source_plan_revision === null || (
+      typeof value.source_plan_revision === 'number'
+      && Number.isSafeInteger(value.source_plan_revision)
+      && value.source_plan_revision >= 1
+    ))
+    || !(value.source_plan_item_index === null || (
+      typeof value.source_plan_item_index === 'number'
+      && Number.isSafeInteger(value.source_plan_item_index)
+      && value.source_plan_item_index >= 1
+      && value.source_plan_item_index <= 7
+    ))
+    || !isNullableUuid(value.source_direction_id)
+    || !(value.source_direction_revision === null || (
+      typeof value.source_direction_revision === 'number'
+      && Number.isSafeInteger(value.source_direction_revision)
+      && value.source_direction_revision >= 1
+    ))
+    || !isNullableString(value.source_direction_topic)
+    || !(sourceDirectionStatus === null || sourceDirectionStatus === 'approved')
   ) {
     throw malformedError();
   }
@@ -197,6 +229,27 @@ function parseItem(value: unknown): MarketingContentItem {
     || intendedAudience !== null
     || contentRole !== null
   )) throw malformedError();
+  const hasDirectionLineage = strategicSource === 'approved_direction';
+  if (hasDirectionLineage !== (
+    value.source_plan_id !== null
+    && value.source_plan_revision !== null
+    && value.source_plan_item_index !== null
+    && value.source_direction_id !== null
+    && value.source_direction_revision !== null
+    && typeof value.source_direction_topic === 'string'
+    && value.source_direction_topic.trim().length > 0
+    && sourceDirectionStatus === 'approved'
+  )) throw malformedError();
+  if (!hasDirectionLineage && (
+    value.source_plan_id !== null
+    || value.source_plan_revision !== null
+    || value.source_plan_item_index !== null
+    || value.source_direction_id !== null
+    || value.source_direction_revision !== null
+    || value.source_direction_topic !== null
+    || sourceDirectionStatus !== null
+  )) throw malformedError();
+  if (hasDirectionLineage && preparationSource !== 'codex_assisted') throw malformedError();
 
   return {
     id: value.content_id,
@@ -227,6 +280,14 @@ function parseItem(value: unknown): MarketingContentItem {
     preparationSequence: value.preparation_sequence,
     intendedAudience: intendedAudience as MarketingPreparationAudience | null,
     contentRole: contentRole as MarketingContentRole | null,
+    strategicSource: strategicSource as MarketingStrategicSource | null,
+    sourcePlanId: value.source_plan_id,
+    sourcePlanRevision: value.source_plan_revision,
+    sourcePlanItemIndex: value.source_plan_item_index,
+    sourceDirectionId: value.source_direction_id,
+    sourceDirectionRevision: value.source_direction_revision,
+    sourceDirectionTopic: value.source_direction_topic,
+    sourceDirectionStatus: sourceDirectionStatus as 'approved' | null,
   };
 }
 

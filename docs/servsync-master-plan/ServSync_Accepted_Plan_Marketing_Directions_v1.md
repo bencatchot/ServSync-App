@@ -2,17 +2,17 @@
 
 ## Product Boundary
 
-Marketing Slice 5 makes Marketing Direction a durable, reviewable record between an accepted Marketing Plan and any future content package:
+Marketing Slice 5 makes Marketing Direction a durable, reviewable record between an accepted Marketing Plan and content preparation:
 
 ```text
 Business Marketing Profile
 -> accepted Marketing Plan
 -> Marketing Directions
--> future content packages
+-> approved-Direction content packages
 -> existing human content approval
 ```
 
-A Direction defines one specific story strategy for one exact accepted Plan item. It is not finished copy and it does not create content, submit content, approve content, schedule, publish, contact prospects, or change analytics.
+A Direction defines one specific story strategy for one exact accepted Plan item. Approval may authorize the separately reviewed Slice 6 preparation path, but approval itself still creates no content and never submits, approves, schedules, publishes, contacts prospects, or changes analytics.
 
 ## Durable Model
 
@@ -61,12 +61,11 @@ Migration `servsync-accepted-plan-marketing-directions.sql` has SHA-256 `1652085
 
 The exact migration is applied and validated in Sandbox, Demo (`2026-08-11T03:58:19Z` through `04:03:11Z`), and Production (`04:05:19Z` through `04:05:29Z`). Demo passed before Production was touched. Both targets matched the reviewed ownership, forced-RLS, policy-free, direct-table-denial, fixed-path RPC, and authenticated-only grant contract. Rollback-only six-item preparation, exact snapshots, atomicity, replay/conflict handling, draft revision, stale-write rejection, terminal approval, malformed/stale/draft/cross-workspace denial, role denial, and zero downstream content changes passed with no residue.
 
-Production retains zero first-class Directions and revisions. Accepted Plan `4e390d96-03f0-4342-9a13-3e8119383024`, its six items and revision history, the Profile and revisions, historical planner-v1/v2 Plans, Packages #1/#2, ten content records (three approved and seven draft), sixteen status events, and sampled unrelated-business identifiers remain fingerprint-exact. Schema availability does not authorize real Direction preparation.
+The owner subsequently prepared, refined, and approved all six first-class Directions for accepted Plan `4e390d96-03f0-4342-9a13-3e8119383024`. Their approval authorizes development of those exact stories, not publication. Slice 6 adds the approved-Direction-to-draft package foundation in Sandbox, Demo, and Production. The first real six-draft preparation remains a separate operational gate.
 
 ## Deferred
 
-- preparation of the first real Directions from the accepted Production Plan;
-- content-package creation from an approved Direction;
+- separately authorized creation of the first real six-draft package;
 - runtime AI or provider-backed preparation;
 - automatic submission or approval;
 - scheduling, publishing, social/email integrations, campaigns, outreach, and analytics;

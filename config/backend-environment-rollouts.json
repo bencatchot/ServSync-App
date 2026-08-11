@@ -380,6 +380,24 @@
           "reason": "Exact SHA-256 165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 03:58:19Z through 03:58:21Z. Catalog/security and rollback-only six-item preparation, replay/conflict, draft/stale revision, terminal approval, malformed/stale/draft/cross-workspace denial, role denial, and zero-residue validation passed through 04:03:11Z. Demo retains one internal workspace/profile/revision and zero Plans, Directions/revisions, packages, content records, or status events."
         }
       }
+    },
+    {
+      "id": "approved-direction-content-preparation-v1",
+      "artifact": "servsync-approved-direction-content-preparation.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-11 before 13:28:15Z and validated through 13:34:38Z. Catalog, postgres ownership, forced-RLS/policy-free storage, zero browser table grants, fixed-path authenticated-only RPC grants, six approved Directions to six drafts, exact lineage, role preservation, atomicity, replay/conflict behavior, stale/draft/cross-workspace and role denial, immutable provenance, historical compatibility, and rollback-only cleanup passed. Sandbox retains zero packages, content rows, status events, Directions, and lineage rows."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-11 from 14:41:28Z through 14:41:29Z after Demo passed. Catalog, postgres ownership, forced-RLS/policy-free storage, zero direct-table grants, exact fixed-path RPC grants, rollback-only six-Direction ingestion/replay/conflict/stale/cross-workspace/role validation, PostgREST exposure, and zero-residue checks passed through 14:43:07Z. Production retains two historical packages, ten content records (three approved and seven draft), sixteen status events, six approved Directions with fourteen revisions, and exact Marketing/unrelated-business fingerprints. No real approved-Direction package or content was created."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 14:38:11Z through 14:38:13Z. Catalog, postgres ownership, forced-RLS/policy-free storage, zero direct-table grants, exact fixed-path RPC grants, rollback-only six-Direction ingestion/replay/conflict/stale/cross-workspace/role validation, PostgREST exposure, and zero-residue checks passed through 14:40:23Z. Demo retains one internal workspace/profile/revision and zero Plans, Directions/revisions, packages, content records, status events, or lineage rows."
+        }
+      }
     }
   ]
 }
