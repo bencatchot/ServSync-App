@@ -355,6 +355,7 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - production smoke accounts
 - provider-backed Stripe Checkout/webhook lifecycle in this browser suite (offline full/partial payment is covered)
 - a clearly labeled closed/paid financial destination (the current `Open invoice records` tile leads to the all-status list)
+- browser comparison of interactive Paid Invoice Preview content against the downloaded Paid PDF artifact
 - QuickBooks or external accounting integrations
 
 ## Recommended Next Test Additions

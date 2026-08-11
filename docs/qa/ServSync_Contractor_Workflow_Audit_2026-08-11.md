@@ -75,6 +75,13 @@ All five required scenarios were attempted through actual contractor/customer br
 - Actual: the guide listed the full core loop as both covered and a recommended future addition, and said Estimate acceptance/payment were not covered.
 - Correction: the guide now distinguishes connected, not-connected, offline payment, provider-payment, mobile, and closed-record gaps accurately.
 
+### CWA-008 - TEST GAP - Low - Paid PDF Preview/download parity is not compared in the lifecycle
+
+- Reproduction: complete either lifecycle through Paid and inspect the automated document assertions.
+- Expected: the browser journey compares the interactive Preview presentation with the downloaded Paid PDF content.
+- Actual: both connected and not-connected journeys prove a successful Paid PDF download, and focused PDF coverage protects the shared generator, but the lifecycle does not compare Preview and Download artifacts directly.
+- Status: unresolved. Add bounded browser document-content comparison when a stable Preview assertion contract is available; do not infer parity merely from a successful download.
+
 ## Cleanup And Boundaries
 
 Every completed lifecycle records exact fixture identities and removes only those records after execution. The audit also removed exact interrupted-run records carrying the audit's `E2E Core Loop`, `E2E Partial Payment`, and `E2E Test Customer` timestamp prefixes, then verified zero matching residue. No migration, RLS, RPC, environment configuration, Stripe setting, Production record, or Demo record changed.
