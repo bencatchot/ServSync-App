@@ -458,7 +458,7 @@ test.describe('contractor-created local Customer lifecycle', () => {
 
     await openSidebarTab(contractorPage, /Customers/i);
     await openE2ECustomerDetail(contractorPage, customerName);
-    await main.getByTestId('contractor-customer-tab-profile').click();
+    await main.getByTestId('contractor-customer-tab-fieldwork').click();
     const mixedFinancialHistory = main.getByTestId('customer-financial-records');
     await expect(mixedFinancialHistory).toContainText('1 estimate');
     await expect(mixedFinancialHistory).toContainText('1 paid');
@@ -517,6 +517,18 @@ test.describe('contractor-created local Customer lifecycle', () => {
     await expect(main.getByRole('heading', { name: /^Saved invoice draft$/i })).toBeVisible({ timeout: 30_000 });
     let invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
     await expect(invoiceCard.getByText(/^Draft$/i).first()).toBeVisible();
+
+    await openSidebarTab(page, /Customers/i);
+    await openE2ECustomerDetail(page, customerName);
+    await main.getByTestId('contractor-customer-tab-fieldwork').click();
+    const openCustomerFinancialRecords = main.getByTestId('customer-financial-records');
+    await expect(openCustomerFinancialRecords).toContainText('1 open invoice');
+    await expect(openCustomerFinancialRecords).toContainText('0 paid');
+    await expect(openCustomerFinancialRecords.getByRole('button', { name: /^Open invoices 1$/i })).toBeVisible();
+    await expect(openCustomerFinancialRecords.getByRole('button').filter({ hasText: invoiceTitle })).toContainText('Invoice · Draft');
+    await openCustomerFinancialRecords.getByRole('button').filter({ hasText: invoiceTitle }).click();
+    await expect(main.getByRole('heading', { name: /^Saved invoice draft$/i })).toBeVisible({ timeout: 30_000 });
+    invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
     const markPaidAction = invoiceCard.getByTestId('contractor-record-invoice-payment');
     await expect(markPaidAction).toContainText(/^Mark Paid$/i);
     await markPaidAction.click();
@@ -595,7 +607,9 @@ test.describe('contractor-created local Customer lifecycle', () => {
     await page.reload();
     await openSidebarTab(page, /^Jobs\b/i);
     await expectActiveTabHeading(page, /^Jobs$/i);
-    await main.getByRole('button', { name: /^Invoices:/i }).click();
+    const invoiceSummary = main.getByTestId('contractor-jobs-summary-invoices');
+    await expect(invoiceSummary).toContainText(/\d+ open · \d+ paid/);
+    await invoiceSummary.click();
     await main.getByRole('tab', { name: /^Invoices\b/i }).first().click();
     await main.getByTestId('contractor-invoice-search').fill(invoiceTitle);
     await main.getByTestId('contractor-invoice-status-filter').selectOption('paid');
@@ -613,7 +627,7 @@ test.describe('contractor-created local Customer lifecycle', () => {
 
     await openSidebarTab(page, /Customers/i);
     await openE2ECustomerDetail(page, customerName);
-    await main.getByTestId('contractor-customer-tab-profile').click();
+    await main.getByTestId('contractor-customer-tab-fieldwork').click();
     const customerFinancialRecords = main.getByTestId('customer-financial-records');
     await expect(customerFinancialRecords).toContainText('0 open invoices');
     await expect(customerFinancialRecords).toContainText('1 paid');
@@ -626,19 +640,37 @@ test.describe('contractor-created local Customer lifecycle', () => {
     await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible();
     await main.getByRole('button', { name: /^Customer profile$/i }).click();
     await expect(main.getByRole('heading', { level: 2, name: new RegExp(`^${escapeRegExp(customerName)}$`, 'i') })).toBeVisible();
+    await main.getByTestId('contractor-customer-tab-fieldwork').click();
     await expect(main.getByTestId('customer-financial-records')).toContainText('1 paid');
 
     await main.getByTestId('customer-financial-records').getByRole('button', { name: /^Paid invoices 1$/i }).click();
     await expect(main.getByTestId('contractor-invoice-status-filter')).toHaveValue('paid');
-    await expect(main.getByTestId('contractor-invoice-status-shortcuts').getByRole('button', { name: /^Paid 1$/i })).toHaveAttribute('aria-pressed', 'true');
+    const invoiceShortcuts = main.getByTestId('contractor-invoice-status-shortcuts');
+    await expect(invoiceShortcuts.getByRole('button', { name: /^Paid 1$/i })).toHaveAttribute('aria-pressed', 'true');
     invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
     await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible();
+
+    await invoiceShortcuts.getByRole('button', { name: /^All 1$/i }).click();
+    await expect(main.getByTestId('contractor-invoice-status-filter')).toHaveValue('all');
+    await expect(main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first()).toBeVisible();
+    await invoiceShortcuts.getByRole('button', { name: /^Open 0$/i }).click();
+    await expect(main.getByTestId('contractor-invoice-status-filter')).toHaveValue('open');
+    await expect(main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle })).toHaveCount(0);
+    await invoiceShortcuts.getByRole('button', { name: /^Paid 1$/i }).click();
+    invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
 
     const downloadPromise = page.waitForEvent('download');
     await invoiceCard.getByRole('button', { name: /^Download PDF$/i }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/invoice.+\.pdf$/i);
     expect(await download.failure()).toBeNull();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await main.getByRole('button', { name: /^Customer profile$/i }).click();
+    await main.getByTestId('contractor-customer-tab-fieldwork').click();
+    await expect(main.getByTestId('customer-financial-records')).toContainText('1 paid');
+    const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(hasHorizontalOverflow).toBe(false);
     expect(invoiceSendRequests).toBe(0);
     expect(providerRequests).toEqual([]);
     await consoleErrors.assertClean(testInfo);
