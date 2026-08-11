@@ -41,7 +41,7 @@
     "test:draft-optional-customer-migrations": "scripts/validation/validate-draft-optional-customer-migrations.sh",
     "test:public-signup-role-hardening": "scripts/validation/validate-public-signup-role-hardening.sh",
     "test:accepted-estimate-deposit-workflow": "scripts/validation/validate-accepted-estimate-deposit-workflow.sh",
-    "test:draft-invoice-mark-paid": "bash scripts/validation/validate-draft-invoice-mark-paid.sh && playwright test tests/e2e/accepted-estimate-deposit-workflow.spec.ts tests/e2e/invoice-payment-presentation.spec.ts tests/e2e/estimate-invoice-pdf-actions.spec.ts --project=chromium",
+    "test:draft-invoice-mark-paid": "bash scripts/validation/validate-draft-invoice-mark-paid.sh && playwright test tests/e2e/accepted-estimate-deposit-workflow.spec.ts tests/e2e/invoice-payment-presentation.spec.ts tests/e2e/estimate-invoice-pdf-actions.spec.ts tests/e2e/invoice-pdf-preview-download-parity.spec.ts --project=chromium",
     "test:stripe-connect-online-payments": "scripts/validation/validate-stripe-connect-online-payments-foundation.sh",
     "test:codex-marketing-drafts": "bash scripts/validation/validate-codex-assisted-marketing-drafts.sh && node --test tests/marketing/codex-marketing-package-contract.test.mjs",
     "test:business-marketing-planning": "bash scripts/validation/validate-business-marketing-profile-plan.sh",
