@@ -6,6 +6,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/approved-direction-content-foundation-v1`
+- Starting main SHA: `27d5d24f262cf0d3887536d9519077282c90a849`
+- Files changed: approved-Direction preparation migration; provider-neutral schema, validator, operator, SQL/contract/UI tests; Marketing Content adapter and review UI; rollout ledger; Marketing architecture, Direction architecture, runbook, master plan, backlog, parity notes, and changelog.
+- Summary of change: Marketing Slice 6 connects one exact accepted Plan and its complete set of current approved Directions to one primary durable package containing one draft per Direction. New records preserve exact Plan/Direction revisions, item order, audience, role, Truth Pack, `approved_direction` strategic source, and separate `codex_assisted` generator provenance. Existing human Content approval remains unchanged, and historical Packages #1/#2 receive no backfill.
+- Architecture and security: One additive platform-admin-only RPC validates every server-side Plan/Direction binding, canonical role shape, claim safety, package completeness, replay fingerprint, and initial draft status in one transaction. Private tables remain postgres-owned, forced-RLS, policy-free, and unavailable through browser or service-role table access. The owner Content UI shows concise approved-Direction lineage without adding runtime generation, approval automation, scheduling, or publishing.
+- Environment rollout: Exact migration SHA-256 `884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331` is applied and rollback-only validated in Sandbox `zpzdkoaubyjtsomccxya`. Demo and Production are pending; the PR must remain draft and unmerged until a separately authorized migration-first rollout completes. No real Production content was created.
+- Tests/checks run: disposable PostgreSQL migration chain with a real historical package; six-Direction prepare/approve/ingest/replay/conflict and failed-package atomicity; role, stale, cross-workspace, claim, direct-table, RLS/ACL/RPC, immutability, repeat-install, and residue checks; live Sandbox catalog/security and rollback-only validation; focused package-contract tests; strict TypeScript; focused desktop/mobile Marketing Content tests; Production build; backend parity/rollout validation; JSON/Bash parsing; sensitive-value and scope scans; and `git diff --check`.
+- Known risks and follow-up: Semantic copy quality and grounding still require owner editorial review. The v1 primary-package uniqueness intentionally defers alternate treatments. Demo/Production rollout, merge, and the separately authorized first real six-draft preparation remain pending. Runtime AI, contractor/homeowner Marketing, submission/approval automation, scheduling, publishing, campaigns, outreach, analytics, providers, and billing are unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records the Sandbox-only approved-Direction handoff and exact rollout/operational gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the approved-Direction-to-draft architecture while preserving separate human approval and publication boundaries.
+
 - Branch: `codex/marketing-direction-foundation-v1`
 - Starting main SHA: `bf8ea23d4deb488447fe4d396fd4a205f71b64da`
 - Files changed:

@@ -107,6 +107,31 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
+      },
+      {
+        "id": "approved-direction-content-preparation-v1",
+        "reason": "Approved Sandbox-only Marketing Slice 6 foundation pending Demo/Production rollout.",
+        "selectors": {
+          "relationScopes": [
+            "public.marketing_content_items",
+            "public.marketing_content_preparation_packages"
+          ],
+          "functionScopes": [
+            "public.servsync_ingest_internal_marketing_direction_package(uuid, uuid, bigint, text, text, jsonb)",
+            "public.servsync_private_guard_marketing_content_lineage()"
+          ],
+          "exactObjects": []
+        },
+        "expectedCounts": {
+          "columns": 8,
+          "constraints": 10,
+          "indexes": 3,
+          "triggers": 1,
+          "functions": 2,
+          "functionGrants": 3
+        },
+        "expectedKeyFingerprint": "sha256:06b10c48a1d2cd2c948512daa13d5e6a35fb803b31d40a6765d944cc99564a7d",
+        "expectedCatalogFingerprint": "sha256:fd8b99128a42f0fe13360c31188574f5466ddb6912cbff9108d5212a4a9015c2"
       }
     ]
   }

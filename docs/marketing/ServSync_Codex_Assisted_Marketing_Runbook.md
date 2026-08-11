@@ -12,6 +12,12 @@ The repository-current contracts are:
 - local validator: `scripts/marketing/marketing-package-contract.mjs`
 - authenticated operator: `scripts/marketing/ingest-codex-marketing-package.mjs`
 
+The approved-Direction Plan-level path additionally uses:
+
+- schema: `config/marketing/codex-approved-direction-package.v1.schema.json`
+- local validator: `scripts/marketing/approved-direction-package-contract.mjs`
+- authenticated operator: `scripts/marketing/ingest-approved-direction-marketing-package.mjs`
+
 The immutable v1 and v2 files remain available for exact replay or audit. Do not rewrite a historical contract.
 
 Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/landscaping, pressure washing, and handyman businesses without adding new product claims. Its required migration `servsync-marketing-planner-quality-v2.sql`, exact SHA-256 `c05d5e84704d15ccc134970fd71dd297f26e936bbd4091e5a860d40a8ca2800`, is applied in Sandbox, Demo, and Production. Target-environment and Production/Demo command guards still require explicit operational authorization for every package ingestion; schema availability is not content-creation, approval, or publishing authority.
@@ -134,6 +140,39 @@ npm run marketing:prepare-codex-directions -- path/to/directions.json
 
 The exact Direction migration is applied in Sandbox, Demo, and Production. Schema availability does not authorize preparation: Demo or Production Direction preparation still requires a separately approved operational request, and no real Production Direction was created during rollout.
 
+## Approved Direction Content Preparation
+
+Use this path only after every item in one exact accepted Plan has a current owner-approved Direction and the target environment contains `servsync-approved-direction-content-preparation.sql`.
+
+1. Load the current accepted Plan, approved Directions, Profile context, Truth Pack v3, recipe-role definitions, and recent internal Content.
+2. Prepare exactly one primary item per Direction, in Plan order. Preserve each Direction's audience and content role. `short_video_concept` maps to `other`/`social`; other currently supported roles map to `social_post`/`social`.
+3. Keep each item to one grounded story. Avoid product-documentation prose and exact repetition of recent Package #1/#2 titles or bodies.
+4. Use one fresh preparation request UUID and keep it unchanged for every retry of the same exact six-item artifact.
+5. Validate locally against an exported current Direction context and recent-content list:
+
+```bash
+node scripts/marketing/approved-direction-package-contract.mjs \
+  path/to/package.json \
+  path/to/current-directions.json \
+  path/to/recent-content.json
+```
+
+6. Authenticate with an ordinary platform-admin session and browser-public anon key. Never use `service_role` or persist an interactive owner password.
+7. Ingest only after separate target authorization:
+
+```bash
+SERVSYNC_MARKETING_TARGET=sandbox \
+SERVSYNC_MARKETING_SUPABASE_URL="$SERVSYNC_SANDBOX_SUPABASE_URL" \
+SERVSYNC_MARKETING_SUPABASE_ANON_KEY="$SERVSYNC_SANDBOX_ANON_KEY" \
+SERVSYNC_MARKETING_ACCESS_TOKEN="$SERVSYNC_MARKETING_ADMIN_ACCESS_TOKEN" \
+npm run marketing:ingest-approved-direction-package -- path/to/package.json
+```
+
+8. Verify one package, one draft for every approved Direction, exact Plan/Direction lineage, `approved_direction` strategic source, `codex_assisted` generator source, and only initial `draft` status events.
+9. Open Marketing -> Content and review the owner-readable Direction lineage. The existing human submit/approve workflow begins only after preparation.
+
+The migration is currently applied only in Sandbox. Do not run this operator against Demo or Production until their exact schema rollout is separately authorized. Do not create the real Production six-draft package as an implementation test.
+
 ## Package Contract
 
 The current v3 top-level object has exactly:
@@ -181,6 +220,8 @@ Planner Coherence + Relevance v3 is a planning-only contract applied in Sandbox,
 - Never change the UUID while retrying an ambiguous result until the existing request is checked.
 - Never use a service-role key or direct table write.
 - Never target Demo or Production without separate migration and ingestion authorization.
+- Never substitute another content role for an approved Plan/Direction role.
+- Never create more than one primary package for the same accepted Plan revision under v1.
 - Stop if the Truth Pack does not establish the requested claim, topic, or capability.
 
 ## Maintenance
