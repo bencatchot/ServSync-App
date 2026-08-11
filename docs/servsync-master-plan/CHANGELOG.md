@@ -47,6 +47,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
   - REASON: Records the approved-Direction-to-draft architecture while preserving separate human approval and publication boundaries.
+- Branch: `codex/draft-invoice-mark-paid-v1`
+- Starting main SHA: `27d5d24f262cf0d3887536d9519077282c90a849`
+- Files changed:
+  - `servsync-draft-invoice-mark-paid.sql`
+  - `src/App.tsx`
+  - `src/features/invoices/RecordInvoicePaymentDialog.tsx`
+  - `src/features/invoices/offlinePayments.ts`
+  - `src/utils/pdfDocuments.ts`
+  - focused SQL, Playwright, validation-script, package-script, rollout-ledger, master-plan, backlog, and changelog files
+- Summary of change: Adds a narrow `Mark Paid` path for saved Draft Invoices using the existing append-only offline-payment ledger. The server requires the exact full remaining balance for a Draft, records payment metadata, atomically finalizes the Invoice as paid, supplies `issued_at` when absent, preserves the selected payment date in `paid_at`, and leaves sent/viewed/overdue partial-payment behavior unchanged. Paid Invoice PDFs now show a prominent `PAID` treatment plus Invoice Total, Amount Paid, Balance Due, and paid date from persisted Invoice state.
+- Architecture and security: The existing postgres-owned, fixed-path `servsync_record_offline_invoice_payment` RPC remains the only browser mutation boundary. Existing billing authority, tenant derivation, advisory/row locking, idempotency, ledger immutability, workflow activity, and Stripe-independent accounting are preserved. Draft partial payment, paid/void mutation, stale amount, unauthorized role, and cross-tenant requests fail closed. No new table, browser table grant, provider integration, customer terminology, or automatic delivery is added.
+- Environment status: Exact migration `servsync-draft-invoice-mark-paid.sql` SHA-256 `ac6ceeb8b834dab923ac65824c3d1d184a42d418a1733c66ac36fc7eec2998c3` is locally validated and Pending in Sandbox, Demo, and Production. The frontend must not merge to `main` before the reviewed migration is applied and validated in the deployment environments because their current RPC excludes Draft Invoices.
+- Tests/checks run: Disposable PostgreSQL 16 prerequisite, repeat-application, ownership/grant, role, full/partial, replay, lifecycle, ledger, and Activity validation; focused invoice/payment/PDF Playwright including desktop `1440x900` and mobile `390x844`; strict TypeScript; Production build; relevant invoice/payment/Stripe regressions; rollout/parity validation; JSON/Bash checks; sensitive-value and scope scans; and `git diff --check`.
+- Known risks and follow-up: Live environment rollout remains approval-gated. The selected date is persisted at a stable UTC midday because the existing form captures a date, not a time. Refunds, chargebacks, accounting export, provider receipts, and Production online-payment activation remain separate work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-014 records the locally complete Draft Invoice Mark Paid correction and its migration-first rollout gate while preserving broader payment gaps.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the intended draft-to-paid lifecycle and persisted paid-PDF presentation without claiming the Pending migration is live.
 
 - Branch: `codex/marketing-direction-foundation-v1`
 - Starting main SHA: `bf8ea23d4deb488447fe4d396fd4a205f71b64da`

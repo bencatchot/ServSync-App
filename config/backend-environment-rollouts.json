@@ -364,6 +364,24 @@
       }
     },
     {
+      "id": "draft-invoice-mark-paid-v1",
+      "artifact": "servsync-draft-invoice-mark-paid.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Exact SHA-256 ac6ceeb8b834dab923ac65824c3d1d184a42d418a1733c66ac36fc7eec2998c3 is locally PostgreSQL 16 validated; live Sandbox SQL requires separate authorization."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Migration-first rollout is required before the Draft Mark Paid frontend can merge because the deployed RPC currently excludes Draft Invoices."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Schema parity and compatibility validation remain required before the Draft Mark Paid frontend can merge."
+        }
+      }
+    },
+    {
       "id": "accepted-plan-marketing-directions-v1",
       "artifact": "servsync-accepted-plan-marketing-directions.sql",
       "environments": {

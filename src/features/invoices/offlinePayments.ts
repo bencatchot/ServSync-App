@@ -43,6 +43,14 @@ export function createOfflinePaymentDraft(invoice: Invoice): OfflinePaymentDraft
   };
 }
 
+export function offlinePaymentDraftIsFullBalance(invoice: Invoice, draft: OfflinePaymentDraft) {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(draft.amount.trim())) return false;
+  const amount = Number(draft.amount);
+  return Number.isFinite(amount)
+    && Math.round(amount * 100) === invoiceBalanceDueCents(invoice)
+    && invoiceBalanceDueCents(invoice) > 0;
+}
+
 export function offlinePaymentMethodLabel(method: InvoiceOfflinePaymentMethod) {
   return OFFLINE_PAYMENT_METHOD_OPTIONS.find(option => option.value === method)?.label ?? 'Offline payment';
 }

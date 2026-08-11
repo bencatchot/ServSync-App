@@ -28,6 +28,49 @@ function paymentInvoice(overrides: Partial<PaymentInvoice> = {}): PaymentInvoice
 }
 
 test.describe('Invoice payment presentation', () => {
+  for (const viewport of [
+    { name: 'desktop', width: 1440, height: 900 },
+    { name: 'mobile', width: 390, height: 844 },
+  ]) {
+    test(`Draft Mark Paid dialog is usable without layout overflow on ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await page.evaluate(async () => {
+        const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
+        const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as { createElement: (...args: unknown[]) => unknown };
+        const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as {
+          createRoot: (element: HTMLElement) => { render: (node: unknown) => void };
+        }).createRoot;
+        const module = await dynamicImport('/src/features/invoices/RecordInvoicePaymentDialog.tsx');
+        const Dialog = module.RecordInvoicePaymentDialog as (...args: unknown[]) => unknown;
+        const invoice = {
+          id: 'invoice-draft-1', contractor_id: 'contractor-1', homeowner_user_id: null,
+          local_contact_id: 'customer-1', service_request_id: null, job_id: null, estimate_id: null,
+          home_id: null, local_home_id: 'property-1', invoice_number: 'INV-1042', invoice_type: 'standard',
+          title: 'Repair Invoice', scope: '', notes: '', terms: '', status: 'draft', subtotal_cents: 125000,
+          tax_cents: 0, discount_cents: 0, total_cents: 125000, amount_paid_cents: 0,
+          issued_at: null, due_at: null, paid_at: null, voided_at: null,
+          created_at: '2026-08-11T12:00:00.000Z', updated_at: '2026-08-11T12:00:00.000Z', line_items: [],
+        };
+        document.body.innerHTML = '<div id="invoice-payment-dialog-root"></div>';
+        createRoot(document.getElementById('invoice-payment-dialog-root') as HTMLElement).render(
+          React.createElement(Dialog, {
+            invoice, payments: [], onlinePayments: [], loadingHistory: false, submitting: false,
+            onClose: () => undefined, onSubmit: async () => undefined,
+          }),
+        );
+      });
+
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Mark Paid' })).toBeVisible();
+      await expect(page.getByLabel('Payment amount')).toHaveValue('1250.00');
+      await expect(page.getByLabel('Payment amount')).toHaveAttribute('readonly', '');
+      await expect(page.getByText('It will no longer be editable as a Draft.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Mark Paid' })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    });
+  }
+
   test('presents paid invoices with paid date, amount paid, and zero balance', () => {
     const invoice = paymentInvoice({
       status: 'paid',
@@ -142,7 +185,7 @@ test.describe('Invoice payment presentation', () => {
     expect(appSource).toContain('<InvoicePaymentSummary invoice={invoice} variant="detail" showStatus');
     expect(appSource).toContain('<InvoicePaymentSummary invoice={linkedInvoiceForJob}');
     expect(appSource).toContain('Pay online when available, or contact your contractor for payment instructions.');
-    expect(appSource).toContain('Record payment');
+    expect(appSource).toContain('Mark Paid');
     expect(appSource).toContain('Payment history');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-compact"');
     expect(componentSource).toContain('data-testid="invoice-payment-summary-detail"');
@@ -164,7 +207,8 @@ test.describe('Invoice payment presentation', () => {
     const dateSource = sourceFile('src/utils/datePresentation.ts');
     const helperSource = sourceFile('src/features/invoices/paymentPresentation.ts');
 
-    expect(paymentDialogSource).toContain("['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)");
+    expect(paymentDialogSource).toContain("['draft', 'sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)");
+    expect(paymentDialogSource).toContain("fullBalancePayment ? 'Mark Paid' : 'Record payment'");
     expect(paymentDialogSource).toContain('Record money received outside ServSync.');
     expect(appSource).toContain('recordOfflineInvoicePayment');
     expect(appSource).toContain('voidInvoice(invoice)');
@@ -173,6 +217,11 @@ test.describe('Invoice payment presentation', () => {
     expect(appSource).not.toContain("status === 'Overdue'");
     expect(appSource).not.toContain("status === 'Void'");
     expect(pdfSource).toContain('function invoiceBalanceDueCents');
+    expect(pdfSource).toContain("pdf.text('PAID'");
+    expect(pdfSource).toContain("moneyRow('Invoice Total'");
+    expect(pdfSource).toContain("moneyRow('Amount Paid'");
+    expect(pdfSource).toContain("moneyRow('Balance Due'");
+    expect(pdfSource).toContain('formatPdfDate(invoice.paid_at)');
     expect(pdfSource).not.toContain('InvoicePaymentSummary');
     expect(dateSource).not.toContain('invoicePayment');
     expect(helperSource).not.toContain('supabase');

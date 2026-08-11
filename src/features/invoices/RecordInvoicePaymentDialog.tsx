@@ -6,6 +6,7 @@ import { invoiceBalanceDueCents } from './paymentPresentation';
 import {
   OFFLINE_PAYMENT_METHOD_OPTIONS,
   createOfflinePaymentDraft,
+  offlinePaymentDraftIsFullBalance,
   offlinePaymentMethodLabel,
   validateOfflinePaymentDraft,
   type OfflinePaymentSubmission,
@@ -35,7 +36,9 @@ export function RecordInvoicePaymentDialog({
   const [draft, setDraft] = useState(() => createOfflinePaymentDraft(invoice));
   const [error, setError] = useState('');
   const balanceDueCents = invoiceBalanceDueCents(invoice);
-  const canRecord = balanceDueCents > 0 && ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status);
+  const canRecord = balanceDueCents > 0 && ['draft', 'sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status);
+  const finalizingDraft = invoice.status === 'draft';
+  const fullBalancePayment = offlinePaymentDraftIsFullBalance(invoice, draft);
 
   useEffect(() => {
     setDraft(createOfflinePaymentDraft(invoice));
@@ -61,7 +64,7 @@ export function RecordInvoicePaymentDialog({
       <div className="max-h-[94vh] w-full overflow-y-auto rounded-t-lg bg-white shadow-2xl sm:max-w-2xl sm:rounded-lg">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
           <div className="min-w-0">
-            <h2 id="record-invoice-payment-title" className="text-lg font-bold text-slate-950">{canRecord ? 'Record payment' : 'Payment history'}</h2>
+            <h2 id="record-invoice-payment-title" className="text-lg font-bold text-slate-950">{canRecord ? fullBalancePayment ? 'Mark Paid' : 'Record payment' : 'Payment history'}</h2>
             <p className="mt-1 break-words text-sm text-slate-600">{invoice.invoice_number || invoice.title || 'Invoice'} · Balance {formatMoney(balanceDueCents)}</p>
           </div>
           <button type="button" onClick={onClose} disabled={submitting} className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label="Close payment dialog">
@@ -75,12 +78,17 @@ export function RecordInvoicePaymentDialog({
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                 Record money received outside ServSync. This does not process a payment or contact a payment provider.
               </div>
+              {finalizingDraft && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Marking this Draft paid finalizes the Invoice. It will no longer be editable as a Draft.
+                </div>
+              )}
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold text-slate-700">
                   Amount received
                   <div className="mt-1 flex rounded-md border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
                     <span className="px-3 py-2 text-slate-500">$</span>
-                    <input className="min-w-0 flex-1 rounded-r-md px-2 py-2 outline-none" inputMode="decimal" value={draft.amount} onChange={event => setDraft(current => ({ ...current, amount: event.target.value }))} aria-label="Payment amount" />
+                    <input className="min-w-0 flex-1 rounded-r-md px-2 py-2 outline-none read-only:bg-slate-50 read-only:text-slate-700" inputMode="decimal" value={draft.amount} readOnly={finalizingDraft} onChange={event => setDraft(current => ({ ...current, amount: event.target.value }))} aria-label="Payment amount" />
                   </div>
                 </label>
                 <label className="text-sm font-semibold text-slate-700">
@@ -107,7 +115,7 @@ export function RecordInvoicePaymentDialog({
                 <button type="button" onClick={onClose} disabled={submitting} className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancel</button>
                 <button type="button" onClick={() => void submit()} disabled={submitting} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">
                   <CheckCircle2 size={16} />
-                  {submitting ? 'Recording...' : 'Record payment'}
+                  {submitting ? 'Recording...' : fullBalancePayment ? 'Mark Paid' : 'Record payment'}
                 </button>
               </div>
             </section>

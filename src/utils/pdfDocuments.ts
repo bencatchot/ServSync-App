@@ -1027,6 +1027,13 @@ export async function createInvoicePdf(invoice: Invoice, context: InvoicePdfCont
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(22);
   pdf.text('Invoice', margin, 18);
+  if (invoice.status === 'paid') {
+    pdf.setFillColor(5, 150, 105);
+    pdf.roundedRect(margin + 34, 8, 28, 12, 2, 2, 'F');
+    pdf.setFontSize(11);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('PAID', margin + 48, 16, { align: 'center' });
+  }
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   pdf.text(context.contractorName || 'Contractor', margin, 27);
@@ -1054,7 +1061,7 @@ export async function createInvoicePdf(invoice: Invoice, context: InvoicePdfCont
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(16);
   addWrappedText(invoice.title || 'Invoice', margin, contentW - 60, 16, 7);
-  const amountLabel = invoice.status === 'paid' ? 'Paid' : invoice.status === 'void' ? 'Void' : 'Amount Due';
+  const amountLabel = invoice.status === 'paid' ? 'Balance Due' : invoice.status === 'void' ? 'Void' : 'Amount Due';
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(9);
   pdf.setTextColor(71, 85, 105);
@@ -1195,14 +1202,31 @@ export async function createInvoicePdf(invoice: Invoice, context: InvoicePdfCont
   moneyRow('Fees', totals.feeTotalCents);
   moneyRow('Tax', totals.taxCents);
   moneyRow('Discount', -invoice.discount_cents);
-  moneyRow('Total', invoice.total_cents, true);
-  moneyRow('Amount paid', invoice.amount_paid_cents);
-  moneyRow('Balance due', balanceDue, true);
+  moneyRow('Invoice Total', invoice.total_cents, true);
+  moneyRow('Amount Paid', invoice.amount_paid_cents);
+  moneyRow('Balance Due', balanceDue, true);
+  if (invoice.status === 'paid' && invoice.paid_at) {
+    addPageIfNeeded(7);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(15, 23, 42);
+    pdf.text('Paid', pageW - margin - 58, y);
+    pdf.text(formatPdfDate(invoice.paid_at), pageW - margin, y, { align: 'right' });
+    y += 6;
+  }
 
-  sectionTitle('Payment Instructions');
+  sectionTitle(invoice.status === 'paid' ? 'Payment Status' : 'Payment Instructions');
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(51, 65, 85);
-  addWrappedText('Payment processing through ServSync is coming soon. Please follow the contractor payment instructions provided outside this invoice.', margin, contentW, 10, 5);
+  addWrappedText(
+    invoice.status === 'paid'
+      ? `Paid in full${invoice.paid_at ? ` on ${formatPdfDate(invoice.paid_at)}` : ''}. No balance remains.`
+      : 'Payment processing through ServSync is coming soon. Please follow the contractor payment instructions provided outside this invoice.',
+    margin,
+    contentW,
+    10,
+    5,
+  );
 
   if (invoice.notes) {
     sectionTitle('Notes');
