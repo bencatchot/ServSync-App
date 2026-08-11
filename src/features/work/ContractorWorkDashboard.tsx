@@ -111,6 +111,8 @@ export type ContractorWorkDashboardProps = {
   estimateCount: number;
   activeJobCount: number;
   invoiceCount: number;
+  openInvoiceCount: number;
+  paidInvoiceCount: number;
   needsAttentionCount: number;
   onViewNeedsAttention: () => void;
   onViewDrafts: () => void;
@@ -135,6 +137,8 @@ export function ContractorWorkDashboard({
   estimateCount,
   activeJobCount,
   invoiceCount,
+  openInvoiceCount,
+  paidInvoiceCount,
   needsAttentionCount,
   onViewNeedsAttention,
   onViewDrafts,
@@ -209,8 +213,8 @@ export function ContractorWorkDashboard({
           <SummaryTile
             testId="contractor-jobs-summary-invoices"
             label="Invoices"
-            helper="Open invoice records"
-            emptyHelper="No open invoices"
+            helper={`${openInvoiceCount} open · ${paidInvoiceCount} paid`}
+            emptyHelper="No invoice records"
             state={loadedState(invoiceCount)}
             icon={<Receipt size={18} />}
             onClick={onViewInvoices}

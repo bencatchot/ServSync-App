@@ -94,6 +94,8 @@ export function renderContractorJobsOverview(canViewPriceBook: boolean) {
       estimateCount: 0,
       activeJobCount: 0,
       invoiceCount: 0,
+      openInvoiceCount: 0,
+      paidInvoiceCount: 0,
       needsAttentionCount: 0,
       onViewNeedsAttention: () => undefined,
       onViewDrafts: () => undefined,

@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/cwa003-invoice-discoverability-v1`
+- Starting main SHA: `1377dc4832d16d5a326091945fce28681e397e95`
+- Files changed: contractor Jobs overview; canonical Customer financial summary/navigation; focused Jobs/lifecycle Playwright coverage; workflow audit; FB-035 backlog; master plan; changelog.
+- Summary of change: Corrects CWA-003 without changing Jobs architecture or financial behavior. The Jobs Invoice tile now represents all Invoice records and states open/Paid counts, the list exposes direct All/Open/Paid groups while preserving every detailed status, and Customer profiles include canonical Invoice records alongside Estimates with exact-record opening and a Customer-profile return path.
+- Validation: TypeScript, Production build, focused Jobs source/UI coverage, payment/PDF regressions, backend parity, rollout-ledger validation, and exact-head Vercel checks pass. Exact-head Sandbox browser coverage verified a Draft Invoice while open, full offline payment without send, persisted Paid status and zero balance after reload, truthful global Invoice summary, exact customer-scoped Open/Paid counts, All/Open/Paid navigation, mixed Estimate/Paid history, exact reopening, Customer return navigation, PDF download, clean console/network behavior, and no horizontal overflow at 390x844. All closeout fixtures were removed; the pre-existing tagged baseline remained unchanged.
+- Known risks and follow-up: CWA-003 is Fixed. CWA-008 direct Preview-versus-Download PDF comparison remains separately open. No SQL, RLS, RPC, payment ledger, Stripe, secure delivery, authentication, environment, or Production/Demo change is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 records the implemented and authenticated-Sandbox-validated CWA-003 correction as Fixed while preserving CWA-008 and later Draft-first maturity as separate follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Documents the bounded Customer-to-financial-record navigation contract and its exact-head authenticated Sandbox validation without changing financial behavior.
+
 - Branch: `codex/contractor-workflow-e2e-audit-v1`
 - Starting main SHA: `f2aa415a1ea344228b191be4760b9044d2981833`
 - Files changed: contractor Customer readiness controls; local Estimate/Invoice secure-delivery panels; connected/not-connected lifecycle Playwright coverage; package QA command; QA guide and audit evidence; master plan; FB-035 backlog; changelog.

@@ -46,8 +46,9 @@ All five required scenarios passed through actual contractor/customer browser pa
 - Expected: the overview clearly identifies where closed/paid records live.
 - Actual: the tile is described as `Open invoice records`, but selecting it opens the all-status list where the Paid filter successfully reaches the Invoice, history, and PDF. The Customer financial summary also does not surface this paid Invoice.
 - Root cause: overview wording/count semantics do not describe the broader list they open.
-- Status: unresolved and recorded under FB-035. Correcting the overview information architecture is broader than a selector/copy patch in this audit.
-- Regression: both connected and not-connected lifecycle tests reopen Paid through the current real route, preventing the functionality from being mistaken for absent.
+- Status: Fixed. The Jobs Invoice tile now counts all Invoice records and states the open/Paid split instead of describing an all-status destination as open-only. The Invoice list adds direct All/Open/Paid groups while preserving every detailed status filter. The Customer Jobs workspace uses canonical Invoice records, shows open/Paid counts beside Estimates, reopens exact financial records, and retains a Customer-profile return path.
+- Validation: exact-head Sandbox browser coverage passed through the deployed Preview. It verified a Draft Invoice while open, full offline payment without send, persisted Paid status, amount paid equal to total, zero balance, reload durability, global Jobs Invoice summary, exact customer-scoped Open/Paid counts, All/Open/Paid navigation, mixed Estimate/Paid history, exact-record reopening, Customer return navigation, PDF download, clean console/network behavior, and no horizontal overflow at 390x844.
+- Preservation: all fixtures created by the closeout run were removed by the established exact-ID cleanup. The pre-existing tagged Sandbox baseline remained unchanged. No Production or Demo data, authentication, configuration, or environment state changed.
 
 ### CWA-004 - TEST GAP - Medium - Core lifecycle stopped before payment
 
