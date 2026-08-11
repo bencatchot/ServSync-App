@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/cwa008-invoice-pdf-parity-v1`
+- Starting main SHA: `162e87f83d5812e67fbfe69c5657e26fd88ecae0`
+- Files changed: Invoice Preview/download artifact parity Playwright coverage; payment/PDF regression package; contractor workflow audit; FB-035 backlog; changelog.
+- Summary of change: Closes CWA-008 with deterministic automated comparison of actual PDF blobs produced independently by the production Preview and Download wrappers. The test extracts and normalizes jsPDF text-layer content, compares user-visible semantic parity, and deliberately ignores unstable binary metadata rather than requiring byte equality.
+- Validation: Outstanding, Paid, partially paid, and refreshed outstanding-to-Paid scenarios protect Invoice/customer/property identity, number, issue/due/Paid dates, line-item content and totals, Invoice total, amount paid, balance due, status, notes, and terms. Existing PDF action and Draft Invoice Mark Paid regression coverage remains in the same package. TypeScript, Production build, backend parity, rollout-ledger validation, sensitive-value checks, exact-head Vercel checks, and independent review are merge gates.
+- Known risks and follow-up: No production PDF discrepancy was found, so runtime PDF and accounting code are unchanged. The text-layer extractor is intentionally test-only and tied to the existing uncompressed jsPDF output contract. CWA-003 and CWA-008 are Fixed; no additional contractor-workflow audit blocker remains. Controlled mutating Production smoke, optional role coverage, telemetry, and later Draft-first maturity remain product-readiness work rather than audit findings.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 records CWA-008 as Fixed while retaining its separate Production-readiness and maturity follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This QA-hardening slice protects existing Invoice document behavior and does not change product direction, workflow semantics, or rollout state.
+
 - Branch: `codex/cwa003-invoice-discoverability-v1`
 - Starting main SHA: `1377dc4832d16d5a326091945fce28681e397e95`
 - Files changed: contractor Jobs overview; canonical Customer financial summary/navigation; focused Jobs/lifecycle Playwright coverage; workflow audit; FB-035 backlog; master plan; changelog.

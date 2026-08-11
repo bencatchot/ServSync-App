@@ -74,12 +74,12 @@ All five required scenarios passed through actual contractor/customer browser pa
 - Actual: the guide listed the full core loop as both covered and a recommended future addition, and said Estimate acceptance/payment were not covered.
 - Correction: the guide now distinguishes connected, not-connected, offline payment, provider-payment, mobile, and closed-record gaps accurately.
 
-### CWA-008 - TEST GAP - Low - Paid PDF Preview/download parity is not compared in the lifecycle
+### CWA-008 - FIXED - Invoice PDF Preview/download semantic parity
 
-- Reproduction: complete either lifecycle through Paid and inspect the automated document assertions.
-- Expected: the browser journey compares the interactive Preview presentation with the downloaded Paid PDF content.
-- Actual: both connected and not-connected journeys prove a successful Paid PDF download, and focused PDF coverage protects the shared generator, but the lifecycle does not compare Preview and Download artifacts directly.
-- Status: unresolved. Add bounded browser document-content comparison when a stable Preview assertion contract is available; do not infer parity merely from a successful download.
+- Architecture: contractor Preview and Download actions receive the same current Invoice/context, independently invoke their exported production wrapper, and generate separate PDF blobs through the shared `createInvoicePdf` builder before their distinct browser handoffs.
+- Correction: focused automation captures both actual blobs, extracts their jsPDF text-layer content, normalizes whitespace, and compares user-visible semantics rather than unstable PDF metadata or byte identity.
+- Validation: outstanding, Paid, and partially paid Invoice artifacts agree on Invoice/customer/property identity, number, dates, line details, total, amount paid, balance due, status, Paid marker/date where applicable, notes, and terms. A refreshed outstanding-to-Paid case proves newly generated Preview and Download artifacts both use the updated state. The actions leave their Invoice input unchanged.
+- Status: Fixed. A newly generated Invoice Preview and Download are automatically checked for semantic financial/document parity. Existing persisted Sandbox lifecycle coverage remains the authority for payment-state refresh and cleanup; this deterministic artifact comparison requires no live fixture.
 
 ## Cleanup And Boundaries
 
@@ -87,4 +87,4 @@ Every completed lifecycle records exact fixture identities and removes only thos
 
 ## PR #417 Boundary
 
-PR #417 owns the completed Draft Invoice full offline-payment correction and migration rollout. It preserves the #419 Customer-readiness and secure-delivery fixes, existing sent/viewed/overdue/partially-paid behavior, CWA-003 as a bounded low-severity discoverability follow-up, and CWA-008 as a bounded PDF Preview/download comparison gap.
+PR #417 owns the completed Draft Invoice full offline-payment correction and migration rollout. It preserves the #419 Customer-readiness and secure-delivery fixes plus existing sent/viewed/overdue/partially-paid behavior. The later bounded CWA-003 and CWA-008 follow-ups now close paid-record discoverability and Invoice PDF Preview/download semantic parity without changing payment accounting.
