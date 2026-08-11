@@ -1,0 +1,113 @@
+{
+  "preparation_request_id": "47000000-0000-4000-8000-000000000100",
+  "source_plan_id": "4e390d96-03f0-4342-9a13-3e8119383024",
+  "source_plan_revision": 3,
+  "truth_pack_version": "servsync-marketing-truth-v3",
+  "preparation_source": "codex_assisted",
+  "direction_mode": "recommended",
+  "owner_input": null,
+  "directions": [
+    {
+      "plan_item_index": 1,
+      "audience_key": "small_contractors",
+      "objective": "Help small contractors understand how ServSync keeps billing connected to the customer and completed service work.",
+      "statement": "Focus on the point when a contractor turns completed service work into an invoice: show that the bill remains tied to the customer and the work it represents, giving both sides a clearer record than a standalone amount with no service context.",
+      "central_message": "An invoice is easier to understand when the customer and billed service work remain connected.",
+      "supporting_points": [
+        "Show the customer and service context before showing the invoice.",
+        "Keep the story about clarity and organization rather than payment automation."
+      ],
+      "cautions": [
+        "Do not imply accounting integration, automatic collections, or online payment processing."
+      ],
+      "corrected_assumptions": [],
+      "recommendation_rationale": "This develops the accepted invoice topic into one concrete billing story for a small contractor without repeating the broader job or deposit directions.",
+      "truth_capability_keys": ["invoices"]
+    },
+    {
+      "plan_item_index": 2,
+      "audience_key": "small_contractors",
+      "objective": "Show small contractors one credible way a clear ServSync business profile can support homeowner discovery.",
+      "statement": "Focus on a homeowner viewing a contractor's supported business and service information, then deciding whether to connect. Keep the story on recognizable profile details and the discovery interaction rather than promising ranking, verification, or lead results.",
+      "central_message": "A clear contractor profile gives a homeowner useful context for deciding whether to connect.",
+      "supporting_points": [
+        "Use only business and service information the contractor can maintain in ServSync.",
+        "Keep the visible story limited to profile details and the homeowner's choice to connect."
+      ],
+      "cautions": [
+        "Do not claim credential verification, preferred ranking, guaranteed leads, or lead performance."
+      ],
+      "corrected_assumptions": [],
+      "recommendation_rationale": "This turns the accepted discovery topic into a bounded profile-viewing story while preserving the Truth Pack's marketplace and verification limits.",
+      "truth_capability_keys": ["contractor_business_profile"]
+    },
+    {
+      "plan_item_index": 3,
+      "audience_key": "small_contractors",
+      "objective": "Explain the deliberate deposit request and manual payment record that can follow an accepted estimate.",
+      "statement": "Focus on the contractor choosing Request deposit after an estimate is accepted, reviewing the resulting draft deposit invoice, and later recording a partial or full manual payment. Keep each action deliberate and separate from online processing.",
+      "central_message": "ServSync can connect an accepted estimate to a deliberate deposit invoice and an accurate manual payment record.",
+      "supporting_points": [
+        "The deposit amount comes from the accepted estimate's payment schedule.",
+        "The contractor reviews and sends the draft invoice before recording an offline payment."
+      ],
+      "cautions": [
+        "Do not imply automatic invoice sending, card processing, Pay Online, refunds, or deposit-gated job creation."
+      ],
+      "corrected_assumptions": [],
+      "recommendation_rationale": "This develops an underused current capability into a precise contractor action sequence that is distinct from the general invoice and job items.",
+      "truth_capability_keys": ["deposit_and_manual_payments", "estimates"]
+    },
+    {
+      "plan_item_index": 4,
+      "audience_key": "homeowners",
+      "objective": "Help homeowners understand the supported service records that can remain organized around their home.",
+      "statement": "Focus on a homeowner returning to the home in ServSync and finding eligible completed work, reports, invoice records, documents, and manual reminders together. Frame Home History as an organized record, not an automatic record of every interaction.",
+      "central_message": "Home History can keep eligible completed service records organized around the home they belong to.",
+      "supporting_points": [
+        "Use one completed-work example rather than a broad feature inventory.",
+        "Make the property connection visible in the story."
+      ],
+      "cautions": [
+        "Do not imply every guest interaction becomes Home History or promise automatic reminders and notifications."
+      ],
+      "corrected_assumptions": [],
+      "recommendation_rationale": "This gives the planning period one useful homeowner story while staying bounded to eligible records and the current Home History experience.",
+      "truth_capability_keys": ["home_history"]
+    },
+    {
+      "plan_item_index": 5,
+      "audience_key": "small_contractors",
+      "objective": "Show the continuity between an accepted scope, the contractor's job, and the finalized work report.",
+      "statement": "Focus on the moment after an estimate is accepted: show the agreed scope carrying into the job and remaining connected to the finalized customer-facing work report. Present this as continuity in the service record, not as automated field-service dispatch.",
+      "central_message": "The accepted scope, active job, and finalized work report can remain part of the same service record.",
+      "supporting_points": [
+        "Begin with the accepted scope before showing the job.",
+        "End with the finalized report rather than continuing into billing."
+      ],
+      "cautions": [
+        "Do not claim automated diagnostics, enterprise dispatch, code compliance, or third-party certification."
+      ],
+      "corrected_assumptions": [],
+      "recommendation_rationale": "This turns the accepted Jobs item into a specific scope-to-report story and leaves invoicing and request intake to separate Directions.",
+      "truth_capability_keys": ["estimates", "jobs_and_reports"]
+    },
+    {
+      "plan_item_index": 6,
+      "audience_key": "small_contractors",
+      "objective": "Demonstrate one short product moment from homeowner request submission to organized contractor receipt.",
+      "statement": "Show a homeowner submitting a service request for one specific home, followed immediately by the contractor seeing that request tied to the relevant customer and home. Stop the demonstration there without opening an estimate, job, invoice, or account comparison.",
+      "central_message": "A new service request can arrive with the customer and home context the contractor needs to begin reviewing it.",
+      "supporting_points": [
+        "Use one request and one immediate contractor view.",
+        "Keep the sequence short enough to understand without narration-heavy explanation."
+      ],
+      "cautions": [
+        "Do not promise emergency dispatch, guaranteed response, automated matching, or a complete service-call walkthrough."
+      ],
+      "corrected_assumptions": [],
+      "recommendation_rationale": "This preserves the accepted narrow demonstration and clearly separates it from prior full-service-call and account-versus-link video concepts.",
+      "truth_capability_keys": ["service_requests"]
+    }
+  ]
+}

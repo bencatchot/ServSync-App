@@ -54,9 +54,11 @@ async function installMarketingHarness(page: Page, role: UserRole) {
     const module = await dynamicImport('/src/features/marketing/MarketingWorkspace.tsx');
     const Workspace = module.InternalMarketingWorkspace as (...args: unknown[]) => unknown;
     const client = {
-      rpc: async (name: string) => name === 'servsync_get_internal_marketing_planning'
-        ? { data: planningState, error: null }
-        : { data: [], error: null },
+      rpc: async (name: string) => {
+        if (name === 'servsync_get_internal_marketing_planning') return { data: planningState, error: null };
+        if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
+        return { data: [], error: null };
+      },
     };
 
     document.body.innerHTML = '<main class="mx-auto max-w-6xl bg-slate-50 p-4"><div id="marketing-test-root"></div></main>';

@@ -14,6 +14,8 @@ import {
   type MarketingPlanningState,
   type MarketingProfileChannel,
 } from './marketingPlanning';
+import { MarketingDirectionsWorkspace } from './MarketingDirectionsWorkspace';
+import type { MarketingDirection, MarketingDirectionsState } from './marketingDirections';
 
 const inputClass = 'min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100';
 const textareaClass = `${inputClass} min-h-24 resize-y`;
@@ -437,6 +439,7 @@ export function MarketingPlanningWorkspace({
   onCreatePlan,
   onUpdatePlan,
   onAcceptPlan,
+  directions,
 }: {
   state: MarketingPlanningState | null;
   loading: boolean;
@@ -447,8 +450,17 @@ export function MarketingPlanningWorkspace({
   onCreatePlan: Parameters<typeof PlanEditor>[0]['onCreate'];
   onUpdatePlan: (plan: MarketingPlan) => Promise<void>;
   onAcceptPlan: (plan: MarketingPlan) => Promise<void>;
+  directions: {
+    state: MarketingDirectionsState | null;
+    loading: boolean;
+    error: string | null;
+    saving: boolean;
+    onReload: () => Promise<void>;
+    onUpdate: (direction: MarketingDirection) => Promise<void>;
+    onApprove: (direction: MarketingDirection) => Promise<void>;
+  };
 }) {
-  const [view, setView] = useState<'profile' | 'plan'>('profile');
+  const [view, setView] = useState<'profile' | 'plan' | 'directions'>('profile');
 
   if (loading) return <div data-testid="marketing-planning-loading" className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading Marketing Profile...</div>;
   if (error || !state) {
@@ -463,15 +475,16 @@ export function MarketingPlanningWorkspace({
   return (
     <div data-testid="marketing-planning-workspace" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div role="tablist" aria-label="Marketing planning" className="mb-5 inline-flex rounded-md border border-slate-300 p-1">
-        {(['profile', 'plan'] as const).map(value => (
+        {(['profile', 'plan', 'directions'] as const).map(value => (
           <button key={value} type="button" role="tab" aria-selected={view === value} onClick={() => setView(value)} className={`min-h-10 rounded px-4 text-sm font-bold ${view === value ? 'bg-slate-900 text-white' : 'text-slate-600'}`}>
-            {value === 'profile' ? 'Profile' : 'Plan'}
+            {value === 'profile' ? 'Profile' : value === 'plan' ? 'Plan' : 'Directions'}
           </button>
         ))}
       </div>
       {view === 'profile'
         ? <ProfileEditor profile={state.profile} saving={saving} onSave={onSaveProfile} />
-        : (
+        : view === 'plan'
+          ? (
           <PlanEditor
             state={state}
             saving={saving}
@@ -479,7 +492,8 @@ export function MarketingPlanningWorkspace({
             onUpdate={onUpdatePlan}
             onAccept={onAcceptPlan}
           />
-        )}
+          )
+          : <MarketingDirectionsWorkspace {...directions} />}
     </div>
   );
 }

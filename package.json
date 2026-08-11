@@ -45,7 +45,9 @@
     "test:business-marketing-planning": "bash scripts/validation/validate-business-marketing-profile-plan.sh",
     "test:marketing-planner-quality-v2": "bash scripts/validation/validate-marketing-planner-quality-v2.sh",
     "test:marketing-planner-coherence-v3": "bash scripts/validation/validate-marketing-planner-coherence-relevance-v3.sh",
+    "test:marketing-directions": "bash scripts/validation/validate-accepted-plan-marketing-directions.sh && node --test tests/marketing/marketing-direction-preparation-contract.test.mjs",
     "marketing:ingest-codex-package": "node scripts/marketing/ingest-codex-marketing-package.mjs",
+    "marketing:prepare-codex-directions": "node scripts/marketing/prepare-codex-marketing-directions.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {

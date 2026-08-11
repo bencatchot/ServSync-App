@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-10",
+  "updatedOn": "2026-08-11",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -360,6 +360,24 @@
         "demo": {
           "status": "Applied",
           "reason": "Exact SHA-256 c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 22:07:54Z through 22:08:02Z. The additive postgres-owned fixed-path SECURITY DEFINER v3 RPC, exact authenticated-only grant, v1/v2 preservation, version/mode enforcement, transaction-local platform-admin creation/replay, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Demo retained one internal workspace, profile, and profile revision with zero plans, plan revisions, packages, content records, status events, or validation residue."
+        }
+      }
+    },
+    {
+      "id": "accepted-plan-marketing-directions-v1",
+      "artifact": "servsync-accepted-plan-marketing-directions.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-11 from approximately 03:41:31Z through 03:41:37Z. Catalog, postgres ownership, forced-RLS/policy-free private tables, fixed-path authenticated-only RPC grants, accepted-Plan-only all-or-nothing preparation, exact Plan mode/provenance binding, replay, draft edit, stale-write rejection, terminal approval, direct-table denial, rollback-only cleanup, and existing Marketing data preservation passed. Sandbox retains zero Plans, Direction rows, Direction revisions, packages, content records, and status events after validation."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production rollout is not authorized in Slice 5. The accepted planner-v3 Plan, historical plans, packages, content records, and status events remain unchanged, and the deployed schema does not yet expose the four Direction RPCs."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo rollout is not authorized in Slice 5. Demo remains on the existing Marketing Profile/Plan/content schema and does not expose the durable Direction tables or RPCs."
         }
       }
     }

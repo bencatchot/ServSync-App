@@ -18,7 +18,7 @@ Truth Pack v3 adds canonical contractor audience coverage for carpentry, lawn/la
 
 Planner v3 migration `servsync-marketing-planner-coherence-relevance-v3.sql`, exact SHA-256 `c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b`, is applied in Sandbox, Demo, and Production. It improves deterministic recommendation coherence and relevance only. A recommendation remains a draft plan; it does not create Marketing Direction, content, approvals, schedules, or published work.
 
-Planner v3 operational hardening is source-only: discovery/profile cautions use claim-safe wording without relaxing the server validator, customer-communication overlap recognizes bounded estimate/response/link/connection relationships, and Product demonstrations name one eligible supported interaction selected from the current Profile and recent-content evidence. Do not treat the planner as ready for Plan-to-Direction handoff until a real Production recommendation succeeds after this client correction is deployed.
+Planner v3 operational hardening is source-only: discovery/profile cautions use claim-safe wording without relaxing the server validator, customer-communication overlap recognizes bounded estimate/response/link/connection relationships, and Product demonstrations name one eligible supported interaction selected from the current Profile and recent-content evidence. The first real Production planner-v3 Plan was subsequently reviewed, refined, and accepted; that acceptance is strategy input only and does not itself authorize Direction preparation or content creation.
 
 ## Marketing Direction
 
@@ -103,6 +103,37 @@ Password authentication is also supported through the approved secret-only `SERV
 11. Verify the receipt reports `status: draft`, the requested count, and only non-secret record identifiers. A replay of the same UUID and exact package must return the same records with `replayed: true`.
 12. Open Marketing -> Content and review the `Codex-prepared` drafts. Human workflow actions begin here; Codex must not invoke approval transitions.
 
+## Accepted Plan Direction Preparation
+
+Slice 5 introduces a separate preparation step before content packaging. Use it only in an environment where `servsync-accepted-plan-marketing-directions.sql` is applied and the exact accepted Plan has no existing Directions.
+
+1. Load the current accepted Plan through the internal Settings workspace or `servsync_get_internal_marketing_directions`.
+2. Prepare exactly one Direction per Plan item, in Plan order, using `config/marketing/codex-marketing-directions.v1.schema.json` and the current Truth Pack.
+3. Preserve the exact Plan ID and revision. Recommended Plans use `direction_mode: recommended` with null owner input. Owner-directed Plans use `direction_mode: owner_led` with the Plan's exact owner direction.
+4. Use one fresh request UUID and keep it unchanged for retries of the same exact artifact.
+5. Validate before authentication:
+
+```bash
+node scripts/marketing/marketing-direction-preparation-contract.mjs path/to/directions.json
+```
+
+6. Authenticate only through an approved transient or local secret flow using an ordinary platform-admin account and the browser-public anon key. Do not use `service_role`.
+7. Run the guarded operator. Sandbox example:
+
+```bash
+SERVSYNC_MARKETING_TARGET=sandbox \
+SERVSYNC_MARKETING_SUPABASE_URL="$SERVSYNC_SANDBOX_SUPABASE_URL" \
+SERVSYNC_MARKETING_SUPABASE_ANON_KEY="$SERVSYNC_SANDBOX_ANON_KEY" \
+SERVSYNC_MARKETING_ACCESS_TOKEN="$SERVSYNC_MARKETING_ADMIN_ACCESS_TOKEN" \
+npm run marketing:prepare-codex-directions -- path/to/directions.json
+```
+
+8. Verify one replay-safe receipt, the exact Plan/revision, one draft per Plan item, `codex_assisted` provenance, and the Truth Pack version.
+9. Review and refine each draft under Marketing -> Settings -> Directions. Save any edit before approval.
+10. Approve only deliberate owner decisions. Direction approval creates no content package and grants no publishing authority.
+
+Demo and Production Direction preparation remain prohibited until their exact migration rollout and an operational preparation request are separately authorized.
+
 ## Package Contract
 
 The current v3 top-level object has exactly:
@@ -138,7 +169,7 @@ The local validator rejects malformed directions, uncorrected competitor assumpt
 
 Historical v1 packages retain `brief_summary` and remain locally replay-valid against the immutable v1 Truth Pack and recipes. Historical v2 packages remain replay-valid with their exact Marketing Direction. New packages may use v3 only in environments whose catalog still matches the exact planner-quality migration; environment rollout alone does not authorize ingestion.
 
-Planner Coherence + Relevance v3 is a planning-only contract and is currently Sandbox-only. It improves which audiences, topics, and roles are recommended but does not create a Marketing Direction or content package. A user must still inspect and deliberately accept or revise the plan, establish the bounded Marketing Direction, validate against the applicable Truth Pack and recipe, and separately authorize ingestion. Demo and Production remain on planner v2 until the additive v3 RPC receives a separately approved migration-first rollout.
+Planner Coherence + Relevance v3 is a planning-only contract applied in Sandbox, Demo, and Production. It improves which audiences, topics, and roles are recommended but does not create a Marketing Direction or content package. A user must still inspect and deliberately accept or revise the plan, establish the bounded Marketing Direction, validate against the applicable Truth Pack and recipe, and separately authorize ingestion.
 
 ## Fail-Closed Rules
 

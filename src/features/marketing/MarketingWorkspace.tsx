@@ -38,6 +38,12 @@ import {
   type MarketingPlanningState,
 } from './marketingPlanning';
 import { MarketingPlanningWorkspace } from './MarketingPlanningWorkspace';
+import {
+  createMarketingDirectionsAdapter,
+  type MarketingDirection,
+  type MarketingDirectionsRpcClient,
+  type MarketingDirectionsState,
+} from './marketingDirections';
 
 const SECTION_PRESENTATION: Record<MarketingWorkspaceSection, { label: string; icon: typeof BarChart3 }> = {
   overview: { label: 'Overview', icon: BarChart3 },
@@ -340,10 +346,11 @@ function AuthorizedInternalMarketingWorkspace({
   client,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient;
 }) {
   const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
   const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
+  const directionsAdapter = useMemo(() => createMarketingDirectionsAdapter(client), [client]);
   const [items, setItems] = useState<MarketingContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -351,6 +358,10 @@ function AuthorizedInternalMarketingWorkspace({
   const [planningLoading, setPlanningLoading] = useState(true);
   const [planningSaving, setPlanningSaving] = useState(false);
   const [planningError, setPlanningError] = useState<string | null>(null);
+  const [directionsState, setDirectionsState] = useState<MarketingDirectionsState | null>(null);
+  const [directionsLoading, setDirectionsLoading] = useState(true);
+  const [directionsSaving, setDirectionsSaving] = useState(false);
+  const [directionsError, setDirectionsError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -382,6 +393,21 @@ function AuthorizedInternalMarketingWorkspace({
 
   useEffect(() => { void loadPlanning(); }, [loadPlanning]);
 
+  const loadDirections = useCallback(async (showLoading = true) => {
+    if (showLoading) setDirectionsLoading(true);
+    setDirectionsError(null);
+    try {
+      setDirectionsState(await directionsAdapter.get());
+    } catch (loadError) {
+      setDirectionsState(null);
+      setDirectionsError(loadError instanceof Error ? loadError.message : 'ServSync could not load Marketing Directions.');
+    } finally {
+      setDirectionsLoading(false);
+    }
+  }, [directionsAdapter]);
+
+  useEffect(() => { void loadDirections(); }, [loadDirections]);
+
   const withPlanningSave = async (operation: () => Promise<unknown>) => {
     setPlanningSaving(true);
     try {
@@ -389,6 +415,16 @@ function AuthorizedInternalMarketingWorkspace({
       await loadPlanning(false);
     } finally {
       setPlanningSaving(false);
+    }
+  };
+
+  const withDirectionSave = async (operation: () => Promise<unknown>) => {
+    setDirectionsSaving(true);
+    try {
+      await operation();
+      await loadDirections(false);
+    } finally {
+      setDirectionsSaving(false);
     }
   };
 
@@ -448,6 +484,15 @@ function AuthorizedInternalMarketingWorkspace({
     onCreatePlan: (input: MarketingPlanCreateInput) => withPlanningSave(() => planningAdapter.createPlan(input)),
     onUpdatePlan: (plan: MarketingPlan) => withPlanningSave(() => planningAdapter.updatePlan(plan)),
     onAcceptPlan: (plan: MarketingPlan) => withPlanningSave(() => planningAdapter.acceptPlan(plan)),
+    directions: {
+      state: directionsState,
+      loading: directionsLoading,
+      error: directionsError,
+      saving: directionsSaving,
+      onReload: () => loadDirections(true),
+      onUpdate: (direction: MarketingDirection) => withDirectionSave(() => directionsAdapter.update(direction)),
+      onApprove: (direction: MarketingDirection) => withDirectionSave(() => directionsAdapter.approve(direction)),
+    },
   };
 
   return <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} planning={planning} />;
@@ -460,7 +505,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;
