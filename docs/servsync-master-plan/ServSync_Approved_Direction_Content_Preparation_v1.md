@@ -49,11 +49,10 @@ Codex preparation must read the approved Directions, accepted Plan/Profile, Trut
 
 Migration `servsync-approved-direction-content-preparation.sql` has SHA-256 `884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331`.
 
-The exact migration is applied and rollback-only validated in Sandbox `zpzdkoaubyjtsomccxya` on 2026-08-11. Sandbox retains zero preparation packages, content rows, status events, Directions, and lineage rows. Demo and Production remain pending and must receive the exact migration before the client changes can merge. No real six-draft Production package was created during implementation.
+The exact migration is applied and rollback-only validated in Sandbox `zpzdkoaubyjtsomccxya`, Demo `bdytwgejqnlblhrnqxkp` (`2026-08-11T14:38:11Z` through `14:40:23Z`), and Production `uqgtheclhxqlnjpfmheq` (`14:41:28Z` through `14:43:07Z`). Demo passed before Production was touched. Catalog, ownership, forced RLS, direct-table denial, fixed-path authenticated-only RPC grants, six-Direction atomic preparation, replay/conflict, stale/cross-workspace/role denial, PostgREST exposure, historical preservation, and rollback-only cleanup passed. Demo remains empty; Production retains its exact two packages, ten content records, sixteen status events, and six approved Directions with no first-class lineage rows. No real six-draft Production package was created during rollout.
 
 ## Deferred
 
-- Demo-first and Production-second schema rollout and merge;
 - separately authorized first real six-draft Production preparation;
 - alternate or additional treatments of one Direction;
 - runtime AI or paid provider generation;

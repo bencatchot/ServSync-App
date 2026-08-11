@@ -61,11 +61,10 @@ Migration `servsync-accepted-plan-marketing-directions.sql` has SHA-256 `1652085
 
 The exact migration is applied and validated in Sandbox, Demo (`2026-08-11T03:58:19Z` through `04:03:11Z`), and Production (`04:05:19Z` through `04:05:29Z`). Demo passed before Production was touched. Both targets matched the reviewed ownership, forced-RLS, policy-free, direct-table-denial, fixed-path RPC, and authenticated-only grant contract. Rollback-only six-item preparation, exact snapshots, atomicity, replay/conflict handling, draft revision, stale-write rejection, terminal approval, malformed/stale/draft/cross-workspace denial, role denial, and zero downstream content changes passed with no residue.
 
-The owner subsequently prepared, refined, and approved all six first-class Directions for accepted Plan `4e390d96-03f0-4342-9a13-3e8119383024`. Their approval authorizes development of those exact stories, not publication. Slice 6 adds a Sandbox-only, prospective approved-Direction-to-draft package foundation; Demo/Production rollout and the first real six-draft preparation remain separate gates.
+The owner subsequently prepared, refined, and approved all six first-class Directions for accepted Plan `4e390d96-03f0-4342-9a13-3e8119383024`. Their approval authorizes development of those exact stories, not publication. Slice 6 adds the approved-Direction-to-draft package foundation in Sandbox, Demo, and Production. The first real six-draft preparation remains a separate operational gate.
 
 ## Deferred
 
-- Demo/Production rollout of approved-Direction content preparation;
 - separately authorized creation of the first real six-draft package;
 - runtime AI or provider-backed preparation;
 - automatic submission or approval;

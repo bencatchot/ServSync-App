@@ -171,7 +171,7 @@ npm run marketing:ingest-approved-direction-package -- path/to/package.json
 8. Verify one package, one draft for every approved Direction, exact Plan/Direction lineage, `approved_direction` strategic source, `codex_assisted` generator source, and only initial `draft` status events.
 9. Open Marketing -> Content and review the owner-readable Direction lineage. The existing human submit/approve workflow begins only after preparation.
 
-The migration is currently applied only in Sandbox. Do not run this operator against Demo or Production until their exact schema rollout is separately authorized. Do not create the real Production six-draft package as an implementation test.
+The migration is applied in Sandbox, Demo, and Production. Operator execution remains a separate target-specific authorization: schema availability alone never authorizes creating a real package. Do not create the real Production six-draft package as a rollout or implementation test.
 
 ## Package Contract
 

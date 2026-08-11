@@ -390,12 +390,12 @@
           "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-11 before 13:28:15Z and validated through 13:34:38Z. Catalog, postgres ownership, forced-RLS/policy-free storage, zero browser table grants, fixed-path authenticated-only RPC grants, six approved Directions to six drafts, exact lineage, role preservation, atomicity, replay/conflict behavior, stale/draft/cross-workspace and role denial, immutable provenance, historical compatibility, and rollback-only cleanup passed. Sandbox retains zero packages, content rows, status events, Directions, and lineage rows."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Production rollout is not authorized in Slice 6 implementation. Apply the exact reviewed migration only through a separate migration-first rollout before merging the client; do not create the real six-draft package as rollout validation."
+          "status": "Applied",
+          "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-11 from 14:41:28Z through 14:41:29Z after Demo passed. Catalog, postgres ownership, forced-RLS/policy-free storage, zero direct-table grants, exact fixed-path RPC grants, rollback-only six-Direction ingestion/replay/conflict/stale/cross-workspace/role validation, PostgREST exposure, and zero-residue checks passed through 14:43:07Z. Production retains two historical packages, ten content records (three approved and seven draft), sixteen status events, six approved Directions with fourteen revisions, and exact Marketing/unrelated-business fingerprints. No real approved-Direction package or content was created."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo rollout is not authorized in Slice 6 implementation. Demo must receive and validate the exact reviewed migration before Production and before merging the client."
+          "status": "Applied",
+          "reason": "Exact SHA-256 884ef1f93871a293291c3133c64754553c03aa88a518b3ca9a14887505873331 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 14:38:11Z through 14:38:13Z. Catalog, postgres ownership, forced-RLS/policy-free storage, zero direct-table grants, exact fixed-path RPC grants, rollback-only six-Direction ingestion/replay/conflict/stale/cross-workspace/role validation, PostgREST exposure, and zero-residue checks passed through 14:40:23Z. Demo retains one internal workspace/profile/revision and zero Plans, Directions/revisions, packages, content records, status events, or lineage rows."
         }
       }
     }
