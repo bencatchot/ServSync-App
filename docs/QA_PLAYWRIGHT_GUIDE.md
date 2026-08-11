@@ -262,6 +262,24 @@ npx playwright test tests/e2e/invoice-notification.spec.ts
 npx playwright test tests/e2e/standalone-calendar-event.spec.ts
 ```
 
+## Contractor Workflow Lifecycle Audit
+
+Use the focused Sandbox-only lifecycle command deliberately:
+
+```bash
+npm run qa:e2e:contractor-workflow
+```
+
+This runs real browser workflows against persisted Sandbox records and removes its exact tagged fixtures after the run:
+
+- connected Customer request -> Estimate -> authenticated acceptance -> Job -> completed work -> sent Invoice -> full offline payment -> Paid PDF -> Home History -> reminder;
+- connected Customer request -> Estimate -> acceptance -> Job -> sent Invoice -> partial external ACH payment -> persisted Partially Paid -> exact final cash payment -> Paid;
+- contractor-created not-connected Customer -> Draft-first Estimate -> secure request-free acceptance -> Job -> completed work -> secure request-free Invoice -> full cash payment -> durable Paid state.
+
+The local-customer journey uses the real request-free server handlers and the durable Sandbox payment-state server boundary. It proves recipient document access, exact Estimate acceptance, payment persistence, direct ledger correspondence, browser reopen, immutable payment history, and Paid PDF without treating mocked UI state as lifecycle evidence. Paid records are currently reached through the Jobs overview `Invoices` tile and its Paid status filter even though the tile describes itself as `Open invoice records`; tests follow that real route while the wording/discoverability inconsistency remains tracked.
+
+These tests require the approved Sandbox Supabase identity, contractor/homeowner test credentials, the server-only Sandbox validation credential as `TEST_SUPABASE_SERVICE_ROLE_KEY`, the three Draft-first UI gates, and a Supabase CLI link to the exact Sandbox project. The alias is injected into the real request-free handler only for the duration of each server request; the connected lifecycle retains its guard against a globally configured `SUPABASE_SERVICE_ROLE_KEY`. They fail closed on project mismatch and must never run against Production or Demo business data.
+
 ## Full Playwright Suite
 
 Use:
@@ -324,29 +342,30 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - contractor standalone calendar event create/edit/delete, when run directly
 - connected-homeowner invoice notification flow, when run directly
 - unauthenticated production public route smoke through `tests/e2e/production-public-smoke.spec.ts`
-- full homeowner request -> contractor estimate -> homeowner approval -> job -> invoice -> Home History -> reminder flow, when run directly
+- full connected-Customer request -> Estimate -> authenticated acceptance -> Job -> Invoice -> offline full/partial payment -> Paid -> Home History -> reminder flows, when run deliberately
+- not-connected Customer secure Estimate acceptance -> Job -> secure Invoice recipient view -> durable offline Paid flow, when run deliberately
 - RLS/cross-user access-boundary checks, when run directly
 
 ## Current Not Covered Yet
 
-- homeowner estimate accept/decline E2E path
+- secure guest Request changes/Decline within the full contractor lifecycle (focused guest-response coverage exists separately)
 - Home Reminder create/complete/dismiss E2E path
 - RLS/cross-user browser-level negative tests beyond direct Supabase client checks
 - mobile full workflow automation
 - production smoke accounts
-- payment/Stripe flows
+- provider-backed Stripe Checkout/webhook lifecycle in this browser suite (offline full/partial payment is covered)
+- a clearly labeled closed/paid financial destination (the current `Open invoice records` tile leads to the all-status list)
 - QuickBooks or external accounting integrations
 
 ## Recommended Next Test Additions
 
-1. Add a sandbox-only full core-loop E2E test:
-   Homeowner Request -> Contractor Estimate -> Homeowner Approval -> Job -> Completion -> Invoice -> Home History -> Reminder.
-
-2. Add a focused invoice-to-Home-History E2E test:
+1. Add a focused invoice-to-Home-History idempotency test:
    file eligible invoice once, confirm no duplicate after repeat action, verify Home History entry.
 
-3. Add a Home Reminders E2E test:
+2. Add a Home Reminders E2E test:
    create manual reminder, complete it, dismiss another, and confirm contractor UI does not expose homeowner reminder management.
+
+3. Add a closed-financial discoverability regression after the product exposes a stable route to paid local-customer Invoices.
 
 4. Add RLS/cross-user checks:
    use secondary homeowner/contractor accounts to confirm unrelated records are not visible.
@@ -359,6 +378,7 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - Use clearly labeled records such as `E2E Test Customer`, `E2E Test Job`, `E2E Test Estimate`, and `PR Preview Test`.
 - Prefer app UI and existing workflows over direct SQL.
 - Use direct sandbox SQL only after separate approval.
+- Lifecycle-audit specs must remove only their exact tagged records and verify zero residue; interrupted runs require an explicit exact-prefix cleanup before rerunning.
 - Do not create fake/demo production data.
 - Do not run mutating tests against real beta user data.
 

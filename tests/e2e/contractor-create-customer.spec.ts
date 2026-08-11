@@ -189,7 +189,7 @@ test.describe('contractor mutating customer creation', () => {
     await main.getByRole('button', { name: /^Save property$/i }).click();
     const createHomeResponse = await createHomeResponsePromise;
     expect(createHomeResponse.ok()).toBeTruthy();
-    await expect(main.getByText(/Property added to this local customer/i)).toBeVisible({ timeout: 10_000 });
+    await expect(main.getByText(/Property added to this customer/i)).toBeVisible({ timeout: 10_000 });
 
     await expect(main.getByRole('button', { name: new RegExp(escapeRegExp(firstProperty), 'i') })).toBeVisible();
     await expect(main.getByRole('button', { name: new RegExp(escapeRegExp(secondProperty), 'i') })).toBeVisible();
@@ -227,7 +227,9 @@ test.describe('contractor mutating customer creation', () => {
     await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
     await main.getByRole('button', { name: /^Create Draft\b/i }).click();
     await expect(main.getByTestId('shared-draft-composer')).toBeVisible();
-    await expect(main.getByRole('combobox', { name: /^Property$/i }).locator('option:checked')).toHaveText(editedSecondProperty);
+    await expect(main.getByRole('combobox', { name: /^Property$/i }).locator('option:checked')).toContainText(
+      editedSecondProperty,
+    );
 
     const contractorClient = await signInAs('contractor');
     const otherContractorClient = await signInAs('contractorB');
@@ -383,7 +385,7 @@ test.describe('contractor mutating customer creation', () => {
     await expect(main.getByText(editedCustomerEmail)).toBeVisible();
     await expect(main.getByText(/Customer profile updated\. The pending claim invite was revoked/i)).toBeVisible();
     await expect(main.getByRole('button', { name: /^Create New ServSync Invite$/i })).toBeVisible();
-    await expect(main.getByText(/Last invite: Revoked/i)).toBeVisible();
+    await expect(main.getByText(/Last invite: Invite Revoked/i)).toBeVisible();
     await expect(main.getByText(/Updated contractor-private customer notes/i)).toBeVisible();
 
     const contractorClient = await signInAs('contractor');

@@ -35781,8 +35781,8 @@ function ContractorDashboard({
                         <Field label="Home notes"><textarea className={`${inputClass()} min-h-[80px] resize-y`} {...writingAssistProps} value={localContactDraft.home_notes} onChange={e => setLocalContactDraft(d => ({ ...d, home_notes: e.target.value }))} placeholder="Home details useful for this work." /></Field>
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
-                        <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: false })} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
-                          {savingInspection ? 'Saving...' : 'Save new customer'}
+                        <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: false })} disabled={savingInspection || !contractorDraft.id || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
+                          {savingInspection ? 'Saving...' : !contractorDraft.id ? 'Loading workspace...' : 'Save new customer'}
                         </button>
                         <button type="button" onClick={() => { setShowLocalContactForm(false); setHomeownerMobileDetailOpen(false); }} className={buttonClass('secondary')}>Cancel</button>
                       </div>
@@ -39193,10 +39193,10 @@ function ContractorDashboard({
                               <button
                                 type="button"
                                 onClick={() => void saveEstimateCustomerAndContinue()}
-                                disabled={savingInspection}
+                                disabled={savingInspection || !contractorDraft.id}
                                 className={buttonClass('primary')}
                               >
-                                {savingInspection ? 'Saving...' : 'Save customer and continue'}
+                                {savingInspection ? 'Saving...' : !contractorDraft.id ? 'Loading workspace...' : 'Save customer and continue'}
                               </button>
                               <button type="button" onClick={() => setEstimateCustomerCreateOpen(false)} className={buttonClass('secondary')}>
                                 Cancel
@@ -40758,8 +40758,8 @@ function ContractorDashboard({
                       </Field>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => void createLocalContact()} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
-                        {savingInspection ? 'Saving...' : 'Save new customer'}
+                      <button type="button" onClick={() => void createLocalContact()} disabled={savingInspection || !contractorDraft.id || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
+                        {savingInspection ? 'Saving...' : !contractorDraft.id ? 'Loading workspace...' : 'Save new customer'}
                       </button>
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
                     </div>
@@ -42177,8 +42177,8 @@ function ContractorDashboard({
                       </Field>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: true })} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
-                        {savingInspection ? 'Saving...' : 'Save and use customer'}
+                      <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: true })} disabled={savingInspection || !contractorDraft.id || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
+                        {savingInspection ? 'Saving...' : !contractorDraft.id ? 'Loading workspace...' : 'Save and use customer'}
                       </button>
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
                     </div>

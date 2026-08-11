@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/contractor-workflow-e2e-audit-v1`
+- Starting main SHA: `f2aa415a1ea344228b191be4760b9044d2981833`
+- Files changed: contractor Customer readiness controls; local Estimate/Invoice secure-delivery panels; connected/not-connected lifecycle Playwright coverage; package QA command; QA guide and audit evidence; master plan; FB-035 backlog; changelog.
+- Summary of change: Completes the first actual-contractor Sandbox lifecycle audit across connected Customer full/partial payment, contractor-created not-connected Customer secure Estimate/Invoice delivery, duplicate-payment prevention, and the separately owned draft-Invoice payment scenario. Local Customer creation now waits for its authoritative contractor workspace identity instead of exposing an action that cannot issue its RPC. Secure local Estimate and Invoice one-time-link dialogs now defer parent refresh until close so successful issuance cannot discard the only visible bearer value before capture.
+- Validation: Real browser/persisted Sandbox coverage proved connected request -> Estimate -> authenticated acceptance -> Job -> Invoice -> full check payment -> Paid PDF -> Home History/reminder; $40 external ACH partial -> reload -> $85 cash final -> Paid with two immutable rows; and not-connected Customer -> secure Estimate acceptance -> Job -> secure Invoice recipient view -> full cash payment -> browser-reopened Paid history/PDF. Exact tagged fixtures were removed. TypeScript, Production build, focused delivery/customer regressions, parity unit tests, rollout-ledger validation, scope/sensitive-value checks, and exact-head review are recorded in the PR evidence. The live environment parity command remained fail-closed because this task environment did not expose the separately required `SUPABASE_ACCESS_TOKEN`.
+- Known risks and follow-up: Paid local-customer Invoices reopen correctly through the Jobs Invoice list and Paid filter, but the only overview entry is labeled `Open invoice records`, and the Customer financial summary does not surface the paid Invoice. FB-035 retains that bounded discoverability/consistency follow-up. Draft Invoice Mark Paid remains owned by draft PR #417 and its unapplied migration; no overlapping implementation or rollout occurred.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the closed-financial discoverability gap and PR #417 boundary found by the real lifecycle audit.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Replaces the obsolete statement that core-loop E2E remains entirely future work with the exact coverage and remaining gaps.
+
 - Branch: `codex/stripe-sandbox-webhook-reliability`
 - Starting main SHA: `6c4bb1f081b822ce50e395a99c5db4366edb7a67`
 - Files changed: Stripe Connect architecture/runbook, FB-014 backlog status, master plan, and changelog only.
