@@ -851,6 +851,13 @@ export interface ContractorPriceBookItem {
   archived_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Manager-only projection from the private cost RPC; never stored on the base Price Book row. */
+  internal_cost_cents?: number | null;
+}
+
+export interface ContractorPriceBookInternalCost {
+  price_book_item_id: string;
+  internal_cost_cents: number;
 }
 
 export type ServiceAgreementTemplateStatus = 'active' | 'archived';

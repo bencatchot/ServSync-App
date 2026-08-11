@@ -50,6 +50,7 @@
     "test:marketing-directions": "bash scripts/validation/validate-accepted-plan-marketing-directions.sh && node --test tests/marketing/marketing-direction-preparation-contract.test.mjs",
     "test:approved-direction-content": "bash scripts/validation/validate-approved-direction-content-preparation.sh && node --test tests/marketing/approved-direction-package-contract.test.mjs",
     "test:price-book-import-rollback": "bash scripts/validation/validate-price-book-import-rollback.sh",
+    "test:price-book-cost-margin": "bash scripts/validation/validate-price-book-cost-margin.sh",
     "marketing:ingest-codex-package": "node scripts/marketing/ingest-codex-marketing-package.mjs",
     "marketing:validate-approved-direction-package": "node scripts/marketing/approved-direction-package-contract.mjs",
     "marketing:ingest-approved-direction-package": "node scripts/marketing/ingest-approved-direction-marketing-package.mjs",

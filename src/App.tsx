@@ -420,6 +420,7 @@ import type {
   ContractorConnectedHomeowner,
   ContractorConnectedHomeownerHome,
   ContractorAccountStatus,
+  ContractorPriceBookInternalCost,
   ContractorPriceBookItem,
   ContractorSavedEstimateCharge,
   ConnectionAlertLevel,
@@ -1017,6 +1018,7 @@ type ContractorPriceBookItemDraft = {
   line_type: EstimateLineType;
   unit: string;
   default_unit_price: string;
+  internal_cost: string;
   taxable: boolean;
   labor_hours: string;
   sku: string;
@@ -1704,6 +1706,7 @@ function createBlankContractorPriceBookItemDraft(overrides: Partial<ContractorPr
     line_type: 'material',
     unit: 'each',
     default_unit_price: '',
+    internal_cost: '',
     taxable: true,
     labor_hours: '',
     sku: '',
@@ -1727,6 +1730,11 @@ function contractorPriceBookItemDraftFromRecord(item: ContractorPriceBookItem): 
       : item.default_unit_price_cents === 0
         ? '0.00'
       : centsToDollars(item.default_unit_price_cents),
+    internal_cost: item.internal_cost_cents === null || item.internal_cost_cents === undefined
+      ? ''
+      : item.internal_cost_cents === 0
+        ? '0.00'
+        : centsToDollars(item.internal_cost_cents),
     taxable: item.taxable,
     labor_hours: item.labor_hours === null || item.labor_hours === undefined ? '' : String(Number(item.labor_hours)),
     sku: item.sku || '',
@@ -22607,7 +22615,8 @@ function ContractorDashboard({
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
         const loadedCanManageCustomers = canManageContractorCustomersUi(loadedContractor, loadedTeamAccess, profile.id);
-        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localHistoricalContactsRes, archivedLocalContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
+        const loadedCanManageEstimateSettings = contractorPriceBookAccess(loadedContractor, loadedTeamAccess, profile.id).canManage;
+        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localHistoricalContactsRes, archivedLocalContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes, priceBookCostsRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -22673,6 +22682,9 @@ function ContractorDashboard({
             .eq('contractor_id', loadedContractor.id)
             .order('active', { ascending: false })
             .order('title', { ascending: true }),
+          loadedCanManageEstimateSettings
+            ? supabase.rpc('servsync_list_price_book_internal_costs')
+            : Promise.resolve({ data: [], error: null }),
         ]);
         if (!tplRes.error) setInspectionTemplates((tplRes.data || []) as InspectionTemplate[]);
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
@@ -22726,14 +22738,23 @@ function ContractorDashboard({
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
         if (!savedEstimateChargesRes.error) setSavedEstimateCharges((savedEstimateChargesRes.data || []) as ContractorSavedEstimateCharge[]);
-        if (!priceBookItemsRes.error) {
-          setContractorPriceBookItems((priceBookItemsRes.data || []) as ContractorPriceBookItem[]);
+        if (!priceBookItemsRes.error && !priceBookCostsRes.error) {
+          const costsByItemId = new Map(
+            ((priceBookCostsRes.data || []) as unknown as ContractorPriceBookInternalCost[])
+              .map(cost => [cost.price_book_item_id, cost.internal_cost_cents]),
+          );
+          setContractorPriceBookItems(((priceBookItemsRes.data || []) as ContractorPriceBookItem[]).map(item => ({
+            ...item,
+            ...(loadedCanManageEstimateSettings
+              ? { internal_cost_cents: costsByItemId.get(item.id) ?? null }
+              : {}),
+          })));
           setContractorPriceBookLoadState('ready');
           setContractorPriceBookLoadError('');
         } else {
           setContractorPriceBookItems([]);
           setContractorPriceBookLoadState('error');
-          setContractorPriceBookLoadError(readableError(priceBookItemsRes.error, 'Try loading the contractor workspace again.'));
+          setContractorPriceBookLoadError(readableError(priceBookItemsRes.error ?? priceBookCostsRes.error, 'Try loading the contractor workspace again.'));
         }
         if (userCanManageServiceAgreementUi(loadedContractor, loadedTeamAccess, profile.id)) {
           const [serviceAgreementTemplatesRes, serviceAgreementOffersRes] = await Promise.all([
@@ -25589,6 +25610,8 @@ function ContractorDashboard({
     const title = contractorPriceBookDraft.title.trim();
     const priceInput = contractorPriceBookDraft.default_unit_price.replace(/[$,]/g, '').trim();
     const priceValue = priceInput === '' ? null : Number(priceInput);
+    const costInput = contractorPriceBookDraft.internal_cost.replace(/[$,]/g, '').trim();
+    const costValue = costInput === '' ? null : Number(costInput);
     const laborHoursInput = contractorPriceBookDraft.labor_hours.trim();
     const laborHoursValue = laborHoursInput === '' ? null : Number(laborHoursInput);
     if (!title) {
@@ -25597,6 +25620,10 @@ function ContractorDashboard({
     }
     if (priceValue !== null && (!Number.isFinite(priceValue) || priceValue < 0)) {
       setError('Enter a default price of zero or more, or leave it blank for Price Required.');
+      return;
+    }
+    if (costValue !== null && (!Number.isFinite(costValue) || costValue < 0)) {
+      setError('Enter an internal cost of zero or more, or leave it blank when cost is not set.');
       return;
     }
     if (laborHoursValue !== null && (!Number.isFinite(laborHoursValue) || laborHoursValue < 0)) {
@@ -25618,6 +25645,7 @@ function ContractorDashboard({
       line_type: normalizeEstimateLineType(contractorPriceBookDraft.line_type),
       unit: contractorPriceBookDraft.unit.trim() || null,
       default_unit_price_cents: priceValue === null ? null : dollarsToCents(contractorPriceBookDraft.default_unit_price),
+      internal_cost_cents: costValue === null ? null : dollarsToCents(contractorPriceBookDraft.internal_cost),
       taxable: contractorPriceBookDraft.taxable,
       labor_hours: laborHoursValue === null ? null : Number(laborHoursValue.toFixed(2)),
       sku: contractorPriceBookDraft.sku.trim() || null,
@@ -25626,31 +25654,23 @@ function ContractorDashboard({
       archived_at: active ? null : new Date().toISOString(),
     };
     try {
-      const mutation = editingContractorPriceBookItemId
-        ? supabase
-            .from('contractor_price_book_items')
-            .update({
-              title: payload.title,
-              customer_description: payload.customer_description,
-              internal_notes: payload.internal_notes,
-              trade: payload.trade,
-              category: payload.category,
-              subcategory: payload.subcategory,
-              line_type: payload.line_type,
-              unit: payload.unit,
-              default_unit_price_cents: payload.default_unit_price_cents,
-              taxable: payload.taxable,
-              labor_hours: payload.labor_hours,
-              sku: payload.sku,
-              source: payload.source,
-              active: payload.active,
-              archived_at: payload.archived_at,
-            })
-            .eq('id', editingContractorPriceBookItemId)
-        : supabase
-            .from('contractor_price_book_items')
-            .insert(payload);
-      const { error: saveError } = await mutation;
+      const { error: saveError } = await supabase.rpc('servsync_save_price_book_item_with_cost', {
+        p_item_id: editingContractorPriceBookItemId,
+        p_title: payload.title,
+        p_customer_description: payload.customer_description,
+        p_internal_notes: payload.internal_notes,
+        p_trade: payload.trade,
+        p_category: payload.category,
+        p_subcategory: payload.subcategory,
+        p_line_type: payload.line_type,
+        p_unit: payload.unit,
+        p_default_unit_price_cents: payload.default_unit_price_cents,
+        p_taxable: payload.taxable,
+        p_labor_hours: payload.labor_hours,
+        p_sku: payload.sku,
+        p_active: payload.active,
+        p_internal_cost_cents: payload.internal_cost_cents,
+      });
       if (saveError) throw saveError;
       setNotice(editingContractorPriceBookItemId ? 'Price Book item updated.' : 'Price Book item created.');
       resetContractorPriceBookDraft();

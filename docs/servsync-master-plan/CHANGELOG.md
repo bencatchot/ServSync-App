@@ -6,6 +6,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/fb024-price-book-cost-margin-v1`
+- Starting main SHA: `4d8d348030a4ba164e4c481e3e0a4c97bf45c001`
+- Files changed: additive private Price Book cost migration; manager-only Price Book load/save and cost/margin UI; derived margin helpers; disposable PostgreSQL and authenticated Sandbox tests; backend rollout ledger; master plan; FB-024 backlog; completed-features ledger; changelog.
+- Summary of change: Completes FB-024 Price Book Cost and Margin Foundation v1. Owner/Admin/Office can leave cost unset, persist explicit zero, change or clear cost, and view gross profit and gross margin beside the existing selling price. Cost is integer cents in a private companion table rather than the broadly readable Price Book row. Negative margin is allowed and presented neutrally; zero selling price never divides by zero. Field Technician, Viewer, inactive, homeowner, direct-table, and cross-tenant cost access fails closed.
+- Privacy and import boundary: Internal cost and derived values are not added to Draft, Estimate, Invoice, PDF, Home History, guest, request-free, notification, or customer response schemas. The shared Price Book-to-Draft mapper remains allowlisted and cost-free. Generic CSV imports do not map cost in v1, so repeat import and guarded rollback cannot erase or rewrite the companion value.
+- Environment rollout: Exact migration `servsync-price-book-cost-margin-foundation.sql` SHA-256 `656d360037fa8a47f34f58bf972221b8d4d7560af502d9c851e7c489b4252a66` was applied to Sandbox from `2026-08-11T21:49:31Z` through `21:49:32Z`, Demo from `21:54:02Z` through `21:54:03Z`, and Production from `21:54:30Z` through `21:54:31Z`. Sandbox returned to its exact 41-item fingerprint and zero cost rows after fixture cleanup. Demo and Production retained zero Price Book/cost/import/rollback records; Production Draft, Estimate, Invoice, line, import, rollback, and mapping counts and SHA-256 fingerprints remained exact. No Production or Demo cost value or validation fixture was created.
+- Validation: PostgreSQL 16 clean dependency application, repeat-install rejection, ownership/RLS/ACL/RPC/search-path, constraints, role/tenant, create/missing/zero/negative-margin/zero-price/update/clear, import preservation, rollback compatibility, and customer-schema isolation passed. Authenticated Sandbox desktop/mobile UI and RPC validation passed with exact cleanup. Focused Price Book, Draft picker, Estimate/Invoice PDF, guest/request-free delivery, TypeScript, Production build, parity unit, JSON/Bash, sensitive-value, scope, and diff checks are merge gates. One existing Sandbox-Stripe-only request-free Invoice assertion remains unavailable under the local Stripe-disabled gate; the other 132 tests in that regression package passed.
+- Known risks and follow-up: Cost import, job costing, actual-versus-estimated cost, Estimate/Invoice cost snapshots, assemblies, accounting/export, markup automation, margin targets/recommendations, and profitability reporting remain deliberately out of scope. Production had zero Price Book items, so no real Production cost workflow was exercised.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records Cost and Margin Foundation v1 as complete while retaining broader Price Book and profitability maturity.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the private companion-storage model, role/privacy boundary, derived-value semantics, and exact environment rollout.
+
 - Branch: `codex/fb024-price-book-import-rollback-v1`
 - Starting main SHA: `c6630b7c0dad538cbcd011ac29df78a25ec9d271`
 - Files changed: additive guarded Price Book rollback migration; rollback-aware import history UI/types/RPC adapter; disposable PostgreSQL and authenticated Sandbox tests; backend rollout ledger; master plan; FB-024 backlog; completed-features ledger; changelog.
