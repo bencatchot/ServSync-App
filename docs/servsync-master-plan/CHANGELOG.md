@@ -4,6 +4,49 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-11
+
+- Branch: `codex/marketing-direction-foundation-v1`
+- Starting main SHA: `bf8ea23d4deb488447fe4d396fd4a205f71b64da`
+- Files changed:
+  - `servsync-accepted-plan-marketing-directions.sql`
+  - `src/features/marketing/marketingDirections.ts`
+  - `src/features/marketing/MarketingDirectionsWorkspace.tsx`
+  - `src/features/marketing/MarketingPlanningWorkspace.tsx`
+  - `src/features/marketing/MarketingWorkspace.tsx`
+  - `config/marketing/codex-marketing-directions.v1.schema.json`
+  - `scripts/marketing/marketing-direction-preparation-contract.mjs`
+  - `scripts/marketing/prepare-codex-marketing-directions.mjs`
+  - `scripts/validation/validate-accepted-plan-marketing-directions.sh`
+  - `tests/fixtures/accepted-plan-marketing-directions-v1.json`
+  - `tests/marketing/marketing-direction-preparation-contract.test.mjs`
+  - `tests/sql/accepted-plan-marketing-directions-validation.sql`
+  - `tests/sql/accepted-plan-marketing-directions-sandbox-validation.sql`
+  - `tests/e2e/internal-marketing-directions.spec.ts`
+  - `tests/e2e/internal-marketing-content-approval.spec.ts`
+  - `tests/e2e/internal-marketing-planning.spec.ts`
+  - `tests/e2e/internal-marketing-workspace.spec.ts`
+  - `package.json`
+  - `config/backend-environment-parity.json`
+  - `config/backend-environment-rollouts.json`
+  - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Accepted_Plan_Marketing_Directions_v1.md`
+  - `docs/servsync-master-plan/ServSync_Business_Marketing_Profile_Planning_v1.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Slice 5 adds a durable provider-neutral Direction layer between an exact accepted Marketing Plan and future content preparation. One accepted Plan item maps to at most one draft Direction, complete-Plan preparation is atomic and replay-safe, edits use optimistic revisions, approval is terminal and immutable, and approval creates no package or content.
+- Architecture and security: The private tables are `postgres`-owned, forced-RLS, policy-free, and unavailable through direct browser or service-role table privileges. Four fixed-path `SECURITY DEFINER` RPCs enforce platform-admin-only list, prepare, edit, and approve operations; server-side Plan/workspace/item lineage, accepted revision, mode, provenance, Truth Pack, bounded content, claim safety, idempotency, and stale-write checks fail closed. The reusable persistence shape retains workspace lineage without exposing contractor or homeowner runtime access.
+- Environment rollout: Exact migration SHA-256 `165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93` was applied to Sandbox `zpzdkoaubyjtsomccxya` on 2026-08-11 from approximately `03:41:31Z` through `03:41:37Z`, Demo `bdytwgejqnlblhrnqxkp` from `03:58:19Z` through `03:58:21Z`, and Production `uqgtheclhxqlnjpfmheq` from `04:05:19Z` through `04:05:20Z`. Demo passed before Production was touched. Catalog/security and rollback-only six-item preparation, exact snapshot lineage, replay/conflict, draft/stale revision, terminal approval, malformed/stale/draft/cross-workspace denial, platform-admin/contractor/homeowner/anonymous boundaries, and zero downstream content effects passed with no residue. Production retained zero Directions/revisions plus exact accepted Plan/revision, Profile/revision, historical plan/revision, package/content/status-event, and sampled unrelated-business fingerprints.
+- Tests/checks run: Strict TypeScript; Production build; focused Marketing Directions/planning/content/workspace Playwright at desktop and `390x844`; local PostgreSQL 16 migration, role/security, replay, concurrency, terminal-state, repeat-application, and residue validation; live Sandbox, Demo, and Production catalog/security plus rollback-only six-item validation; package-contract unit tests; backend parity and rollout-ledger validation; JSON and Bash parsing; sensitive-value and scope scans; and `git diff --check`.
+- Known risks and follow-up: Direction quality remains a human editorial responsibility. Production's accepted six-item planner-v3 Plan is unchanged and still has no first-class Direction rows; the first real preparation requires separate operational authorization. Approved-Direction-to-package creation, contractor/homeowner runtime, provider generation, publishing, scheduling, campaigns, outreach, analytics, and billing remain pending.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 records the all-environment Slice 5 foundation while keeping real Direction preparation and execution capabilities as explicit next gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the accepted-Plan-to-Direction architecture, human approval boundary, and environment status without implying content creation authority.
+
 ## 2026-08-10
 
 - Branch: `codex/marketing-planner-v3-operational-hardening`

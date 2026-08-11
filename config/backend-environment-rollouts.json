@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-10",
+  "updatedOn": "2026-08-11",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -360,6 +360,24 @@
         "demo": {
           "status": "Applied",
           "reason": "Exact SHA-256 c7360421519d5bf494a874aa5ec257a428b204e50d624d0f1139d0a1959ed81b was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-10 from 22:07:54Z through 22:08:02Z. The additive postgres-owned fixed-path SECURITY DEFINER v3 RPC, exact authenticated-only grant, v1/v2 preservation, version/mode enforcement, transaction-local platform-admin creation/replay, contractor/homeowner/anonymous denial, and rollback-only cleanup passed. Demo retained one internal workspace, profile, and profile revision with zero plans, plan revisions, packages, content records, status events, or validation residue."
+        }
+      }
+    },
+    {
+      "id": "accepted-plan-marketing-directions-v1",
+      "artifact": "servsync-accepted-plan-marketing-directions.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-11 from approximately 03:41:31Z through 03:41:37Z. Catalog, postgres ownership, forced-RLS/policy-free private tables, fixed-path authenticated-only RPC grants, accepted-Plan-only all-or-nothing preparation, exact Plan mode/provenance binding, replay, draft edit, stale-write rejection, terminal approval, direct-table denial, rollback-only cleanup, and existing Marketing data preservation passed. Sandbox retains zero Plans, Direction rows, Direction revisions, packages, content records, and status events after validation."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-11 from 04:05:19Z through 04:05:20Z after Demo passed. Catalog/security and rollback-only six-item preparation, replay/conflict, draft/stale revision, terminal approval, malformed/stale/draft/cross-workspace denial, role denial, and zero-residue validation passed through 04:05:29Z. Production retains zero Directions/revisions; accepted Plan 4e390d96-03f0-4342-9a13-3e8119383024, Profile/revisions, historical plans/revisions, two packages, ten content records (three approved and seven draft), sixteen status events, and sampled unrelated-business fingerprints remain exact."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 03:58:19Z through 03:58:21Z. Catalog/security and rollback-only six-item preparation, replay/conflict, draft/stale revision, terminal approval, malformed/stale/draft/cross-workspace denial, role denial, and zero-residue validation passed through 04:03:11Z. Demo retains one internal workspace/profile/revision and zero Plans, Directions/revisions, packages, content records, or status events."
         }
       }
     }

@@ -97,6 +97,7 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
         if (behavior === 'pending') return new Promise(() => undefined);
         if (behavior === 'error') return { data: null, error: { message: 'database detail must stay private' } };
         if (name === 'servsync_list_internal_marketing_content') return { data: state.map(row => ({ ...row })), error: null };
+        if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
         if (name === 'servsync_create_internal_marketing_content') {
           const id = `40000000-0000-4000-8000-${String(nextId++).padStart(12, '0')}`;
           state.unshift({

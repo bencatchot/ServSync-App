@@ -82,7 +82,7 @@ Workspace, actor, recent-content context, and current profile version are derive
 
 ## Internal UX
 
-Marketing -> Settings now contains a compact Profile/Plan workspace. A platform administrator can inspect and edit the ServSync profile, request a profile-based recommendation, prepare an owner-directed plan, edit/add/remove draft plan items, and accept a plan. Acceptance creates no Marketing content and has no submit, approve, schedule, or publish effect.
+Marketing -> Settings contains a compact Profile/Plan/Directions workspace. A platform administrator can inspect and edit the ServSync profile, request a profile-based recommendation, prepare an owner-directed plan, edit/add/remove draft plan items, and accept a plan. In environments with the separately reviewed Slice 5 migration, the same workspace can load, refine, and approve exact accepted-Plan Directions. Acceptance and Direction approval create no Marketing content and have no submit, schedule, or publish effect.
 
 Loading, error, incomplete-profile, stale-write, and accepted-plan states remain explicit. Desktop and `390x844` layouts are covered.
 
@@ -100,7 +100,8 @@ Planner Coherence + Relevance v3 migration `servsync-marketing-planner-coherence
 
 - contractor Business Marketing activation and authorization;
 - contractor canonical-profile/context RPC composition;
-- content creation from accepted plans;
+- preparation and owner review of the first real accepted-Plan Directions;
+- content creation from approved Directions;
 - publishing and scheduling;
 - social/provider OAuth;
 - paid runtime AI;

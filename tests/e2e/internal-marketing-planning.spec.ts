@@ -123,6 +123,7 @@ async function installHarness(page: Page, role = 'platform_admin') {
         calls.push({ name, args });
         if (name === 'servsync_list_internal_marketing_content') return { data: [], error: null };
         if (name === 'servsync_get_internal_marketing_planning') return { data: structuredClone(state), error: null };
+        if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
         if (name === 'servsync_update_internal_marketing_profile') {
           state.profile = {
             ...state.profile,
