@@ -169,6 +169,7 @@ export function LocalInvoiceDeliveryPanel({
   const [copiedAutomatically, setCopiedAutomatically] = useState(false);
   const mountedRef = useRef(false);
   const busyRef = useRef(false);
+  const refreshAfterOneTimeLinkRef = useRef(false);
   const oneTimeUrlRef = useRef('');
   const historyRequestRef = useRef(0);
   const actionRequestRef = useRef(0);
@@ -190,6 +191,7 @@ export function LocalInvoiceDeliveryPanel({
       historyRequestRef.current += 1;
       actionRequestRef.current += 1;
       busyRef.current = false;
+      refreshAfterOneTimeLinkRef.current = false;
       oneTimeUrlRef.current = '';
     };
   }, []);
@@ -198,6 +200,7 @@ export function LocalInvoiceDeliveryPanel({
     historyRequestRef.current += 1;
     actionRequestRef.current += 1;
     busyRef.current = false;
+    refreshAfterOneTimeLinkRef.current = false;
     setLinks([]);
     setLoading(false);
     setBusy(null);
@@ -268,7 +271,7 @@ export function LocalInvoiceDeliveryPanel({
       setNotice(invoice.status === 'draft'
         ? 'Invoice issued and secure link created. No email or text was sent.'
         : 'Secure link created. No email or text was sent.');
-      await onInvoiceChanged();
+      refreshAfterOneTimeLinkRef.current = true;
     } catch (err) {
       if (isCurrent()) setError(readableError(err, 'The secure invoice link could not be created.'));
     } finally {
@@ -437,7 +440,13 @@ export function LocalInvoiceDeliveryPanel({
           url={oneTimeUrl}
           copiedInitially={copiedAutomatically}
           returnFocusTarget={panelToggleRef.current}
-          onClose={clearOneTimeUrl}
+          onClose={() => {
+            clearOneTimeUrl();
+            if (refreshAfterOneTimeLinkRef.current) {
+              refreshAfterOneTimeLinkRef.current = false;
+              void onInvoiceChanged();
+            }
+          }}
         />
       )}
     </div>

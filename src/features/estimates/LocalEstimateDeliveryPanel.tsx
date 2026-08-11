@@ -173,6 +173,7 @@ export function LocalEstimateDeliveryPanel({
   const [copiedAutomatically, setCopiedAutomatically] = useState(false);
   const mountedRef = useRef(false);
   const busyRef = useRef(false);
+  const refreshAfterOneTimeLinkRef = useRef(false);
   const historyRequestRef = useRef(0);
   const actionRequestRef = useRef(0);
   const contextKey = `${estimate.id}:${localContact.id}`;
@@ -192,6 +193,7 @@ export function LocalEstimateDeliveryPanel({
       historyRequestRef.current += 1;
       actionRequestRef.current += 1;
       busyRef.current = false;
+      refreshAfterOneTimeLinkRef.current = false;
     };
   }, []);
 
@@ -199,6 +201,7 @@ export function LocalEstimateDeliveryPanel({
     historyRequestRef.current += 1;
     actionRequestRef.current += 1;
     busyRef.current = false;
+    refreshAfterOneTimeLinkRef.current = false;
     setLinks([]);
     setLoading(false);
     setBusy(null);
@@ -267,7 +270,7 @@ export function LocalEstimateDeliveryPanel({
       setNotice(estimate.status === 'draft'
         ? 'Estimate issued and secure snapshot created. No email or text was sent.'
         : 'Secure Estimate snapshot created. No email or text was sent.');
-      await onEstimateChanged();
+      refreshAfterOneTimeLinkRef.current = true;
     } catch (err) {
       if (isCurrent()) setError(readableError(err, 'The secure Estimate link could not be created.'));
     } finally {
@@ -530,7 +533,13 @@ export function LocalEstimateDeliveryPanel({
           url={oneTimeUrl}
           copiedInitially={copiedAutomatically}
           returnFocusTarget={panelToggleRef.current}
-          onClose={clearOneTimeUrl}
+          onClose={() => {
+            clearOneTimeUrl();
+            if (refreshAfterOneTimeLinkRef.current) {
+              refreshAfterOneTimeLinkRef.current = false;
+              void onEstimateChanged();
+            }
+          }}
         />
       )}
     </div>

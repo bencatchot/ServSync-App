@@ -479,7 +479,7 @@ Current beta-readiness notes:
 - FB-020 Slice 1D adds a no-secret local production smoke credential readiness check so operators can see whether approved `PROD_SMOKE_*` variable names are present without printing values, signing in, validating credentials, or contacting Supabase.
 - The first authenticated production smoke scaffold is read-only, uses only approved `PROD_SMOKE_*` credentials, requires `TEST_APP_URL=https://servsync.app`, and now has passing required homeowner/contractor owner sign-in/navigation evidence. Optional role credentials and optional stable smoke record IDs remain future/not configured; mutation smoke remains a separate future tier.
 - Preview/sandbox should remain the default place for authenticated testing.
-- Full end-to-end coverage for the core loop remains future work.
+- Sandbox browser coverage now exercises the connected request -> Estimate -> acceptance -> Job -> Invoice -> full/partial offline payment -> Paid -> Home History path and the not-connected secure Estimate/Invoice path through browser-reopened Paid state and PDF. Remaining core-loop QA gaps include mobile mutation coverage, provider-backed Stripe browser coverage, and clearer closed-financial navigation than the current `Open invoice records` entry into the all-status list.
 - Mobile visual QA remains important because contractor and homeowner cards can become dense.
 - Local Vercel CLI account/project mismatch is a non-blocking tooling cleanup item.
 - FB-020 now tracks security, records reliability, backup/restore, storage, dependency security, and scale readiness as a cross-cutting workstream before broader beta/public go-live. This does not mean those readiness items are complete; they require separate audited implementation and verification.

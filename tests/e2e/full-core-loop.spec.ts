@@ -1,5 +1,7 @@
-import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
 import { escapeRegExp, timestampForRecord } from './helpers/customers';
@@ -10,6 +12,98 @@ const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
 const PRODUCTION_HOSTS = new Set(['servsync.app', 'www.servsync.app']);
 const PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN = 'ALLOW_PRODUCTION_TEST_ACCOUNT_SMOKE';
+const DURABLE_SANDBOX_SERVER_ORIGIN = 'https://servsync-stripe-sandbox.vercel.app';
+
+function quoteSqlText(value: string) {
+  if (!/^E2E (?:Core Loop|Partial Payment) \d{14}$/.test(value)) {
+    throw new Error(`Refusing core-loop cleanup for unexpected record prefix "${value}".`);
+  }
+  return `'${value.replaceAll("'", "''")}%'`;
+}
+
+function cleanupCoreLoopFixtures(recordPrefixes: string[]) {
+  if (recordPrefixes.length === 0) return;
+  const linkedProject = readFileSync('supabase/.temp/project-ref', 'utf8').trim();
+  if (linkedProject !== SANDBOX_SUPABASE_REF) {
+    throw new Error(`Refusing core-loop cleanup outside Sandbox ${SANDBOX_SUPABASE_REF}.`);
+  }
+  const patterns = [...new Set(recordPrefixes)].map(quoteSqlText).join(', ');
+  const sql = `
+begin;
+create temporary table audit_request_ids on commit drop as
+  select id from public.service_requests where title like any (array[${patterns}]);
+create temporary table audit_estimate_ids on commit drop as
+  select id from public.estimates where title like any (array[${patterns}]);
+create temporary table audit_job_ids on commit drop as
+  select id from public.inspections where name like any (array[${patterns}]);
+create temporary table audit_invoice_ids on commit drop as
+  select id from public.invoices where title like any (array[${patterns}]);
+delete from public.home_reminders where title like any (array[${patterns}]);
+delete from public.workflow_thread_reads
+ where service_request_id in (select id from audit_request_ids)
+    or inspection_id in (select id from audit_job_ids);
+delete from public.workflow_activity_events
+ where service_request_id in (select id from audit_request_ids)
+    or estimate_id in (select id from audit_estimate_ids)
+    or inspection_id in (select id from audit_job_ids)
+    or invoice_id in (select id from audit_invoice_ids);
+delete from public.workflow_messages
+ where service_request_id in (select id from audit_request_ids)
+    or inspection_id in (select id from audit_job_ids);
+delete from public.notifications
+ where request_id in (select id from audit_request_ids)
+    or estimate_id in (select id from audit_estimate_ids)
+    or invoice_id in (select id from audit_invoice_ids);
+alter table public.invoice_offline_payment_records disable trigger invoice_offline_payment_records_immutable;
+delete from public.invoice_offline_payment_records where invoice_id in (select id from audit_invoice_ids);
+alter table public.invoice_offline_payment_records enable trigger invoice_offline_payment_records_immutable;
+delete from public.invoice_backlog_items where invoice_id in (select id from audit_invoice_ids);
+delete from public.invoice_line_items where invoice_id in (select id from audit_invoice_ids);
+update public.job_work_items
+   set billing_status = case when billing_status = 'not_billable' then 'not_billable' else 'unbilled' end,
+       reserved_invoice_id = null,
+       invoiced_invoice_id = null,
+       updated_at = now()
+ where reserved_invoice_id in (select id from audit_invoice_ids)
+    or invoiced_invoice_id in (select id from audit_invoice_ids);
+delete from public.invoices where id in (select id from audit_invoice_ids);
+delete from public.job_work_items where inspection_id in (select id from audit_job_ids);
+delete from public.estimate_line_items where estimate_id in (select id from audit_estimate_ids);
+delete from public.inspections where id in (select id from audit_job_ids);
+delete from public.estimates where id in (select id from audit_estimate_ids);
+delete from public.service_request_media where request_id in (select id from audit_request_ids);
+delete from public.service_request_messages where request_id in (select id from audit_request_ids);
+delete from public.service_requests where id in (select id from audit_request_ids);
+commit;
+  `.trim();
+  execFileSync('supabase', ['db', 'query', '--linked', sql], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    stdio: 'pipe',
+  });
+}
+
+async function installSandboxServerRouteProxy(page: Page) {
+  const appUrl = new URL(requiredEnv('TEST_APP_URL'));
+  if (!['127.0.0.1', 'localhost'].includes(appUrl.hostname)) return;
+
+  await page.route('**/api/stripe-invoice-payment-state', async route => {
+    const request = route.request();
+    const headers = {
+      ...request.headers(),
+      origin: DURABLE_SANDBOX_SERVER_ORIGIN,
+      referer: `${DURABLE_SANDBOX_SERVER_ORIGIN}/`,
+    };
+    delete headers.host;
+    const response = await route.fetch({
+      url: `${DURABLE_SANDBOX_SERVER_ORIGIN}/api/stripe-invoice-payment-state`,
+      method: request.method(),
+      headers,
+      postData: request.postDataBuffer(),
+    });
+    await route.fulfill({ response });
+  });
+}
 
 function appContextOptions() {
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
@@ -25,6 +119,7 @@ function appContextOptions() {
 async function freshRolePage(browser: Browser, role: 'contractor' | 'homeowner') {
   const context = await browser.newContext(appContextOptions());
   const page = await context.newPage();
+  await installSandboxServerRouteProxy(page);
   const consoleErrors = captureMajorConsoleErrors(page);
   await loginAs(page, role);
   return { context, page, consoleErrors };
@@ -77,7 +172,7 @@ async function markSeededPricedWorkItemsCompleted(jobId: string) {
       .in('id', workItems.data!.map(item => item.id));
     expect(complete.error, 'Seeded priced work items should be markable complete by the contractor').toBeNull();
   } finally {
-    await client.auth.signOut().catch(() => undefined);
+    await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
   }
 }
 
@@ -167,7 +262,7 @@ async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
   await main.getByRole('button', { name: /^Send Request$/i }).click();
   expect((await createRequestResponse).ok()).toBeTruthy();
 
-  await expect(main.getByText(/Service request sent/i)).toBeVisible({ timeout: 30_000 });
+  await expect(main.getByText(/Service request submitted/i)).toBeVisible({ timeout: 30_000 });
   await expect(main.getByTestId('homeowner-service-request-card').filter({ hasText: requestTitle }).first()).toBeVisible({ timeout: 30_000 });
 
   return { requestTitle, requestDescription };
@@ -254,10 +349,12 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
 
   await openSidebarTab(page, /^Jobs\b/i);
   await expectActiveTabHeading(page, /^Jobs$/i);
-  const estimatesTab = main.getByRole('tab', { name: /^Estimates\b/i });
-  if (await estimatesTab.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await estimatesTab.click();
-  }
+  await main.getByRole('button', { name: /^Estimates:/i }).click();
+  const estimatesTab = main.getByRole('tab', { name: /^Estimates\b/i }).first();
+  await estimatesTab.waitFor({ state: 'visible', timeout: 30_000 });
+  await estimatesTab.click();
+  await main.getByTestId('contractor-estimate-search').fill(estimateTitle);
+  await main.getByTestId('contractor-estimate-status-filter').selectOption('approved');
 
   const acceptedEstimateCard = main.getByTestId('contractor-estimate-card').filter({ hasText: estimateTitle });
   await expect(acceptedEstimateCard).toHaveCount(1, { timeout: 30_000 });
@@ -291,12 +388,12 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   await markSeededPricedWorkItemsCompleted(jobId);
   await page.reload();
 
+  const completeJob = main.getByTestId('contractor-complete-job');
+  await expect(completeJob).toBeEnabled({ timeout: 30_000 });
   const completeJobResponse = page.waitForResponse(
     response => response.url().includes('/rest/v1/inspections') && response.request().method() === 'PATCH',
     { timeout: 30_000 },
   );
-  const completeJob = main.getByTestId('contractor-complete-job');
-  await expect(completeJob).toBeEnabled();
   page.once('dialog', dialog => dialog.accept());
   await completeJob.click();
   expect((await completeJobResponse).ok()).toBeTruthy();
@@ -313,6 +410,11 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   await main.getByTestId('confirm-create-partial-invoice').click();
   expect((await createInvoiceResponse).ok()).toBeTruthy();
 
+  const createdInvoiceCard = main.getByTestId('contractor-invoice-card').first();
+  await expect(createdInvoiceCard).toBeVisible({ timeout: 30_000 });
+  await createdInvoiceCard.getByRole('button', { name: /^Edit draft$/i }).click();
+  await expect(main.getByRole('heading', { name: /^Edit invoice$/i })).toBeVisible({ timeout: 30_000 });
+
   const saveAndSendInvoice = main.getByTestId('contractor-save-and-send-invoice');
   await expect(saveAndSendInvoice).toBeVisible({ timeout: 30_000 });
   await main.getByRole('textbox', { name: /^Invoice title$/i }).fill(invoiceTitle);
@@ -328,9 +430,152 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   await saveAndSendInvoice.click();
   expect((await saveInvoiceResponse).ok()).toBeTruthy();
   expect((await sendInvoiceResponse).ok()).toBeTruthy();
-  await expect(main.getByText(/Invoice sent to homeowner/i)).toBeVisible({ timeout: 30_000 });
+  await expect(main.getByText(/^Invoice sent$/i)).toBeVisible({ timeout: 30_000 });
 
   return { invoiceTitle };
+}
+
+async function openContractorInvoiceCard(page: Page, invoiceTitle: string, closed = false) {
+  const main = page.getByRole('main');
+  await openSidebarTab(page, /^Jobs\b/i);
+  await expectActiveTabHeading(page, /^Jobs$/i);
+
+  await main.getByRole('button', { name: /^Invoices:/i }).click();
+
+  const invoicesTab = main.getByRole('tab', { name: /^Invoices\b/i }).first();
+  await invoicesTab.waitFor({ state: 'visible', timeout: 30_000 });
+  await invoicesTab.click();
+
+  const search = main.getByTestId('contractor-invoice-search');
+  await search.waitFor({ state: 'visible', timeout: 30_000 });
+  await search.fill(invoiceTitle);
+  await main.getByTestId('contractor-invoice-status-filter').selectOption(closed ? 'paid' : 'all');
+  const invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
+  await expect(invoiceCard).toBeVisible({ timeout: 30_000 });
+  return invoiceCard;
+}
+
+async function recordFullOfflinePayment(page: Page, invoiceTitle: string, recordPrefix: string) {
+  let invoiceCard = await openContractorInvoiceCard(page, invoiceTitle);
+  await invoiceCard.getByTestId('contractor-record-invoice-payment').click();
+
+  const dialog = page.getByRole('dialog', { name: /^Record payment$/i });
+  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await expect(dialog.getByLabel(/^Payment amount$/i)).toHaveValue('125.00');
+  await dialog.locator('select').selectOption('check');
+  await dialog.locator('input[maxlength="120"]').fill(`${recordPrefix} check`);
+  await dialog.locator('textarea[maxlength="500"]').fill(`${recordPrefix}: full offline payment E2E verification.`);
+
+  const paymentResponse = page.waitForResponse(
+    response => response.url().includes('/rpc/servsync_record_offline_invoice_payment'),
+    { timeout: 30_000 },
+  );
+  await dialog.getByRole('button', { name: /^Record payment$/i }).click();
+  expect((await paymentResponse).ok()).toBeTruthy();
+  await expect(page.getByRole('main').getByText(/^Invoice paid$/i)).toBeVisible({ timeout: 30_000 });
+
+  await page.reload();
+  invoiceCard = await openContractorInvoiceCard(page, invoiceTitle, true);
+  await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible();
+  const summary = invoiceCard.getByTestId('invoice-payment-summary-detail');
+  await expect(summary).toContainText('Amount paid');
+  await expect(summary).toContainText('$125.00');
+  await expect(summary).toContainText('Balance due');
+  await expect(summary).toContainText('$0.00');
+
+  await invoiceCard.getByTestId('contractor-record-invoice-payment').click();
+  const historyDialog = page.getByRole('dialog', { name: /^Payment history$/i });
+  await expect(historyDialog).toBeVisible({ timeout: 30_000 });
+  await expect(historyDialog.getByRole('button', { name: /^Record payment$/i })).toHaveCount(0);
+  await expect(historyDialog.getByText(/\$125\.00 · Check/i)).toHaveCount(1);
+  await expect(historyDialog.getByText(`${recordPrefix} check`, { exact: false })).toBeVisible();
+  await historyDialog.getByRole('button', { name: /^Close payment dialog$/i }).click();
+
+  const downloadPromise = page.waitForEvent('download');
+  await invoiceCard.getByRole('button', { name: /^Download PDF$/i }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/invoice.+\.pdf$/i);
+  expect(await download.failure()).toBeNull();
+}
+
+async function recordPartialThenFinalOfflinePayment(page: Page, invoiceTitle: string, recordPrefix: string) {
+  let invoiceCard = await openContractorInvoiceCard(page, invoiceTitle);
+  await invoiceCard.getByTestId('contractor-record-invoice-payment').click();
+
+  let dialog = page.getByRole('dialog', { name: /^Record payment$/i });
+  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await dialog.getByLabel(/^Payment amount$/i).fill('40.00');
+  await dialog.locator('select').selectOption('bank_transfer');
+  await dialog.locator('input[maxlength="120"]').fill(`${recordPrefix} transfer`);
+  await dialog.locator('textarea[maxlength="500"]').fill(`${recordPrefix}: first partial payment.`);
+  let paymentResponse = page.waitForResponse(
+    response => response.url().includes('/rpc/servsync_record_offline_invoice_payment'),
+    { timeout: 30_000 },
+  );
+  await dialog.getByRole('button', { name: /^Record payment$/i }).click();
+  expect((await paymentResponse).ok()).toBeTruthy();
+  await expect(page.getByRole('main').getByText(/^Payment recorded$/i)).toBeVisible({ timeout: 30_000 });
+
+  await page.reload();
+  invoiceCard = await openContractorInvoiceCard(page, invoiceTitle);
+  await expect(invoiceCard.getByText(/^Partially Paid$/i).first()).toBeVisible();
+  let summary = invoiceCard.getByTestId('invoice-payment-summary-detail');
+  await expect(summary).toContainText('Amount paid');
+  await expect(summary).toContainText('$40.00');
+  await expect(summary).toContainText('Balance due');
+  await expect(summary).toContainText('$85.00');
+
+  await invoiceCard.getByTestId('contractor-record-invoice-payment').click();
+  dialog = page.getByRole('dialog', { name: /^Record payment$/i });
+  await expect(dialog.getByLabel(/^Payment amount$/i)).toHaveValue('85.00');
+  await dialog.locator('select').selectOption('cash');
+  await dialog.locator('input[maxlength="120"]').fill(`${recordPrefix} cash`);
+  await dialog.locator('textarea[maxlength="500"]').fill(`${recordPrefix}: exact remaining balance.`);
+  paymentResponse = page.waitForResponse(
+    response => response.url().includes('/rpc/servsync_record_offline_invoice_payment'),
+    { timeout: 30_000 },
+  );
+  await dialog.getByRole('button', { name: /^Record payment$/i }).click();
+  expect((await paymentResponse).ok()).toBeTruthy();
+  await expect(page.getByRole('main').getByText(/^Invoice paid$/i)).toBeVisible({ timeout: 30_000 });
+
+  await page.reload();
+  invoiceCard = await openContractorInvoiceCard(page, invoiceTitle, true);
+  await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible();
+  summary = invoiceCard.getByTestId('invoice-payment-summary-detail');
+  await expect(summary).toContainText('$125.00');
+  await expect(summary).toContainText('$0.00');
+
+  await invoiceCard.getByTestId('contractor-record-invoice-payment').click();
+  const historyDialog = page.getByRole('dialog', { name: /^Payment history$/i });
+  await expect(historyDialog.getByRole('button', { name: /^Record payment$/i })).toHaveCount(0);
+  await expect(historyDialog.getByText(/\$40\.00 · Bank transfer \/ external ACH/i)).toHaveCount(1);
+  await expect(historyDialog.getByText(/\$85\.00 · Cash/i)).toHaveCount(1);
+  await expect(historyDialog.locator('article')).toHaveCount(2);
+}
+
+async function createConnectedSentInvoice(browser: Browser, recordPrefix: string, testInfo: TestInfo) {
+  const homeownerRequest = await freshRolePage(browser, 'homeowner');
+  const { requestTitle } = await createHomeownerServiceRequest(homeownerRequest.page, recordPrefix);
+  await homeownerRequest.consoleErrors.assertClean(testInfo);
+  await homeownerRequest.context.close();
+
+  const contractorEstimate = await freshRolePage(browser, 'contractor');
+  const { estimateTitle } = await createAndSendEstimateFromRequest(contractorEstimate.page, requestTitle, recordPrefix);
+  await contractorEstimate.consoleErrors.assertClean(testInfo);
+  await contractorEstimate.context.close();
+
+  const homeownerAccept = await freshRolePage(browser, 'homeowner');
+  await acceptHomeownerEstimate(homeownerAccept.page, estimateTitle);
+  await homeownerAccept.consoleErrors.assertClean(testInfo);
+  await homeownerAccept.context.close();
+
+  const contractorJob = await freshRolePage(browser, 'contractor');
+  const { invoiceTitle } = await createJobCompleteAndSendInvoice(contractorJob.page, estimateTitle, recordPrefix);
+  await contractorJob.consoleErrors.assertClean(testInfo);
+  await contractorJob.context.close();
+
+  return { estimateTitle, invoiceTitle };
 }
 
 async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, recordPrefix: string) {
@@ -343,17 +588,18 @@ async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, re
   await openSidebarTab(page, /Estimates \/ Invoices/i);
   await expectActiveTabHeading(page, /^Estimates \/ Invoices$/i);
   await setPropertyScopeAllIfAvailable(main, /^Property scope$/i);
-  await main.getByRole('button').filter({ hasText: /^Open Invoices/i }).first().click();
+  const paidInvoices = main.getByRole('button').filter({ hasText: /^Paid \/ Closed/i }).first();
+  if (await paidInvoices.isVisible().catch(() => false)) {
+    await paidInvoices.click();
+  } else {
+    await main.getByRole('button').filter({ hasText: /^Open Invoices/i }).first().click();
+  }
 
   const invoiceCard = main.getByTestId('homeowner-invoice-card').filter({ hasText: invoiceTitle }).first();
   await expect(invoiceCard).toBeVisible({ timeout: 30_000 });
 
-  const viewInvoiceResponse = page.waitForResponse(
-    response => response.url().includes('/rpc/servsync_homeowner_view_invoice'),
-    { timeout: 30_000 },
-  );
   await invoiceCard.getByRole('button', { name: /^View Invoice$/i }).click();
-  expect((await viewInvoiceResponse).ok()).toBeTruthy();
+  await expect(invoiceCard.getByText(/Invoice total/i)).toBeVisible({ timeout: 30_000 });
 
   const fileInvoiceResponse = page.waitForResponse(
     response => response.url().includes('/rpc/servsync_file_invoice_to_home_history'),
@@ -399,37 +645,43 @@ async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, re
 }
 
 test.describe('full sandbox core loop', () => {
-  test('homeowner request to contractor invoice to Home History reminder', async ({ page, browser }, testInfo) => {
+  const recordPrefixes: string[] = [];
+
+  test.afterAll(() => {
+    cleanupCoreLoopFixtures(recordPrefixes);
+  });
+
+  test('homeowner request to paid contractor invoice to Home History reminder', async ({ browser }, testInfo) => {
     requireApprovedSandboxForMutation();
     test.setTimeout(300_000);
 
     const timestamp = timestampForRecord();
     const recordPrefix = `E2E Core Loop ${timestamp}`;
-    const homeownerErrors = captureMajorConsoleErrors(page);
+    recordPrefixes.push(recordPrefix);
+    const { invoiceTitle } = await createConnectedSentInvoice(browser, recordPrefix, testInfo);
 
-    await loginAs(page, 'homeowner');
-
-    const { requestTitle } = await createHomeownerServiceRequest(page, recordPrefix);
-    await homeownerErrors.assertClean(testInfo);
-
-    const contractorEstimate = await freshRolePage(browser, 'contractor');
-    const { estimateTitle } = await createAndSendEstimateFromRequest(contractorEstimate.page, requestTitle, recordPrefix);
-    await contractorEstimate.consoleErrors.assertClean(testInfo);
-    await contractorEstimate.context.close();
-
-    const homeownerAccept = await freshRolePage(browser, 'homeowner');
-    await acceptHomeownerEstimate(homeownerAccept.page, estimateTitle);
-    await homeownerAccept.consoleErrors.assertClean(testInfo);
-    await homeownerAccept.context.close();
-
-    const contractorJob = await freshRolePage(browser, 'contractor');
-    const { invoiceTitle } = await createJobCompleteAndSendInvoice(contractorJob.page, estimateTitle, recordPrefix);
-    await contractorJob.consoleErrors.assertClean(testInfo);
-    await contractorJob.context.close();
+    const contractorPayment = await freshRolePage(browser, 'contractor');
+    await recordFullOfflinePayment(contractorPayment.page, invoiceTitle, recordPrefix);
+    await contractorPayment.consoleErrors.assertClean(testInfo);
+    await contractorPayment.context.close();
 
     const homeownerCloseout = await freshRolePage(browser, 'homeowner');
     await fileInvoiceAndCreateReminder(homeownerCloseout.page, invoiceTitle, recordPrefix);
     await homeownerCloseout.consoleErrors.assertClean(testInfo);
     await homeownerCloseout.context.close();
+  });
+
+  test('partial offline payment persists before exact final payment', async ({ browser }, testInfo) => {
+    requireApprovedSandboxForMutation();
+    test.setTimeout(300_000);
+
+    const recordPrefix = `E2E Partial Payment ${timestampForRecord()}`;
+    recordPrefixes.push(recordPrefix);
+    const { invoiceTitle } = await createConnectedSentInvoice(browser, recordPrefix, testInfo);
+
+    const contractorPayment = await freshRolePage(browser, 'contractor');
+    await recordPartialThenFinalOfflinePayment(contractorPayment.page, invoiceTitle, recordPrefix);
+    await contractorPayment.consoleErrors.assertClean(testInfo);
+    await contractorPayment.context.close();
   });
 });
