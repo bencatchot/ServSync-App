@@ -10,6 +10,10 @@ import {
   canonicalMarketingAudience,
   canonicalMarketingTopic,
 } from '../../src/features/marketing/marketingTaxonomy';
+import {
+  operationalPlannerV3Profile,
+  operationalPlannerV3RecentContent,
+} from '../fixtures/marketingPlannerV3Operational';
 
 const overview = {
   metrics: [],
@@ -217,42 +221,10 @@ test.describe('internal Business Marketing Profile and Plan', () => {
   });
 
   test('planner v3 prioritizes coherent ServSync relevance before audience uniqueness', () => {
-    const servSyncPlan = buildRecommendedMarketingPlan({
-      ...profile,
-      audienceSegments: [
-        'Small contractors', 'HVAC', 'Plumbing contractors', 'Electrical contractors', 'Carpentry',
-        'Lawn care and landscaping', 'Pressure washing', 'Handyman/general maintenance', 'Homeowners',
-      ],
-      serviceFocus: [
-        'Contractor work organization', 'Homeowner and contractor connections', 'Customer requests',
-        'Estimates and approvals', 'Jobs and finalized work reports', 'Invoices and manual payments',
-        'Home History and homeowner records', 'Product education and demonstrations',
-      ],
-      primaryGoal: 'Increase qualified small-contractor awareness, consideration, and signups for ServSync.',
-      secondaryGoals: ['Increase homeowner adoption', 'Educate contractors and homeowners', 'Explain current product workflows'],
-      emphasizedTopics: [
-        'Organizing service work', 'Customer requests', 'Estimates and approvals', 'Jobs and reports',
-        'Invoices and manual payments', 'Customer communication', 'Home History and homeowner records',
-        'Contractor discovery and profiles', 'Secure document links', 'Connected homeowner relationships',
-        'Trade-specific examples', 'Product demonstrations', 'Practical contractor and homeowner problems',
-      ],
-      ownerNotes: 'Create deliberate audience, trade, topic, and format variety over time; each item should have one clear audience and one primary idea. Homeowner value should stand on its own merits.',
-    }, {
-      windowLimit: 20,
-      itemCount: 10,
-      items: [
-        { ...recent.items[0], intendedAudience: 'hvac_contractors', title: 'A more organized customer workflow for small HVAC teams' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000002', intendedAudience: 'hvac_contractors', title: 'Send an estimate without forcing an account signup' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000003', intendedAudience: 'hvac_contractors', title: 'What should stay connected after a customer calls?' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000004', intendedAudience: 'hvac_contractors', title: 'Demo concept: follow one HVAC service call', contentRole: 'short_video_concept' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000005', intendedAudience: 'hvac_contractors', title: 'Video concept: One customer, two useful paths', contentRole: 'short_video_concept' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000006', intendedAudience: 'hvac_contractors', title: 'Let the estimate move forward before account setup', contentRole: 'feature_highlight' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000007', intendedAudience: 'hvac_contractors', title: 'Secure link or connected homeowner account?' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000008', intendedAudience: 'hvac_contractors', title: 'Not every HVAC customer needs the same starting point', contentRole: 'linkedin_post' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000009', intendedAudience: 'hvac_contractors', title: "When a customer asks, 'Do I need an account?'", contentRole: 'facebook_instagram_post' },
-        { ...recent.items[0], id: '42000000-0000-4000-8000-000000000010', intendedAudience: 'hvac_contractors', title: 'When one service call lives in too many places', contentRole: 'facebook_instagram_post' },
-      ],
-    });
+    const servSyncPlan = buildRecommendedMarketingPlan(
+      operationalPlannerV3Profile,
+      operationalPlannerV3RecentContent,
+    );
 
     expect(servSyncPlan).toHaveLength(6);
     const audienceKeys = servSyncPlan.map(item => canonicalMarketingAudience(item.audience).key);
@@ -263,6 +235,40 @@ test.describe('internal Business Marketing Profile and Plan', () => {
     expect(servSyncPlan.every(item => item.direction.includes('ServSync'))).toBe(true);
     expect(servSyncPlan.some(item => /practical contractor and homeowner problems|trade-specific examples/i.test(item.topic))).toBe(false);
     expect(servSyncPlan.some(item => item.contentRoles.includes('feature_announcement'))).toBe(false);
+
+    const discovery = servSyncPlan.find(item => canonicalMarketingTopic(item.topic).key === 'contractor_discovery_profiles');
+    expect(discovery?.direction).toContain('without claiming ranking, credential verification, or lead outcomes');
+    expect(discovery?.direction).not.toMatch(/guarantee/i);
+
+    const communication = servSyncPlan.find(item => canonicalMarketingTopic(item.topic).key === 'customer_communication');
+    expect(communication?.rationale).toContain('related recent coverage exists');
+    expect(communication?.rationale).not.toContain('recent window does not cover');
+
+    const demonstration = servSyncPlan.find(item => canonicalMarketingTopic(item.topic).key === 'product_demonstrations');
+    expect(demonstration?.direction).toMatch(/product demonstration about (Customer requests|Estimates and approvals|Jobs|Invoices|Customer communication|Home History|Secure document links|Connected homeowner relationships):/);
+    expect(demonstration?.direction).not.toContain('demonstrate one current product interaction');
+  });
+
+  test('product demonstrations resolve from eligible profile interactions or yield to stronger topics', () => {
+    const withSpecificOptions = buildRecommendedMarketingPlan({
+      ...profile,
+      audienceSegments: ['Small contractors'],
+      serviceFocus: ['Product demonstrations', 'Customer requests'],
+      emphasizedTopics: ['Product demonstrations', 'Customer requests', 'Invoices', 'Jobs', 'Home History'],
+      primaryGoal: 'Increase contractor signups.',
+    }, { windowLimit: 20, itemCount: 0, items: [] });
+    const demonstration = withSpecificOptions.find(item => canonicalMarketingTopic(item.topic).key === 'product_demonstrations');
+    expect(demonstration?.direction).toMatch(/product demonstration about (Customer requests|Invoices|Jobs|Home History):/);
+
+    const withoutSpecificOptions = buildRecommendedMarketingPlan({
+      ...profile,
+      audienceSegments: ['Small contractors'],
+      serviceFocus: ['Product demonstrations', 'Seasonal campaign planning'],
+      emphasizedTopics: ['Product demonstrations', 'Local content calendar', 'Service business education', 'Owner marketing priorities', 'Brand awareness'],
+      primaryGoal: 'Increase contractor signups.',
+    }, { windowLimit: 20, itemCount: 0, items: [] });
+    expect(withoutSpecificOptions.some(item => canonicalMarketingTopic(item.topic).key === 'product_demonstrations')).toBe(false);
+    expect(withoutSpecificOptions.every(item => !item.direction.includes('demonstrate one current product interaction'))).toBe(true);
   });
 
   test('trade audiences require actual profile relevance instead of unused-audience novelty', () => {

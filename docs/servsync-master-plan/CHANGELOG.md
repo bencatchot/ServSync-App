@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-10
 
+- Branch: `codex/marketing-planner-v3-operational-hardening`
+- Starting main SHA: `a8edcd1a09e240a556ca91db539ecde1aa865374`
+- Files changed:
+  - `src/features/marketing/marketingTaxonomy.ts`
+  - `src/features/marketing/marketingPlanning.ts`
+  - `tests/fixtures/marketingPlannerV3Operational.ts`
+  - `tests/e2e/internal-marketing-planning.spec.ts`
+  - `scripts/validation/validate-marketing-planner-coherence-relevance-v3.sh`
+  - `docs/marketing/ServSync_Codex_Assisted_Marketing_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Business_Marketing_Profile_Planning_v1.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marketing Slice 4C hardens planner v3 after the first real Production recommendation failed atomically. Discovery/profile cautionary wording now passes the existing claim guard without weakening it, customer-communication recommendations recognize bounded estimate/response/link/connection overlap, and Product demonstrations dynamically resolve to a named eligible product interaction or are omitted when no specific interaction exists.
+- Architecture and security: This is a source-only deterministic-planner correction. Planner version 3, the platform-admin-only RPC, server-derived context, forced-RLS/private tables, replay protection, historical v1/v2/v3 interpretation, and claim validator remain unchanged. The exact Production-like fixture is generated through the current planner and validated end-to-end by the same PostgreSQL package/claim functions used at runtime. No plan, Marketing Direction, content, approval, scheduling, publishing, provider, environment, SQL, or authorization behavior is added.
+- Tests/checks run: Strict TypeScript; focused planner/domain/UI Playwright on desktop and `390x844`; exact Production-like generated-package validation through disposable PostgreSQL 16; safe-caution acceptance and affirmative prohibited-claim rejection; planner v1/v2/v3 compatibility; ServSync and single-trade contractor fixtures; historical migration/security/replay/rollback validation; Production build; backend parity and rollout-ledger validation; Bash syntax; sensitive-value/scope scans; and `git diff --check`.
+- Known risks and follow-up: Semantic overlap and demonstration eligibility remain deliberately bounded taxonomy rules. A real signed-in Production planner-v3 retry is still required after merge/deployment before Plan-to-Direction readiness can be claimed; this implementation does not create that plan or begin the handoff.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-037 now records the operational hardening and the exact real-Production retry gate while keeping downstream execution pending.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the corrected planner-v3 operating contract and preserves the separate Plan-to-Direction gate.
+
 - Branch: `codex/marketing-planner-coherence-relevance-v3`
 - Starting main SHA: `3de06a90c837245382d50731fbb6449542cd7d4c`
 - Files changed:
