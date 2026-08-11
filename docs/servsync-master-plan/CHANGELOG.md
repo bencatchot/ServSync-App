@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/cwa003-invoice-discoverability-v1`
+- Starting main SHA: `1377dc4832d16d5a326091945fce28681e397e95`
+- Files changed: contractor Jobs overview; canonical Customer financial summary/navigation; focused Jobs/lifecycle Playwright coverage; workflow audit; FB-035 backlog; master plan; changelog.
+- Summary of change: Corrects CWA-003 without changing Jobs architecture or financial behavior. The Jobs Invoice tile now represents all Invoice records and states open/Paid counts, the list exposes direct All/Open/Paid groups while preserving every detailed status, and Customer profiles include canonical Invoice records alongside Estimates with exact-record opening and a Customer-profile return path.
+- Validation: TypeScript and focused Jobs source/UI contract coverage pass. The updated local/not-connected lifecycle test creates mixed Estimate/Paid-Invoice Customer history, verifies Customer-profile counts, exact Paid reopening, cross-navigation, reload, status, amount paid, zero balance, and cleanup. Its first Sandbox attempt stopped before fixture creation because the approved local Sandbox Owner/Admin/Office credentials were stale; no authentication, database, configuration, or business data was changed. Exact Sandbox browser validation and exact-head Preview checks remain merge gates.
+- Known risks and follow-up: CWA-003 remains in review rather than Fixed until the authenticated Sandbox lifecycle passes. CWA-008 direct Preview-versus-Download PDF comparison remains separately open. No SQL, RLS, RPC, payment ledger, Stripe, secure delivery, or Production/Demo change is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 records the implemented CWA-003 correction and its remaining authenticated Sandbox gate without marking it complete.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Documents the bounded Customer-to-financial-record navigation contract as in review without claiming it is live.
+
 - Branch: `codex/contractor-workflow-e2e-audit-v1`
 - Starting main SHA: `f2aa415a1ea344228b191be4760b9044d2981833`
 - Files changed: contractor Customer readiness controls; local Estimate/Invoice secure-delivery panels; connected/not-connected lifecycle Playwright coverage; package QA command; QA guide and audit evidence; master plan; FB-035 backlog; changelog.

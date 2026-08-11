@@ -886,7 +886,7 @@ type ContractorJobsView = 'overview' | 'needs_attention' | 'drafts' | 'new_jobs'
 type ContractorJobsHeaderTab = 'overview' | 'estimates' | 'invoices' | 'jobs_reports' | 'templates';
 type ContractorFinancialRecordKind = 'estimates' | 'invoices';
 type ContractorEstimateRecordStatusFilter = 'all' | 'draft' | 'sent' | 'approved' | 'invoiced' | 'closed';
-type ContractorInvoiceRecordStatusFilter = 'all' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';
+type ContractorInvoiceRecordStatusFilter = 'all' | 'open' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';
 type ContractorEstimateRecordSort = 'updated_newest' | 'created_newest' | 'amount_high' | 'amount_low' | 'customer_az';
 type ContractorInvoiceRecordSort = ContractorEstimateRecordSort | 'due_date';
 type InspectionView = 'list' | 'new' | 'detail' | 'draft_job';
@@ -28666,6 +28666,21 @@ function ContractorDashboard({
     : selectedJobsLocalContact
       ? invoices.filter(invoice => invoice.local_contact_id === selectedJobsLocalContact.id)
       : invoices;
+  const openSelectedJobsCustomerProfile = () => {
+    if (selectedJobsConnection) {
+      openHomeownerWorkspaceForConnection(selectedJobsConnection, 'profile');
+      return;
+    }
+    if (!selectedJobsLocalContact) return;
+    const homes = sortedLocalHomes(selectedJobsLocalContact.homes);
+    setSelectedHomeownerSubjectId(`local:${selectedJobsLocalContact.id}`);
+    setSelectedHomeownerWorkspaceLocalHomeId(homes[0]?.id ?? '');
+    setHomeownerWorkspacePropertyScope('selected');
+    setHomeownerFilter(selectedJobsLocalContact.archived_at ? 'archived' : 'active');
+    setHomeownerDetailTab('profile');
+    setHomeownerMobileDetailOpen(true);
+    setContractorTab('connections');
+  };
   const activeSavedEstimateCharges = savedEstimateCharges
     .filter(charge => charge.active)
     .sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -28835,6 +28850,7 @@ function ContractorDashboard({
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
   const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
+  const paidInvoiceRecords = invoices.filter(invoice => invoice.status === 'paid');
   const acceptedEstimatesNeedingJobs = estimates.filter(estimate => estimate.status === 'accepted' && !estimateHasLinkedJob(estimate));
   const invoiceAttentionRecords = openInvoiceRecords.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));
   const contractorJobsHeaderTabForView = (view: ContractorJobsView): ContractorJobsHeaderTab => {
@@ -28864,6 +28880,7 @@ function ContractorDashboard({
     }
     if (tab === 'invoices') {
       setContractorFinancialRecordKind('invoices');
+      setContractorInvoiceRecordStatusFilter('all');
       setContractorJobsViewAndScroll('open_financial');
       return;
     }
@@ -36015,6 +36032,11 @@ function ContractorDashboard({
                       : localCustomer
                         ? estimates.filter(estimate => estimate.local_contact_id === localCustomer.id)
                         : [];
+                    const rawSubjectInvoices = conn
+                      ? invoicesForHomeowner(conn.homeowner_user_id)
+                      : localCustomer
+                        ? invoices.filter(invoice => invoice.local_contact_id === localCustomer.id)
+                        : [];
                     const rawConnReqs = conn ? serviceRequests.filter(r => r.connection_id === conn.connection_id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) : [];
                     const matchesWorkspacePropertyScope = (record: PropertyContextRecord) => {
                       if (!propertyScopeEnabled) return true;
@@ -36029,6 +36051,9 @@ function ContractorDashboard({
                     const subjectEstimates = rawSubjectEstimates.filter(matchesWorkspacePropertyScope);
                     const invoiceRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) === 'Invoice');
                     const estimateRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
+                    const subjectInvoiceRecords = rawSubjectInvoices.filter(matchesWorkspacePropertyScope);
+                    const openSubjectInvoiceRecords = subjectInvoiceRecords.filter(invoice => !['paid', 'void'].includes(invoice.status));
+                    const paidSubjectInvoiceRecords = subjectInvoiceRecords.filter(invoice => invoice.status === 'paid');
                     const subjectEstimateRecordsAcrossProperties = rawSubjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
                     const subjectEstimateDraftCountAcrossProperties = subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'draft').length;
                     const subjectEstimateAcceptedCountAcrossProperties = subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'accepted').length;
@@ -36208,6 +36233,20 @@ function ContractorDashboard({
                     ];
                     const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'profile';
                     const workspaceSubjectFilterId = conn?.connection_id ?? (localCustomer ? `local:${localCustomer.id}` : '');
+                    const openCustomerInvoiceRecords = (status: ContractorInvoiceRecordStatusFilter) => {
+                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                      setFocusedEstimateRecordId(null);
+                      setFocusedInvoiceRecordId(null);
+                      setContractorFinancialRecordKind('invoices');
+                      setContractorInvoiceRecordStatusFilter(status);
+                      setContractorJobsView(status === 'paid' ? 'closed_financial' : 'open_financial');
+                      setContractorTab('inspections');
+                    };
+                    const customerFinancialRecords = [
+                      ...estimateRecords.map(record => ({ kind: 'estimate' as const, record })),
+                      ...invoiceRecords.map(record => ({ kind: 'legacy_invoice' as const, record })),
+                      ...subjectInvoiceRecords.map(record => ({ kind: 'invoice' as const, record })),
+                    ].sort((left, right) => new Date(right.record.updated_at).getTime() - new Date(left.record.updated_at).getTime());
                     const isStartingWorkOrderForThisSubject = inspectionView === 'new' && (
                       (isConn && conn && inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id === conn.homeowner_user_id)
                       || (!isConn && localCustomer && inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id === localCustomer.id)
@@ -36319,12 +36358,17 @@ function ContractorDashboard({
                       },
                       {
                         label: 'Invoices',
-                        value: String(invoiceRecords.length),
-                        helper: `${draftInvoiceCount} draft${draftInvoiceCount === 1 ? '' : 's'} · ${invoiceRecords.filter(estimate => estimate.status === 'accepted').length} accepted`,
+                        value: String(invoiceRecords.length + subjectInvoiceRecords.length),
+                        helper: `${openSubjectInvoiceRecords.length} open · ${paidSubjectInvoiceRecords.length} paid`,
                         icon: <Receipt size={16} />,
-                        tone: invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftInvoiceCount > 0 ? 'amber' : 'slate',
+                        tone: openSubjectInvoiceRecords.length > 0 || draftInvoiceCount > 0 ? 'amber' : paidSubjectInvoiceRecords.length > 0 ? 'emerald' : 'slate',
                         onClick: () => {
+                          if (subjectInvoiceRecords.length > 0) {
+                            openCustomerInvoiceRecords(openSubjectInvoiceRecords.length > 0 ? 'open' : paidSubjectInvoiceRecords.length > 0 ? 'paid' : 'all');
+                            return;
+                          }
                           if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                          setContractorFinancialRecordKind('estimates');
                           setHomeownerWorkspaceEstimateView(invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftInvoiceCount > 0 ? 'draft' : 'sent');
                           setContractorJobsView(invoiceRecords.length > 0 ? 'open_financial' : 'new_financial');
                           setContractorTab('inspections');
@@ -37630,26 +37674,46 @@ function ContractorDashboard({
                                     )}
                                   </div>
 
-                                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4" data-testid="customer-financial-records">
                                     <div className="mb-3 flex items-center justify-between gap-3">
                                       <div>
-                                        <h4 className="text-sm font-bold text-slate-950">Estimates and invoices</h4>
-                                        <p className="mt-1 text-xs text-slate-500">{estimateRecords.length + invoiceRecords.length} financial record{estimateRecords.length + invoiceRecords.length === 1 ? '' : 's'}</p>
+                                        <h4 className="text-sm font-bold text-slate-950">Financial records</h4>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                          {estimateRecords.length} estimate{estimateRecords.length === 1 ? '' : 's'} · {openSubjectInvoiceRecords.length} open invoice{openSubjectInvoiceRecords.length === 1 ? '' : 's'} · {paidSubjectInvoiceRecords.length} paid
+                                        </p>
                                       </div>
-                                      <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open financials</button>
+                                      <button type="button" onClick={() => openCustomerInvoiceRecords('all')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">All invoices</button>
                                     </div>
-                                    {[...estimateRecords, ...invoiceRecords].slice(0, 5).length === 0 ? (
+                                    <div className="mb-3 grid grid-cols-2 gap-2" aria-label="Customer invoice shortcuts">
+                                      <button type="button" onClick={() => openCustomerInvoiceRecords('open')} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-100">
+                                        <span className="block text-xs font-semibold text-blue-700">Open invoices</span>
+                                        <span className="mt-1 block text-lg font-bold text-blue-950">{openSubjectInvoiceRecords.length}</span>
+                                      </button>
+                                      <button type="button" onClick={() => openCustomerInvoiceRecords('paid')} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-100">
+                                        <span className="block text-xs font-semibold text-emerald-700">Paid invoices</span>
+                                        <span className="mt-1 block text-lg font-bold text-emerald-950">{paidSubjectInvoiceRecords.length}</span>
+                                      </button>
+                                    </div>
+                                    {customerFinancialRecords.slice(0, 5).length === 0 ? (
                                       <EmptyState text="No estimates or invoices yet for this customer." />
                                     ) : (
                                       <div className="space-y-2">
-                                        {[...estimateRecords, ...invoiceRecords].slice(0, 5).map(record => {
-                                          const propertyLabel = recordPropertyLabelForContractor(record);
+                                        {customerFinancialRecords.slice(0, 5).map(item => {
+                                          const propertyLabel = recordPropertyLabelForContractor(item.record);
+                                          const recordLabel = item.kind === 'invoice'
+                                            ? `Invoice · ${invoiceStatusPresentation(item.record.status).label}`
+                                            : `${estimateDocumentLabel(item.record)} · ${estimateStatusLabel(item.record.status)}`;
                                           return (
-                                            <button key={record.id} type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                                            <button
+                                              key={`${item.kind}:${item.record.id}`}
+                                              type="button"
+                                              onClick={() => item.kind === 'invoice' ? focusSavedInvoiceRecord(item.record) : focusSavedEstimateRecord(item.record)}
+                                              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                                            >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
-                                                  <p className="truncate text-sm font-semibold text-slate-900">{record.title}</p>
-                                                  <p className="mt-1 text-xs text-slate-500">{estimateDocumentLabel(record)} · {estimateStatusLabel(record.status)}</p>
+                                                  <p className="truncate text-sm font-semibold text-slate-900">{item.record.title}</p>
+                                                  <p className="mt-1 text-xs text-slate-500">{recordLabel}</p>
                                                   {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
                                                     <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
                                                   )}
@@ -38665,7 +38729,9 @@ function ContractorDashboard({
                     canViewPriceBook={priceBookAccess.canView}
                     estimateCount={openFinancialRecords.length}
                     activeJobCount={openJobs.length}
-                    invoiceCount={openInvoiceRecords.length}
+                    invoiceCount={invoices.length}
+                    openInvoiceCount={openInvoiceRecords.length}
+                    paidInvoiceCount={paidInvoiceRecords.length}
                     needsAttentionCount={contractorJobsNeedsAttentionCount({
                       acceptedEstimateCount: acceptedEstimatesNeedingJobs.length,
                       readyToInvoiceJobCount: completedJobsReadyToInvoice.length,
@@ -38683,6 +38749,7 @@ function ContractorDashboard({
                     }}
                     onViewInvoices={() => {
                       setContractorFinancialRecordKind('invoices');
+                      setContractorInvoiceRecordStatusFilter('all');
                       setContractorJobsViewAndScroll('open_financial');
                     }}
                     onStartNewDraft={startCleanDraftJobComposer}
@@ -39666,6 +39733,7 @@ function ContractorDashboard({
                       return estimate.status === contractorEstimateRecordStatusFilter;
                     };
                     const invoiceMatchesStatus = (invoice: Invoice) => contractorInvoiceRecordStatusFilter === 'all'
+                      || (contractorInvoiceRecordStatusFilter === 'open' && !['paid', 'void'].includes(invoice.status))
                       || invoice.status === contractorInvoiceRecordStatusFilter;
                     const recordTime = (value?: string | null) => value ? new Date(value).getTime() : 0;
                     const customerCompare = (left: string, right: string) => left.localeCompare(right, undefined, { sensitivity: 'base' });
@@ -39699,12 +39767,14 @@ function ContractorDashboard({
                     const listTitle = focusedEstimateRecord
                       ? 'Saved estimate draft'
                       : focusedInvoiceRecord
-                        ? 'Saved invoice draft'
+                        ? focusedInvoiceRecord.status === 'draft' ? 'Saved invoice draft' : 'Invoice record'
                         : showingEstimates ? 'Estimate records' : 'Invoice records';
                     const listDescription = focusedEstimateRecord
                       ? 'This is the estimate you just saved. Send it, download the PDF, save it as a template, or continue editing.'
                       : focusedInvoiceRecord
-                        ? 'This is the invoice you just saved. Preview or download the PDF now, keep editing, or send it when the customer is connected.'
+                        ? focusedInvoiceRecord.status === 'draft'
+                          ? 'This is the invoice you just saved. Preview or download the PDF now, keep editing, or send it when the customer is connected.'
+                          : 'Review this customer Invoice, payment state, history, and PDF actions.'
                         : showingEstimates
                           ? 'Search, filter, and sort estimate records without mixing in invoice cards.'
                           : 'Search, filter, and sort invoice records without mixing in estimate cards.';
@@ -39726,6 +39796,7 @@ function ContractorDashboard({
 	                    };
 	                    const invoiceStatusFilterLabels: Record<ContractorInvoiceRecordStatusFilter, string> = {
 	                      all: 'All',
+	                      open: 'Open',
 	                      draft: 'Draft',
 	                      sent: 'Sent',
 	                      viewed: 'Viewed',
@@ -39764,6 +39835,11 @@ function ContractorDashboard({
 	                      contractorInvoiceRecordStatusFilter !== 'all' ? `Status: ${invoiceStatusFilterLabels[contractorInvoiceRecordStatusFilter]}` : null,
 	                      contractorInvoiceRecordSort !== 'updated_newest' ? `Sort: ${recordSortLabels[contractorInvoiceRecordSort]}` : null,
 	                    ].filter((label): label is string => Boolean(label));
+	                    const invoiceStatusShortcuts = [
+	                      { id: 'all' as const, label: 'All', count: invoiceRecordsForView.length },
+	                      { id: 'open' as const, label: 'Open', count: invoiceRecordsForView.filter(invoice => !['paid', 'void'].includes(invoice.status)).length },
+	                      { id: 'paid' as const, label: 'Paid', count: invoiceRecordsForView.filter(invoice => invoice.status === 'paid').length },
+	                    ];
 	                    return (
                       <div className="space-y-4">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -39812,7 +39888,12 @@ function ContractorDashboard({
                               )}
                               {focusedInvoiceRecord && (
                                 <button type="button" onClick={() => setFocusedInvoiceRecordId(null)} className={buttonClass('secondary')}>
-                                  View all open invoices
+                                  View all invoices
+                                </button>
+                              )}
+                              {jobsCustomerFilterSubjectId && (selectedJobsConnection || selectedJobsLocalContact) && (
+                                <button type="button" onClick={openSelectedJobsCustomerProfile} className={buttonClass('secondary')}>
+                                  Customer profile
                                 </button>
                               )}
                               <button
@@ -39829,7 +39910,27 @@ function ContractorDashboard({
                             </div>
                           </div>
                           {!focusedEstimateRecord && !focusedInvoiceRecord && (
-                          <div
+                            <>
+                              {!showingEstimates && (
+                                <div className="mt-4 grid grid-cols-3 gap-2" data-testid="contractor-invoice-status-shortcuts" aria-label="Invoice record groups">
+                                  {invoiceStatusShortcuts.map(shortcut => {
+                                    const active = contractorInvoiceRecordStatusFilter === shortcut.id;
+                                    return (
+                                      <button
+                                        key={shortcut.id}
+                                        type="button"
+                                        onClick={() => setContractorInvoiceRecordStatusFilter(shortcut.id)}
+                                        aria-pressed={active}
+                                        className={`min-w-0 rounded-lg border px-3 py-2 text-left transition ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`}
+                                      >
+                                        <span className="block text-xs font-semibold">{shortcut.label}</span>
+                                        <span className="mt-1 block text-lg font-bold">{shortcut.count}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              <div
                             className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(11rem,14rem)_minmax(11rem,14rem)_auto] xl:items-end"
                             data-testid={showingEstimates ? 'contractor-estimate-list-controls' : 'contractor-invoice-list-controls'}
                           >
@@ -39925,6 +40026,7 @@ function ContractorDashboard({
                                     data-testid="contractor-invoice-status-filter"
                                   >
                                     <option value="all">All</option>
+                                    <option value="open">Open</option>
                                     <option value="draft">Draft</option>
                                     <option value="sent">Sent</option>
                                     <option value="viewed">Viewed</option>
@@ -39960,8 +40062,9 @@ function ContractorDashboard({
                                 </button>
                               </>
                             )}
-	                          </div>
-	                          )}
+                              </div>
+                            </>
+                          )}
 	                          {!focusedEstimateRecord && (showingEstimates ? estimateFilterActive : invoiceFilterActive) && (
 	                            <FilterSummary
 	                              className="mt-3"

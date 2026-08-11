@@ -114,6 +114,9 @@ test.describe('Jobs overview redesign guardrails', () => {
     expect(overview).toContain('label="Estimates"');
     expect(overview).toContain('label="Active Jobs"');
     expect(overview).toContain('label="Invoices"');
+    expect(overview).toContain('helper={`${openInvoiceCount} open · ${paidInvoiceCount} paid`}');
+    expect(overview).toContain('emptyHelper="No invoice records"');
+    expect(overview).not.toContain('Open invoice records');
     expect(overview).not.toContain('PreviewList');
     expect(overview).not.toContain('.map(job');
     expect(overview).not.toContain('.map(estimate');
@@ -148,6 +151,21 @@ test.describe('Jobs overview redesign guardrails', () => {
     expect(overview).toContain("setContractorJobsViewAndScroll('open_jobs')");
     expect(source).toContain("{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
     expect(source).toContain("contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'");
+  });
+
+  test('keeps Paid invoices discoverable from Jobs and the Customer profile', () => {
+    const source = sourceFile('src/App.tsx');
+
+    expect(source).toContain('data-testid="contractor-invoice-status-shortcuts"');
+    expect(source).toContain("{ id: 'open' as const, label: 'Open'");
+    expect(source).toContain("{ id: 'paid' as const, label: 'Paid'");
+    expect(source).toContain("contractorInvoiceRecordStatusFilter === 'open' && !['paid', 'void'].includes(invoice.status)");
+    expect(source).toContain('data-testid="customer-financial-records"');
+    expect(source).toContain('Open invoices</span>');
+    expect(source).toContain('Paid invoices</span>');
+    expect(source).toContain("item.kind === 'invoice' ? focusSavedInvoiceRecord(item.record) : focusSavedEstimateRecord(item.record)");
+    expect(source).toContain('Customer profile');
+    expect(source).not.toContain('View all open invoices');
   });
 
   test('opens qualifying attention rows through existing record workflows', () => {

@@ -23,6 +23,7 @@ import {
   escapeRegExp,
   launchCustomerProfileDraft,
   openE2ECustomerActionPanel,
+  openE2ECustomerDetail,
   timestampForRecord,
   waitForContractorWorkspaceReady,
 } from './helpers/customers';
@@ -455,6 +456,15 @@ test.describe('contractor-created local Customer lifecycle', () => {
     expect(download.suggestedFilename()).toMatch(/invoice.+\.pdf$/i);
     expect(await download.failure()).toBeNull();
 
+    await openSidebarTab(contractorPage, /Customers/i);
+    await openE2ECustomerDetail(contractorPage, customerName);
+    await main.getByTestId('contractor-customer-tab-profile').click();
+    const mixedFinancialHistory = main.getByTestId('customer-financial-records');
+    await expect(mixedFinancialHistory).toContainText('1 estimate');
+    await expect(mixedFinancialHistory).toContainText('1 paid');
+    await expect(mixedFinancialHistory.getByRole('button').filter({ hasText: estimateTitle })).toBeVisible();
+    await expect(mixedFinancialHistory.getByRole('button').filter({ hasText: invoiceTitle })).toContainText('Invoice · Paid');
+
     await contractorConsole.assertClean(testInfo);
     await contractorContext.close();
   });
@@ -600,6 +610,29 @@ test.describe('contractor-created local Customer lifecycle', () => {
     await expect(historyDialog.getByText(`Reference: ${paymentReference}`, { exact: true })).toBeVisible();
     await expect(historyDialog.getByText(paymentNote, { exact: true })).toBeVisible();
     await historyDialog.getByRole('button', { name: /^Close payment dialog$/i }).click();
+
+    await openSidebarTab(page, /Customers/i);
+    await openE2ECustomerDetail(page, customerName);
+    await main.getByTestId('contractor-customer-tab-profile').click();
+    const customerFinancialRecords = main.getByTestId('customer-financial-records');
+    await expect(customerFinancialRecords).toContainText('0 open invoices');
+    await expect(customerFinancialRecords).toContainText('1 paid');
+    await expect(customerFinancialRecords.getByRole('button', { name: /^Paid invoices 1$/i })).toBeVisible();
+    await expect(customerFinancialRecords.getByRole('button').filter({ hasText: invoiceTitle })).toContainText('Invoice · Paid');
+
+    await customerFinancialRecords.getByRole('button').filter({ hasText: invoiceTitle }).click();
+    await expect(main.getByRole('heading', { name: /^Invoice record$/i })).toBeVisible({ timeout: 30_000 });
+    invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
+    await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible();
+    await main.getByRole('button', { name: /^Customer profile$/i }).click();
+    await expect(main.getByRole('heading', { level: 2, name: new RegExp(`^${escapeRegExp(customerName)}$`, 'i') })).toBeVisible();
+    await expect(main.getByTestId('customer-financial-records')).toContainText('1 paid');
+
+    await main.getByTestId('customer-financial-records').getByRole('button', { name: /^Paid invoices 1$/i }).click();
+    await expect(main.getByTestId('contractor-invoice-status-filter')).toHaveValue('paid');
+    await expect(main.getByTestId('contractor-invoice-status-shortcuts').getByRole('button', { name: /^Paid 1$/i })).toHaveAttribute('aria-pressed', 'true');
+    invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
+    await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
     await invoiceCard.getByRole('button', { name: /^Download PDF$/i }).click();

@@ -46,8 +46,9 @@ All five required scenarios passed through actual contractor/customer browser pa
 - Expected: the overview clearly identifies where closed/paid records live.
 - Actual: the tile is described as `Open invoice records`, but selecting it opens the all-status list where the Paid filter successfully reaches the Invoice, history, and PDF. The Customer financial summary also does not surface this paid Invoice.
 - Root cause: overview wording/count semantics do not describe the broader list they open.
-- Status: unresolved and recorded under FB-035. Correcting the overview information architecture is broader than a selector/copy patch in this audit.
-- Regression: both connected and not-connected lifecycle tests reopen Paid through the current real route, preventing the functionality from being mistaken for absent.
+- Correction in review: the Jobs Invoice tile now counts all Invoice records and states the open/Paid split instead of describing an all-status destination as open-only. The Invoice list adds direct All/Open/Paid groups while preserving every detailed status filter. Customer profiles use canonical Invoice records, show open/Paid counts beside Estimates, reopen exact financial records, and retain a Customer-profile return path.
+- Validation status: typecheck and focused source/UI contract coverage pass. Exact Sandbox browser validation remains required before this finding can move to Fixed; the approved local Sandbox Owner/Admin/Office credentials were stale when the correction was prepared, so no fixture or environment mutation occurred.
+- Regression: the connected and not-connected lifecycle coverage now includes Customer-profile financial discovery and exact Paid-Invoice navigation, but its new assertions must pass against Sandbox before merge.
 
 ### CWA-004 - TEST GAP - Medium - Core lifecycle stopped before payment
 
