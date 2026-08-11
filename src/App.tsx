@@ -24561,9 +24561,9 @@ function ContractorDashboard({
       if (paymentError) throw paymentError;
       const result = (data || {}) as { status?: InvoiceStatus; amount_paid_cents?: number; balance_due_cents?: number };
       setNotice(actionFeedbackMessage(
-        result.status === 'paid' ? 'Invoice marked paid' : 'Payment recorded',
+        result.status === 'paid' ? 'Invoice paid' : 'Payment recorded',
         result.status === 'paid'
-          ? 'The Invoice balance is paid. ServSync recorded the payment details. ServSync did not process a payment.'
+          ? 'The Invoice balance is paid. ServSync recorded an offline payment and did not process money.'
           : `${formatMoney(result.amount_paid_cents ?? 0)} recorded in total; ${formatMoney(result.balance_due_cents ?? 0)} remains.`,
         'contractor-invoice-payment-feedback',
       ));

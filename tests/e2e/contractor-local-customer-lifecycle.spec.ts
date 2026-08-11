@@ -54,11 +54,15 @@ async function withSandboxServiceRole<T>(operation: () => Promise<T>) {
     || !requiredEnv('TEST_SUPABASE_URL').includes(SANDBOX_PROJECT_REF)) {
     throw new Error(`Refusing request-free server validation outside Sandbox ${SANDBOX_PROJECT_REF}.`);
   }
+  const previousUrl = process.env.SUPABASE_URL;
   const previous = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_URL = requiredEnv('TEST_SUPABASE_URL');
   process.env.SUPABASE_SERVICE_ROLE_KEY = requiredEnv('TEST_SUPABASE_SERVICE_ROLE_KEY');
   try {
     return await operation();
   } finally {
+    if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = previousUrl;
     if (previous === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     else process.env.SUPABASE_SERVICE_ROLE_KEY = previous;
   }
@@ -453,5 +457,158 @@ test.describe('contractor-created local Customer lifecycle', () => {
 
     await contractorConsole.assertClean(testInfo);
     await contractorContext.close();
+  });
+
+  test('marks a saved local-customer Draft Invoice paid without sending it', async ({ browser }, testInfo) => {
+    requireApprovedSandboxForMutation();
+    test.setTimeout(180_000);
+
+    const timestamp = timestampForRecord();
+    const recordPrefix = `E2E Local Lifecycle ${timestamp}`;
+    const invoiceTitle = `${recordPrefix} Draft Paid Invoice`;
+    const paymentReference = `DRAFT-${timestamp}`;
+    const paymentNote = `${recordPrefix}: full offline payment before send.`;
+    const context = await browser.newContext({ baseURL: requiredEnv('TEST_APP_URL') });
+    const page = await context.newPage();
+    await installSandboxServerRoutes(page);
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+    const providerRequests: string[] = [];
+    let invoiceSendRequests = 0;
+    page.on('request', request => {
+      const url = request.url();
+      if (/stripe\.com|\/api\/stripe-|\/rpc\/servsync_create_stripe/i.test(url)) providerRequests.push(url);
+      if (url.includes('/rpc/servsync_send_invoice')) invoiceSendRequests += 1;
+    });
+
+    await loginAs(page, 'contractor');
+    await openSidebarTab(page, /Customers/i);
+    await expectActiveTabHeading(page, /^Customers$/i);
+    const createContactResponse = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_create_local_contact'),
+      { timeout: 30_000 },
+    );
+    const { customerName } = await createLocalE2ECustomer(page, timestamp);
+    const createdContact = await createContactResponse;
+    expect(createdContact.ok()).toBeTruthy();
+    const createdPayload = await createdContact.json() as { contact?: { id?: string } };
+    const contactId = createdPayload.contact?.id;
+    expect(contactId).toBeTruthy();
+    createdContactIds.push(contactId!);
+
+    await openE2ECustomerActionPanel(page, customerName);
+    await launchCustomerProfileDraft(page, {
+      customerName,
+      output: 'invoice',
+      title: invoiceTitle,
+      scope: `${recordPrefix}: Draft Invoice full-payment audit without delivery.`,
+    });
+
+    await expect(main.getByRole('heading', { name: /^Saved invoice draft$/i })).toBeVisible({ timeout: 30_000 });
+    let invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
+    await expect(invoiceCard.getByText(/^Draft$/i).first()).toBeVisible();
+    const markPaidAction = invoiceCard.getByTestId('contractor-record-invoice-payment');
+    await expect(markPaidAction).toContainText(/^Mark Paid$/i);
+    await markPaidAction.click();
+
+    const paymentDialog = page.getByRole('dialog', { name: /^Mark Paid$/i });
+    await expect(paymentDialog).toBeVisible();
+    await expect(paymentDialog.getByText(/finalizes the Invoice/i)).toBeVisible();
+    await expect(paymentDialog.getByLabel(/^Payment amount$/i)).toHaveValue('123.00');
+    await expect(paymentDialog.getByLabel(/^Payment amount$/i)).toHaveAttribute('readonly', '');
+    await paymentDialog.locator('select').selectOption('check');
+    await paymentDialog.getByLabel(/Reference or check number/i).fill(paymentReference);
+    await paymentDialog.getByLabel(/^Note/i).fill(paymentNote);
+
+    const paymentResponse = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_record_offline_invoice_payment'),
+      { timeout: 30_000 },
+    );
+    await paymentDialog.getByRole('button', { name: /^Mark Paid$/i }).click();
+    const recordedPayment = await paymentResponse;
+    expect(recordedPayment.ok()).toBeTruthy();
+    expect(await recordedPayment.json()).toMatchObject({
+      created: true,
+      status: 'paid',
+      amount_paid_cents: 12_300,
+      balance_due_cents: 0,
+      finalized_from_draft: true,
+    });
+    await expect(main.getByText(/^Invoice paid$/i)).toBeVisible({ timeout: 30_000 });
+    expect(invoiceSendRequests).toBe(0);
+    expect(providerRequests).toEqual([]);
+
+    const client = createClient(requiredEnv('VITE_SUPABASE_URL'), requiredEnv('VITE_SUPABASE_ANON_KEY'), {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    try {
+      const signIn = await client.auth.signInWithPassword(credentialsFor('contractor'));
+      expect(signIn.error).toBeNull();
+      const invoice = await client
+        .from('invoices')
+        .select('id,status,total_cents,amount_paid_cents,paid_at,issued_at,local_contact_id,local_home_id,job_id,estimate_id')
+        .eq('title', invoiceTitle)
+        .single();
+      expect(invoice.error).toBeNull();
+      expect(invoice.data).toMatchObject({
+        status: 'paid',
+        total_cents: 12_300,
+        amount_paid_cents: 12_300,
+        local_contact_id: contactId,
+        job_id: null,
+        estimate_id: null,
+      });
+      expect(invoice.data?.local_home_id).toBeTruthy();
+      expect(invoice.data?.issued_at).toBeTruthy();
+      expect(invoice.data?.paid_at).toBeTruthy();
+      const payments = await client.rpc('servsync_list_invoice_offline_payments', { p_invoice_id: invoice.data!.id });
+      expect(payments.error).toBeNull();
+      expect(payments.data).toHaveLength(1);
+      expect(payments.data[0]).toMatchObject({
+        amount_cents: 12_300,
+        payment_method: 'check',
+        reference: paymentReference,
+        note: paymentNote,
+      });
+      const invoiceId = invoice.data!.id;
+      if (!/^[0-9a-f-]{36}$/i.test(invoiceId)) throw new Error('Refusing actor verification for malformed Invoice ID.');
+      const actorQuery = execFileSync('supabase', [
+        'db', 'query', '--linked', '--output', 'json',
+        `select recorded_by_user_id::text as recorded_by_user_id from public.invoice_offline_payment_records where invoice_id = '${invoiceId}'::uuid`,
+      ], { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const actorRows = (JSON.parse(actorQuery) as { rows?: Array<{ recorded_by_user_id?: string }> }).rows ?? [];
+      expect(actorRows).toEqual([{ recorded_by_user_id: signIn.data.user!.id }]);
+    } finally {
+      await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    }
+
+    await page.reload();
+    await openSidebarTab(page, /^Jobs\b/i);
+    await expectActiveTabHeading(page, /^Jobs$/i);
+    await main.getByRole('button', { name: /^Invoices:/i }).click();
+    await main.getByRole('tab', { name: /^Invoices\b/i }).first().click();
+    await main.getByTestId('contractor-invoice-search').fill(invoiceTitle);
+    await main.getByTestId('contractor-invoice-status-filter').selectOption('paid');
+    invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
+    await expect(invoiceCard.getByText(/^Paid$/i).first()).toBeVisible({ timeout: 30_000 });
+    await expect(invoiceCard.getByTestId('invoice-payment-summary-detail')).toContainText('$123.00');
+    await expect(invoiceCard.getByTestId('invoice-payment-summary-detail')).toContainText('$0.00');
+    await invoiceCard.getByTestId('contractor-record-invoice-payment').click();
+    const historyDialog = page.getByRole('dialog', { name: /^Payment history$/i });
+    await expect(historyDialog.getByRole('button', { name: /^(?:Mark Paid|Record payment)$/i })).toHaveCount(0);
+    await expect(historyDialog.getByText(/\$123\.00 · Check/i)).toHaveCount(1);
+    await expect(historyDialog.getByText(`Reference: ${paymentReference}`, { exact: true })).toBeVisible();
+    await expect(historyDialog.getByText(paymentNote, { exact: true })).toBeVisible();
+    await historyDialog.getByRole('button', { name: /^Close payment dialog$/i }).click();
+
+    const downloadPromise = page.waitForEvent('download');
+    await invoiceCard.getByRole('button', { name: /^Download PDF$/i }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/invoice.+\.pdf$/i);
+    expect(await download.failure()).toBeNull();
+    expect(invoiceSendRequests).toBe(0);
+    expect(providerRequests).toEqual([]);
+    await consoleErrors.assertClean(testInfo);
+    await context.close();
   });
 });

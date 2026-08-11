@@ -8,7 +8,7 @@ Source baseline: `f2aa415a1ea344228b191be4760b9044d2981833`
 
 ## Result
 
-All five required scenarios were attempted through actual contractor/customer browser paths and persisted Sandbox state. Connected full and partial offline-payment lifecycles passed through Paid. The not-connected Customer lifecycle passed from Customer creation through secure Estimate acceptance, Job completion, secure Invoice recipient access, and durable full payment. Draft Invoice Mark Paid remains unavailable on current main because draft PR #417 and its reviewed migration are not applied. No Production or Demo mutation occurred.
+All five required scenarios passed through actual contractor/customer browser paths and persisted Sandbox state. Connected full and partial offline-payment lifecycles passed through Paid. The not-connected Customer lifecycle passed from Customer creation through secure Estimate acceptance, Job completion, secure Invoice recipient access, and durable full payment. A separate local-Customer Draft-first path saved a Draft Invoice and recorded its exact full offline balance directly to Paid without sending or contacting Stripe. The exact Draft Invoice Mark Paid migration is applied in Sandbox, Demo, and Production; Demo and Production validation was read-only apart from the reviewed function replacement.
 
 ## Scenario Evidence
 
@@ -17,7 +17,7 @@ All five required scenarios were attempted through actual contractor/customer br
 | A. Connected Customer lifecycle | PASS | Homeowner request, contractor Estimate, authenticated acceptance, Job, completed priced work, sent Invoice, full check payment, reload, immutable one-row payment history, Paid PDF, Home History filing, and reminder all passed. |
 | B. Not-connected Customer lifecycle | PASS | Contractor created the Customer/property, launched a Draft-first Estimate, issued a secure exact-snapshot link, guest accepted, contractor created/completed the Job, issued a secure Invoice, recipient loaded it without an account, and contractor recorded full cash payment. Reload, the Jobs Invoice list Paid filter, immutable one-row history, and Paid PDF all passed. |
 | C. Partial then full payment | PASS | A $40 external ACH payment persisted as Partially Paid with $85 due; a later $85 cash payment produced Paid with $0 due and exactly two immutable history rows. |
-| D. Draft Invoice paid without send | BLOCKED | Current main offers no draft-payment action. Draft PR #417 implements the separately reviewed behavior but is conflicting and its migration remains unapplied in Sandbox, Demo, and Production. No overlapping change was made here. |
+| D. Draft Invoice paid without send | PASS | A local Customer/property launched a $123 saved Draft Invoice from the normal Draft-first path. `Mark Paid` recorded one full check payment without any send or Stripe request, persisted actor/date/reference/note and exact Customer/property lineage, reloaded as Paid with $0 due and one immutable history row, blocked a second payment action, and downloaded the Paid PDF. Exact cleanup restored the Sandbox baseline. |
 | E. Correction/exception | PASS | Paid Invoices expose immutable payment history without another Record payment action; reload preserved exact totals and no duplicate payment was posted. |
 
 ## Findings
@@ -63,12 +63,10 @@ All five required scenarios were attempted through actual contractor/customer br
 - Actual: components and gateways had focused coverage, but no browser journey connected them.
 - Correction: `contractor-local-customer-lifecycle.spec.ts` exercises the real handlers, recipient UI, canonical mutations, browser reopen, payment history, Paid PDF, and exact cleanup.
 
-### CWA-006 - MISSING CAPABILITY - High - Draft Invoice cannot be paid on current main
+### CWA-006 - FIXED - Draft Invoice can be paid in full without send
 
-- Reproduction: create a draft Invoice and inspect its actions before send.
-- Expected for the separately approved #417 scope: Record payment can settle the exact draft balance while preserving ledger/audit rules.
-- Actual: current main requires Invoice send before manual payment.
-- Ownership: draft PR #417. Its head is conflicting with current main and its migration is unapplied. This audit neither duplicates nor applies that work.
+- Correction: eligible saved Draft Invoices expose `Mark Paid`; the amount is locked to the server-authoritative full remaining balance, and the existing offline-payment RPC atomically records one immutable payment and finalizes the Invoice as Paid.
+- Validation: actual Sandbox UI coverage proved Customer/property lineage, full-balance enforcement, actor/date/method/reference/note persistence, reload durability, one-row history, zero balance, Paid PDF download, no send/provider request, and no second payment action. The exact migration is applied in Sandbox, Demo, and Production with preserved target data fingerprints.
 
 ### CWA-007 - INCONSISTENCY - Low - QA guide understated existing coverage
 
@@ -84,8 +82,8 @@ All five required scenarios were attempted through actual contractor/customer br
 
 ## Cleanup And Boundaries
 
-Every completed lifecycle records exact fixture identities and removes only those records after execution. The audit also removed exact interrupted-run records carrying the audit's `E2E Core Loop`, `E2E Partial Payment`, and `E2E Test Customer` timestamp prefixes, then verified zero matching residue. No migration, RLS, RPC, environment configuration, Stripe setting, Production record, or Demo record changed.
+Every completed lifecycle records exact fixture identities and removes only those records after execution. The audit also removed exact interrupted-run records carrying the audit's `E2E Core Loop`, `E2E Partial Payment`, and `E2E Test Customer` timestamp prefixes, then verified zero matching residue. Scenario D returned Sandbox to 84 Invoices, zero offline payments, and zero invoice-paid events. The reviewed function migration was applied without environment, Stripe, authentication, or ad hoc business-data changes; Demo retained zero Invoices and Production retained its exact 12-Invoice financial fingerprint.
 
 ## PR #417 Boundary
 
-PR #417 remains a separate draft for draft-Invoice full offline payment. It must resolve its current-main conflict and complete the reviewed migration rollout before Scenario D can pass. This audit reuses only the already-live sent-Invoice payment model and does not alter draft payment semantics.
+PR #417 owns the completed Draft Invoice full offline-payment correction and migration rollout. It preserves the #419 Customer-readiness and secure-delivery fixes, existing sent/viewed/overdue/partially-paid behavior, CWA-003 as a bounded low-severity discoverability follow-up, and CWA-008 as a bounded PDF Preview/download comparison gap.
