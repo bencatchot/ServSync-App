@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
+import { Archive, ChevronLeft, ChevronRight, Download, RotateCcw, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type {
@@ -8,6 +8,8 @@ import type {
   PriceBookImportAction,
   PriceBookImportBatchResult,
   PriceBookImportBatchSummary,
+  PriceBookImportRollbackPreview,
+  PriceBookImportRollbackResult,
   PriceBookImportPreview,
   PriceBookImportRequestRow,
   PriceBookImportSource,
@@ -61,6 +63,8 @@ type PriceBookImportApi = {
     mapping: PriceBookCsvMapping;
   }) => Promise<PriceBookImportBatchResult>;
   listBatches: () => Promise<PriceBookImportBatchSummary[]>;
+  previewRollback: (batchId: string) => Promise<PriceBookImportRollbackPreview>;
+  executeRollback: (batchId: string, idempotencyKey: string) => Promise<PriceBookImportRollbackResult>;
 };
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -102,9 +106,11 @@ function reconciliationStatusLabel(status: PriceBookImportPreview['rows'][number
 export function PriceBookCsvReconciliationPanel({
   api,
   onCompleted,
+  onRollbackCompleted,
 }: {
   api: PriceBookImportApi;
   onCompleted: (result: PriceBookImportBatchResult) => Promise<void>;
+  onRollbackCompleted: (result: PriceBookImportRollbackResult) => Promise<void>;
 }) {
   const [sources, setSources] = useState<PriceBookImportSource[]>([]);
   const [sourceId, setSourceId] = useState('');
@@ -124,9 +130,14 @@ export function PriceBookCsvReconciliationPanel({
   const [executing, setExecuting] = useState(false);
   const [previewPage, setPreviewPage] = useState(1);
   const [history, setHistory] = useState<PriceBookImportBatchSummary[]>([]);
+  const [rollbackPreview, setRollbackPreview] = useState<PriceBookImportRollbackPreview | null>(null);
+  const [previewingRollbackId, setPreviewingRollbackId] = useState<string | null>(null);
+  const [executingRollback, setExecutingRollback] = useState(false);
+  const [rollbackIdempotencyKey, setRollbackIdempotencyKey] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const executeLockRef = useRef(false);
+  const rollbackLockRef = useRef(false);
 
   const localRows = useMemo(() => buildPriceBookImportRows(rows, mapping), [rows, mapping]);
   const blockedLocalRows = localRows.filter(row => row.errors.length > 0);
@@ -171,6 +182,46 @@ export function PriceBookCsvReconciliationPanel({
     setMapping({});
     clearPreview();
     setError('');
+  };
+
+  const previewRollback = async (batchId: string) => {
+    if (previewingRollbackId || executingRollback) return;
+    setPreviewingRollbackId(batchId);
+    setRollbackPreview(null);
+    setRollbackIdempotencyKey('');
+    setError('');
+    setNotice('');
+    try {
+      const nextPreview = await api.previewRollback(batchId);
+      setRollbackPreview(nextPreview);
+      setRollbackIdempotencyKey(crypto.randomUUID());
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Unable to preview this import rollback.');
+    } finally {
+      setPreviewingRollbackId(null);
+    }
+  };
+
+  const executeRollback = async () => {
+    if (!rollbackPreview?.can_rollback || !rollbackIdempotencyKey || rollbackLockRef.current) return;
+    if (!window.confirm('Roll back this completed import? Updated fields will be restored and items added by the import will be archived.')) return;
+    rollbackLockRef.current = true;
+    setExecutingRollback(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.executeRollback(rollbackPreview.batch_id, rollbackIdempotencyKey);
+      setNotice(`Rollback complete: ${result.restore_count} restored, ${result.archive_count} archived, ${result.unchanged_count} unchanged.`);
+      setRollbackPreview(null);
+      setRollbackIdempotencyKey('');
+      await onRollbackCompleted(result);
+      await loadPrivateLists();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Unable to roll back this import. Preview it again before retrying.');
+    } finally {
+      rollbackLockRef.current = false;
+      setExecutingRollback(false);
+    }
   };
 
   const createSource = async () => {
@@ -402,10 +453,53 @@ export function PriceBookCsvReconciliationPanel({
         <details className="rounded-xl border border-slate-200 bg-white">
           <summary className="min-h-[48px] cursor-pointer px-4 py-3 text-sm font-bold text-slate-800">Recent import history</summary>
           <div className="space-y-2 border-t border-slate-200 p-4">
-            {history.map(batch => <div key={batch.id} className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600"><p className="font-bold text-slate-950">{batch.source_name} · {batch.original_filename || 'CSV import'}</p><p className="mt-1">{batch.add_count} added · {batch.update_count} updated · {batch.skip_count} skipped · {new Date(batch.completed_at).toLocaleString()}</p></div>)}
-            <p className="text-xs text-slate-500">Rollback is not included in this slice. Import history is read-only.</p>
+            {history.map(batch => (
+              <div key={batch.id} className="flex flex-col gap-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-bold text-slate-950">{batch.source_name} · {batch.original_filename || 'CSV import'}</p>
+                  <p className="mt-1">{batch.add_count} added · {batch.update_count} updated · {batch.skip_count} skipped · {new Date(batch.completed_at).toLocaleString()}</p>
+                  {batch.rollback ? <p className="mt-1 font-semibold text-emerald-700">Rolled back {new Date(batch.rollback.completed_at).toLocaleString()}</p> : null}
+                </div>
+                {batch.rollback ? null : (
+                  <button type="button" className={secondaryButtonClass} disabled={Boolean(previewingRollbackId) || executingRollback} onClick={() => void previewRollback(batch.id)}>
+                    <RotateCcw size={16} />{previewingRollbackId === batch.id ? 'Checking...' : 'Preview rollback'}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </details>
+      ) : null}
+
+      {rollbackPreview ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4" aria-labelledby="price-book-rollback-heading" data-testid="price-book-rollback-preview">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h4 id="price-book-rollback-heading" className="text-sm font-bold text-slate-950">Review import rollback</h4>
+              <p className="mt-1 text-xs leading-5 text-slate-600">Only unchanged imported fields can be restored. Added items are archived and retained in history.</p>
+            </div>
+            <button type="button" className={secondaryButtonClass} disabled={executingRollback} onClick={() => setRollbackPreview(null)}>Close</button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Rollback counts">
+            {(['restore', 'archive', 'unchanged', 'conflict'] as const).map(key => <div key={key} className="rounded-lg bg-white p-3"><p className="text-xs font-bold uppercase text-slate-500">{key}</p><p className="mt-1 text-lg font-bold text-slate-950">{rollbackPreview.counts[key]}</p></div>)}
+          </div>
+          <div className="mt-3 space-y-2">
+            {rollbackPreview.rows.map(row => (
+              <div key={row.original_batch_row_id} className="rounded-lg border border-amber-200 bg-white p-3 text-xs" data-testid="price-book-rollback-row">
+                <div className="flex items-start gap-2">
+                  {row.rollback_action === 'archive_item' ? <Archive size={15} className="mt-0.5 text-amber-700" /> : <RotateCcw size={15} className="mt-0.5 text-slate-500" />}
+                  <div><p className="font-bold text-slate-950">Row {row.row_number} · {row.title}</p><p className="mt-1 text-slate-600">{row.rollback_action === 'restore_fields' ? `Restore ${row.restore_fields.join(', ')}` : row.rollback_action === 'archive_item' ? 'Archive imported item' : 'No Price Book change'}</p></div>
+                </div>
+                {row.errors.length > 0 ? <p className="mt-2 font-semibold text-red-700">{row.errors.join(' ')}</p> : null}
+              </div>
+            ))}
+          </div>
+          {rollbackPreview.can_rollback ? (
+            <div className="mt-4 flex justify-end"><button type="button" className={primaryButtonClass} disabled={executingRollback} onClick={() => void executeRollback()}><RotateCcw size={16} />{executingRollback ? 'Rolling back...' : 'Confirm rollback'}</button></div>
+          ) : (
+            <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">This batch cannot be rolled back until the listed conflicts are resolved through normal Price Book management.</div>
+          )}
+        </section>
       ) : null}
     </div>
   );
