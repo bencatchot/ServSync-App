@@ -59,11 +59,12 @@ Unsaved edits must be saved before approval. Loading, no-accepted-Plan, no-prepa
 
 Migration `servsync-accepted-plan-marketing-directions.sql` has SHA-256 `165208592583b97cbd7abe95fb3ef95ff8adff93141ea5a4038cedd1f45cae93`.
 
-This slice authorizes Sandbox migration and validation only. Demo and Production remain pending. The accepted Production planner-v3 Plan and all historical plans, packages, content records, status events, profile state, and unrelated business data remain unchanged. Source or Preview availability does not authorize Direction preparation in an environment whose migration is absent.
+The exact migration is applied and validated in Sandbox, Demo (`2026-08-11T03:58:19Z` through `04:03:11Z`), and Production (`04:05:19Z` through `04:05:29Z`). Demo passed before Production was touched. Both targets matched the reviewed ownership, forced-RLS, policy-free, direct-table-denial, fixed-path RPC, and authenticated-only grant contract. Rollback-only six-item preparation, exact snapshots, atomicity, replay/conflict handling, draft revision, stale-write rejection, terminal approval, malformed/stale/draft/cross-workspace denial, role denial, and zero downstream content changes passed with no residue.
+
+Production retains zero first-class Directions and revisions. Accepted Plan `4e390d96-03f0-4342-9a13-3e8119383024`, its six items and revision history, the Profile and revisions, historical planner-v1/v2 Plans, Packages #1/#2, ten content records (three approved and seven draft), sixteen status events, and sampled unrelated-business identifiers remain fingerprint-exact. Schema availability does not authorize real Direction preparation.
 
 ## Deferred
 
-- Demo and Production schema rollout;
 - preparation of the first real Directions from the accepted Production Plan;
 - content-package creation from an approved Direction;
 - runtime AI or provider-backed preparation;

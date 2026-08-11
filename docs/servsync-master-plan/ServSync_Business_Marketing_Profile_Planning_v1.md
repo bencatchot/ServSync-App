@@ -100,7 +100,7 @@ Planner Coherence + Relevance v3 migration `servsync-marketing-planner-coherence
 
 - contractor Business Marketing activation and authorization;
 - contractor canonical-profile/context RPC composition;
-- Demo/Production rollout of the durable Marketing Direction foundation;
+- preparation and owner review of the first real accepted-Plan Directions;
 - content creation from approved Directions;
 - publishing and scheduling;
 - social/provider OAuth;

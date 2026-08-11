@@ -107,41 +107,6 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
-      },
-      {
-        "id": "accepted-plan-marketing-directions-v1",
-        "reason": "Approved Sandbox-only durable accepted-Plan Marketing Direction foundation.",
-        "selectors": {
-          "relationScopes": [
-            "public.marketing_direction_revisions",
-            "public.marketing_directions"
-          ],
-          "functionScopes": [
-            "public.servsync_approve_internal_marketing_direction(uuid, bigint)",
-            "public.servsync_get_internal_marketing_directions()",
-            "public.servsync_prepare_internal_marketing_directions(uuid, uuid, bigint, text, text, text, text, jsonb)",
-            "public.servsync_private_guard_marketing_direction()",
-            "public.servsync_private_guard_marketing_direction_revision()",
-            "public.servsync_private_marketing_direction_audience_matches(text, text)",
-            "public.servsync_private_marketing_direction_corrections_valid(jsonb)",
-            "public.servsync_private_marketing_direction_snapshot(marketing_directions)",
-            "public.servsync_private_marketing_direction_values_valid(jsonb, text, text, text, text, text[], text[], jsonb, text, text[], text, text)",
-            "public.servsync_update_internal_marketing_direction(uuid, bigint, text, text, text, text[], text[], jsonb, text)"
-          ],
-          "exactObjects": []
-        },
-        "expectedCounts": {
-          "relations": 2,
-          "columns": 38,
-          "constraints": 37,
-          "indexes": 8,
-          "triggers": 4,
-          "functions": 10,
-          "functionGrants": 14,
-          "tableGrants": 16
-        },
-        "expectedKeyFingerprint": "sha256:5418753ee609d2d2c0da67db2d08ae4483a5fff1dc26f8b7f1bd9b8d076dfb4d",
-        "expectedCatalogFingerprint": "sha256:6224714ba2eaf5002d6f2dee7e6cc2bc56918416da277f2da5d1df60a014ceb4"
       }
     ]
   }

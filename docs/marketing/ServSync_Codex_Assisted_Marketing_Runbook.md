@@ -132,7 +132,7 @@ npm run marketing:prepare-codex-directions -- path/to/directions.json
 9. Review and refine each draft under Marketing -> Settings -> Directions. Save any edit before approval.
 10. Approve only deliberate owner decisions. Direction approval creates no content package and grants no publishing authority.
 
-Demo and Production Direction preparation remain prohibited until their exact migration rollout and an operational preparation request are separately authorized.
+The exact Direction migration is applied in Sandbox, Demo, and Production. Schema availability does not authorize preparation: Demo or Production Direction preparation still requires a separately approved operational request, and no real Production Direction was created during rollout.
 
 ## Package Contract
 
