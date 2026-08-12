@@ -476,16 +476,16 @@
       "artifact": "servsync-price-book-portable-reference-manual-edit-preservation.sql",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Exact SHA-256 373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8 is locally validated and awaits controlled Sandbox-first application."
+          "status": "Applied",
+          "reason": "Exact SHA-256 373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-12 from 17:14:16Z through 17:14:17Z. Catalog/grants remained exact; rollback-only authenticated preview and execution preserved an unrelated manual description while applying the imported price. Disposable same-field conflict coverage remained ambiguous and skip-only. Sandbox returned to 195 items, three sources, eight batches, 169 batch rows, 161 mappings, and its exact item fingerprint."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Apply only after the exact additive correction passes Sandbox and Demo baseline-preservation gates."
+          "status": "Applied",
+          "reason": "Exact SHA-256 373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-12 from 17:16:44Z through 17:16:46Z after Sandbox and Demo passed. Catalog/grants and rollback-only authenticated preview/execution preservation passed with zero residue. Production retained zero Price Book items, sources, imports, and mappings, plus its exact 7-profile, 22-Estimate, 39-line, and 12-Invoice baseline."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Apply after Sandbox acceptance and before Production to preserve supported-schema parity."
+          "status": "Applied",
+          "reason": "Exact SHA-256 373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-12 from 17:15:50Z through 17:15:51Z. Catalog/grants and rollback-only authenticated preview/execution preservation passed with zero residue. Demo retained zero Price Book items, sources, imports, and mappings."
         }
       }
     }
