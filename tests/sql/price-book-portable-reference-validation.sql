@@ -2,6 +2,7 @@ set role authenticated;
 set request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select public.servsync_create_price_book_import_source('Portable export round trip') as owner_source \gset
 select public.servsync_create_price_book_import_source('Portable identity conflict') as conflict_source \gset
+select public.servsync_create_price_book_import_source('Portable manual preservation') as preservation_source \gset
 reset role;
 
 insert into public.contractor_price_book_items (
@@ -125,6 +126,115 @@ select public.test_assert(
      from public.contractor_price_book_items
     where id = '30000000-0000-4000-8000-000000000001'),
   'Generic guarded rollback did not restore a portable-reference update.'
+);
+
+insert into public.external_object_mappings (
+  provider, provider_account_id, provider_object_type, provider_object_id,
+  servsync_entity_type, servsync_entity_id, contractor_id, mapping_status,
+  sync_direction, metadata
+)
+select 'servsync_file_import', :'preservation_source'::jsonb ->> 'id',
+       'contractor_price_book_item',
+       'servsync-item:30000000-0000-4000-8000-000000000003',
+       'contractor_price_book_item', item.id, item.contractor_id, 'active',
+       'imported', jsonb_build_object(
+         'last_import_values', public.servsync_private_price_book_item_values(item),
+         'last_import_mapped_fields', jsonb_build_array(
+           'title', 'customer_description', 'default_unit_price_cents'
+         )
+       )
+  from public.contractor_price_book_items item
+ where item.id = '30000000-0000-4000-8000-000000000003';
+
+update public.contractor_price_book_items
+   set customer_description = 'Manual customer description'
+ where id = '30000000-0000-4000-8000-000000000003';
+
+set role authenticated;
+set request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select public.servsync_preview_price_book_import(
+  (:'preservation_source'::jsonb ->> 'id')::uuid,
+  jsonb_build_array(jsonb_build_object(
+    'row_number', 601,
+    'external_item_id', 'servsync-item:30000000-0000-4000-8000-000000000003',
+    'mapped_fields', jsonb_build_array(
+      'title', 'customer_description', 'default_unit_price_cents'
+    ),
+    'values', jsonb_build_object(
+      'title', 'HVAC item 003',
+      'customer_description', 'Customer description 3',
+      'default_unit_price_cents', 8888
+    )
+  ))
+) as preservation_preview \gset
+reset role;
+
+select public.test_assert(
+  :'preservation_preview'::jsonb #>> '{rows,0,reconciliation_status}' = 'changed'
+  and :'preservation_preview'::jsonb #>> '{rows,0,recommended_action}' = 'update'
+  and :'preservation_preview'::jsonb #>> '{rows,0,result_values,customer_description}' = 'Manual customer description'
+  and (:'preservation_preview'::jsonb #>> '{rows,0,result_values,default_unit_price_cents}')::integer = 8888
+  and jsonb_array_length(:'preservation_preview'::jsonb #> '{rows,0,conflict_fields}') = 0,
+  'Portable reconciliation did not preserve an unrelated manual edit from an agreeing source baseline.'
+);
+
+set role authenticated;
+set request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select public.servsync_execute_price_book_import(
+  (:'preservation_source'::jsonb ->> 'id')::uuid,
+  jsonb_build_array(jsonb_build_object(
+    'row_number', 601,
+    'external_item_id', 'servsync-item:30000000-0000-4000-8000-000000000003',
+    'mapped_fields', jsonb_build_array(
+      'title', 'customer_description', 'default_unit_price_cents'
+    ),
+    'values', jsonb_build_object(
+      'title', 'HVAC item 003',
+      'customer_description', 'Customer description 3',
+      'default_unit_price_cents', 8888
+    )
+  )),
+  '{"601":"update"}'::jsonb,
+  '40000000-0000-4000-8000-000000000003',
+  'portable-manual-preservation.csv', repeat('c', 64), 256,
+  '{"ServSync Item Reference":"external_item_id"}'::jsonb
+) as preservation_import \gset
+reset role;
+
+select public.test_assert(
+  (select customer_description = 'Manual customer description'
+          and default_unit_price_cents = 8888
+     from public.contractor_price_book_items
+    where id = '30000000-0000-4000-8000-000000000003'),
+  'Portable-reference execution did not preserve the unrelated manual edit.'
+);
+
+update public.contractor_price_book_items
+   set customer_description = 'Second manual customer description'
+ where id = '30000000-0000-4000-8000-000000000003';
+
+set role authenticated;
+set request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+select public.servsync_preview_price_book_import(
+  (:'preservation_source'::jsonb ->> 'id')::uuid,
+  jsonb_build_array(jsonb_build_object(
+    'row_number', 602,
+    'external_item_id', 'servsync-item:30000000-0000-4000-8000-000000000003',
+    'mapped_fields', jsonb_build_array('title', 'customer_description'),
+    'values', jsonb_build_object(
+      'title', 'HVAC item 003',
+      'customer_description', 'Imported conflicting description'
+    )
+  ))
+) as preservation_conflict \gset
+reset role;
+
+select public.test_assert(
+  :'preservation_conflict'::jsonb #>> '{rows,0,reconciliation_status}' = 'ambiguous'
+  and :'preservation_conflict'::jsonb #>> '{rows,0,recommended_action}' = 'skip'
+  and :'preservation_conflict'::jsonb #> '{rows,0,allowed_actions}' = '["skip"]'::jsonb
+  and :'preservation_conflict'::jsonb #> '{rows,0,conflict_fields}' ? 'customer_description',
+  'Portable reconciliation did not fail closed for a same-field manual/import conflict.'
 );
 
 insert into public.external_object_mappings (

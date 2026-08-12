@@ -238,6 +238,7 @@ test.describe('FB-024 Price Book Export v1', () => {
 
   test('binds exported ServSync references to tenant-scoped server reconciliation', () => {
     const migration = sourceFile('servsync-price-book-portable-reference-reconciliation.sql');
+    const preservation = sourceFile('servsync-price-book-portable-reference-manual-edit-preservation.sql');
     expect(migration).toContain("v_external_item_id ~ '^servsync-item:");
     expect(migration).toContain('where id = v_portable_item_id');
     expect(migration).toContain('and contractor_id = p_contractor_id');
@@ -247,6 +248,11 @@ test.describe('FB-024 Price Book Export v1', () => {
     expect(migration).toContain("ServSync item reference is invalid.");
     expect(migration).not.toContain('grant execute on function public.servsync_private_preview_price_book_import');
     expect(migration).not.toMatch(/alter table|create table|create policy|grant .*table/i);
+    expect(preservation).toContain("v_mapping.metadata -> 'last_import_values'");
+    expect(preservation).toContain("jsonb_array_length(v_merge -> 'conflict_fields') > 0");
+    expect(preservation).toContain('Manual and imported values both changed');
+    expect(preservation).not.toContain('grant execute on function public.servsync_private_preview_price_book_import');
+    expect(preservation).not.toMatch(/alter table|create table|create policy|grant .*table/i);
   });
 
   test('keeps export source-only, paginated, non-mutating, and free of private export columns', () => {

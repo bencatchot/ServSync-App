@@ -34,10 +34,11 @@ run --file "$ROOT/tests/sql/price-book-import-rollback-foundation.sql" >/dev/nul
 run --file "$ROOT/servsync-price-book-repeat-import-reconciliation.sql" >/dev/null
 run --file "$ROOT/servsync-price-book-import-batch-rollback.sql" >/dev/null
 run --file "$ROOT/servsync-price-book-portable-reference-reconciliation.sql" >/dev/null
+run --file "$ROOT/servsync-price-book-portable-reference-manual-edit-preservation.sql" >/dev/null
 run --file "$ROOT/tests/sql/price-book-portable-reference-validation.sql" >/dev/null
 
-if run --file "$ROOT/servsync-price-book-portable-reference-reconciliation.sql" >"$TMP/reapply.log" 2>&1; then
-  echo 'Expected repeated portable-reference migration application to fail closed.' >&2
+if run --file "$ROOT/servsync-price-book-portable-reference-manual-edit-preservation.sql" >"$TMP/reapply.log" 2>&1; then
+  echo 'Expected repeated portable-reference manual-edit migration application to fail closed.' >&2
   exit 1
 fi
 if ! grep -q 'already installed' "$TMP/reapply.log"; then
@@ -45,4 +46,4 @@ if ! grep -q 'already installed' "$TMP/reapply.log"; then
   exit 1
 fi
 
-echo 'Price Book portable-reference PostgreSQL validation passed.'
+echo 'Price Book portable-reference and manual-edit preservation PostgreSQL validation passed.'

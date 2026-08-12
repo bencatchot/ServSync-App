@@ -470,6 +470,24 @@
           "reason": "Exact SHA-256 a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-12 from 17:01:17Z through 17:01:18Z after Sandbox acceptance. Catalog/security and rollback-only authenticated public-RPC validation passed with zero residue. Demo retained zero Price Book items, costs, sources, imports, mappings, and rollbacks; its three contractor profiles and zero Estimate/Invoice baseline remained unchanged."
         }
       }
+    },
+    {
+      "id": "price-book-portable-reference-manual-edit-preservation-v1",
+      "artifact": "servsync-price-book-portable-reference-manual-edit-preservation.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Exact SHA-256 373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8 is locally validated and awaits controlled Sandbox-first application."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Apply only after the exact additive correction passes Sandbox and Demo baseline-preservation gates."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Apply after Sandbox acceptance and before Production to preserve supported-schema parity."
+        }
+      }
     }
   ]
 }
