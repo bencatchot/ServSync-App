@@ -100,6 +100,7 @@ export function ContractorPriceBookWorkspace({
   savingItem,
   togglingItemId,
   csvTools,
+  exportTools,
   onBack,
   onRetry,
   onOpenAddForm,
@@ -121,6 +122,7 @@ export function ContractorPriceBookWorkspace({
   savingItem: boolean;
   togglingItemId: string | null;
   csvTools?: ReactNode;
+  exportTools?: ReactNode;
   onBack: () => void;
   onRetry: () => void;
   onOpenAddForm: () => void;
@@ -668,6 +670,16 @@ export function ContractorPriceBookWorkspace({
             </button>
           </div>
         </div>
+      ) : null}
+
+      {exportTools ? (
+        <details className="rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="price-book-export-tools">
+          <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
+            Export Price Book
+            <ChevronDown size={17} />
+          </summary>
+          <div className="border-t border-slate-200 p-4">{exportTools}</div>
+        </details>
       ) : null}
 
       {canMutate && csvTools ? (

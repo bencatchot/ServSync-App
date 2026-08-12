@@ -214,7 +214,7 @@ export const PRICE_BOOK_CSV_FIELDS: Array<{
 ];
 
 export const PRICE_BOOK_CSV_FIELD_ALIASES: Record<PriceBookCsvField, string[]> = {
-  external_item_id: ['externalid', 'externalitemid', 'recordid', 'sourceid', 'sourceitemid', 'itemid', 'productid', 'serviceid'],
+  external_item_id: ['externalid', 'externalitemid', 'servsyncitemreference', 'recordid', 'sourceid', 'sourceitemid', 'itemid', 'productid', 'serviceid'],
   title: ['title', 'item', 'itemname', 'name', 'service', 'servicename', 'product', 'productname', 'descriptionname'],
   customer_description: ['customerdescription', 'description', 'desc', 'customerdesc', 'servicedescription', 'itemdescription', 'productdescription', 'details'],
   internal_notes: ['internalnotes', 'internal_notes', 'notes', 'note', 'private_notes', 'privatenotes', 'internalnote'],
@@ -227,7 +227,7 @@ export const PRICE_BOOK_CSV_FIELD_ALIASES: Record<PriceBookCsvField, string[]> =
   default_unit_price_cents: ['defaultunitpricecents', 'pricecents', 'amountcents', 'unitpricecents'],
   taxable: ['taxable', 'tax', 'istaxable', 'taxstatus'],
   labor_hours: ['laborhours', 'laborhrs', 'hours', 'hrs', 'estimatedhours', 'estimatedlabor', 'estimatedlaborhours', 'labortime', 'estimatedlabortime'],
-  sku: ['sku', 'code', 'itemcode', 'servicecode', 'productcode', 'partnumber', 'catalogcode'],
+  sku: ['sku', 'skucode', 'code', 'itemcode', 'servicecode', 'productcode', 'partnumber', 'catalogcode'],
   active: ['active', 'enabled', 'status'],
 };
 

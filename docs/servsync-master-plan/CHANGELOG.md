@@ -6,6 +6,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-price-book-export-v1`
+- Starting main SHA: `c407ea32c11444e9533d949dee9c5ced8f348587`
+- Files changed: shared Price Book CSV/XLSX export contract; compact export UI; complete-catalog paginated read integration; importer header aliases; focused export, round-trip, privacy, authorization, scale, failure, and responsive tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
+- Summary of change: Completes Price Book Export v1. Existing authorized Price Book readers can download All items or Active items only as a clean UTF-8 CSV or one-sheet `.xlsx` workbook. Both artifacts use user-facing Service/Labor/Material/Fee terminology and the same automatically recognized headers, values, blank-versus-zero behavior, and bounded generic row contract used by the existing importer.
+- Privacy and identity: Export includes a prefixed `ServSync Item Reference` as portable correlation, not authority. Existing authenticated contractor, selected-source, mapping, and reconciliation checks remain authoritative. The export-specific read and generated files exclude private cost/margin, internal notes, contractor/account IDs, source/audit fields, and reconciliation metadata. CSV formula-like text is apostrophe-contained before spreadsheet opening; XLSX cells are explicitly typed and never written as formulas.
+- Scale and UX: Export verifies an exact RLS-protected count before and after deterministic 500-row paging, rejects duplicate/missing row identities, and never serializes only the visible 25-row view. It supports up to 5,000 items and fails rather than returning an incomplete or concurrently changed file. Empty Price Books explain why no download is available, and a responsive disclosure keeps the normal management screen compact.
+- Architecture: No SQL, schema, RPC, RLS, grants, environment, Production data, raw-file storage, dependency, import execution, cost authority, or provider integration changed. The existing `write-excel-file` dependency is reused.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 now records contractor-owned portable CSV/XLSX export as complete while retaining broader Price Book maturity work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the export contract, portable-identity boundary, privacy allowlist, role behavior, scale limit, and explicit exclusions.
+
 - Branch: `codex/fb024-possible-duplicate-status-v1`
 - Starting main SHA: `b2b448f5601c397f15b230c6fb559c7d1ce671a1`
 - Files changed: existing Price Book duplicate-review summary helper and reconciliation UI; focused controlled-fixture and status tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
