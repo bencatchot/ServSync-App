@@ -203,7 +203,7 @@ export const PRICE_BOOK_CSV_FIELDS: Array<{
   { key: 'trade', label: 'Trade', helper: 'HVAC, plumbing, electrical, etc.' },
   { key: 'category', label: 'Category', helper: 'Service, repair, material, or your own grouping.' },
   { key: 'subcategory', label: 'Subcategory', helper: 'Optional grouping beneath category.' },
-  { key: 'line_type', label: 'Line type', helper: 'labor, material, fee, or other.' },
+  { key: 'line_type', label: 'Item type', helper: 'Service, Labor, Material, or Fee.' },
   { key: 'unit', label: 'Unit', helper: 'Each, hour, job, lot, etc.' },
   { key: 'default_unit_price', label: 'Default price', helper: 'Dollar price such as $95.00. Blank means Price Required.' },
   { key: 'default_unit_price_cents', label: 'Default price cents', helper: 'Integer cents if your export uses cents.' },
@@ -269,7 +269,9 @@ function allNonBlankValues(rows: PriceBookTabularRow[], header: string) {
 function interpretationLabel(field: PriceBookCsvField, rawValue: string) {
   if (field === 'line_type') {
     const parsed = parseLineType(rawValue);
-    return parsed.value && parsed.value !== rawValue.trim().toLowerCase() ? `${rawValue} -> ${parsed.value}` : '';
+    if (!parsed.value) return '';
+    const label = parsed.value === 'other' ? 'Service' : `${parsed.value.charAt(0).toUpperCase()}${parsed.value.slice(1)}`;
+    return normalizePriceBookCsvHeader(rawValue) !== normalizePriceBookCsvHeader(label) ? `${rawValue} -> ${label}` : '';
   }
   if (field === 'active' || field === 'taxable') {
     const parsed = parseBoolean(rawValue, field === 'active' ? 'Active' : 'Taxable');
@@ -312,7 +314,8 @@ export function interpretPriceBookImport(headers: string[], rows: PriceBookTabul
     const interpretations = detectedValues.map(value => interpretationLabel(field.key, value)).filter(Boolean);
     const usesSkuAsIdentity = field.key === 'external_item_id' && header === mapping.sku && !PRICE_BOOK_CSV_FIELD_ALIASES.external_item_id.includes(normalizedHeader);
     const reviewAlias = REVIEW_HEADER_ALIASES[field.key]?.includes(normalizedHeader) || false;
-    const confidence: PriceBookImportMappingConfidence = usesSkuAsIdentity || reviewAlias || interpretations.length > 0 ? 'review' : 'automatic';
+    const semanticInterpretation = field.key === 'line_type' && interpretations.length > 0;
+    const confidence: PriceBookImportMappingConfidence = usesSkuAsIdentity || reviewAlias || semanticInterpretation ? 'review' : 'automatic';
     next[field.key] = {
       field: field.key,
       header,
@@ -451,7 +454,7 @@ function parseLineType(value: string) {
   if (['material', 'materials', 'part', 'parts', 'equipment', 'product'].includes(normalized)) return { value: 'material' as EstimateLineType };
   if (['fee', 'charge', 'trip charge', 'trip fee'].includes(normalized)) return { value: 'fee' as EstimateLineType };
   if (['other', 'service', 'service item', 'repair', 'diagnostic', 'misc', 'miscellaneous'].includes(normalized)) return { value: 'other' as EstimateLineType };
-  return { value: null, error: 'Line type is not recognized. Use labor, material, fee, other, or a common equivalent such as service, part, or charge.' };
+  return { value: null, error: 'Item type is not recognized. Use Service, Labor, Material, or Fee, or a common equivalent such as repair, part, or charge.' };
 }
 
 export function buildPriceBookImportRows(rows: PriceBookCsvRow[], mapping: PriceBookCsvMapping): PriceBookLocalPreviewRow[] {

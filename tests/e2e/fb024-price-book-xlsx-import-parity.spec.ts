@@ -8,7 +8,9 @@ import {
   parsePriceBookCsv,
   priceBookCsvRowsFromParsed,
   type PriceBookTabularRow,
+  type PriceBookImportPreviewRow,
 } from '../../src/features/price-book/priceBookCsvReconciliation';
+import { findPriceBookPossibleDuplicate } from '../../src/features/price-book/priceBookPossibleDuplicates';
 
 type TestCell = string | number | boolean | Date | null | { type: 'Formula'; value: string };
 
@@ -169,6 +171,36 @@ test.describe('FB-024 Price Book XLSX Import Parity v1', () => {
       { external_item_id: 'HVAC-001', values: { line_type: 'other', default_unit_price_cents: 18900, active: true } },
       { external_item_id: 'HVAC-002', values: { line_type: 'material', default_unit_price_cents: 0, active: false } },
     ]);
+  });
+
+  test('feeds equivalent CSV and XLSX rows into the same cross-source duplicate review', async ({ page }) => {
+    const sourceRows: TestCell[][] = [
+      ['External ID', 'Title', 'Trade', 'Category', 'Item Type', 'Price'],
+      ['ALT-CAP-1', 'Dual-Run Capacitor Replacement', 'HVAC', 'Electrical', 'Service', 229],
+    ];
+    const [worksheet] = await parseWorkbookInBrowser(page, await workbookBuffer([{ name: 'Catalog', rows: sourceRows }]));
+    const csv = priceBookCsvRowsFromParsed(parsePriceBookCsv([
+      'External ID,Title,Trade,Category,Item Type,Price',
+      'ALT-CAP-1,Dual-Run Capacitor Replacement,HVAC,Electrical,Service,229',
+    ].join('\n')));
+    const xlsxInterpretation = interpretPriceBookImport(worksheet.headers, worksheet.rows);
+    const csvInterpretation = interpretPriceBookImport(csv.headers, csv.rows);
+    const [xlsxRequest] = buildPriceBookImportRows(worksheet.rows, xlsxInterpretation.mapping).map(row => row.requestRow);
+    const [csvRequest] = buildPriceBookImportRows(csv.rows, csvInterpretation.mapping).map(row => row.requestRow);
+    const preview = (values: typeof xlsxRequest.values): PriceBookImportPreviewRow => ({
+      row_number: 2, external_item_id: 'ALT-CAP-1', sku: null, row_fingerprint: 'a'.repeat(64), mapped_fields: Object.keys(values),
+      match_type: 'none', reconciliation_status: 'new', match_confidence: 'none', target_item_id: null, target_updated_at: null,
+      current_values: null, incoming_values: values, result_values: values, changed_fields: [], conflict_fields: [],
+      recommended_action: 'add', allowed_actions: ['add', 'skip'], warnings: [], errors: [],
+    });
+    const existing = [{
+      id: 'existing-capacitor', title: 'Dual Run Capacitor Replacement', customer_description: '', trade: 'HVAC', category: 'Electrical',
+      subcategory: null, line_type: 'other' as const, unit: null, default_unit_price_cents: 22900, sku: 'ABC-123', active: true,
+    }];
+
+    expect(xlsxRequest).toEqual(csvRequest);
+    expect(findPriceBookPossibleDuplicate(preview(xlsxRequest.values), existing)?.item.id).toBe('existing-capacitor');
+    expect(findPriceBookPossibleDuplicate(preview(csvRequest.values), existing)?.item.id).toBe('existing-capacitor');
   });
 
   test('uses cached formula values without evaluating formulas or external references', async ({ page }) => {

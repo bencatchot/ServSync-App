@@ -88,7 +88,8 @@ test.describe('FB-024 Price Book management cleanup', () => {
     expect(workspace).toContain('Only the item name is required.');
     expect(workspace).toContain('data-testid="price-book-item-list"');
     expect(workspace).toContain('min-h-[44px]');
-    expect(workspace).toContain('Service / Other');
+    expect(workspace).toContain("{ value: 'other', label: 'Service' }");
+    expect(workspace).not.toContain('Service / Other');
     expect(workspace).toContain('Active (');
     expect(workspace).toContain('Archived (');
   });

@@ -44,7 +44,7 @@ const TYPE_FILTERS: Array<{ value: PriceBookTypeFilter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'labor', label: 'Labor' },
   { value: 'material', label: 'Material' },
-  { value: 'other', label: 'Service / Other' },
+  { value: 'other', label: 'Service' },
   { value: 'fee', label: 'Fee' },
 ];
 
@@ -52,7 +52,7 @@ const LINE_TYPE_LABELS: Record<EstimateLineType, string> = {
   labor: 'Labor',
   material: 'Material',
   fee: 'Fee',
-  other: 'Service / Other',
+  other: 'Service',
 };
 
 const inputClass = 'min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
@@ -679,7 +679,7 @@ export function ContractorPriceBookWorkspace({
           }}
         >
           <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">
-            Import from CSV
+            Import from CSV or XLSX
             <ChevronDown size={17} />
           </summary>
           {csvToolsMounted ? <div className="border-t border-slate-200 p-4">{csvTools}</div> : null}
