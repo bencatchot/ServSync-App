@@ -22,6 +22,14 @@ export type PriceBookPossibleDuplicate = {
   additionalMatchCount: number;
 };
 
+export type PriceBookImportReviewCounts = {
+  new: number;
+  changed: number;
+  current: number;
+  possibleDuplicates: number;
+  attention: number;
+};
+
 const GENERIC_TITLES = new Set([
   'diagnostic',
   'fee',
@@ -161,4 +169,18 @@ export function applyPriceBookPossibleDuplicateReview(
     actions[String(row.row_number)] = candidate ? 'skip' : row.recommended_action;
   });
   return { candidates, actions };
+}
+
+export function summarizePriceBookImportReview(
+  previewRows: PriceBookImportPreviewRow[],
+  possibleDuplicates: Map<number, PriceBookPossibleDuplicate>,
+): PriceBookImportReviewCounts {
+  return previewRows.reduce<PriceBookImportReviewCounts>((counts, row) => {
+    if (row.errors.length > 0 || row.reconciliation_status === 'invalid' || row.reconciliation_status === 'ambiguous') counts.attention += 1;
+    else if (possibleDuplicates.has(row.row_number)) counts.possibleDuplicates += 1;
+    else if (row.reconciliation_status === 'new') counts.new += 1;
+    else if (row.reconciliation_status === 'changed') counts.changed += 1;
+    else if (row.reconciliation_status === 'unchanged') counts.current += 1;
+    return counts;
+  }, { new: 0, changed: 0, current: 0, possibleDuplicates: 0, attention: 0 });
 }
