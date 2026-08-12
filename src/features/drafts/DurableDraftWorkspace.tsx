@@ -1696,7 +1696,7 @@ export function DurableDraftWorkspace({
         priceBookItems={priceBookItems}
         priceBookLoadState={priceBookLoadState}
         priceBookLoadError={priceBookLoadError}
-        canViewPriceBook={canViewPriceBook}
+        canViewPriceBook={canViewPriceBook && (form.intended_output !== 'invoice' || capabilities.canLaunchInvoice)}
         currentDraftId={canonical?.draft.draftId ?? null}
         canSave={capabilities.canPersistDraft && saveState !== 'saving'}
         saving={saveState === 'saving'}

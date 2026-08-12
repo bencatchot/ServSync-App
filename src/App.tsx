@@ -277,6 +277,7 @@ import {
   type PriceBookLoadState,
 } from './features/price-book/ContractorPriceBookWorkspace';
 import { contractorPriceBookAccess } from './features/price-book/priceBookAccess';
+import { DraftPriceBookPicker } from './features/price-book/DraftPriceBookPicker';
 import { PriceBookExportPanel } from './features/price-book/PriceBookExportPanel';
 import { PRICE_BOOK_EXPORT_MAX_ITEMS, type PriceBookExportItem } from './features/price-book/priceBookExport';
 import { priceBookItemToEstimateLineDraft } from './features/price-book/priceBookEstimateLineSnapshot';
@@ -26529,6 +26530,14 @@ function ContractorDashboard({
     );
   };
 
+  const addPriceBookLinesToInvoiceDraft = (lines: EstimateLineDraft[]) => {
+    if (!canUseInvoiceDraftPriceBook || lines.length === 0) return;
+    setInvoiceDraft(draft => ({
+      ...draft,
+      line_items: [...(draft.line_items ?? []), ...lines],
+    }));
+  };
+
   const renderEstimateSavedItemPicker = () => {
     const hasSavedItems = activeContractorPriceBookItems.length > 0;
     const hasSearchMatches = estimatePriceBookQuickPickItems.length > 0;
@@ -31284,6 +31293,7 @@ function ContractorDashboard({
   const canManageInspectionTemplates = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
   const priceBookAccess = contractorPriceBookAccess(contractor, teamAccess, profile.id);
   const canManageEstimateSettings = priceBookAccess.canManage;
+  const canUseInvoiceDraftPriceBook = priceBookAccess.canView && effectiveDurableDraftCapabilities.canLaunchInvoice;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
   const contractorAccountName = profile.full_name.trim() || profile.email;
@@ -39182,6 +39192,19 @@ function ContractorDashboard({
                         <div className="mt-4">
                           {renderInvoiceLaborControls()}
                         </div>
+
+                        {canUseInvoiceDraftPriceBook ? (
+                          <div className="mt-4" data-testid="legacy-invoice-price-book">
+                            <DraftPriceBookPicker
+                              items={contractorPriceBookItems}
+                              loadState={contractorPriceBookLoadState}
+                              loadError={contractorPriceBookLoadError}
+                              disabled={savingInvoice}
+                              draftLabel="Invoice Draft"
+                              onAddLines={addPriceBookLinesToInvoiceDraft}
+                            />
+                          </div>
+                        ) : null}
 
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between gap-3">

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ContractorPriceBookItem, EstimateLineType } from '../../types';
 import { formatMoney } from '../../utils/format';
 import type { WorkComposerLineDraft } from '../work-composer/types';
-import { priceBookItemToEstimateLineDraft, priceBookStagedQuantityError } from './priceBookEstimateLineSnapshot';
+import { priceBookItemToDraftLineSnapshot, priceBookStagedQuantityError } from './priceBookEstimateLineSnapshot';
 import {
   filterPriceBookItems,
   priceBookFilterOptions,
@@ -44,12 +44,14 @@ export function DraftPriceBookPicker({
   loadState,
   loadError = '',
   disabled = false,
+  draftLabel = 'Draft',
   onAddLines,
 }: {
   items: ContractorPriceBookItem[];
   loadState: PriceBookLoadState;
   loadError?: string;
   disabled?: boolean;
+  draftLabel?: 'Draft' | 'Invoice Draft';
   onAddLines: (lines: WorkComposerLineDraft[]) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -149,7 +151,7 @@ export function DraftPriceBookPicker({
     }
     addingSelectionRef.current = true;
     setAddingSelection(true);
-    onAddLines(selectedItems.map(item => priceBookItemToEstimateLineDraft(item, (stagedQuantities[item.id] ?? '1').trim())));
+    onAddLines(selectedItems.map(item => priceBookItemToDraftLineSnapshot(item, (stagedQuantities[item.id] ?? '1').trim())));
     setAddedCount(selectedItems.length);
     setSelectedItemIds([]);
     setStagedQuantities({});
@@ -172,7 +174,7 @@ export function DraftPriceBookPicker({
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
             {ready
-              ? `${activeItems.length} active item${activeItems.length === 1 ? '' : 's'} available. Select items and add independent editable Draft lines.`
+              ? `${activeItems.length} active item${activeItems.length === 1 ? '' : 's'} available. Select items and add independent editable ${draftLabel} lines.`
               : stateCopy}
           </p>
         </div>
@@ -235,7 +237,7 @@ export function DraftPriceBookPicker({
 
           {addedCount ? (
             <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800" role="status" data-testid="durable-draft-price-book-feedback">
-              Added {addedCount} Price Book item{addedCount === 1 ? '' : 's'}. Review and edit the new Draft line{addedCount === 1 ? '' : 's'} before saving.
+              Added {addedCount} Price Book item{addedCount === 1 ? '' : 's'}. Review and edit the new {draftLabel} line{addedCount === 1 ? '' : 's'} before saving.
             </p>
           ) : null}
 
@@ -253,7 +255,7 @@ export function DraftPriceBookPicker({
                   onClick={addSelectedItems}
                 >
                   <Plus size={15} />
-                  {addingSelection ? 'Adding...' : `Add ${selectedItems.length} item${selectedItems.length === 1 ? '' : 's'} to Draft`}
+                  {addingSelection ? 'Adding...' : `Add ${selectedItems.length} item${selectedItems.length === 1 ? '' : 's'} to ${draftLabel}`}
                 </button>
               </div>
               <div className="mt-2 space-y-2">

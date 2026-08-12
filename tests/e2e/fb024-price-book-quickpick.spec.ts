@@ -86,7 +86,7 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     expect(quickPickSource).toContain('sm:w-auto');
   });
 
-  test('unified saved-item picker remains excluded from invoice composer paths', () => {
+  test('legacy Invoice Draft reuses the canonical picker without estimate-only controls', () => {
     const source = appSource();
     const lineSourcePanel = sourceBetween(
       source,
@@ -117,6 +117,10 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     expect(invoiceComposerSource).not.toContain('renderEstimateDraftLineGroups');
     expect(invoiceComposerSource).not.toContain('renderEstimateSavedItemPicker');
     expect(invoiceComposerSource).not.toContain('estimateLineSourcePanel');
+    expect(invoiceComposerSource).toContain('<DraftPriceBookPicker');
+    expect(invoiceComposerSource).toContain('draftLabel="Invoice Draft"');
+    expect(invoiceComposerSource).toContain('onAddLines={addPriceBookLinesToInvoiceDraft}');
+    expect(invoiceComposerSource).toContain('{canUseInvoiceDraftPriceBook ? (');
     expect(source).not.toContain('{isInvoiceWorkspaceTab && renderEstimateSavedItemPicker()}');
     expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderEstimateSavedItemPicker()");
   });

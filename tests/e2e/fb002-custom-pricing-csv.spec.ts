@@ -26,15 +26,18 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
 
     expect(customPricingSource).not.toContain('<Card title="Price Book"');
     expect(customPricingSource).toContain('<ContractorPriceBookWorkspace');
-    expect(customPricingSource).toContain('<PriceBookCsvReconciliationPanel');
+    expect(source).toContain('<PriceBookCsvReconciliationPanel');
     expect(sourceFile('src/features/price-book/ContractorPriceBookWorkspace.tsx')).toContain('if (event.currentTarget.open) setCsvToolsMounted(true)');
     expect(panel).toContain('Repeat-import reconciliation');
     expect(panel).toContain('Sample CSV');
     expect(panel).toContain('Choose CSV or XLSX');
     expect(panel).toContain('accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"');
-    expect(panel).toContain('Upload and map CSV or XLSX');
+    expect(panel).toContain('Upload and verify CSV or XLSX');
     expect(panel).toContain('Preview reconciliation');
-    expect(panel).toContain('Review Add, Update, and Skip');
+    expect(panel).toContain('Review Price Book changes');
+    expect(panel).toContain("if (action === 'add') return 'Add as new';");
+    expect(panel).toContain("if (action === 'update') return 'Update existing';");
+    expect(panel).toContain("return 'Skip';");
     expect(panel).toContain('Conflicting manual edits remain unchanged.');
     expect(panel).toContain('PREVIEW_PAGE_SIZE = 25');
   });
@@ -56,7 +59,7 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(csvSource).toContain('Default price must be blank, zero, or a positive amount.');
     expect(csvSource).toContain('Default price cents must be a non-negative whole number.');
     expect(csvSource).toContain("values.default_unit_price_cents = parsedPrice.value");
-    expect(csvSource).toContain('Line type must be labor, material, fee, or other.');
+    expect(csvSource).toContain('Item type is not recognized. Use Service, Labor, Material, or Fee');
   });
 
   test('server reconciliation replaces direct add-only table insertion', () => {
@@ -78,11 +81,13 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(panel).toContain('disabled={!sourceId || !mapping.title || blockedLocalRows.length > 0');
   });
 
-  test('Price Book quick-pick remains estimate-only and invoice quick-pick remains future', () => {
+  test('Price Book snapshots remain allowlisted when shared with Invoice Drafts', () => {
     const source = appSource();
     const mapperSource = sourceFile('src/features/price-book/priceBookEstimateLineSnapshot.ts');
 
     expect(source).toContain("estimateLineSourcePanel === 'saved' && renderEstimateSavedItemPicker()");
+    expect(source).toContain('draftLabel="Invoice Draft"');
+    expect(source).toContain('onAddLines={addPriceBookLinesToInvoiceDraft}');
     expect(source).not.toContain('{isInvoiceWorkspaceTab && renderEstimateSavedItemPicker()}');
     expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderEstimateSavedItemPicker()");
 
