@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ContractorPriceBookItem, EstimateLineType } from '../../types';
 import { formatMoney } from '../../utils/format';
 import type { WorkComposerLineDraft } from '../work-composer/types';
-import { priceBookItemToEstimateLineDraft } from './priceBookEstimateLineSnapshot';
+import { priceBookItemToEstimateLineDraft, priceBookStagedQuantityError } from './priceBookEstimateLineSnapshot';
 import {
   filterPriceBookItems,
   priceBookFilterOptions,
@@ -58,6 +58,8 @@ export function DraftPriceBookPicker({
   const [trade, setTrade] = useState('');
   const [category, setCategory] = useState('');
   const [addedTitle, setAddedTitle] = useState('');
+  const [stagedQuantities, setStagedQuantities] = useState<Record<string, string>>({});
+  const [quantityErrors, setQuantityErrors] = useState<Record<string, string>>({});
   const [addingItemId, setAddingItemId] = useState<string | null>(null);
   const addingItemIdRef = useRef<string | null>(null);
   const resetTimer = useRef<number | null>(null);
@@ -93,9 +95,17 @@ export function DraftPriceBookPicker({
 
   const addItem = (item: ContractorPriceBookItem) => {
     if (pickerDisabled || addingItemIdRef.current) return;
+    const quantity = stagedQuantities[item.id] ?? '1';
+    const quantityError = priceBookStagedQuantityError(quantity);
+    if (quantityError) {
+      setQuantityErrors(current => ({ ...current, [item.id]: quantityError }));
+      return;
+    }
     addingItemIdRef.current = item.id;
     setAddingItemId(item.id);
-    onAddLine(priceBookItemToEstimateLineDraft(item));
+    onAddLine(priceBookItemToEstimateLineDraft(item, quantity.trim()));
+    setStagedQuantities(current => ({ ...current, [item.id]: '1' }));
+    setQuantityErrors(current => ({ ...current, [item.id]: '' }));
     setAddedTitle(item.title);
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
     resetTimer.current = window.setTimeout(() => {
@@ -201,16 +211,42 @@ export function DraftPriceBookPicker({
                       {LINE_TYPE_LABELS[item.line_type]} / {item.unit || 'each'} / {priceLabel(item)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                    data-testid="durable-draft-price-book-add"
-                    disabled={Boolean(addingItemId)}
-                    onClick={() => addItem(item)}
-                  >
-                    <Plus size={15} />
-                    {addingItemId === item.id ? 'Adding...' : 'Add item'}
-                  </button>
+                  <div className="w-full shrink-0 sm:w-auto">
+                    <div className="flex items-end gap-2">
+                      <label className="block w-24 shrink-0 text-xs font-semibold text-slate-600">
+                        <span className="mb-1 block">Qty</span>
+                        <input
+                          aria-label={`Quantity for ${item.title}`}
+                          className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-sm"
+                          type="number"
+                          inputMode="decimal"
+                          min="0.01"
+                          step="0.01"
+                          value={stagedQuantities[item.id] ?? '1'}
+                          aria-invalid={Boolean(quantityErrors[item.id])}
+                          aria-describedby={quantityErrors[item.id] ? `price-book-quantity-error-${item.id}` : undefined}
+                          onChange={event => {
+                            const quantity = event.target.value;
+                            setStagedQuantities(current => ({ ...current, [item.id]: quantity }));
+                            setQuantityErrors(current => ({ ...current, [item.id]: '' }));
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 min-w-28 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                        data-testid="durable-draft-price-book-add"
+                        disabled={Boolean(addingItemId)}
+                        onClick={() => addItem(item)}
+                      >
+                        <Plus size={15} />
+                        {addingItemId === item.id ? 'Adding...' : 'Add item'}
+                      </button>
+                    </div>
+                    {quantityErrors[item.id] ? (
+                      <p id={`price-book-quantity-error-${item.id}`} className="mt-1 text-xs font-semibold text-red-700" role="alert">{quantityErrors[item.id]}</p>
+                    ) : null}
+                  </div>
                 </article>
               ))}
             </div>

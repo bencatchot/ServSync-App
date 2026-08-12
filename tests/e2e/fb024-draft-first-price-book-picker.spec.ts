@@ -4,7 +4,11 @@ import { resolve } from 'node:path';
 import type { ContractorPriceBookItem } from '../../src/types';
 import { prepareDurableDraftSave } from '../../src/features/drafts/durableDraftComposerIntegration';
 import { createBlankSharedDraftComposerDraft } from '../../src/features/drafts/draftComposerMappings';
-import { priceBookItemToEstimateLineDraft } from '../../src/features/price-book/priceBookEstimateLineSnapshot';
+import {
+  priceBookItemToEstimateLineDraft,
+  priceBookStagedQuantityError,
+} from '../../src/features/price-book/priceBookEstimateLineSnapshot';
+import { workComposerLineTotalCents } from '../../src/features/work-composer/workComposerDrafts';
 
 const CONTRACTOR_ID = '00000000-0000-4000-8000-000000000401';
 
@@ -21,6 +25,7 @@ function priceBookItem(overrides: Partial<ContractorPriceBookItem> = {}): Contra
     line_type: 'material',
     unit: 'each',
     default_unit_price_cents: 0,
+    internal_cost_cents: 875,
     taxable: true,
     labor_hours: 1.25,
     sku: 'PRIVATE-SKU',
@@ -51,6 +56,7 @@ async function installComposerHarness(page: Page) {
       customer_description: 'Includes one standard copper fitting.', internal_notes: 'Private margin target',
       trade: 'Plumbing', category: 'Repair', subcategory: 'Fittings', line_type: 'material', unit: 'each',
       default_unit_price_cents: 0, taxable: true, labor_hours: 1.25, sku: 'PRIVATE-SKU', source: 'csv_import',
+      internal_cost_cents: 875,
       active: true, archived_at: null, created_at: '2026-08-01T12:00:00.000Z', updated_at: '2026-08-01T12:00:00.000Z',
       ...overrides,
     });
@@ -139,35 +145,46 @@ async function installComposerHarness(page: Page) {
 
 test.describe('FB-024 Draft-first Price Book picker v1', () => {
   test('uses one safe snapshot mapper for blank, zero, and priced items', () => {
-    const zero = priceBookItemToEstimateLineDraft(priceBookItem());
-    const blank = priceBookItemToEstimateLineDraft(priceBookItem({ id: 'blank', default_unit_price_cents: null, labor_hours: null }));
-    const priced = priceBookItemToEstimateLineDraft(priceBookItem({ id: 'priced', default_unit_price_cents: 129900 }));
+    const zero = priceBookItemToEstimateLineDraft(priceBookItem(), '5');
+    const blank = priceBookItemToEstimateLineDraft(priceBookItem({ id: 'blank', default_unit_price_cents: null, labor_hours: null }), '3');
+    const priced = priceBookItemToEstimateLineDraft(priceBookItem({ id: 'priced', default_unit_price_cents: 3500 }), '4');
 
     expect(zero).toMatchObject({
       line_type: 'material',
       description: 'Copper fitting replacement',
       line_title: 'Copper fitting replacement',
       customer_description: 'Includes one standard copper fitting.',
-      quantity: '1',
+      quantity: '5',
       unit: 'each',
       unit_price: '0.00',
       labor_hours: '1.25',
     });
     expect(blank.unit_price).toBe('');
     expect(blank.labor_hours).toBe('');
-    expect(priced.unit_price).toBe('1299.00');
+    expect(blank.quantity).toBe('3');
+    expect(priced.unit_price).toBe('35.00');
+    expect(priced.quantity).toBe('4');
+    expect(workComposerLineTotalCents(priced)).toBe(14000);
     expect(zero.id).not.toBe(blank.id);
     expect(JSON.stringify(zero)).not.toContain('Private margin target');
     expect(JSON.stringify(zero)).not.toContain('PRIVATE-SKU');
     expect(JSON.stringify(zero)).not.toContain('csv_import');
     expect(JSON.stringify(zero)).not.toContain('price-book-1');
-    for (const excluded of ['contractor_id', 'internal_notes', 'sku', 'source', 'trade', 'category', 'taxable', 'archived_at']) {
+    for (const excluded of ['contractor_id', 'internal_notes', 'internal_cost_cents', 'sku', 'source', 'trade', 'category', 'taxable', 'archived_at']) {
       expect(zero).not.toHaveProperty(excluded);
+      expect(priced).not.toHaveProperty(excluded);
+    }
+  });
+
+  test('uses the existing positive finite Draft quantity rule for staging', () => {
+    for (const valid of ['1', '4', '0.5', '2.5']) expect(priceBookStagedQuantityError(valid)).toBe('');
+    for (const invalid of ['', '0', '-1', 'not-a-number', 'Infinity']) {
+      expect(priceBookStagedQuantityError(invalid)).toBe('Enter a quantity greater than zero.');
     }
   });
 
   test('persists the editable snapshot fields without Price Book linkage for Draft-to-Estimate launch', () => {
-    const line = priceBookItemToEstimateLineDraft(priceBookItem());
+    const line = priceBookItemToEstimateLineDraft(priceBookItem(), '2.5');
     const draft = createBlankSharedDraftComposerDraft({
       intended_output: 'estimate',
       title: 'Plumbing estimate',
@@ -188,7 +205,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
       customer_description: 'Includes one standard copper fitting.',
       internal_notes: '',
       line_type: 'material',
-      quantity: 1,
+      quantity: 2.5,
       unit: 'each',
       unit_price_cents: 0,
       labor_hours: 1.25,
@@ -196,6 +213,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     expect(JSON.stringify(prepared.payload)).not.toContain('price-book-1');
     expect(JSON.stringify(prepared.payload)).not.toContain('PRIVATE-SKU');
     expect(JSON.stringify(prepared.payload)).not.toContain('Private margin target');
+    expect(JSON.stringify(prepared.payload)).not.toContain('internal_cost');
     expect(JSON.stringify(prepared.payload)).not.toContain('Fittings');
   });
 
@@ -231,6 +249,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     await expect(page.getByTestId('durable-draft-price-book-picker')).toHaveCount(0);
     await page.getByTestId('durable-draft-price-book-toggle').click();
     await expect(page.getByText('Copper fitting replacement')).toBeVisible();
+    await expect(page.getByLabel('Quantity for Copper fitting replacement')).toHaveValue('1');
     await expect(page.getByText('Diagnostic labor')).toBeVisible();
     await expect(page.getByText('Archived fee')).toHaveCount(0);
 
@@ -245,6 +264,49 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('stages whole and decimal quantities, keeps repeated snapshots independent, and resets after add', async ({ page }) => {
+    await installComposerHarness(page);
+    await page.evaluate(() => window.__draftPriceBookHarness.setItems([
+      window.__draftPriceBookHarness.item({ default_unit_price_cents: 3500 }),
+      window.__draftPriceBookHarness.item({ id: 'blank-price', title: 'Price required item', default_unit_price_cents: null }),
+    ]));
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('Copper');
+    const quantity = page.getByLabel('Quantity for Copper fitting replacement');
+    await expect(quantity).toHaveValue('1');
+    await quantity.fill('4');
+    await page.getByTestId('durable-draft-price-book-add').first().click();
+    await expect(quantity).toHaveValue('1');
+    await expect(page.getByPlaceholder('Search title, description, trade, category, SKU...')).toHaveValue('Copper');
+    await page.waitForTimeout(300);
+    await quantity.fill('2.5');
+    await page.getByTestId('durable-draft-price-book-add').first().click();
+
+    const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+    expect((snapshot.draft.line_items as Array<Record<string, unknown>>).map(line => line.quantity)).toEqual(['4', '2.5']);
+    expect((snapshot.draft.line_items as Array<Record<string, unknown>>).map(line => line.unit_price)).toEqual(['35.00', '35.00']);
+    expect(snapshot.items).toEqual([
+      expect.objectContaining({ id: 'price-book-1', default_unit_price_cents: 3500, internal_cost_cents: 875 }),
+      expect.objectContaining({ id: 'blank-price', default_unit_price_cents: null, internal_cost_cents: 875 }),
+    ]);
+    expect(JSON.stringify(snapshot.draft)).not.toMatch(/internal_cost|PRIVATE-SKU|Private margin target|price-book-1/);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('blocks invalid staged quantities without adding a line', async ({ page }) => {
+    await installComposerHarness(page);
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    const quantity = page.getByLabel('Quantity for Copper fitting replacement');
+    for (const invalid of ['', '0', '-1']) {
+      await quantity.fill(invalid);
+      await page.getByTestId('durable-draft-price-book-add').first().click();
+      await expect(page.getByRole('alert')).toContainText('Enter a quantity greater than zero.');
+      const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+      expect(snapshot.draft.line_items).toEqual([]);
+    }
   });
 
   test('fails closed for idle, loading, and error states and distinguishes empty from no results', async ({ page }) => {
@@ -295,6 +357,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     await installComposerHarness(page);
     const originalItems = await page.evaluate(() => window.__draftPriceBookHarness.snapshot().items);
     await page.getByTestId('durable-draft-price-book-toggle').click();
+    await page.getByLabel('Quantity for Copper fitting replacement').fill('3');
     const addButton = page.getByTestId('durable-draft-price-book-add').first();
     await addButton.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
 
@@ -305,13 +368,12 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     expect(snapshot.items).toEqual(originalItems);
 
     await page.getByLabel('Draft estimate line item 1 description').fill('Edited copper fitting');
-    await page.getByLabel('Draft estimate line item 1 quantity').fill('2');
     await page.getByLabel('Draft estimate line item 1 unit price').fill('45.00');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     await page.evaluate(() => window.__draftPriceBookHarness.reopenSaved());
 
     await expect(page.getByLabel('Draft estimate line item 1 description')).toHaveValue('Edited copper fitting');
-    await expect(page.getByLabel('Draft estimate line item 1 quantity')).toHaveValue('2');
+    await expect(page.getByLabel('Draft estimate line item 1 quantity')).toHaveValue('3');
     await expect(page.getByLabel('Draft estimate line item 1 unit price')).toHaveValue('45.00');
     snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
     expect(snapshot.saveCount).toBe(1);

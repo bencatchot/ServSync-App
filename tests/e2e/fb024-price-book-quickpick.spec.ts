@@ -48,7 +48,8 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     expect(mapperSource).toContain('description: item.title');
     expect(mapperSource).toContain('line_title: item.title');
     expect(mapperSource).toContain("customer_description: item.customer_description || ''");
-    expect(mapperSource).toContain("quantity: '1'");
+    expect(mapperSource).toContain("quantity = '1'");
+    expect(mapperSource).toContain('quantity,');
     expect(mapperSource).toContain("unit: item.unit || 'each'");
     expect(mapperSource).toContain('item.default_unit_price_cents');
     expect(mapperSource).toContain('item.labor_hours');

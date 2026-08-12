@@ -177,7 +177,8 @@ test.describe('FB-024 Price Book Organization Foundation v1', () => {
     for (const privateField of ['item.trade', 'item.category', 'item.subcategory', 'item.internal_notes', 'item.sku', 'item.source', 'item.taxable', 'item.id']) {
       expect(mapper).not.toContain(privateField);
     }
-    expect(mapper).toContain("quantity: '1'");
+    expect(mapper).toContain("quantity = '1'");
+    expect(mapper).toContain('quantity,');
     expect(mapper).toContain('item.default_unit_price_cents');
     expect(mapper).toContain('item.labor_hours');
   });
