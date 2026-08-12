@@ -84,7 +84,11 @@ function worksheetFromData(name: string, hidden: boolean, data: XlsxCell[][]): P
   if (meaningfulColumnCount === 0) return { name, hidden, headers: [], rows: [], error: 'This worksheet is empty.' };
   try {
     const firstMeaningfulRow = normalized.find(row => row.some(cell => cell));
-    if (firstMeaningfulRow?.slice(0, meaningfulColumnCount).some(header => !header)) {
+    const completeHeader = Array.from(
+      { length: meaningfulColumnCount },
+      (_, index) => firstMeaningfulRow?.[index] || '',
+    );
+    if (completeHeader.some(header => !header)) {
       throw new Error('XLSX headers cannot be blank when their column contains data.');
     }
     const parsed = priceBookTabularRowsFromParsed(normalized, 'XLSX');

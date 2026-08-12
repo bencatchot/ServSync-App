@@ -224,6 +224,10 @@ test.describe('FB-024 Price Book XLSX Import Parity v1', () => {
     const [blankHeaderSheet] = await parseWorkbookInBrowser(page, blankHeader);
     expect(blankHeaderSheet.error).toBe('XLSX headers cannot be blank when their column contains data.');
 
+    const shortHeader = await workbookBuffer([{ name: 'Short header', rows: [['external_id', 'title'], ['A-1', 'Ambiguous', 10]] }]);
+    const [shortHeaderSheet] = await parseWorkbookInBrowser(page, shortHeader);
+    expect(shortHeaderSheet.error).toBe('XLSX headers cannot be blank when their column contains data.');
+
     const empty = await workbookBuffer([{ name: 'Empty', rows: [[null]] }]);
     const [emptySheet] = await parseWorkbookInBrowser(page, empty);
     expect(emptySheet.error).toBe('This worksheet is empty.');
