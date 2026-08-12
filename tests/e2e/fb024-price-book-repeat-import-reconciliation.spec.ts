@@ -200,7 +200,7 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await installImportHarness(page);
     await expect(page.getByLabel('Existing source')).toHaveValue('source-1');
-    await page.getByLabel('Choose CSV').setInputFiles({
+    await page.getByLabel('Choose CSV or XLSX').setInputFiles({
       name: 'catalog.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('external_id,title,price\nA-1,Diagnostic visit,\nA-2,No-charge follow-up,0'),

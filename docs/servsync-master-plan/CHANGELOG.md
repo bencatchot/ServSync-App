@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/fb024-price-book-xlsx-import-parity-v1`
+- Starting main SHA: `e95211c07959459645d9acf6eedd11d5b65a4361`
+- Files changed: shared Price Book tabular normalization; browser-only XLSX parser and workbook safety boundary; existing import workflow worksheet selection; XLSX/CSV parity, reconciliation, rollback, privacy, and responsive tests; package manifests; FB-024 backlog; master plan; completed-features ledger; changelog.
+- Summary of change: Completes FB-024 Price Book XLSX Import Parity v1. Contractors can choose modern `.xlsx` files in the existing stable-source import workflow. One usable visible worksheet is selected automatically; multiple usable visible worksheets require an explicit selection, and changing sheets clears mapping and preview state. Selected headers and scalar cell values normalize into the same generic row contract used by CSV before the existing field mapping, server reconciliation, explicit Add/Update/Skip review, transactional execution, immutable audit, and guarded rollback paths.
+- Safety and data boundary: XLSX parsing is client-side and value-only. ServSync does not execute formulas, macros, scripts, links, external references, or connections; cached formula values may be read as ordinary data and formulas without cached values remain blank. Hidden sheets are ignored. Corrupt, protected/unsupported, macro-bearing, ambiguous-header, oversized, and over-limit workbooks fail closed. XLSX is limited to 1 MB, 20 worksheets, 50 meaningful columns, 500 imported rows, 300 archive entries, and 20 MB uncompressed. Blank and explicit zero remain distinct, date cells become stable ISO dates, and booleans reuse CSV semantics. Raw workbooks are neither uploaded nor retained.
+- Architecture and privacy: No backend or schema knows about XLSX. Stable import-source identity remains independent of filename and format. Existing matching, external IDs, three-way manual-edit preservation, idempotency, tenant authority, audit, and rollback remain authoritative. Unknown columns remain unmapped; internal cost, margin, profit, and quantity do not enter the canonical import request or mutate private cost/Draft quantity state.
+- Dependency impact: Adds `read-excel-file` for browser `.xlsx` value extraction and a direct `fflate` dependency for bounded archive/worksheet metadata preflight; both are dynamically loaded only after XLSX selection. Adds `write-excel-file` as a test-only deterministic fixture generator. No newly introduced high/critical runtime vulnerability is accepted; dependency audit and production bundle inspection remain merge gates.
+- Validation: Focused CSV/XLSX canonical-row parity, scalar/date/boolean/blank/zero normalization, cached/uncached formula safety, hidden/multiple/single worksheet behavior, worksheet-switch reset, Add/Update/Skip execution, generic audit/rollback, duplicate headers/IDs, limits, malformed files, private-column exclusion, and 390x844 layout pass. TypeScript, Production build, broader Price Book/Draft regressions, disposable PostgreSQL reconciliation/rollback/security suites, backend parity, rollout-ledger, sensitive-value, scope, dependency, and exact-head checks remain merge gates.
+- Known risks and follow-up: `.xls`, `.xlsm`, password-protected workbooks, arbitrary header detection, merged/decorative layouts, multiple simultaneous worksheet imports, formulas/calculation, formatting/media/comments, Google Sheets/Office APIs, cost import, inventory, assemblies, export, provider-specific imports, and scheduled sync remain out of scope. FB-024 remains active.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records XLSX Import Parity v1 as complete while retaining broader Price Book/reusable-content maturity.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the shared normalized-input boundary, worksheet behavior, safety limits, and unchanged backend/privacy model.
+
 - Branch: `codex/fb024-draft-price-book-quantity-staging-v1`
 - Starting main SHA: `0124c04d528addb29531bb88b0af6f30991ab6ce`
 - Files changed: Draft-first Price Book picker; customer-safe Price Book snapshot helper; focused picker, persistence, privacy, Price Book, and responsive tests; FB-024 backlog; master plan; completed-features ledger; changelog.
