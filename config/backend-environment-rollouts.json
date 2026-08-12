@@ -458,16 +458,16 @@
       "artifact": "servsync-price-book-portable-reference-reconciliation.sql",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Exact SHA-256 a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8 is locally validated and awaits controlled Sandbox-first application and authenticated acceptance."
+          "status": "Applied",
+          "reason": "Exact SHA-256 a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-12 from 16:55:22Z through 16:55:24Z. Postgres ownership, fixed-path SECURITY DEFINER behavior, public-wrapper/private-helper grants, tenant isolation, malformed/conflicting identity denial, and preservation passed. Authenticated execution against the existing catalog produced exact CSV- and XLSX-equivalent results of 150 unchanged and zero other rows; one changed price produced 149 unchanged and one correct changed target. Sandbox retained 195 items, zero costs, three sources, eight batches, 169 batch rows, 161 mappings, zero rollback rows/batches, and exact item/business fingerprints."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Apply only after the exact migration passes Sandbox and Demo security, preservation, and round-trip gates."
+          "status": "Applied",
+          "reason": "Exact SHA-256 a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8 was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-12 from 17:02:27Z through 17:02:28Z after Sandbox and Demo passed. Catalog/security and rollback-only authenticated public-RPC validation passed with zero residue. Production retained zero Price Book items, costs, sources, imports, mappings, and rollbacks; its 7 contractor profiles, 22 Estimates, 39 Estimate lines, and 12 Invoices remained unchanged."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Apply after Sandbox acceptance and before Production to preserve supported-schema parity."
+          "status": "Applied",
+          "reason": "Exact SHA-256 a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-12 from 17:01:17Z through 17:01:18Z after Sandbox acceptance. Catalog/security and rollback-only authenticated public-RPC validation passed with zero residue. Demo retained zero Price Book items, costs, sources, imports, mappings, and rollbacks; its three contractor profiles and zero Estimate/Invoice baseline remained unchanged."
         }
       }
     }
