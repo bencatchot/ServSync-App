@@ -11,6 +11,7 @@ import {
 import {
   applyPriceBookPossibleDuplicateReview,
   findPriceBookPossibleDuplicate,
+  summarizePriceBookImportReview,
   type PriceBookDuplicateCandidateItem,
 } from '../../src/features/price-book/priceBookPossibleDuplicates';
 import type { PriceBookImportPreviewRow, PriceBookNormalizedValues } from '../../src/features/price-book/priceBookCsvReconciliation';
@@ -184,6 +185,53 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(findPriceBookPossibleDuplicate(materiallyDifferent, [capacitor])).toBeNull();
     expect(findPriceBookPossibleDuplicate(differentCategory, [capacitor])).toBeNull();
     expect(findPriceBookPossibleDuplicate(differentPrice, [capacitor])).not.toBeNull();
+  });
+
+  test('classifies the controlled nine-row alternate-source fixture without matcher overreach', () => {
+    const existing = [
+      existingItem(1, { title: 'Dual Run Capacitor Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 22900 }),
+      existingItem(2, { title: 'Cooling Maintenance - Single System', category: 'Maintenance', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 18900 }),
+      existingItem(3, { title: 'Wi-Fi Thermostat Installation', category: 'Controls', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 34900 }),
+      existingItem(4, { title: 'Refrigerant Leak Search', category: 'Diagnostics', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 27500 }),
+      existingItem(5, { title: 'Contactor Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 21500 }),
+    ];
+    const incoming = [
+      { title: 'Dual Run Capacitor Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 22900 },
+      { title: 'Cooling Maintenance - Single System', category: 'Maintenance', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 18900 },
+      { title: 'Wi-Fi Thermostat Installation', category: 'Controls', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 34900 },
+      { title: 'Refrigerant Leak Search!', category: 'Diagnostics', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 27500 },
+      { title: 'Contactor Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 25900 },
+      { title: 'Cooling Maintenance - Two System Package', category: 'Maintenance', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 32900 },
+      { title: 'Outdoor Condenser Cabinet Wash and Wax', category: 'Maintenance', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 14900 },
+      { title: 'Smart Thermostat Remote Sensor Installation', category: 'Controls', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 15900 },
+      { title: 'Bathroom Exhaust Duct Connection Repair', category: 'Ventilation', trade: 'HVAC', line_type: 'other' as const, default_unit_price_cents: 24500 },
+    ];
+    const rows = incoming.map((values, index) => previewRow(values, { row_number: index + 2, external_item_id: `ALT-${index + 1}` }));
+    const review = applyPriceBookPossibleDuplicateReview(rows, existing);
+    const summary = summarizePriceBookImportReview(rows, review.candidates);
+
+    expect([...review.candidates.keys()]).toEqual([2, 3, 4, 5, 6]);
+    expect([...review.candidates.values()].map(candidate => candidate.item.title)).toEqual(existing.map(item => item.title));
+    expect(summary).toEqual({ new: 4, changed: 0, current: 0, possibleDuplicates: 5, attention: 0 });
+    expect(Object.values(review.actions)).toEqual(['skip', 'skip', 'skip', 'skip', 'skip', 'add', 'add', 'add', 'add']);
+  });
+
+  test('reserves Needs attention for blocking preview conditions', () => {
+    const validCandidate = previewRow({ title: 'Diagnostic visit', category: 'Diagnostics', trade: 'HVAC', line_type: 'other' });
+    const invalid = previewRow({ title: '', default_unit_price_cents: null }, {
+      row_number: 3,
+      reconciliation_status: 'invalid',
+      recommended_action: 'skip',
+      allowed_actions: ['skip'],
+      errors: ['Title is required.'],
+    });
+    const review = applyPriceBookPossibleDuplicateReview([validCandidate, invalid], [
+      existingItem(1, { title: 'Diagnostic visit', category: 'Diagnostics', trade: 'HVAC', line_type: 'other', default_unit_price_cents: null }),
+    ]);
+
+    expect(summarizePriceBookImportReview([validCandidate, invalid], review.candidates)).toEqual({
+      new: 0, changed: 0, current: 0, possibleDuplicates: 1, attention: 1,
+    });
   });
 
   test('requires additional business evidence for generic titles and surfaces ambiguous ties', () => {
@@ -483,11 +531,34 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     });
     await page.getByRole('button', { name: 'Preview reconciliation' }).click();
     await expect(page.getByTestId('price-book-possible-duplicate')).toContainText('same normalized title');
-    await expect(page.getByText(/Needs attention · Possible duplicate/i)).toBeVisible();
+    await expect(page.getByText(/Row 2 · Possible duplicate/i)).toBeVisible();
+    await expect(page.getByLabel('Reconciliation counts')).toContainText('Possible duplicates1');
+    await expect(page.getByLabel('Reconciliation counts')).toContainText('Needs attention0');
     await expect(page.getByLabel('Action')).toHaveValue('skip');
     await expect(page.getByLabel('Action').locator('option')).toHaveText(['Add as new', 'Skip']);
+    await expect(page.getByRole('button', { name: 'Confirm and apply import' })).toBeEnabled();
     await page.getByLabel('Action').selectOption('add');
     await expect(page.getByLabel('Action')).toHaveValue('add');
+  });
+
+  test('can apply a duplicate-only preview safely with the default Skip', async ({ page }) => {
+    await installImportHarness(page, [existingItem(1, { title: 'Diagnostic visit', category: '', trade: '', line_type: 'other', default_unit_price_cents: null })]);
+    await page.getByLabel('Choose CSV or XLSX').setInputFiles({
+      name: 'alternate-source.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('external_id,title,description,line_type,price\nALT-1,Diagnostic visit,Customer-safe description 1,Service,'),
+    });
+    await page.getByRole('button', { name: 'Preview reconciliation' }).click();
+    await expect(page.getByLabel('Action')).toHaveValue('skip');
+    await expect(page.getByLabel('Reconciliation counts')).toContainText('Possible duplicates1');
+    await expect(page.getByLabel('Reconciliation counts')).toContainText('Needs attention0');
+
+    page.once('dialog', dialog => void dialog.accept());
+    await page.getByRole('button', { name: 'Confirm and apply import' }).click();
+    const state = await page.evaluate(() => (window as typeof window & {
+      __priceBookImportHarness?: { executeCalls: number; executeActions: Record<string, string> };
+    }).__priceBookImportHarness);
+    expect(state).toMatchObject({ executeCalls: 1, executeActions: { 2: 'skip' } });
   });
 
   test('explains a fully unchanged repeat import in contractor language', async ({ page }) => {

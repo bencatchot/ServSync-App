@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-possible-duplicate-status-v1`
+- Starting main SHA: `b2b448f5601c397f15b230c6fb559c7d1ce671a1`
+- Files changed: existing Price Book duplicate-review summary helper and reconciliation UI; focused controlled-fixture and status tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
+- Summary of change: Completes the narrow FB-024 Possible-Duplicate Status Polish v1. Cross-source candidates now have a distinct Possible duplicates summary count and row status instead of being grouped into Needs attention. Needs attention remains reserved for invalid, ambiguous, or error-bearing preview rows that require correction or an explicit safe disposition.
+- UX and safety: Possible duplicates remain valid review opportunities with Skip selected by default and Add as new available. They do not imply a broken import and do not block the existing confirm action. A controlled nine-row alternate-source HVAC regression produces four New, five Possible duplicates, and zero Needs attention; a separate invalid-row control remains Needs attention. Stable-ID authority, matching thresholds, Update eligibility, server validation, audit, idempotency, rollback, and CSV/XLSX parity are unchanged.
+- Architecture: No matcher, SQL, schema, RPC, RLS, grant, environment, database data, import execution, dependency, or tenant-authority change is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 now records the contractor-facing distinction between advisory duplicate review and blocking import problems.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Clarifies the established Price Book import status model without changing reconciliation architecture.
+
 - Branch: `codex/fb024-cross-source-duplicates-v1`
 - Starting main SHA: `c49a7867534107d5eeefbd79fa7fa9a2eafeb4af`
 - Files changed: deterministic Price Book possible-duplicate review helper; existing CSV/XLSX reconciliation UI; Price Book/Draft-picker presentation labels; focused tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.

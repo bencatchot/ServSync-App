@@ -34,6 +34,7 @@ import {
 } from './priceBookXlsxImport';
 import {
   applyPriceBookPossibleDuplicateReview,
+  summarizePriceBookImportReview,
   type PriceBookDuplicateCandidateItem,
 } from './priceBookPossibleDuplicates';
 
@@ -172,13 +173,10 @@ export function PriceBookCsvReconciliationPanel({
     () => preview ? applyPriceBookPossibleDuplicateReview(preview.rows, existingItems || []).candidates : new Map(),
     [existingItems, preview],
   );
-  const reviewCounts = useMemo(() => preview ? preview.rows.reduce((counts, row) => {
-    if (row.errors.length > 0 || row.reconciliation_status === 'invalid' || row.reconciliation_status === 'ambiguous' || possibleDuplicates.has(row.row_number)) counts.attention += 1;
-    else if (row.reconciliation_status === 'new') counts.new += 1;
-    else if (row.reconciliation_status === 'changed') counts.changed += 1;
-    else if (row.reconciliation_status === 'unchanged') counts.current += 1;
-    return counts;
-  }, { new: 0, changed: 0, current: 0, attention: 0 }) : null, [possibleDuplicates, preview]);
+  const reviewCounts = useMemo(
+    () => preview ? summarizePriceBookImportReview(preview.rows, possibleDuplicates) : null,
+    [possibleDuplicates, preview],
+  );
 
   const loadPrivateLists = async () => {
     setLoadingSources(true);
@@ -558,8 +556,8 @@ export function PriceBookCsvReconciliationPanel({
           <h4 id="price-book-import-review-heading" className="text-sm font-bold text-slate-950">3. Review Price Book changes</h4>
           <p className="mt-1 text-xs leading-5 text-slate-500">ServSync uses stable item identity for updates and separately flags likely duplicates for your review. Conflicting manual edits remain unchanged.</p>
           {reviewCounts?.current === preview.rows.length ? <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3" data-testid="price-book-import-up-to-date"><p className="font-bold text-emerald-900">{reviewCounts.current} {reviewCounts.current === 1 ? 'item' : 'items'} already up to date</p><p className="mt-1 text-xs leading-5 text-emerald-900">ServSync matched {reviewCounts.current === 1 ? 'this item' : 'these items'} to existing Price Book records and found no imported values that need to change. {reviewCounts.current === 1 ? 'It' : 'They'} will be skipped.</p></div> : null}
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Reconciliation counts">
-            {reviewCounts ? ([['New', reviewCounts.new], ['Changed', reviewCounts.changed], ['Already up to date', reviewCounts.current], ['Needs attention', reviewCounts.attention]] as const).map(([label, count]) => <div key={label} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-950">{count}</p></div>) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Reconciliation counts">
+            {reviewCounts ? ([['New', reviewCounts.new], ['Changed', reviewCounts.changed], ['Already up to date', reviewCounts.current], ['Possible duplicates', reviewCounts.possibleDuplicates], ['Needs attention', reviewCounts.attention]] as const).map(([label, count]) => <div key={label} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-950">{count}</p></div>) : null}
           </div>
           <div className="mt-4 space-y-3">
             {previewRows.map(row => {
@@ -567,7 +565,7 @@ export function PriceBookCsvReconciliationPanel({
               return (
               <article key={row.row_number} className={`rounded-xl border p-3 ${possibleDuplicate ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'}`} data-testid="price-book-import-review-row">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0"><p className="text-xs font-bold uppercase text-slate-500">Row {row.row_number} · {possibleDuplicate ? 'Needs attention · Possible duplicate' : `${reconciliationStatusLabel(row.reconciliation_status)} · ${matchLabel(row.match_type)}`}</p><h5 className="mt-1 truncate font-bold text-slate-950">{valueLabel('title', row.incoming_values.title)}</h5><p className="mt-1 text-xs font-semibold text-slate-600">{valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p></div>
+                  <div className="min-w-0"><p className="text-xs font-bold uppercase text-slate-500">Row {row.row_number} · {possibleDuplicate ? 'Possible duplicate' : `${reconciliationStatusLabel(row.reconciliation_status)} · ${matchLabel(row.match_type)}`}</p><h5 className="mt-1 truncate font-bold text-slate-950">{valueLabel('title', row.incoming_values.title)}</h5><p className="mt-1 text-xs font-semibold text-slate-600">{valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p></div>
                   <label className="text-xs font-bold text-slate-700">Action<select className={`${inputClass} mt-1`} value={actions[String(row.row_number)]} disabled={executing} onChange={event => setActions(current => ({ ...current, [String(row.row_number)]: event.target.value as PriceBookImportAction }))}>{(possibleDuplicate ? (['add', 'skip'] as PriceBookImportAction[]) : row.allowed_actions).map(action => <option key={action} value={action}>{actionLabel(action)}</option>)}</select></label>
                 </div>
                 {possibleDuplicate ? <div className="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-xs" data-testid="price-book-possible-duplicate"><p className="font-bold text-amber-900">ServSync found {possibleDuplicate.additionalMatchCount > 0 ? `${possibleDuplicate.additionalMatchCount + 1} similar items` : 'a similar item'} already in this Price Book.</p><div className="mt-2 grid gap-2 sm:grid-cols-2"><p><span className="font-semibold text-slate-500">Incoming:</span> {valueLabel('title', row.incoming_values.title)} · {valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p><p><span className="font-semibold text-slate-500">Existing:</span> {possibleDuplicate.item.title} · {valueLabel('default_unit_price_cents', possibleDuplicate.item.default_unit_price_cents)}{possibleDuplicate.item.active ? '' : ' · Archived'}</p></div><p className="mt-2 text-slate-700"><span className="font-semibold">Why this was flagged:</span> {possibleDuplicate.reasons.join(', ')}.</p><p className="mt-1 text-slate-600">Choose Add as new only if these are intentionally separate services. Cross-source suggestions are never updated automatically.</p></div> : null}
