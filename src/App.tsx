@@ -281,6 +281,7 @@ import { PriceBookExportPanel } from './features/price-book/PriceBookExportPanel
 import { PRICE_BOOK_EXPORT_MAX_ITEMS, type PriceBookExportItem } from './features/price-book/priceBookExport';
 import { priceBookItemToEstimateLineDraft } from './features/price-book/priceBookEstimateLineSnapshot';
 import { PriceBookCsvReconciliationPanel } from './features/price-book/PriceBookCsvReconciliationPanel';
+import { createBasicPriceBookStarterCatalog } from './features/price-book/priceBookStarterCatalog';
 import type {
   PriceBookImportBatchResult,
   PriceBookImportBatchSummary,
@@ -22022,6 +22023,7 @@ function ContractorDashboard({
     () => window.localStorage.getItem(contractorProfileSetupStorageKey) === 'true',
   );
   const contractorViewedCalendarVisitsStorageKey = `${STORAGE_KEYS.contractorViewedCalendarVisits}:${profile.id}`;
+  const contractorPriceBookOnboardingStorageKey = `servsync.priceBook.onboardingDismissed:${profile.id}`;
   const [viewedContractorVisitKeys, setViewedContractorVisitKeys] = useState<Set<string>>(
     () => storedStringSet(contractorViewedCalendarVisitsStorageKey),
   );
@@ -25908,6 +25910,22 @@ function ContractorDashboard({
     });
     if (rpcError) throw rpcError;
     return data as unknown as PriceBookImportBatchResult;
+  };
+
+  const addBasicPriceBookStarterCatalog = async () => {
+    requirePriceBookImportAccess();
+    setNotice('');
+    setError('');
+    const result = await createBasicPriceBookStarterCatalog({
+      listSources: listPriceBookImportSources,
+      createSource: createPriceBookImportSource,
+      preview: previewPriceBookImport,
+      execute: executePriceBookImport,
+    });
+    setNotice(result.add_count > 0
+      ? `Added ${result.add_count} starter Price Book item${result.add_count === 1 ? '' : 's'}. Review names, tax settings, and prices before use.`
+      : 'The starter items already exist or match current Price Book items. No duplicates were added.');
+    await loadContractor();
   };
 
   const listPriceBookImportBatches = async () => {
@@ -40545,6 +40563,8 @@ function ContractorDashboard({
                     onEdit={editContractorPriceBookItem}
                     onToggleActive={item => void toggleContractorPriceBookItemActive(item)}
                     onBulkUpdate={bulkUpdateContractorPriceBookItems}
+                    onAddStarterCatalog={addBasicPriceBookStarterCatalog}
+                    onboardingStorageKey={contractorPriceBookOnboardingStorageKey}
                     exportTools={(
                       <PriceBookExportPanel
                         loadedItems={contractorPriceBookItems}

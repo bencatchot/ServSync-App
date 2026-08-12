@@ -101,6 +101,12 @@
       "boundaries": "Secure guest acceptance and bounded responses are not electronic signatures, negotiation, or payment."
     },
     {
+      "key": "contractor_price_book",
+      "status": "available_beta",
+      "claim": "Contractors can keep reusable Service, Labor, Material, and Fee items in a private Price Book, start manually or from an editable blank-price generic starter, import or export CSV/XLSX catalogs, and copy selected items into estimate drafts.",
+      "boundaries": "Do not claim market pricing, trade-specific or provider catalogs, automatic pricing, inventory, assemblies, direct invoice selection, accounting sync, scheduled sync, universal spreadsheet compatibility, or private cost and margin export."
+    },
+    {
       "key": "not_connected_estimate_delivery",
       "status": "available",
       "claim": "For eligible work, customers can receive a secure, expiring estimate link and respond to that exact delivered version without first creating a ServSync account.",
