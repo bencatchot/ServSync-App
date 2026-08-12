@@ -6,6 +6,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-price-book-semantic-import-v1`
+- Starting main SHA: `fa3f9f688a144b5bab34f76fc05c512eb4f01929`
+- Files changed: shared Price Book CSV/XLSX semantic interpretation and canonical value normalization; existing import mapping/review UI; realistic CSV/XLSX regression coverage; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
+- Summary of change: Completes FB-024 Price Book Semantic Import Interpretation v1. Conventional contractor exports now pass through deterministic header aliases, bounded value inspection, and canonical value normalization before the existing mapping and server reconciliation. Common names such as Item Name, Unit Price, Estimated Labor Hours, Item Type, Status, and SKU are recognized; common service/part/fee/labor terms and boolean/status values normalize into the existing contract. When SKU is the only stable identifier, it is preselected for both visible SKU and source-scoped repeat-import identity with an explicit review notice.
+- UX and safety: The mapping screen now distinguishes recognized mappings, review-worthy inferences, ignored columns, and blocked rows, and shows representative detected values plus planned interpretations. Manual overrides remain available. Low-confidence generic status/type values remain unmapped instead of being guessed. Unknown and cost-like columns are ignored, malformed mapped values still block, and blank Price Required remains distinct from explicit zero.
+- Architecture: CSV and XLSX still converge into one generic row pipeline before the unchanged server-authoritative Add/Update/Skip reconciliation, stable-source matching, three-way manual-edit preservation, idempotent transaction, immutable audit, and guarded rollback. No SQL, schema, RPC, RLS, grant, environment, raw-file persistence, provider parser, cost import, or tenant-authority change is included.
+- Validation: A realistic 150-row HVAC export shape and equivalent XLSX/CSV requests cover aliases, source-scoped SKU identity, service/part/fee/labor normalization, Active/Inactive and yes/no/1/0 booleans, formatted money, labor hours, blank/zero pricing, ignored material cost, ambiguity, malformed values, manual override, responsive UI, reconciliation, execution, audit, and rollback. TypeScript, Production build, broader Price Book/Draft/privacy regressions, backend parity, rollout status, sensitive-value, diff, exact-head checks, and independent review remain merge gates.
+- Known risks and follow-up: Interpretation is deliberately deterministic and source-agnostic. Unrecognized or genuinely ambiguous terminology still requires manual mapping; provider-specific import profiles, AI interpretation, cost import, inventory, assemblies, export, and scheduled synchronization remain out of scope. FB-024 remains active.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records semantic CSV/XLSX interpretation as complete while retaining broader reusable-content maturity.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the bounded pre-reconciliation interpretation layer and unchanged server/security boundaries.
+
 - Branch: `codex/fb024-draft-price-book-multi-select-staging-v1`
 - Starting main SHA: `da30f4e9c46c6395cb341cfa766a86419a38d180`
 - Files changed: Draft-first Price Book picker and composer integration; focused multi-select, persistence, privacy, and responsive tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.

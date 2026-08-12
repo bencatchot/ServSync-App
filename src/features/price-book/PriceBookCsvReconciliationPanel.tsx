@@ -1,4 +1,4 @@
-import { Archive, ChevronLeft, ChevronRight, Download, RotateCcw, Upload } from 'lucide-react';
+import { AlertTriangle, Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, RotateCcw, Sparkles, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type {
@@ -8,6 +8,7 @@ import type {
   PriceBookImportAction,
   PriceBookImportBatchResult,
   PriceBookImportBatchSummary,
+  PriceBookImportMappingInsight,
   PriceBookImportRollbackPreview,
   PriceBookImportRollbackResult,
   PriceBookImportPreview,
@@ -19,8 +20,8 @@ import {
   PRICE_BOOK_CSV_FIELDS,
   PRICE_BOOK_CSV_MAX_BYTES,
   PRICE_BOOK_SAMPLE_CSV,
-  autoMapPriceBookCsvHeaders,
   buildPriceBookImportRows,
+  interpretPriceBookImport,
   parsePriceBookCsv,
   priceBookCsvRowsFromParsed,
   sanitizePriceBookImportFilename,
@@ -131,6 +132,7 @@ export function PriceBookCsvReconciliationPanel({
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<PriceBookCsvRow[]>([]);
   const [mapping, setMapping] = useState<PriceBookCsvMapping>({});
+  const [mappingInsights, setMappingInsights] = useState<Partial<Record<PriceBookCsvField, PriceBookImportMappingInsight>>>({});
   const [preview, setPreview] = useState<PriceBookImportPreview | null>(null);
   const [actions, setActions] = useState<Record<string, PriceBookImportAction>>({});
   const [idempotencyKey, setIdempotencyKey] = useState('');
@@ -150,6 +152,8 @@ export function PriceBookCsvReconciliationPanel({
   const localRows = useMemo(() => buildPriceBookImportRows(rows, mapping), [rows, mapping]);
   const blockedLocalRows = localRows.filter(row => row.errors.length > 0);
   const requestRows = localRows.map(row => row.requestRow);
+  const ignoredHeaders = headers.filter(header => !Object.values(mapping).includes(header));
+  const reviewMappingCount = Object.values(mappingInsights).filter(insight => insight?.confidence === 'review').length;
   const pageCount = preview ? Math.max(1, Math.ceil(preview.rows.length / PREVIEW_PAGE_SIZE)) : 1;
   const previewRows = preview?.rows.slice((previewPage - 1) * PREVIEW_PAGE_SIZE, previewPage * PREVIEW_PAGE_SIZE) || [];
 
@@ -191,14 +195,17 @@ export function PriceBookCsvReconciliationPanel({
     setHeaders([]);
     setRows([]);
     setMapping({});
+    setMappingInsights({});
     clearPreview();
     setError('');
   };
 
   const applyTabularRows = (nextHeaders: string[], nextRows: PriceBookCsvRow[]) => {
+    const interpretation = interpretPriceBookImport(nextHeaders, nextRows);
     setHeaders(nextHeaders);
     setRows(nextRows);
-    setMapping(autoMapPriceBookCsvHeaders(nextHeaders));
+    setMapping(interpretation.mapping);
+    setMappingInsights(interpretation.insights);
     clearPreview();
   };
 
@@ -210,6 +217,7 @@ export function PriceBookCsvReconciliationPanel({
       setHeaders([]);
       setRows([]);
       setMapping({});
+      setMappingInsights({});
       clearPreview();
     }
   };
@@ -328,6 +336,21 @@ export function PriceBookCsvReconciliationPanel({
       else delete next[field];
       return next;
     });
+    setMappingInsights(current => {
+      const next = { ...current };
+      if (!header) delete next[field];
+      else {
+        next[field] = {
+          field,
+          header,
+          confidence: 'manual',
+          reason: 'You selected this source column.',
+          detectedValues: Array.from(new Set(rows.map(row => row.values[header]?.trim()).filter((value): value is string => Boolean(value)))).slice(0, 4),
+          interpretations: [],
+        };
+      }
+      return next;
+    });
     clearPreview();
   };
 
@@ -375,6 +398,7 @@ export function PriceBookCsvReconciliationPanel({
       setHeaders([]);
       setRows([]);
       setMapping({});
+      setMappingInsights({});
       setPreview(null);
       setActions({});
       setIdempotencyKey('');
@@ -431,8 +455,8 @@ export function PriceBookCsvReconciliationPanel({
       <section className="rounded-xl border border-slate-200 bg-white p-4" aria-labelledby="price-book-import-file-heading">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h4 id="price-book-import-file-heading" className="text-sm font-bold text-slate-950">2. Upload and map CSV or XLSX</h4>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Up to 1 MB and 500 item rows. XLSX uses one visible worksheet and cached values only. Blank prices remain Price Required; explicit zero remains $0.</p>
+            <h4 id="price-book-import-file-heading" className="text-sm font-bold text-slate-950">2. Upload and verify CSV or XLSX</h4>
+            <p className="mt-1 text-xs leading-5 text-slate-500">ServSync recognizes common headings and source values before you review the mapping. Up to 1 MB and 500 item rows. Blank prices remain Price Required; explicit zero remains $0.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={secondaryButtonClass} onClick={downloadSample}><Download size={16} />Sample CSV</button>
@@ -467,17 +491,33 @@ export function PriceBookCsvReconciliationPanel({
               <div><p className="font-bold text-slate-950">{filename}</p><p className="text-xs text-slate-500">{rows.length} rows; {blockedLocalRows.length} blocked before server preview.</p></div>
               <button type="button" className={secondaryButtonClass} disabled={executing} onClick={clearFile}>Clear file</button>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {PRICE_BOOK_CSV_FIELDS.map(field => (
-                <Field key={field.key} label={`${field.label}${field.required ? ' *' : ''}`}>
-                  <select className={inputClass} value={mapping[field.key] || ''} disabled={previewing || executing} onChange={event => updateMapping(field.key, event.target.value)}>
-                    <option value="">Do not import</option>
-                    {headers.map(header => <option key={`${field.key}-${header}`} value={header}>{header}</option>)}
-                  </select>
-                  <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">{field.helper}</span>
-                </Field>
-              ))}
+            <div className="grid gap-2 sm:grid-cols-3" aria-label="Import interpretation summary" data-testid="price-book-import-interpretation-summary">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><p className="flex items-center gap-2 text-xs font-bold text-emerald-800"><CheckCircle2 size={15} />Automatically recognized</p><p className="mt-1 text-lg font-bold text-slate-950">{Object.keys(mapping).length - reviewMappingCount}</p></div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="flex items-center gap-2 text-xs font-bold text-amber-800"><Sparkles size={15} />Review suggested</p><p className="mt-1 text-lg font-bold text-slate-950">{reviewMappingCount}</p></div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3"><p className="flex items-center gap-2 text-xs font-bold text-slate-600"><AlertTriangle size={15} />Ignored columns</p><p className="mt-1 text-lg font-bold text-slate-950">{ignoredHeaders.length}</p></div>
             </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {PRICE_BOOK_CSV_FIELDS.map(field => {
+                const insight = mappingInsights[field.key];
+                return (
+                  <Field key={field.key} label={`${field.label}${field.required ? ' *' : ''}`}>
+                    <select className={inputClass} value={mapping[field.key] || ''} disabled={previewing || executing} onChange={event => updateMapping(field.key, event.target.value)}>
+                      <option value="">Do not import</option>
+                      {headers.map(header => <option key={`${field.key}-${header}`} value={header}>{header}</option>)}
+                    </select>
+                    {insight ? (
+                      <span className={`mt-2 block rounded-lg border px-2.5 py-2 text-xs font-normal leading-5 ${insight.confidence === 'review' ? 'border-amber-200 bg-amber-50 text-amber-900' : insight.confidence === 'manual' ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`} data-testid={`price-book-mapping-insight-${field.key}`}>
+                        <strong>{insight.confidence === 'review' ? 'Review suggested' : insight.confidence === 'manual' ? 'Selected by you' : 'Recognized'}</strong> from <strong>{insight.header}</strong>. {insight.reason}
+                        {insight.detectedValues.length > 0 ? <span className="mt-1 block">Detected: {insight.detectedValues.join(', ')}</span> : null}
+                        {insight.interpretations.length > 0 ? <span className="mt-1 block font-semibold">ServSync interpretation: {insight.interpretations.join('; ')}</span> : null}
+                      </span>
+                    ) : null}
+                    <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">{field.helper}</span>
+                  </Field>
+                );
+              })}
+            </div>
+            {ignoredHeaders.length > 0 ? <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600" data-testid="price-book-ignored-columns"><strong>Safely ignored:</strong> {ignoredHeaders.join(', ')}. Unmapped columns are not sent to reconciliation.</p> : null}
             {blockedLocalRows.length > 0 ? (
               <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 Resolve {blockedLocalRows.length} blocked row{blockedLocalRows.length === 1 ? '' : 's'} before server preview. {blockedLocalRows.slice(0, 3).map(row => `Row ${row.rowNumber}: ${row.errors.join(' ')}`).join(' ')}

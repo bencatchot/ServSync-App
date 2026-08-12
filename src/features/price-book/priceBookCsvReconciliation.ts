@@ -23,6 +23,23 @@ export type PriceBookCsvField =
 
 export type PriceBookCsvMapping = Partial<Record<PriceBookCsvField, string>>;
 
+export type PriceBookImportMappingConfidence = 'automatic' | 'review' | 'manual';
+
+export type PriceBookImportMappingInsight = {
+  field: PriceBookCsvField;
+  header: string;
+  confidence: PriceBookImportMappingConfidence;
+  reason: string;
+  detectedValues: string[];
+  interpretations: string[];
+};
+
+export type PriceBookImportInterpretation = {
+  mapping: PriceBookCsvMapping;
+  insights: Partial<Record<PriceBookCsvField, PriceBookImportMappingInsight>>;
+  ignoredHeaders: string[];
+};
+
 export type PriceBookTabularRow = {
   rowNumber: number;
   values: Record<string, string>;
@@ -197,21 +214,28 @@ export const PRICE_BOOK_CSV_FIELDS: Array<{
 ];
 
 export const PRICE_BOOK_CSV_FIELD_ALIASES: Record<PriceBookCsvField, string[]> = {
-  external_item_id: ['externalid', 'external_id', 'externalitemid', 'external_item_id', 'recordid', 'record_id', 'sourceitemid', 'source_item_id'],
-  title: ['title', 'item', 'itemname', 'item_name', 'name', 'service', 'servicename', 'service_name'],
-  customer_description: ['customerdescription', 'customer_description', 'description', 'desc', 'customerdesc', 'customer_desc'],
+  external_item_id: ['externalid', 'externalitemid', 'recordid', 'sourceid', 'sourceitemid', 'itemid', 'productid', 'serviceid'],
+  title: ['title', 'item', 'itemname', 'name', 'service', 'servicename', 'product', 'productname', 'descriptionname'],
+  customer_description: ['customerdescription', 'description', 'desc', 'customerdesc', 'servicedescription', 'itemdescription', 'productdescription', 'details'],
   internal_notes: ['internalnotes', 'internal_notes', 'notes', 'note', 'private_notes', 'privatenotes', 'internalnote'],
-  trade: ['trade', 'trade_type', 'tradetype', 'discipline'],
-  category: ['category', 'group', 'section', 'work_category', 'workcategory'],
-  subcategory: ['subcategory', 'sub_category', 'subgroup', 'sub_group', 'subsection', 'sub_section', 'work_subcategory', 'worksubcategory'],
-  line_type: ['line_type', 'linetype', 'type', 'item_type', 'itemtype'],
-  unit: ['unit', 'uom', 'measure', 'unit_of_measure', 'unitofmeasure'],
-  default_unit_price: ['price', 'rate', 'amount', 'default_price', 'defaultprice', 'default_unit_price', 'defaultunitprice', 'unit_price', 'unitprice'],
-  default_unit_price_cents: ['default_unit_price_cents', 'defaultunitpricecents', 'price_cents', 'pricecents', 'amount_cents', 'amountcents'],
-  taxable: ['taxable', 'tax', 'is_taxable', 'istaxable'],
-  labor_hours: ['labor_hours', 'laborhours', 'hours', 'hrs', 'estimated_hours', 'estimatedhours'],
-  sku: ['sku', 'code', 'item_code', 'itemcode', 'part_number', 'partnumber'],
+  trade: ['trade', 'tradetype', 'discipline', 'servicebusiness', 'servicetrade'],
+  category: ['category', 'group', 'section', 'workcategory', 'itemcategory', 'servicecategory', 'productcategory'],
+  subcategory: ['subcategory', 'sub_category', 'subgroup', 'subsection', 'worksubcategory', 'itemsubcategory', 'servicesubcategory', 'productsubcategory'],
+  line_type: ['linetype', 'type', 'itemtype', 'servicetype', 'producttype', 'pricetype'],
+  unit: ['unit', 'uom', 'measure', 'unitofmeasure', 'billingunit', 'priceunit'],
+  default_unit_price: ['price', 'rate', 'amount', 'defaultprice', 'defaultunitprice', 'unitprice', 'sellprice', 'sellingprice', 'retail', 'retailprice', 'customerprice', 'flatrate', 'flatrateprice'],
+  default_unit_price_cents: ['defaultunitpricecents', 'pricecents', 'amountcents', 'unitpricecents'],
+  taxable: ['taxable', 'tax', 'istaxable', 'taxstatus'],
+  labor_hours: ['laborhours', 'laborhrs', 'hours', 'hrs', 'estimatedhours', 'estimatedlabor', 'estimatedlaborhours', 'labortime', 'estimatedlabortime'],
+  sku: ['sku', 'code', 'itemcode', 'servicecode', 'productcode', 'partnumber', 'catalogcode'],
   active: ['active', 'enabled', 'status'],
+};
+
+const REVIEW_HEADER_ALIASES: Partial<Record<PriceBookCsvField, string[]>> = {
+  title: ['descriptionname'],
+  line_type: ['type'],
+  default_unit_price: ['amount', 'rate'],
+  active: ['status'],
 };
 
 export const PRICE_BOOK_SAMPLE_CSV = [
@@ -232,6 +256,78 @@ export function autoMapPriceBookCsvHeaders(headers: string[]): PriceBookCsvMappi
     if (matched) mapping[field.key] = matched.header;
     return mapping;
   }, {});
+}
+
+function representativeValues(rows: PriceBookTabularRow[], header: string) {
+  return Array.from(new Set(rows.map(row => row.values[header]?.trim()).filter((value): value is string => Boolean(value)))).slice(0, 4);
+}
+
+function interpretationLabel(field: PriceBookCsvField, rawValue: string) {
+  if (field === 'line_type') {
+    const parsed = parseLineType(rawValue);
+    return parsed.value && parsed.value !== rawValue.trim().toLowerCase() ? `${rawValue} -> ${parsed.value}` : '';
+  }
+  if (field === 'active' || field === 'taxable') {
+    const parsed = parseBoolean(rawValue, field === 'active' ? 'Active' : 'Taxable');
+    if (parsed.value === null || parsed.error) return '';
+    const canonical = parsed.value ? 'true' : 'false';
+    return rawValue.trim().toLowerCase() !== canonical ? `${rawValue} -> ${canonical}` : '';
+  }
+  if (field === 'default_unit_price') {
+    const parsed = parseDollarPrice(rawValue);
+    if (parsed.error || parsed.value === null) return '';
+    const canonical = `$${(parsed.value / 100).toFixed(2)}`;
+    return rawValue.trim() !== canonical ? `${rawValue} -> ${canonical}` : '';
+  }
+  return '';
+}
+
+export function interpretPriceBookImport(headers: string[], rows: PriceBookTabularRow[]): PriceBookImportInterpretation {
+  const mapping = autoMapPriceBookCsvHeaders(headers);
+  const normalizedHeaders = new Map(headers.map(header => [header, normalizePriceBookCsvHeader(header)]));
+
+  const statusHeader = mapping.active;
+  if (statusHeader && normalizedHeaders.get(statusHeader) === 'status') {
+    const values = representativeValues(rows, statusHeader);
+    if (values.length > 0 && values.every(value => Boolean(parseBoolean(value, 'Active').error))) delete mapping.active;
+  }
+  const typeHeader = mapping.line_type;
+  if (typeHeader && REVIEW_HEADER_ALIASES.line_type?.includes(normalizedHeaders.get(typeHeader) || '')) {
+    const values = representativeValues(rows, typeHeader);
+    if (values.length > 0 && values.every(value => Boolean(parseLineType(value).error))) delete mapping.line_type;
+  }
+
+  // A source SKU is stable within the selected catalog source and can safely provide repeat-import identity.
+  if (!mapping.external_item_id && mapping.sku) mapping.external_item_id = mapping.sku;
+
+  const insights = PRICE_BOOK_CSV_FIELDS.reduce<PriceBookImportInterpretation['insights']>((next, field) => {
+    const header = mapping[field.key];
+    if (!header) return next;
+    const normalizedHeader = normalizedHeaders.get(header) || '';
+    const detectedValues = representativeValues(rows, header);
+    const interpretations = detectedValues.map(value => interpretationLabel(field.key, value)).filter(Boolean);
+    const usesSkuAsIdentity = field.key === 'external_item_id' && header === mapping.sku && !PRICE_BOOK_CSV_FIELD_ALIASES.external_item_id.includes(normalizedHeader);
+    const reviewAlias = REVIEW_HEADER_ALIASES[field.key]?.includes(normalizedHeader) || false;
+    const confidence: PriceBookImportMappingConfidence = usesSkuAsIdentity || reviewAlias || interpretations.length > 0 ? 'review' : 'automatic';
+    next[field.key] = {
+      field: field.key,
+      header,
+      confidence,
+      reason: usesSkuAsIdentity
+        ? 'SKU/code will also provide stable repeat-import identity within this catalog source.'
+        : interpretations.length > 0
+          ? 'ServSync recognized this column and will normalize the listed source values.'
+          : reviewAlias
+            ? 'ServSync inferred this mapping from a general source heading. Review before import.'
+            : 'ServSync recognized this source heading.',
+      detectedValues,
+      interpretations,
+    };
+    return next;
+  }, {});
+
+  const usedHeaders = new Set(Object.values(mapping));
+  return { mapping, insights, ignoredHeaders: headers.filter(header => !usedHeaders.has(header)) };
 }
 
 export function parsePriceBookCsv(text: string) {
@@ -313,8 +409,9 @@ function parseDollarPrice(value: string) {
   const cleaned = value.replace(/[$,]/g, '').trim();
   if (!cleaned) return { value: null as number | null };
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return { value: null, error: 'Default price must be blank, zero, or a positive amount.' };
-  const amount = Number(cleaned);
-  return Number.isFinite(amount) ? { value: Math.round(amount * 100) } : { value: null, error: 'Default price is invalid.' };
+  const [whole, fractional = ''] = cleaned.split('.');
+  const cents = (BigInt(whole) * 100n) + BigInt(fractional.padEnd(2, '0'));
+  return cents <= 2147483647n ? { value: Number(cents) } : { value: null, error: 'Default price is too large.' };
 }
 
 function parseCents(value: string) {
@@ -328,7 +425,7 @@ function parseCents(value: string) {
 }
 
 function parseOptionalNumber(value: string, label: string) {
-  const trimmed = value.trim();
+  const trimmed = value.replace(/,/g, '').trim();
   if (!trimmed) return { value: null as number | null };
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return { value: null, error: `${label} must be a non-negative number with at most two decimals.` };
   const amount = Number(trimmed);
@@ -346,8 +443,11 @@ function parseBoolean(value: string, label: string) {
 function parseLineType(value: string) {
   const normalized = value.trim().toLowerCase();
   if (!normalized) return { value: null as EstimateLineType | null };
-  if (normalized === 'labor' || normalized === 'material' || normalized === 'fee' || normalized === 'other') return { value: normalized as EstimateLineType };
-  return { value: null, error: 'Line type must be labor, material, fee, or other.' };
+  if (['labor', 'labour'].includes(normalized)) return { value: 'labor' as EstimateLineType };
+  if (['material', 'materials', 'part', 'parts', 'equipment', 'product'].includes(normalized)) return { value: 'material' as EstimateLineType };
+  if (['fee', 'charge', 'trip charge', 'trip fee'].includes(normalized)) return { value: 'fee' as EstimateLineType };
+  if (['other', 'service', 'service item', 'repair', 'diagnostic', 'misc', 'miscellaneous'].includes(normalized)) return { value: 'other' as EstimateLineType };
+  return { value: null, error: 'Line type is not recognized. Use labor, material, fee, other, or a common equivalent such as service, part, or charge.' };
 }
 
 export function buildPriceBookImportRows(rows: PriceBookCsvRow[], mapping: PriceBookCsvMapping): PriceBookLocalPreviewRow[] {
