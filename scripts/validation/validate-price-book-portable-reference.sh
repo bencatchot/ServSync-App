@@ -46,4 +46,3 @@ if ! grep -q 'already installed' "$TMP/reapply.log"; then
 fi
 
 echo 'Price Book portable-reference PostgreSQL validation passed.'
-
