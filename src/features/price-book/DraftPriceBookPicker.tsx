@@ -1,4 +1,4 @@
-import { BookOpen, ChevronDown, Plus, Search } from 'lucide-react';
+import { BookOpen, ChevronDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ContractorPriceBookItem, EstimateLineType } from '../../types';
 import { formatMoney } from '../../utils/format';
@@ -44,24 +44,25 @@ export function DraftPriceBookPicker({
   loadState,
   loadError = '',
   disabled = false,
-  onAddLine,
+  onAddLines,
 }: {
   items: ContractorPriceBookItem[];
   loadState: PriceBookLoadState;
   loadError?: string;
   disabled?: boolean;
-  onAddLine: (line: WorkComposerLineDraft) => void;
+  onAddLines: (lines: WorkComposerLineDraft[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [lineType, setLineType] = useState<PriceBookTypeFilter>('all');
   const [trade, setTrade] = useState('');
   const [category, setCategory] = useState('');
-  const [addedTitle, setAddedTitle] = useState('');
+  const [addedCount, setAddedCount] = useState(0);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [stagedQuantities, setStagedQuantities] = useState<Record<string, string>>({});
   const [quantityErrors, setQuantityErrors] = useState<Record<string, string>>({});
-  const [addingItemId, setAddingItemId] = useState<string | null>(null);
-  const addingItemIdRef = useRef<string | null>(null);
+  const [addingSelection, setAddingSelection] = useState(false);
+  const addingSelectionRef = useRef(false);
   const resetTimer = useRef<number | null>(null);
   const ready = loadState === 'ready';
   const activeItems = useMemo(() => filterPriceBookItems(items, {
@@ -82,6 +83,10 @@ export function DraftPriceBookPicker({
     category,
     subcategory: '',
   }), [category, items, lineType, search, trade]);
+  const activeItemById = useMemo(() => new Map(activeItems.map(item => [item.id, item])), [activeItems]);
+  const selectedItems = useMemo(() => selectedItemIds
+    .map(id => activeItemById.get(id))
+    .filter((item): item is ContractorPriceBookItem => Boolean(item)), [activeItemById, selectedItemIds]);
   const pickerDisabled = disabled || !ready;
   const stateCopy = loadStateCopy(loadState, loadError);
 
@@ -93,24 +98,66 @@ export function DraftPriceBookPicker({
     if (!ready) setOpen(false);
   }, [ready]);
 
-  const addItem = (item: ContractorPriceBookItem) => {
-    if (pickerDisabled || addingItemIdRef.current) return;
-    const quantity = stagedQuantities[item.id] ?? '1';
-    const quantityError = priceBookStagedQuantityError(quantity);
-    if (quantityError) {
-      setQuantityErrors(current => ({ ...current, [item.id]: quantityError }));
+  useEffect(() => {
+    setSelectedItemIds(current => current.filter(id => activeItemById.has(id)));
+  }, [activeItemById]);
+
+  const setItemQuantity = (itemId: string, quantity: string) => {
+    setStagedQuantities(current => ({ ...current, [itemId]: quantity }));
+    setQuantityErrors(current => ({ ...current, [itemId]: '' }));
+  };
+
+  const deselectItem = (itemId: string) => {
+    setSelectedItemIds(current => current.filter(id => id !== itemId));
+    setStagedQuantities(current => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
+    setQuantityErrors(current => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
+  };
+
+  const toggleItem = (item: ContractorPriceBookItem, selected: boolean) => {
+    if (!selected) {
+      deselectItem(item.id);
       return;
     }
-    addingItemIdRef.current = item.id;
-    setAddingItemId(item.id);
-    onAddLine(priceBookItemToEstimateLineDraft(item, quantity.trim()));
-    setStagedQuantities(current => ({ ...current, [item.id]: '1' }));
+    setAddedCount(0);
+    setSelectedItemIds(current => current.includes(item.id) ? current : [...current, item.id]);
+    setStagedQuantities(current => current[item.id] === undefined ? { ...current, [item.id]: '1' } : current);
     setQuantityErrors(current => ({ ...current, [item.id]: '' }));
-    setAddedTitle(item.title);
+  };
+
+  const addSelectedItems = () => {
+    if (
+      pickerDisabled
+      || addingSelectionRef.current
+      || selectedItems.length === 0
+      || selectedItems.length !== selectedItemIds.length
+    ) return;
+    const nextErrors = Object.fromEntries(selectedItems.map(item => {
+      const quantity = stagedQuantities[item.id] ?? '1';
+      return [item.id, priceBookStagedQuantityError(quantity)];
+    }));
+    if (Object.values(nextErrors).some(Boolean)) {
+      setQuantityErrors(nextErrors);
+      return;
+    }
+    addingSelectionRef.current = true;
+    setAddingSelection(true);
+    onAddLines(selectedItems.map(item => priceBookItemToEstimateLineDraft(item, (stagedQuantities[item.id] ?? '1').trim())));
+    setAddedCount(selectedItems.length);
+    setSelectedItemIds([]);
+    setStagedQuantities({});
+    setQuantityErrors({});
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
     resetTimer.current = window.setTimeout(() => {
-      addingItemIdRef.current = null;
-      setAddingItemId(null);
+      addingSelectionRef.current = false;
+      setAddingSelection(false);
       resetTimer.current = null;
     }, 250);
   };
@@ -125,7 +172,7 @@ export function DraftPriceBookPicker({
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
             {ready
-              ? `${activeItems.length} active item${activeItems.length === 1 ? '' : 's'} available. Add one as a fresh editable Draft line.`
+              ? `${activeItems.length} active item${activeItems.length === 1 ? '' : 's'} available. Select items and add independent editable Draft lines.`
               : stateCopy}
           </p>
         </div>
@@ -186,10 +233,63 @@ export function DraftPriceBookPicker({
             </label>
           </div>
 
-          {addedTitle ? (
+          {addedCount ? (
             <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800" role="status" data-testid="durable-draft-price-book-feedback">
-              Added {addedTitle}. Review and edit the new Draft line before saving.
+              Added {addedCount} Price Book item{addedCount === 1 ? '' : 's'}. Review and edit the new Draft line{addedCount === 1 ? '' : 's'} before saving.
             </p>
+          ) : null}
+
+          {selectedItems.length > 0 ? (
+            <section className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3" aria-labelledby="price-book-staged-heading" data-testid="durable-draft-price-book-staged">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 id="price-book-staged-heading" className="text-sm font-bold text-slate-950">
+                  {selectedItems.length} item{selectedItems.length === 1 ? '' : 's'} selected
+                </h4>
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="durable-draft-price-book-add-selected"
+                  disabled={pickerDisabled || addingSelection}
+                  onClick={addSelectedItems}
+                >
+                  <Plus size={15} />
+                  {addingSelection ? 'Adding...' : `Add ${selectedItems.length} item${selectedItems.length === 1 ? '' : 's'} to Draft`}
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {selectedItems.map(item => (
+                  <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-end gap-2 rounded-lg border border-blue-100 bg-white p-2" data-testid="durable-draft-price-book-staged-item">
+                    <p className="self-center truncate text-sm font-semibold text-slate-800">{item.title}</p>
+                    <label className="block text-xs font-semibold text-slate-600">
+                      <span className="mb-1 block">Qty</span>
+                      <input
+                        aria-label={`Staged quantity for ${item.title}`}
+                        className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-sm"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={stagedQuantities[item.id] ?? '1'}
+                        aria-invalid={Boolean(quantityErrors[item.id])}
+                        aria-describedby={quantityErrors[item.id] ? `price-book-quantity-error-${item.id}` : undefined}
+                        onChange={event => setItemQuantity(item.id, event.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="inline-flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                      aria-label={`Remove ${item.title} from selected items`}
+                      onClick={() => deselectItem(item.id)}
+                    >
+                      <X size={16} />
+                    </button>
+                    {quantityErrors[item.id] ? (
+                      <p id={`price-book-quantity-error-${item.id}`} className="col-span-3 text-xs font-semibold text-red-700" role="alert">{quantityErrors[item.id]}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
           ) : null}
 
           {activeItems.length === 0 ? (
@@ -202,8 +302,10 @@ export function DraftPriceBookPicker({
             </div>
           ) : (
             <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1" data-testid="durable-draft-price-book-results">
-              {filteredItems.map(item => (
-                <article key={item.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+              {filteredItems.map(item => {
+                const selected = selectedItemIds.includes(item.id);
+                return (
+                  <article key={item.id} className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${selected ? 'border-blue-300 bg-blue-50/60' : 'border-slate-200'}`}>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-slate-950">{item.title}</p>
                     {item.customer_description ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{item.customer_description}</p> : null}
@@ -213,42 +315,21 @@ export function DraftPriceBookPicker({
                   </div>
                   <div className="w-full shrink-0 sm:w-auto">
                     <div className="flex items-end gap-2">
-                      <label className="block w-24 shrink-0 text-xs font-semibold text-slate-600">
-                        <span className="mb-1 block">Qty</span>
+                      <label className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:flex-none">
                         <input
-                          aria-label={`Quantity for ${item.title}`}
-                          className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:text-sm"
-                          type="number"
-                          inputMode="decimal"
-                          min="0.01"
-                          step="0.01"
-                          value={stagedQuantities[item.id] ?? '1'}
-                          aria-invalid={Boolean(quantityErrors[item.id])}
-                          aria-describedby={quantityErrors[item.id] ? `price-book-quantity-error-${item.id}` : undefined}
-                          onChange={event => {
-                            const quantity = event.target.value;
-                            setStagedQuantities(current => ({ ...current, [item.id]: quantity }));
-                            setQuantityErrors(current => ({ ...current, [item.id]: '' }));
-                          }}
+                          type="checkbox"
+                          className="size-4 accent-blue-600"
+                          aria-label={`Select ${item.title}`}
+                          checked={selected}
+                          onChange={event => toggleItem(item, event.target.checked)}
                         />
+                        {selected ? 'Selected' : 'Select'}
                       </label>
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 min-w-28 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
-                        data-testid="durable-draft-price-book-add"
-                        disabled={Boolean(addingItemId)}
-                        onClick={() => addItem(item)}
-                      >
-                        <Plus size={15} />
-                        {addingItemId === item.id ? 'Adding...' : 'Add item'}
-                      </button>
                     </div>
-                    {quantityErrors[item.id] ? (
-                      <p id={`price-book-quantity-error-${item.id}`} className="mt-1 text-xs font-semibold text-red-700" role="alert">{quantityErrors[item.id]}</p>
-                    ) : null}
                   </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           )}
 

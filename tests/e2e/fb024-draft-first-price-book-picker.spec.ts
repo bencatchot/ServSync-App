@@ -229,7 +229,9 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     expect(composer).toContain('!isChecklistDraft && isEstimateIntent && canViewPriceBook');
     expect(composer).toContain('disabled={interactionDisabled || !canSave}');
     expect(picker).toContain("status: 'active'");
-    expect(picker).toContain('addingItemIdRef.current');
+    expect(picker).toContain('addingSelectionRef.current');
+    expect(picker).toContain('current.includes(item.id) ? current : [...current, item.id]');
+    expect(composer).toContain('onAddLines={addPriceBookLines}');
     expect(picker).toContain("loadState === 'ready'");
     expect(picker).toContain('w-full');
     expect(picker).toContain('sm:w-auto');
@@ -240,6 +242,8 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     expect(combined).not.toContain(".from('contractor_price_book_items').update");
     expect(picker).not.toContain('onSave(');
     expect(picker).not.toContain('onLaunch(');
+    expect(picker).not.toContain('localStorage');
+    expect(picker).not.toContain('sessionStorage');
   });
 
   test('renders collapsed on mobile and searches and filters active, non-archived items', async ({ page }) => {
@@ -248,19 +252,21 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     await expect(page.getByTestId('durable-draft-price-book')).toBeVisible();
     await expect(page.getByTestId('durable-draft-price-book-picker')).toHaveCount(0);
     await page.getByTestId('durable-draft-price-book-toggle').click();
-    await expect(page.getByText('Copper fitting replacement')).toBeVisible();
-    await expect(page.getByLabel('Quantity for Copper fitting replacement')).toHaveValue('1');
+    await expect(page.getByTestId('durable-draft-price-book-results').getByText('Copper fitting replacement')).toBeVisible();
+    await page.getByLabel('Select Copper fitting replacement').check();
+    await expect(page.getByLabel('Staged quantity for Copper fitting replacement')).toHaveValue('1');
     await expect(page.getByText('Diagnostic labor')).toBeVisible();
     await expect(page.getByText('Archived fee')).toHaveCount(0);
 
     await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('diagnostic');
     await expect(page.getByText('Diagnostic labor')).toBeVisible();
-    await expect(page.getByText('Copper fitting replacement')).toHaveCount(0);
+    await expect(page.getByTestId('durable-draft-price-book-results').getByText('Copper fitting replacement')).toHaveCount(0);
+    await expect(page.getByTestId('durable-draft-price-book-staged')).toContainText('Copper fitting replacement');
     await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('');
     await page.getByLabel('Filter Price Book items').getByLabel('Trade').selectOption('Plumbing');
     await page.getByLabel('Filter Price Book items').getByLabel('Category').selectOption('Repair');
-    await expect(page.getByText('Copper fitting replacement')).toBeVisible();
-    await expect(page.getByText('Diagnostic labor')).toHaveCount(0);
+    await expect(page.getByTestId('durable-draft-price-book-results').getByText('Copper fitting replacement')).toBeVisible();
+    await expect(page.getByTestId('durable-draft-price-book-results').getByText('Diagnostic labor')).toHaveCount(0);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
@@ -274,15 +280,17 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     ]));
     await page.getByTestId('durable-draft-price-book-toggle').click();
     await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('Copper');
-    const quantity = page.getByLabel('Quantity for Copper fitting replacement');
+    await page.getByLabel('Select Copper fitting replacement').check();
+    const quantity = page.getByLabel('Staged quantity for Copper fitting replacement');
     await expect(quantity).toHaveValue('1');
     await quantity.fill('4');
-    await page.getByTestId('durable-draft-price-book-add').first().click();
-    await expect(quantity).toHaveValue('1');
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+    await expect(page.getByLabel('Staged quantity for Copper fitting replacement')).toHaveCount(0);
     await expect(page.getByPlaceholder('Search title, description, trade, category, SKU...')).toHaveValue('Copper');
     await page.waitForTimeout(300);
-    await quantity.fill('2.5');
-    await page.getByTestId('durable-draft-price-book-add').first().click();
+    await page.getByLabel('Select Copper fitting replacement').check();
+    await page.getByLabel('Staged quantity for Copper fitting replacement').fill('2.5');
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
 
     const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
     expect((snapshot.draft.line_items as Array<Record<string, unknown>>).map(line => line.quantity)).toEqual(['4', '2.5']);
@@ -299,10 +307,11 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
   test('blocks invalid staged quantities without adding a line', async ({ page }) => {
     await installComposerHarness(page);
     await page.getByTestId('durable-draft-price-book-toggle').click();
-    const quantity = page.getByLabel('Quantity for Copper fitting replacement');
+    await page.getByLabel('Select Copper fitting replacement').check();
+    const quantity = page.getByLabel('Staged quantity for Copper fitting replacement');
     for (const invalid of ['', '0', '-1']) {
       await quantity.fill(invalid);
-      await page.getByTestId('durable-draft-price-book-add').first().click();
+      await page.getByTestId('durable-draft-price-book-add-selected').click();
       await expect(page.getByRole('alert')).toContainText('Enter a quantity greater than zero.');
       const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
       expect(snapshot.draft.line_items).toEqual([]);
@@ -357,8 +366,9 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     await installComposerHarness(page);
     const originalItems = await page.evaluate(() => window.__draftPriceBookHarness.snapshot().items);
     await page.getByTestId('durable-draft-price-book-toggle').click();
-    await page.getByLabel('Quantity for Copper fitting replacement').fill('3');
-    const addButton = page.getByTestId('durable-draft-price-book-add').first();
+    await page.getByLabel('Select Copper fitting replacement').check();
+    await page.getByLabel('Staged quantity for Copper fitting replacement').fill('3');
+    const addButton = page.getByTestId('durable-draft-price-book-add-selected');
     await addButton.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
 
     let snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
@@ -378,6 +388,103 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
     expect(snapshot.saveCount).toBe(1);
     expect(snapshot.launchCount).toBe(0);
+  });
+
+  test('stages multiple items across search and filters in selection order', async ({ page }) => {
+    await installComposerHarness(page);
+    await page.evaluate(() => window.__draftPriceBookHarness.setItems([
+      window.__draftPriceBookHarness.item({ id: 'filter', title: 'Filter', trade: 'HVAC', category: 'Maintenance', default_unit_price_cents: 2500 }),
+      window.__draftPriceBookHarness.item({ id: 'capacitor', title: 'Capacitor', trade: 'HVAC', category: 'Repair', default_unit_price_cents: 7500 }),
+      window.__draftPriceBookHarness.item({ id: 'labor', title: 'Diagnostic labor', trade: 'Electrical', category: 'Service', line_type: 'labor', default_unit_price_cents: null }),
+    ]));
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+
+    const search = page.getByPlaceholder('Search title, description, trade, category, SKU...');
+    await search.fill('Filter');
+    await page.getByLabel('Select Filter').check();
+    await page.getByLabel('Staged quantity for Filter').fill('4');
+    await search.fill('Capacitor');
+    await page.getByLabel('Select Capacitor').check();
+    await page.getByLabel('Staged quantity for Capacitor').fill('2.5');
+    await search.fill('Diagnostic');
+    await page.getByLabel('Select Diagnostic labor').check();
+
+    await expect(page.getByTestId('durable-draft-price-book-staged-item')).toHaveCount(3);
+    await expect(page.getByTestId('durable-draft-price-book-staged')).toContainText('Filter');
+    await page.getByLabel('Filter Price Book items').getByLabel('Trade').selectOption('Electrical');
+    await expect(page.getByTestId('durable-draft-price-book-staged')).toContainText('Capacitor');
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+
+    const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+    const lines = snapshot.draft.line_items as Array<Record<string, unknown>>;
+    expect(lines.map(line => [line.description, line.quantity])).toEqual([
+      ['Filter', '4'],
+      ['Capacitor', '2.5'],
+      ['Diagnostic labor', '1'],
+    ]);
+    await expect(page.getByTestId('durable-draft-price-book-staged')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save Draft' }).click();
+    await page.evaluate(() => window.__draftPriceBookHarness.reopenSaved());
+    await expect(page.getByLabel('Draft estimate line item 1 quantity')).toHaveValue('4');
+    await expect(page.getByLabel('Draft estimate line item 2 quantity')).toHaveValue('2.5');
+    await expect(page.getByLabel('Draft estimate line item 3 quantity')).toHaveValue('1');
+    await page.getByRole('button', { name: 'Create Estimate' }).click();
+    expect((await page.evaluate(() => window.__draftPriceBookHarness.snapshot())).launchCount).toBe(1);
+  });
+
+  test('removes a staged item and blocks the entire group for one invalid quantity', async ({ page }) => {
+    await installComposerHarness(page);
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    await page.getByLabel('Select Copper fitting replacement').check();
+    await page.getByLabel('Select Diagnostic labor').check();
+    await page.getByLabel('Staged quantity for Diagnostic labor').fill('0');
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+    expect((await page.evaluate(() => window.__draftPriceBookHarness.snapshot())).draft.line_items).toEqual([]);
+    await expect(page.getByRole('alert')).toContainText('Enter a quantity greater than zero.');
+
+    await page.getByLabel('Remove Diagnostic labor from selected items').click();
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+    const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+    expect(snapshot.draft.line_items).toHaveLength(1);
+    expect((snapshot.draft.line_items as Array<Record<string, unknown>>)[0].description).toBe('Copper fitting replacement');
+  });
+
+  test('preserves blank, zero, priced, existing-line, and private-field boundaries in one add', async ({ page }) => {
+    await installComposerHarness(page);
+    await page.evaluate(() => {
+      const harness = window.__draftPriceBookHarness;
+      harness.setItems([
+        harness.item({ id: 'blank', title: 'Blank price', default_unit_price_cents: null }),
+        harness.item({ id: 'zero', title: 'Zero price', default_unit_price_cents: 0 }),
+        harness.item({ id: 'priced', title: 'Priced item', default_unit_price_cents: 7500 }),
+      ]);
+    });
+    await page.getByRole('button', { name: 'Add estimate line' }).click();
+    await page.getByLabel('Draft estimate line item 1 description').fill('Existing manual line');
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    for (const title of ['Blank price', 'Zero price', 'Priced item']) await page.getByLabel(`Select ${title}`).check();
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+
+    const snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+    const lines = snapshot.draft.line_items as Array<Record<string, unknown>>;
+    expect(lines.map(line => line.description)).toEqual(['Existing manual line', 'Blank price', 'Zero price', 'Priced item']);
+    expect(lines.slice(1).map(line => line.unit_price)).toEqual(['', '0.00', '75.00']);
+    expect(JSON.stringify(lines)).not.toMatch(/internal_cost|margin|profit|PRIVATE-SKU|Private margin target|csv_import|price-book-/);
+  });
+
+  test('keeps multi-add usable without horizontal overflow at 390x844', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installComposerHarness(page);
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    await page.getByLabel('Select Copper fitting replacement').check();
+    await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('Diagnostic');
+    await page.getByLabel('Select Diagnostic labor').check();
+    await page.getByLabel('Staged quantity for Diagnostic labor').fill('2');
+    await page.getByLabel('Remove Copper fitting replacement from selected items').click();
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+    expect((await page.evaluate(() => window.__draftPriceBookHarness.snapshot())).draft.line_items).toHaveLength(1);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 
   test('keeps the legacy estimate picker on the shared mapper', () => {
