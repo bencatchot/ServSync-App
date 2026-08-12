@@ -12,7 +12,7 @@ function laborHoursToInput(value: number | null | undefined) {
   return value === null || value === undefined ? '' : String(Number(value));
 }
 
-export function priceBookItemToEstimateLineDraft(
+export function priceBookItemToDraftLineSnapshot(
   item: ContractorPriceBookItem,
   quantity = '1',
 ): WorkComposerLineDraft {
@@ -28,6 +28,8 @@ export function priceBookItemToEstimateLineDraft(
     editor_source_note: `Added from Price Book: ${item.title}. Review quantity, price, and scope before sending.`,
   });
 }
+
+export const priceBookItemToEstimateLineDraft = priceBookItemToDraftLineSnapshot;
 
 export function priceBookStagedQuantityError(value: string) {
   const normalized = value.trim();

@@ -217,7 +217,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     expect(JSON.stringify(prepared.payload)).not.toContain('Fittings');
   });
 
-  test('wires the picker only through authorized standard Estimate Draft state without backend actions', () => {
+  test('wires the picker through authorized standard Estimate and Invoice Draft state without backend actions', () => {
     const app = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
     const composer = readFileSync(resolve(process.cwd(), 'src/features/drafts/ContractorDraftComposer.tsx'), 'utf8');
     const workspace = readFileSync(resolve(process.cwd(), 'src/features/drafts/DurableDraftWorkspace.tsx'), 'utf8');
@@ -226,7 +226,9 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
 
     expect(app.match(/priceBookItems=\{contractorPriceBookItems\}/g) ?? []).toHaveLength(2);
     expect(app.match(/canViewPriceBook=\{priceBookAccess\.canView\}/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(composer).toContain('!isChecklistDraft && isEstimateIntent && canViewPriceBook');
+    expect(composer).toContain('!isChecklistDraft && (isEstimateIntent || isInvoiceIntent) && canViewPriceBook');
+    expect(composer).toContain("draftLabel={isInvoiceIntent ? 'Invoice Draft' : 'Draft'}");
+    expect(workspace).toContain("canViewPriceBook={canViewPriceBook && (form.intended_output !== 'invoice' || capabilities.canLaunchInvoice)}");
     expect(composer).toContain('disabled={interactionDisabled || !canSave}');
     expect(picker).toContain("status: 'active'");
     expect(picker).toContain('addingSelectionRef.current');
@@ -341,7 +343,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     await expect(page.getByTestId('durable-draft-price-book-no-results')).toBeVisible();
   });
 
-  test('stays hidden outside authorized standard Estimate Drafts', async ({ page }) => {
+  test('stays hidden outside authorized standard Estimate and Invoice Drafts', async ({ page }) => {
     await installComposerHarness(page);
     await page.evaluate(() => window.__draftPriceBookHarness.setCanSave(false));
     await expect(page.getByTestId('durable-draft-price-book-toggle')).toBeDisabled();
@@ -354,12 +356,70 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     });
     await expect(page.getByTestId('durable-draft-price-book')).toHaveCount(0);
     await page.evaluate(() => window.__draftPriceBookHarness.setIntent('invoice'));
-    await expect(page.getByTestId('durable-draft-price-book')).toHaveCount(0);
+    await expect(page.getByTestId('durable-draft-price-book')).toBeVisible();
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    await page.getByLabel('Select Copper fitting replacement').check();
+    await expect(page.getByTestId('durable-draft-price-book-add-selected')).toContainText('to Invoice Draft');
     await page.evaluate(() => {
       window.__draftPriceBookHarness.setIntent('estimate');
       window.__draftPriceBookHarness.setWorkFormat('inspection_checklist');
     });
     await expect(page.getByTestId('durable-draft-price-book')).toHaveCount(0);
+  });
+
+  test('adds independent Invoice Draft snapshots and leaves later Price Book changes disconnected', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installComposerHarness(page);
+    await page.evaluate(() => {
+      const harness = window.__draftPriceBookHarness;
+      harness.setIntent('invoice');
+      harness.setItems([
+        harness.item({ id: 'service', title: 'Service call', line_type: 'other', default_unit_price_cents: null }),
+        harness.item({ id: 'labor', title: 'Diagnostic labor', line_type: 'labor', default_unit_price_cents: 0 }),
+        harness.item({ id: 'material', title: 'Replacement part', line_type: 'material', default_unit_price_cents: 7500 }),
+        harness.item({ id: 'fee', title: 'Permit fee', line_type: 'fee', default_unit_price_cents: 2500 }),
+      ]);
+    });
+    await page.getByRole('button', { name: 'Add invoice line' }).click();
+    await page.getByLabel('Invoice line item 1 description').fill('Inherited or manual line');
+    await page.getByTestId('durable-draft-price-book-toggle').click();
+    for (const title of ['Service call', 'Diagnostic labor', 'Replacement part', 'Permit fee']) {
+      await page.getByLabel(`Select ${title}`).check();
+    }
+    await page.getByLabel('Staged quantity for Diagnostic labor').fill('2.5');
+    await page.getByLabel('Staged quantity for Replacement part').fill('3');
+    await page.getByTestId('durable-draft-price-book-add-selected').click();
+
+    let snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+    const lines = snapshot.draft.line_items as Array<Record<string, unknown>>;
+    expect(lines.map(line => line.description)).toEqual([
+      'Inherited or manual line',
+      'Service call',
+      'Diagnostic labor',
+      'Replacement part',
+      'Permit fee',
+    ]);
+    expect(lines.slice(1).map(line => [line.line_type, line.quantity, line.unit_price])).toEqual([
+      ['other', '1', ''],
+      ['labor', '2.5', '0.00'],
+      ['material', '3', '75.00'],
+      ['fee', '1', '25.00'],
+    ]);
+    expect(JSON.stringify(lines)).not.toMatch(/internal_cost|margin|PRIVATE-SKU|Private margin target|csv_import|price-book-|contractor_id/);
+
+    await page.evaluate(() => {
+      const harness = window.__draftPriceBookHarness;
+      harness.setItems([
+        harness.item({ id: 'service', title: 'Renamed service', line_type: 'other', default_unit_price_cents: 9900, active: false, archived_at: '2026-08-02T00:00:00.000Z' }),
+      ]);
+    });
+    await page.getByRole('button', { name: 'Save Draft' }).click();
+    await page.evaluate(() => window.__draftPriceBookHarness.reopenSaved());
+    snapshot = await page.evaluate(() => window.__draftPriceBookHarness.snapshot());
+    expect((snapshot.draft.line_items as Array<Record<string, unknown>>).map(line => line.description)).toContain('Service call');
+    expect(JSON.stringify(snapshot.draft)).not.toContain('Renamed service');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 
   test('guards duplicate actions, does not autosave or launch, and preserves edits after save and reopen', async ({ page }) => {

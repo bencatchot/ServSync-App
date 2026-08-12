@@ -4,6 +4,20 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-12 - FB-024 Invoice Draft Price Book Selection v1
+
+- Branch: `codex/fb024-invoice-draft-price-book-selection-v1`
+- Starting main SHA: `451fdb701fc15b0bd6deb2c653048359c3d50dc9`
+- Files changed: canonical Price Book-to-Draft snapshot mapper and picker; durable and legacy editable Invoice Draft integration; focused Invoice/Estimate, snapshot privacy, quantity, persistence, launch, and mobile regression tests; FB-024 backlog; master plan; completed-features ledger; Marketing Product Inventory; changelog.
+- Summary of change: Extends the existing active-item Price Book picker to editable Invoice Drafts without introducing an Invoice-specific Price Book model. Standard durable Invoice Drafts and legacy direct editable Invoice Drafts reuse the same search, filters, multi-select, per-item quantity staging, guarded group append, and strict customer-safe snapshot allowlist already used for Estimates. New lines append independently after inherited/manual lines and remain ordinary editable Invoice lines.
+- Authority and safety: Existing Price Book read authority remains necessary, and Invoice use also requires existing Invoice launch/billing authority. Field Technician, Viewer, homeowner, inactive, cross-tenant, and non-draft Invoice access remain fail closed. The picker does not autosave, send, launch, alter payment state, mutate Price Book, retain source IDs/linkage, copy internal notes/cost/margin/import metadata, or change Job/completed-work/partial-invoice billing behavior. No SQL, schema, RPC, RLS, grant, environment, database data, Stripe, or payment change is included.
+- Tests/checks: Focused coverage includes direct and Estimate-derived editable Invoice Drafts, durable Invoice intent, owner/admin/office authority boundaries, active-only selection, Service/Labor/Material/Fee snapshots, multi-select quantities and ordering, blank/zero/priced semantics, inherited/manual-line preservation, double-action protection, private-field exclusion, source edits after insertion, save/reopen, Estimate launch regression, and 390x844 layout. TypeScript, Production build, broader Draft/Invoice/Price Book/import/privacy regressions, backend parity, rollout validation, Marketing contract validation, sensitive-value scan, `git diff --check`, exact-head checks, and independent review remain merge gates.
+- Known risks and follow-up: This is authoring convenience, not assemblies, inventory, line grouping, live linkage, invoice sending, payment processing, or completed-work billing redesign. Routine FB-024 expansion is paused unless new contractor evidence identifies a concrete Price Book problem. Draft-first Work lifecycle consistency under FB-035 is the likely next product focus, subject to current backlog and product state.
+
+### Backlog Impact
+- BACKLOG FILE UPDATED: YES
+- REASON: Records Invoice Draft Price Book selection as complete and moves routine FB-024 expansion to an evidence-gated pause.
+
 ## 2026-08-12 - FB-024 Contractor-Neutral Price Book Onboarding v1
 
 - Branch: `codex/fb024-contractor-neutral-onboarding-v1`

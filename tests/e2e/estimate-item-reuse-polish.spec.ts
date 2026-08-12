@@ -70,7 +70,7 @@ test.describe('Estimate item reuse polish', () => {
     expect(matcher).not.toContain('saved charge');
   });
 
-  test('keeps reusable item selection isolated from Invoice composition', () => {
+  test('keeps estimate-only controls isolated while Invoice Drafts reuse the canonical picker', () => {
     const source = appSource();
     const invoiceComposer = sourceBetween(
       source,
@@ -80,5 +80,7 @@ test.describe('Estimate item reuse polish', () => {
 
     expect(invoiceComposer).not.toContain('renderEstimateSavedItemPicker');
     expect(invoiceComposer).not.toContain('estimateSavedItemSearch');
+    expect(invoiceComposer).toContain('<DraftPriceBookPicker');
+    expect(invoiceComposer).toContain('draftLabel="Invoice Draft"');
   });
 });

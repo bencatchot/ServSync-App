@@ -590,12 +590,13 @@ export function ContractorDraftComposer({
         </div>
       ) : null}
 
-      {!isChecklistDraft && isEstimateIntent && canViewPriceBook ? (
+      {!isChecklistDraft && (isEstimateIntent || isInvoiceIntent) && canViewPriceBook ? (
         <DraftPriceBookPicker
           items={priceBookItems}
           loadState={priceBookLoadState}
           loadError={priceBookLoadError}
           disabled={interactionDisabled || !canSave}
+          draftLabel={isInvoiceIntent ? 'Invoice Draft' : 'Draft'}
           onAddLines={addPriceBookLines}
         />
       ) : null}
