@@ -452,6 +452,24 @@
           "reason": "Exact SHA-256 656d360037fa8a47f34f58bf972221b8d4d7560af502d9c851e7c489b4252a66 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-11 from 21:54:02Z through 21:54:03Z. Catalog ownership, forced RLS, zero policies/direct browser grants, fixed-path RPCs, zero customer-work cost columns, and the zero Price Book/cost/import/rollback/business-record baseline passed; no Demo fixture or cost value was created."
         }
       }
+    },
+    {
+      "id": "price-book-portable-reference-reconciliation-v1",
+      "artifact": "servsync-price-book-portable-reference-reconciliation.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Exact SHA-256 a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8 is locally validated and awaits controlled Sandbox-first application and authenticated acceptance."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Apply only after the exact migration passes Sandbox and Demo security, preservation, and round-trip gates."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Apply after Sandbox acceptance and before Production to preserve supported-schema parity."
+        }
+      }
     }
   ]
 }

@@ -6,16 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-portable-reference-reconciliation-v1`
+- Starting main SHA: `643a1dac872c122231dc63276239b2b43966cdee`
+- Files changed: narrow portable-reference reconciliation migration; disposable PostgreSQL contract/security validation; Price Book export/import regression coverage; backend rollout ledger; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
+- Historical correction: PR #431 safely deployed CSV/XLSX file generation, complete-catalog paging, export privacy, and importer header compatibility, but post-merge SQL-contract review found that `servsync-item:<uuid>` was not authoritative identity in the server preview. Export v1 therefore remained incomplete despite the earlier changelog wording.
+- Summary of change: Adds exact tenant-scoped recognition for canonical `servsync-item:<uuid>` values inside the existing private reconciliation function. A matching item must belong to the authenticated contractor. A contradictory selected-source mapping fails as ambiguous and skip-only. Malformed reserved references fail invalid; valid references absent from the current tenant grant no authority and continue through normal source-scoped new/SKU behavior without global-existence disclosure.
+- Architecture and safety: Existing RPC signatures, authenticated Owner/Admin/Office management authority, source mappings, field comparison, explicit Add/Update/Skip execution, optimistic locking, immutable import audit, idempotency, guarded rollback, direct-table denial, and grants remain unchanged. No new table, RLS policy, browser grant, client workaround, private export field, or second reconciliation backend is added.
+- Migration: `servsync-price-book-portable-reference-reconciliation.sql`, SHA-256 `a958c40d3ed488ce0fdf4dfbc491c7b0c39115a9bcc1810df2e9f44b47880fe8`; shared-environment rollout remains pending until the controlled Sandbox-first gates pass.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Corrects the premature Export v1 completion claim and records portable-reference rollout/acceptance as the active FB-024 gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the authoritative identity precedence, tenant boundary, conflict behavior, and historical post-#431 correction.
+
 - Branch: `codex/fb024-price-book-export-v1`
 - Starting main SHA: `c407ea32c11444e9533d949dee9c5ced8f348587`
 - Files changed: shared Price Book CSV/XLSX export contract; compact export UI; complete-catalog paginated read integration; importer header aliases; focused export, round-trip, privacy, authorization, scale, failure, and responsive tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
-- Summary of change: Completes Price Book Export v1. Existing authorized Price Book readers can download All items or Active items only as a clean UTF-8 CSV or one-sheet `.xlsx` workbook. Both artifacts use user-facing Service/Labor/Material/Fee terminology and the same automatically recognized headers, values, blank-versus-zero behavior, and bounded generic row contract used by the existing importer.
+- Summary of change: Deployed the Price Book Export v1 file-generation foundation. Existing authorized Price Book readers can download All items or Active items only as a clean UTF-8 CSV or one-sheet `.xlsx` workbook. Both artifacts use user-facing Service/Labor/Material/Fee terminology and the same automatically recognized headers, values, blank-versus-zero behavior, and bounded generic row contract used by the existing importer. Post-merge validation subsequently found that server reconciliation did not yet recognize the exported portable reference; the follow-up entry above preserves that correction rather than treating round-trip completion as part of PR #431.
 - Privacy and identity: Export includes a prefixed `ServSync Item Reference` as portable correlation, not authority. Existing authenticated contractor, selected-source, mapping, and reconciliation checks remain authoritative. The export-specific read and generated files exclude private cost/margin, internal notes, contractor/account IDs, source/audit fields, and reconciliation metadata. CSV formula-like text is apostrophe-contained before spreadsheet opening; XLSX cells are explicitly typed and never written as formulas.
 - Scale and UX: Export verifies an exact RLS-protected count before and after deterministic 500-row paging, rejects duplicate/missing row identities, and never serializes only the visible 25-row view. It supports up to 5,000 items and fails rather than returning an incomplete or concurrently changed file. Empty Price Books explain why no download is available, and a responsive disclosure keeps the normal management screen compact.
 - Architecture: No SQL, schema, RPC, RLS, grants, environment, Production data, raw-file storage, dependency, import execution, cost authority, or provider integration changed. The existing `write-excel-file` dependency is reused.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-024 now records contractor-owned portable CSV/XLSX export as complete while retaining broader Price Book maturity work.
+  - REASON: FB-024 recorded the deployed file-generation foundation; the portable-reference reconciliation gap was discovered post-merge and is tracked by the corrective entry above.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
   - REASON: Records the export contract, portable-identity boundary, privacy allowlist, role behavior, scale limit, and explicit exclusions.
