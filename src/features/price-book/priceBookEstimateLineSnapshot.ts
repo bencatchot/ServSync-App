@@ -14,16 +14,25 @@ function laborHoursToInput(value: number | null | undefined) {
 
 export function priceBookItemToEstimateLineDraft(
   item: ContractorPriceBookItem,
+  quantity = '1',
 ): WorkComposerLineDraft {
   return createWorkComposerLineDraft({
     line_type: normalizeWorkComposerLineType(item.line_type),
     description: item.title,
     line_title: item.title,
     customer_description: item.customer_description || '',
-    quantity: '1',
+    quantity,
     unit: item.unit || 'each',
     unit_price: centsToPriceInput(item.default_unit_price_cents),
     labor_hours: laborHoursToInput(item.labor_hours),
     editor_source_note: `Added from Price Book: ${item.title}. Review quantity, price, and scope before sending.`,
   });
+}
+
+export function priceBookStagedQuantityError(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return 'Enter a quantity greater than zero.';
+  const quantity = Number(normalized);
+  if (!Number.isFinite(quantity) || quantity <= 0) return 'Enter a quantity greater than zero.';
+  return '';
 }

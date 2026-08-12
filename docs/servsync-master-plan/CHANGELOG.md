@@ -6,6 +6,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-11
 
+- Branch: `codex/fb024-draft-price-book-quantity-staging-v1`
+- Starting main SHA: `0124c04d528addb29531bb88b0af6f30991ab6ce`
+- Files changed: Draft-first Price Book picker; customer-safe Price Book snapshot helper; focused picker, persistence, privacy, Price Book, and responsive tests; FB-024 backlog; master plan; completed-features ledger; changelog.
+- Summary of change: Completes FB-024 Draft Price Book Quantity Staging v1. Each visible Price Book result now has a compact accessible quantity input that defaults to `1`. Positive finite whole or decimal quantities use the existing Draft quantity contract, copy into one fresh editable Estimate-intent Draft line, and reset to `1` after a successful add. Invalid blank, zero, negative, or malformed values do not create a line. Repeated adds remain independent snapshots, while search/filter context and Price Book records remain unchanged.
+- Privacy and persistence boundary: Staging is component-local state only. It adds no Price Book quantity field, SQL, RLS, RPC, grant, backend request, autosave, or live linkage. The existing allowlisted mapper still copies only customer-safe fields plus the selected quantity; internal notes, SKU, organization/import/mapping metadata, internal cost, profit, and margin remain excluded from Draft, Estimate, and customer payloads. Blank Price Required and explicit zero selling price remain distinct, and labor-hour interpretation is unchanged.
+- Validation: Focused Draft-first picker, shared mapper, Price Book organization, Price Book quick-pick, estimate-item reuse, and Cost/Margin privacy coverage passes 34/34. Tests cover default, whole and decimal staging, invalid blocking, repeated-add independence, reset, blank/zero pricing, derived line total, Draft save/reopen mapping, Draft-to-Estimate persisted quantity contract, no Price Book mutation, authorization visibility, and desktop/mobile layout. TypeScript, Production build, relevant Draft/launch and Price Book regressions, backend parity, sensitive/private-field scan, and `git diff --check` remain merge gates.
+- Known risks and follow-up: Staged quantity is deliberately temporary and not a Price Book default, inventory count, stock level, assembly, bulk-selection mechanism, or job-cost record. The existing durable schema stores quantity with two-decimal precision; this slice does not redesign broader composer quantity validation or labor-hour semantics.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records Quantity Staging v1 as complete while retaining broader reusable-content maturity.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Replaces the prior fixed-quantity picker description with the shipped transient staging and snapshot boundary.
+
 - Branch: `codex/fb024-price-book-cost-margin-v1`
 - Starting main SHA: `4d8d348030a4ba164e4c481e3e0a4c97bf45c001`
 - Files changed: additive private Price Book cost migration; manager-only Price Book load/save and cost/margin UI; derived margin helpers; disposable PostgreSQL and authenticated Sandbox tests; backend rollout ledger; master plan; FB-024 backlog; completed-features ledger; changelog.

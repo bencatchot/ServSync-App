@@ -97,7 +97,8 @@ test.describe('Estimate item reuse polish', () => {
     expect(priceBookMapper).toContain('description: item.title');
     expect(priceBookMapper).toContain('line_title: item.title');
     expect(priceBookMapper).toContain("customer_description: item.customer_description || ''");
-    expect(priceBookMapper).toContain("quantity: '1'");
+    expect(priceBookMapper).toContain("quantity = '1'");
+    expect(priceBookMapper).toContain('quantity,');
     expect(priceBookMapper).toContain("unit: item.unit || 'each'");
     expect(priceBookMapper).toContain('item.default_unit_price_cents');
     expect(priceBookMapper).toContain('item.labor_hours');
