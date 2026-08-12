@@ -152,6 +152,23 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(mapped[0].errors).toContain('Active must be true/false, yes/no, y/n, or 1/0.');
   });
 
+  test('inspects the full column before declining a low-confidence generic mapping', () => {
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv([
+      'Item Name,Type,Status',
+      'One,Unknown,Maybe',
+      'Two,Unknown,Maybe',
+      'Three,Unknown,Maybe',
+      'Four,Unknown,Maybe',
+      'Five,Service,Active',
+    ].join('\n')));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    const rows = buildPriceBookImportRows(parsed.rows, interpretation.mapping);
+
+    expect(interpretation.mapping).toMatchObject({ line_type: 'Type', active: 'Status' });
+    expect(rows.slice(0, 4).every(row => row.errors.length === 2)).toBe(true);
+    expect(rows[4].requestRow.values).toMatchObject({ line_type: 'other', active: true });
+  });
+
   test('normalizes generic CSV rows with stable IDs, mapped-field presence, and exact price semantics', () => {
     const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv([
       'external_id,title,description,price,taxable,sku',

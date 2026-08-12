@@ -262,6 +262,10 @@ function representativeValues(rows: PriceBookTabularRow[], header: string) {
   return Array.from(new Set(rows.map(row => row.values[header]?.trim()).filter((value): value is string => Boolean(value)))).slice(0, 4);
 }
 
+function allNonBlankValues(rows: PriceBookTabularRow[], header: string) {
+  return rows.map(row => row.values[header]?.trim()).filter((value): value is string => Boolean(value));
+}
+
 function interpretationLabel(field: PriceBookCsvField, rawValue: string) {
   if (field === 'line_type') {
     const parsed = parseLineType(rawValue);
@@ -288,12 +292,12 @@ export function interpretPriceBookImport(headers: string[], rows: PriceBookTabul
 
   const statusHeader = mapping.active;
   if (statusHeader && normalizedHeaders.get(statusHeader) === 'status') {
-    const values = representativeValues(rows, statusHeader);
+    const values = allNonBlankValues(rows, statusHeader);
     if (values.length > 0 && values.every(value => Boolean(parseBoolean(value, 'Active').error))) delete mapping.active;
   }
   const typeHeader = mapping.line_type;
   if (typeHeader && REVIEW_HEADER_ALIASES.line_type?.includes(normalizedHeaders.get(typeHeader) || '')) {
-    const values = representativeValues(rows, typeHeader);
+    const values = allNonBlankValues(rows, typeHeader);
     if (values.length > 0 && values.every(value => Boolean(parseLineType(value).error))) delete mapping.line_type;
   }
 
