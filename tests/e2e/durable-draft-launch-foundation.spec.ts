@@ -786,25 +786,16 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(currentEntry).not.toContain('`src/types.ts`');
   });
 
-  test('documents merged foundation, validated sandbox correction, and split Slice 2C plan', () => {
-    const changelog = sourceFile('docs/servsync-master-plan/CHANGELOG.md');
+  test('documents the current installed foundation and all-contractors rollout without stale gate assertions', () => {
     const backlog = sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md');
     const masterPlan = sourceFile('docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md');
 
-    for (const source of [changelog, backlog, masterPlan]) {
-      expect(source).toMatch(/PR #317 (?:is |subsequently )?merged|merged PR #317/i);
-      expect(source).toMatch(/permission correction (?:is |was |were )?installed|foundation and permission correction are installed|both the foundation and its permission-parity correction installed/i);
-      expect(source).toMatch(/runtime (?:matrix|validation) passed/i);
-      expect(source).toMatch(/Production (?:has|now has) (?:the )?(?:corrected )?canonical(?: durable Draft)? foundation installed and verified/i);
-      expect(source).toMatch(/Production durable Draft tables remain empty|its durable Draft tables remain empty/i);
-      expect(source).toMatch(/(?:all three )?(?:global )?gates remain (?:absent\/)?off|global gates are absent\/off/i);
-      expect(source).toContain('Slice 2C-A');
-      expect(source).toContain('Slice 2C-B');
-      expect(source).toContain('Slice 2C-C');
-      expect(source).toContain('Slice 2C-D');
-    }
-    expect(changelog).toContain('no UI wiring');
-    expect(backlog).toContain('hidden typed durable API contracts');
+    expect(masterPlan).toMatch(/PR #317 (?:is |subsequently )?merged|merged PR #317/i);
+    expect(masterPlan).toMatch(/Production (?:has|now has) (?:the )?(?:corrected )?canonical(?: durable Draft)? foundation installed and verified/i);
+    expect(backlog).toContain('durable Draft, item, launch, checklist, invoice, cohort-entitlement, runtime-setting, and rollout-mode foundations already installed');
+    expect(backlog).toContain('server mode is `all_contractors`');
+    expect(backlog).toContain('three Draft/Work Vercel gates are present and compiled as `true`');
+    expect(backlog).toContain('accepted-only, duplicate-safe server contract');
     expect(masterPlan).toContain('typed durable adapters');
     expect(masterPlan).toContain('explicit Open Output');
     expect(masterPlan).toContain('same-session confirmed Create and explicit Retry');

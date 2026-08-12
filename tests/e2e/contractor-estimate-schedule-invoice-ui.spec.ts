@@ -99,7 +99,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     expect(scheduleRendererSource).not.toContain('unlink');
   });
 
-  test('non-accepted scheduled estimates are read-only and legacy estimates keep the generic invoice path', () => {
+  test('non-accepted estimates are read-only unless an existing linked invoice can be opened', () => {
     const source = appSource();
     const financialEstimateCards = sourceBetween(
       source,
@@ -114,13 +114,15 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     const genericDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromEstimateScheduleItem = async');
 
     expect(scheduleRendererSource).toContain('Invoices can be created after homeowner approval.');
-    expect(financialEstimateCards).toContain('const canUseGenericEstimateInvoiceAction = canCreateInvoiceDraftFromEstimate && !hasPaymentScheduleRows;');
+    expect(financialEstimateCards).toContain('const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);');
+    expect(financialEstimateCards).toContain('const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows;');
     expect(financialEstimateCards).toContain('canUseGenericEstimateInvoiceAction &&');
-    expect(financialEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate, customerName)');
+    expect(financialEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate)');
     expect(financialEstimateCards).not.toContain('Create draft invoice');
     expect(genericDraftSource).toContain("const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void')");
-    expect(genericDraftSource).toContain('beginInvoiceDraftForCustomer(subjectName || \'Customer\', {');
-    expect(genericDraftSource).toContain('sourceEstimate: estimate');
+    expect(genericDraftSource).toContain("if (estimate.status !== 'accepted')");
+    expect(genericDraftSource).toContain("supabase.rpc('servsync_create_invoice_from_estimate'");
+    expect(genericDraftSource).not.toContain('beginInvoiceDraftForCustomer');
     expect(source).not.toContain('Choose invoice type');
     expect(source).not.toContain('Select invoice type');
   });

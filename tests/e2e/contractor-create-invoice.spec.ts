@@ -12,6 +12,7 @@ import {
   waitForContractorWorkspaceReady,
 } from './helpers/customers';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+import { estimateCanCreateInvoice } from '../../src/features/estimates/status';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
@@ -24,8 +25,15 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test.describe('contractor estimate-to-invoice draft source', () => {
-  test('saved estimate actions can open an editable invoice draft without the accepted-only RPC', () => {
+test.describe('contractor estimate-to-invoice eligibility', () => {
+  test('only the accepted Estimate lifecycle state is eligible for new Invoice creation', () => {
+    expect(estimateCanCreateInvoice('accepted')).toBe(true);
+    for (const status of ['draft', 'sent', 'declined', 'expired', 'revised'] as const) {
+      expect(estimateCanCreateInvoice(status), `${status} should remain ineligible`).toBe(false);
+    }
+  });
+
+  test('creates only from accepted estimates through the duplicate-safe RPC and still opens linked invoices', () => {
     const source = appSource();
     const directDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromEstimateScheduleItem =');
     const selectedWorkspaceEstimateCards = sourceBetween(
@@ -40,23 +48,57 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     );
 
     expect(source).toContain('Create invoice from estimate');
-    expect(selectedWorkspaceEstimateCards).toContain("['draft', 'sent', 'accepted'].includes(estimate.status)");
-    expect(focusedEstimateCards).toContain("!isInvoice && ['draft', 'sent', 'accepted'].includes(estimate.status)");
-    expect(selectedWorkspaceEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate, headerName)');
-    expect(focusedEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate, customerName)');
+    expect(selectedWorkspaceEstimateCards).toContain('const canCreateInvoiceDraftFromEstimate = estimateCanCreateInvoice(estimate.status);');
+    expect(focusedEstimateCards).toContain('const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);');
+    expect(selectedWorkspaceEstimateCards).toContain('Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate)');
+    expect(focusedEstimateCards).toContain('Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate)');
+    expect(selectedWorkspaceEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate)');
+    expect(focusedEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate)');
     expect(selectedWorkspaceEstimateCards).toContain('Invoice created');
     expect(focusedEstimateCards).toContain('Invoice created');
+    expect(selectedWorkspaceEstimateCards).toContain('Open draft invoice');
+    expect(focusedEstimateCards).toContain('Open invoice');
 
     expect(directDraftSource).toContain('const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== \'void\')');
     expect(directDraftSource).toContain('openInvoiceRecord(existingInvoice)');
-    expect(directDraftSource).toContain('beginInvoiceDraftForCustomer(subjectName || \'Customer\', {');
-    expect(directDraftSource).toContain('sourceEstimate: estimate');
-    expect(directDraftSource).toContain('Invoice draft started from this estimate. Review it before saving or sending.');
-    expect(directDraftSource).not.toContain('servsync_create_invoice_from_estimate');
+    expect(directDraftSource).toContain("if (estimate.status !== 'accepted')");
+    expect(directDraftSource).toContain('createInvoiceCapability.disabled');
+    expect(directDraftSource).toContain("supabase.rpc('servsync_create_invoice_from_estimate'");
+    expect(directDraftSource).toContain('creatingEstimateInvoiceIdsRef.current.has(estimate.id)');
+    expect(directDraftSource).toContain('creatingEstimateInvoiceIdsRef.current.add(estimate.id)');
+    expect(directDraftSource).toContain('creatingEstimateInvoiceIdsRef.current.delete(estimate.id)');
+    expect(directDraftSource).toContain('loadInvoiceById(result.invoice_id)');
+    expect(directDraftSource).toContain('result.created === false');
+    expect(directDraftSource).not.toContain('beginInvoiceDraftForCustomer');
+    expect(directDraftSource).not.toContain('sourceEstimate: estimate');
     expect(directDraftSource).not.toContain('createJobFromAcceptedEstimate');
     expect(directDraftSource).not.toContain('startNewInspection');
     expect(directDraftSource).not.toContain('saveInvoiceDraft');
     expect(directDraftSource).not.toContain('sendInvoiceToHomeowner');
+  });
+
+  test('server contract rejects stale non-accepted calls and serializes duplicate accepted calls', () => {
+    const sql = sourceFile('servsync-structured-line-item-conversion-rpcs.sql');
+    const billingSql = sourceFile('servsync-fb020-billing-permission-helper.sql');
+    const rpcSource = sourceBetween(
+      sql,
+      'create or replace function public.servsync_create_invoice_from_estimate(p_estimate_id uuid)',
+      'create or replace function public.servsync_create_invoice_from_job(p_inspection_id uuid)',
+    );
+
+    expect(rpcSource).toContain("pg_advisory_xact_lock(hashtext('servsync-invoice-estimate-' || p_estimate_id::text))");
+    expect(rpcSource).toContain("if v_estimate.status <> 'accepted' then");
+    expect(rpcSource).toContain("raise exception 'Only accepted estimates can be converted to invoices.'");
+    expect(rpcSource).toContain('current_user_can_write_contractor_jobs(v_estimate.contractor_id)');
+    expect(rpcSource).toContain('where estimate_id = v_estimate.id');
+    expect(rpcSource).toContain("and status <> 'void'");
+    expect(rpcSource).toContain("'created', false");
+    expect(rpcSource).toContain("'created', true");
+    expect(billingSql).toContain("'public.servsync_create_invoice_from_estimate(uuid)'::regprocedure");
+    expect(billingSql).toContain("'public.current_user_can_manage_contractor_billing(v_estimate.contractor_id)'");
+    expect(billingSql).toContain("ctm.role in ('admin', 'office')");
+    expect(billingSql).toContain('cp.owner_user_id = auth.uid()');
+    expect(billingSql).toContain('or public.current_user_is_platform_admin()');
   });
 
   test('invoice composer seed copies supported estimate context and line items', () => {
@@ -131,7 +173,7 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(tabSource).toContain("if (tab === 'invoices') {");
     expect(tabSource).toContain("setContractorFinancialRecordKind('invoices');");
     expect(tabSource).toContain("setContractorJobsViewAndScroll('open_financial');");
-    expect(source).toContain("type ContractorInvoiceRecordStatusFilter = 'all' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';");
+    expect(source).toContain("type ContractorInvoiceRecordStatusFilter = 'all' | 'open' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';");
     expect(source).toContain("type ContractorInvoiceRecordSort = ContractorEstimateRecordSort | 'due_date';");
     expect(source).toContain('const [contractorInvoiceRecordSearch, setContractorInvoiceRecordSearch] = useState');
     expect(source).toContain('const [contractorInvoiceRecordStatusFilter, setContractorInvoiceRecordStatusFilter]');
@@ -148,6 +190,7 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(financialListSource).toContain('aria-label="Search invoices"');
     expect(financialListSource).toContain('data-testid="contractor-invoice-status-filter"');
     expect(financialListSource).toContain('<option value="all">All</option>');
+    expect(financialListSource).toContain('<option value="open">Open</option>');
     expect(financialListSource).toContain('<option value="draft">Draft</option>');
     expect(financialListSource).toContain('<option value="sent">Sent</option>');
     expect(financialListSource).toContain('<option value="viewed">Viewed</option>');

@@ -8,3 +8,7 @@ export function estimateStatusLabel(status: Estimate['status']) {
 export function estimateStatusClass(status: Estimate['status']) {
   return statusToneClass(estimateStatusPresentation(status).tone);
 }
+
+export function estimateCanCreateInvoice(status: Estimate['status']) {
+  return status === 'accepted';
+}

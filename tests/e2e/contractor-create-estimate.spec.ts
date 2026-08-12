@@ -219,7 +219,7 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(financialListSource).toContain('estimate.scope');
     expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'");
     expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'");
-    expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' && (");
+    expect(newFinancialSource).toContain("(!sharedDraftComposerEnabled || contractorFinancialRecordKind === 'estimates') && (");
     expect(newFinancialSource).toContain('Create estimate');
     expect(newFinancialSource).toContain('Create invoice');
   });
