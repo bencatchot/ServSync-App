@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-12 - FB-024 Contractor-Neutral Price Book Onboarding v1
+
+- Branch: `codex/fb024-contractor-neutral-onboarding-v1`
+- Files changed: contractor Price Book workspace and app wiring; bounded starter-catalog domain helper; focused onboarding, authorization, idempotency, and responsive tests; Marketing Truth Pack and product inventory; FB-024 backlog; master plan; completed-features ledger; changelog.
+- Summary of change: Replaces the manager's bare empty Price Book state with four optional first-run paths: add one item, open the existing CSV/XLSX importer, add a twelve-item trade-neutral starter catalog, or continue empty. The panel is not a gate, and an explicit continue-empty choice is remembered only as a profile-scoped local browser preference. Archived-only catalogs receive restore guidance instead of first-run setup, and Field Technician/Viewer read-only users receive an honest no-items state without mutation controls.
+- Starter safety: Starter rows use generic Service, Labor, Material, and Fee labels, leave selling prices blank, create no bundles or provider identities, and become ordinary editable canonical Price Book records. One stable starter source, external-item identities, deterministic request content, server preview, exact Add-or-Skip actions, and the existing idempotent transactional import execution prevent partial catalogs, retry duplicates, and overwrites of equivalent existing entries. Existing RLS/RPC role authority, immutable import audit, guarded rollback, manual editing, Draft snapshots, cost privacy, CSV/XLSX behavior, and tenant isolation are unchanged.
+- Tests/checks: Focused tests cover all onboarding choices, no mutation before explicit action, trade neutrality, blank prices, source concurrency, equivalent-item Skip, incomplete-preview fail-closed behavior, double-action protection, owner/admin/office versus read-only behavior, archived-only catalogs, and desktop/mobile layout. TypeScript, Production build, broader Price Book/import/Draft/privacy regressions, Marketing contract validation, backend parity, sensitive-value scan, `git diff --check`, exact-head checks, and independent review remain merge gates.
+- Known risks and follow-up: The starter catalog uses the existing canonical import audit and its `file_upload` source kind with an explicit ServSync starter source/filename because no second ingestion model was introduced. Tax defaults remain the existing Price Book/import defaults and must be reviewed by the contractor along with names and prices. Starter setup is deliberately basic; trade-specific packs, assemblies, inventory, provider catalogs, accounting sync, AI pricing, recommendations, and automatic market pricing remain out of scope. FB-024 remains active.
+
+### Backlog Impact
+- BACKLOG FILE UPDATED: YES
+- REASON: FB-024 records contractor-neutral first-run onboarding as completed while keeping broader Price Book maturity active.
+
 ## 2026-08-12
 
 - Branch: `codex/fb024-saved-charges-consolidation-v1`

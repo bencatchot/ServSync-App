@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, FileSpreadsheet, ListPlus, PackageOpen, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type { ContractorPriceBookItem, EstimateLineType } from '../../types';
@@ -109,6 +109,8 @@ export function ContractorPriceBookWorkspace({
   onEdit,
   onToggleActive,
   onBulkUpdate,
+  onAddStarterCatalog,
+  onboardingStorageKey,
 }: {
   items: ContractorPriceBookItem[];
   contractorSaved: boolean;
@@ -131,9 +133,16 @@ export function ContractorPriceBookWorkspace({
   onEdit: (item: ContractorPriceBookItem) => void;
   onToggleActive: (item: ContractorPriceBookItem) => void;
   onBulkUpdate: (itemIds: string[], changes: ContractorPriceBookBulkChanges, actionLabel: string) => Promise<boolean>;
+  onAddStarterCatalog: () => Promise<void>;
+  onboardingStorageKey: string;
 }) {
   const [status, setStatus] = useState<PriceBookStatusView>('active');
   const [csvToolsMounted, setCsvToolsMounted] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => typeof window !== 'undefined' && window.localStorage.getItem(onboardingStorageKey) === 'true',
+  );
+  const [creatingStarterCatalog, setCreatingStarterCatalog] = useState(false);
+  const [starterCatalogError, setStarterCatalogError] = useState('');
   const [search, setSearch] = useState('');
   const [lineType, setLineType] = useState<PriceBookTypeFilter>('all');
   const [trade, setTrade] = useState('');
@@ -147,6 +156,7 @@ export function ContractorPriceBookWorkspace({
   const [applyingBulkAction, setApplyingBulkAction] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const importToolsRef = useRef<HTMLDetailsElement>(null);
 
   const statusItems = useMemo(
     () => items.filter(item => status === 'archived' ? priceBookItemIsArchived(item) : !priceBookItemIsArchived(item)),
@@ -170,6 +180,8 @@ export function ContractorPriceBookWorkspace({
   const paged = useMemo(() => priceBookPage(filteredItems, page), [filteredItems, page]);
   const filtersActive = Boolean(search.trim() || lineType !== 'all' || trade || category || subcategory);
   const canMutate = contractorSaved && canManage && loadState === 'ready';
+  const firstRunEmpty = items.length === 0 && status === 'active' && !filtersActive;
+  const onboardingVisible = firstRunEmpty && canMutate && !onboardingDismissed;
   const currentPageIds = useMemo(() => paged.items.map(item => item.id), [paged.items]);
   const selectedCurrentPageCount = currentPageIds.filter(id => selectedIds.has(id)).length;
   const allCurrentPageSelected = currentPageIds.length > 0 && selectedCurrentPageCount === currentPageIds.length;
@@ -216,6 +228,32 @@ export function ContractorPriceBookWorkspace({
     setTrade('');
     setCategory('');
     setSubcategory('');
+  };
+
+  const openImportTools = () => {
+    setCsvToolsMounted(true);
+    window.requestAnimationFrame(() => {
+      if (importToolsRef.current) importToolsRef.current.open = true;
+      importToolsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const addStarterCatalog = async () => {
+    if (!canMutate || creatingStarterCatalog) return;
+    setStarterCatalogError('');
+    setCreatingStarterCatalog(true);
+    try {
+      await onAddStarterCatalog();
+    } catch (error) {
+      setStarterCatalogError(error instanceof Error ? error.message : 'The starter catalog could not be added. No partial catalog was created.');
+    } finally {
+      setCreatingStarterCatalog(false);
+    }
+  };
+
+  const dismissOnboarding = () => {
+    window.localStorage.setItem(onboardingStorageKey, 'true');
+    setOnboardingDismissed(true);
   };
 
   const setStatusView = (nextStatus: PriceBookStatusView) => {
@@ -320,13 +358,44 @@ export function ContractorPriceBookWorkspace({
             <h3 className="text-base font-bold text-slate-950">Items</h3>
             <p className="mt-1 text-sm text-slate-600">Search and filter the reusable pricing your team can use.</p>
           </div>
-          {canMutate ? (
+          {canMutate && !onboardingVisible ? (
             <button type="button" disabled={applyingBulkAction} onClick={onOpenAddForm} className={primaryButtonClass}>
               <Plus size={16} />
               Add Item
             </button>
           ) : null}
         </div>
+
+        {onboardingVisible ? (
+          <div data-testid="price-book-onboarding" className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:p-5">
+            <div className="max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Build your Price Book</p>
+              <h4 className="mt-1 text-lg font-bold text-slate-950">Keep reusable services, labor, materials, and fees ready for estimates.</h4>
+              <p className="mt-1 text-sm leading-6 text-slate-700">Start one item at a time, bring in an existing CSV or XLSX catalog, or add a small editable starter list with prices left blank.</p>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button type="button" onClick={onOpenAddForm} className={primaryButtonClass}>
+                <Plus size={16} />Add your first item
+              </button>
+              <button type="button" onClick={openImportTools} className={secondaryButtonClass}>
+                <FileSpreadsheet size={16} />Import CSV or XLSX
+              </button>
+              <button
+                type="button"
+                disabled={creatingStarterCatalog}
+                onClick={() => void addStarterCatalog()}
+                className={secondaryButtonClass}
+              >
+                <ListPlus size={16} />{creatingStarterCatalog ? 'Adding 12 starter items...' : 'Add 12 starter items'}
+              </button>
+              <button type="button" onClick={dismissOnboarding} className={secondaryButtonClass}>
+                <PackageOpen size={16} />Start with an empty Price Book
+              </button>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-600">The 12 trade-neutral starter items are ordinary editable Price Book records with prices left blank. Review names, tax settings, and prices before using them in an estimate.</p>
+            {starterCatalogError ? <p role="alert" className="mt-3 text-sm font-semibold text-amber-800">{starterCatalogError}</p> : null}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Price Book item status">
           {(['active', 'archived'] as const).map(value => (
@@ -420,14 +489,16 @@ export function ContractorPriceBookWorkspace({
               </div>
               <button type="button" onClick={onRetry} className={`${secondaryButtonClass} mt-3`}>Try again</button>
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : onboardingVisible ? null : filteredItems.length === 0 ? (
             <div data-testid="price-book-empty-state" className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
               <p className="font-bold text-slate-950">
                 {filtersActive
                   ? `No ${status} items match these filters.`
                   : status === 'archived'
                     ? 'No archived Price Book items.'
-                    : 'Your Price Book is empty.'}
+                    : items.length > 0
+                      ? 'No active Price Book items.'
+                      : 'Your Price Book is empty.'}
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 {filtersActive
@@ -435,11 +506,16 @@ export function ContractorPriceBookWorkspace({
                   : status === 'archived'
                     ? 'Archived items will appear here and can be restored.'
                     : canManage
-                      ? 'Add the labor, materials, services, and fees you reuse most often.'
-                      : 'No active items are available for this contractor account.'}
+                      ? items.length > 0
+                        ? 'Restore an archived item or add a new one.'
+                        : 'Add the labor, materials, services, and fees you reuse most often.'
+                      : 'No Price Book items are available. An owner, admin, or office user can add or import them.'}
               </p>
               {!filtersActive && status === 'active' && canMutate ? (
-                <button type="button" onClick={onOpenAddForm} className={`${primaryButtonClass} mt-4`}><Plus size={16} />Add your first item</button>
+                <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row">
+                  {items.length > 0 ? <button type="button" onClick={() => setStatus('archived')} className={secondaryButtonClass}>View archived items</button> : null}
+                  <button type="button" onClick={onOpenAddForm} className={primaryButtonClass}><Plus size={16} />Add your first item</button>
+                </div>
               ) : null}
             </div>
           ) : (
@@ -684,6 +760,7 @@ export function ContractorPriceBookWorkspace({
 
       {canMutate && csvTools ? (
         <details
+          ref={importToolsRef}
           className="rounded-2xl border border-slate-200 bg-white shadow-sm"
           data-testid="price-book-import-tools"
           onToggle={event => {

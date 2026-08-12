@@ -12,6 +12,7 @@ type PriceBookRenderHarness = {
     canManage?: boolean;
     loadState?: 'idle' | 'loading' | 'ready' | 'error';
     formOpen?: boolean;
+    archivedOnly?: boolean;
   }) => string;
   renderContractorJobsOverview: (canViewPriceBook: boolean) => string;
 };
@@ -100,8 +101,9 @@ test.describe('FB-024 rendered Price Book management behavior', () => {
   test('renders empty, normal, and busy libraries without exceeding the 25-row page size', () => {
     const rowCount = (markup: string) => (markup.match(/data-testid="price-book-item-row"/g) || []).length;
 
-    const empty = renderHarness.renderPriceBookWorkspace({ count: 0 });
-    expect(empty).toContain('Your Price Book is empty.');
+    const empty = renderHarness.renderPriceBookWorkspace({ count: 0, canManage: true });
+    expect(empty).toContain('data-testid="price-book-onboarding"');
+    expect(empty).toContain('Build your Price Book');
     expect(rowCount(empty)).toBe(0);
     expect(rowCount(renderHarness.renderPriceBookWorkspace({ count: 10 }))).toBe(10);
 
@@ -109,5 +111,9 @@ test.describe('FB-024 rendered Price Book management behavior', () => {
     expect(rowCount(busy)).toBe(25);
     expect(busy).toContain('Showing 1–25 of 100');
     expect(busy).toContain('Page 1 of 4');
+
+    const archivedOnly = renderHarness.renderPriceBookWorkspace({ count: 1, canManage: true, archivedOnly: true });
+    expect(archivedOnly).not.toContain('data-testid="price-book-onboarding"');
+    expect(archivedOnly).toContain('No active Price Book items.');
   });
 });

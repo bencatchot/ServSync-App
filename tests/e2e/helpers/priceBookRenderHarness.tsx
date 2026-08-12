@@ -49,15 +49,17 @@ export function renderPriceBookWorkspace({
   canManage = false,
   loadState = 'ready',
   formOpen = false,
+  archivedOnly = false,
 }: {
   count?: number;
   canManage?: boolean;
   loadState?: PriceBookLoadState;
   formOpen?: boolean;
+  archivedOnly?: boolean;
 } = {}) {
   return renderToStaticMarkup(
     createElement(ContractorPriceBookWorkspace, {
-      items: Array.from({ length: count }, (_, index) => item(index)),
+      items: Array.from({ length: count }, (_, index) => item(index)).map(row => archivedOnly ? { ...row, active: false, archived_at: '2026-08-02T12:00:00.000Z' } : row),
       contractorSaved: true,
       canManage,
       loadState,
@@ -77,6 +79,8 @@ export function renderPriceBookWorkspace({
       onEdit: () => undefined,
       onToggleActive: () => undefined,
       onBulkUpdate: async () => true,
+      onAddStarterCatalog: async () => undefined,
+      onboardingStorageKey: 'servsync.test.priceBook.onboardingDismissed',
     }),
   );
 }
