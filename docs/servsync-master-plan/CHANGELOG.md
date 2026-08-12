@@ -6,6 +6,16 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-portable-reference-manual-edit-preservation`
+- Starting main SHA: `e8be8b706deee36b7b8ac9c92ebe9d61aa5206c9`
+- Finding: Final post-merge narrative review of PR #432 found that an agreeing selected-source mapping's `last_import_values` baseline was not reused by the new portable-reference branch. Immediate round trips and tenant isolation passed, but mapped portable rows could weaken the existing three-way manual-edit preservation contract.
+- Correction: Adds an immutable follow-up migration that reuses the agreeing source mapping baseline, preserves unrelated manual edits in preview and execution, and makes same-field manual/import conflicts ambiguous and skip-only. Portable references without a source mapping keep the accepted immediate-round-trip behavior; contradictory mappings remain fail-closed.
+- Migration and rollout: Exact SHA-256 `373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8` was applied to Sandbox `zpzdkoaubyjtsomccxya` at 17:14:16Z-17:14:17Z, Demo `bdytwgejqnlblhrnqxkp` at 17:15:50Z-17:15:51Z, and Production `uqgtheclhxqlnjpfmheq` at 17:16:44Z-17:16:46Z on 2026-08-12.
+- Acceptance: Rollback-only authenticated preview and execution in every environment preserved an unrelated manual description while applying a changed imported price and left zero residue. Disposable PostgreSQL coverage also proves same-field manual/import conflicts remain ambiguous and skip-only, direct portable round trips remain unchanged, repeated application fails closed, and the generic audit/rollback path remains authoritative.
+- Scope: Existing public RPC signatures, roles, grants, tables, RLS, execution, audit, idempotency, rollback, client code, export artifacts, and private-field boundaries remain unchanged.
+- Backlog impact: BACKLOG FILE UPDATED: YES. The final portable-reference preservation gate passed, so Export v1 is accurately complete while broader FB-024 remains active.
+- Master plan impact: MASTER PLAN UPDATED: YES. Records the mapped-portable baseline rule and preserves the historical PR #432 finding.
+
 - Branch: `codex/fb024-portable-reference-reconciliation-v1`
 - Starting main SHA: `643a1dac872c122231dc63276239b2b43966cdee`
 - Files changed: narrow portable-reference reconciliation migration; disposable PostgreSQL contract/security validation; Price Book export/import regression coverage; backend rollout ledger; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
