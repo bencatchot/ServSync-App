@@ -30,9 +30,9 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(sourceFile('src/features/price-book/ContractorPriceBookWorkspace.tsx')).toContain('if (event.currentTarget.open) setCsvToolsMounted(true)');
     expect(panel).toContain('Repeat-import reconciliation');
     expect(panel).toContain('Sample CSV');
-    expect(panel).toContain('Choose CSV');
-    expect(panel).toContain('accept=".csv,text/csv"');
-    expect(panel).toContain('Upload and map CSV');
+    expect(panel).toContain('Choose CSV or XLSX');
+    expect(panel).toContain('accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"');
+    expect(panel).toContain('Upload and map CSV or XLSX');
     expect(panel).toContain('Preview reconciliation');
     expect(panel).toContain('Review Add, Update, and Skip');
     expect(panel).toContain('Conflicting manual edits remain unchanged.');
@@ -86,7 +86,8 @@ test.describe('FB-002 Price Book CSV preview regression', () => {
     expect(source).not.toContain('{isInvoiceWorkspaceTab && renderEstimateSavedItemPicker()}');
     expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderEstimateSavedItemPicker()");
 
-    expect(mapperSource).toContain("quantity: '1'");
+    expect(mapperSource).toContain("quantity = '1'");
+    expect(mapperSource).toContain('quantity,');
     expect(mapperSource).toContain('Review quantity, price, and scope before sending.');
     for (const privateOrFutureField of [
       'item.internal_notes',

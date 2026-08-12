@@ -2,6 +2,7 @@ import type { EstimateLineType } from '../../types';
 
 export const PRICE_BOOK_CSV_MAX_BYTES = 1024 * 1024;
 export const PRICE_BOOK_CSV_MAX_ROWS = 500;
+export const PRICE_BOOK_IMPORT_MAX_ROWS = PRICE_BOOK_CSV_MAX_ROWS;
 
 export type PriceBookCsvField =
   | 'external_item_id'
@@ -22,10 +23,12 @@ export type PriceBookCsvField =
 
 export type PriceBookCsvMapping = Partial<Record<PriceBookCsvField, string>>;
 
-export type PriceBookCsvRow = {
+export type PriceBookTabularRow = {
   rowNumber: number;
   values: Record<string, string>;
 };
+
+export type PriceBookCsvRow = PriceBookTabularRow;
 
 export type PriceBookImportAction = 'add' | 'update' | 'skip';
 export type PriceBookImportMatchType = 'none' | 'external_id' | 'sku_suggestion' | 'exact_duplicate' | 'ambiguous';
@@ -269,19 +272,22 @@ export function parsePriceBookCsv(text: string) {
   return rows;
 }
 
-export function priceBookCsvRowsFromParsed(parsedRows: string[][]): { headers: string[]; rows: PriceBookCsvRow[] } {
+export function priceBookTabularRowsFromParsed(
+  parsedRows: string[][],
+  formatLabel: 'CSV' | 'XLSX',
+): { headers: string[]; rows: PriceBookTabularRow[] } {
   const firstNonBlankRowIndex = parsedRows.findIndex(row => row.some(cell => cell.trim()));
-  if (firstNonBlankRowIndex < 0) throw new Error('This CSV appears to be empty.');
+  if (firstNonBlankRowIndex < 0) throw new Error(`This ${formatLabel} worksheet appears to be empty.`);
   const headers = parsedRows[firstNonBlankRowIndex].map((header, index) => header.trim() || `Column ${index + 1}`);
   const normalizedHeaders = headers.map(normalizePriceBookCsvHeader);
   if (new Set(normalizedHeaders).size !== normalizedHeaders.length) {
-    throw new Error('CSV headers must be unique so every mapped field is deterministic.');
+    throw new Error(`${formatLabel} headers must be unique so every mapped field is deterministic.`);
   }
   const dataRows = parsedRows.slice(firstNonBlankRowIndex + 1)
     .map((row, index) => ({ row, rowNumber: firstNonBlankRowIndex + index + 2 }))
     .filter(({ row }) => row.some(cell => cell.trim()));
-  if (dataRows.length === 0) throw new Error('This CSV has headers but no item rows.');
-  if (dataRows.length > PRICE_BOOK_CSV_MAX_ROWS) throw new Error(`CSV imports are limited to ${PRICE_BOOK_CSV_MAX_ROWS} item rows.`);
+  if (dataRows.length === 0) throw new Error(`This ${formatLabel} worksheet has headers but no item rows.`);
+  if (dataRows.length > PRICE_BOOK_IMPORT_MAX_ROWS) throw new Error(`${formatLabel} imports are limited to ${PRICE_BOOK_IMPORT_MAX_ROWS} item rows.`);
   return {
     headers,
     rows: dataRows.map(({ row, rowNumber }) => ({
@@ -292,6 +298,10 @@ export function priceBookCsvRowsFromParsed(parsedRows: string[][]): { headers: s
       }, {}),
     })),
   };
+}
+
+export function priceBookCsvRowsFromParsed(parsedRows: string[][]) {
+  return priceBookTabularRowsFromParsed(parsedRows, 'CSV');
 }
 
 function csvValue(row: PriceBookCsvRow, mapping: PriceBookCsvMapping, field: PriceBookCsvField) {
@@ -456,7 +466,8 @@ export function sanitizePriceBookImportFilename(filename: string) {
   return filename.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 180) || 'price-book.csv';
 }
 
-export async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+export async function sha256Hex(value: string | ArrayBuffer) {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
 }

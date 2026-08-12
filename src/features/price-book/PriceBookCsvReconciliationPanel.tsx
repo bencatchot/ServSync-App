@@ -26,6 +26,11 @@ import {
   sanitizePriceBookImportFilename,
   sha256Hex,
 } from './priceBookCsvReconciliation';
+import {
+  PRICE_BOOK_XLSX_MAX_BYTES,
+  parsePriceBookXlsxWorkbook,
+  type PriceBookXlsxWorksheet,
+} from './priceBookXlsxImport';
 
 const inputClass = 'min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500';
 const primaryButtonClass = 'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
@@ -118,8 +123,11 @@ export function PriceBookCsvReconciliationPanel({
   const [loadingSources, setLoadingSources] = useState(true);
   const [creatingSource, setCreatingSource] = useState(false);
   const [filename, setFilename] = useState('');
+  const [fileKind, setFileKind] = useState<'csv' | 'xlsx' | ''>('');
   const [fileHash, setFileHash] = useState('');
   const [fileSize, setFileSize] = useState(0);
+  const [worksheets, setWorksheets] = useState<PriceBookXlsxWorksheet[]>([]);
+  const [selectedWorksheet, setSelectedWorksheet] = useState('');
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<PriceBookCsvRow[]>([]);
   const [mapping, setMapping] = useState<PriceBookCsvMapping>({});
@@ -175,13 +183,35 @@ export function PriceBookCsvReconciliationPanel({
 
   const clearFile = () => {
     setFilename('');
+    setFileKind('');
     setFileHash('');
     setFileSize(0);
+    setWorksheets([]);
+    setSelectedWorksheet('');
     setHeaders([]);
     setRows([]);
     setMapping({});
     clearPreview();
     setError('');
+  };
+
+  const applyTabularRows = (nextHeaders: string[], nextRows: PriceBookCsvRow[]) => {
+    setHeaders(nextHeaders);
+    setRows(nextRows);
+    setMapping(autoMapPriceBookCsvHeaders(nextHeaders));
+    clearPreview();
+  };
+
+  const selectWorksheet = (name: string) => {
+    setSelectedWorksheet(name);
+    const worksheet = worksheets.find(candidate => candidate.name === name && !candidate.hidden && !candidate.error);
+    if (worksheet) applyTabularRows(worksheet.headers, worksheet.rows);
+    else {
+      setHeaders([]);
+      setRows([]);
+      setMapping({});
+      clearPreview();
+    }
   };
 
   const previewRollback = async (batchId: string) => {
@@ -245,25 +275,49 @@ export function PriceBookCsvReconciliationPanel({
   const loadFile = async (file: File | null) => {
     clearFile();
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setError('Upload a .csv file. XLSX and provider-specific formats remain future work.');
+    const normalizedName = file.name.toLowerCase();
+    const nextFileKind = normalizedName.endsWith('.csv') ? 'csv' : normalizedName.endsWith('.xlsx') ? 'xlsx' : '';
+    if (!nextFileKind) {
+      setError('Upload a supported .csv or .xlsx file. Legacy .xls, macro-enabled, and other spreadsheet formats are not supported.');
       return;
     }
-    if (file.size > PRICE_BOOK_CSV_MAX_BYTES) {
-      setError('CSV files can be up to 1 MB.');
+    const maximumBytes = nextFileKind === 'csv' ? PRICE_BOOK_CSV_MAX_BYTES : PRICE_BOOK_XLSX_MAX_BYTES;
+    if (file.size > maximumBytes) {
+      setError(`${nextFileKind.toUpperCase()} files can be up to 1 MB.`);
       return;
     }
     try {
-      const text = await file.text();
-      const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv(text));
       setFilename(sanitizePriceBookImportFilename(file.name));
-      setFileHash(await sha256Hex(text));
+      setFileKind(nextFileKind);
       setFileSize(file.size);
-      setHeaders(parsed.headers);
-      setRows(parsed.rows);
-      setMapping(autoMapPriceBookCsvHeaders(parsed.headers));
+      if (nextFileKind === 'csv') {
+        const text = await file.text();
+        const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv(text));
+        setFileHash(await sha256Hex(text));
+        applyTabularRows(parsed.headers, parsed.rows);
+        return;
+      }
+      const bytes = await file.arrayBuffer();
+      const parsedWorksheets = await parsePriceBookXlsxWorkbook(bytes);
+      const selectableWorksheets = parsedWorksheets.filter(worksheet => !worksheet.hidden && !worksheet.error);
+      if (selectableWorksheets.length === 0) {
+        const firstVisibleError = parsedWorksheets.find(worksheet => !worksheet.hidden)?.error;
+        throw new Error(firstVisibleError || 'This XLSX workbook has no visible worksheet containing a usable table.');
+      }
+      setFileHash(await sha256Hex(bytes));
+      setWorksheets(parsedWorksheets);
+      if (selectableWorksheets.length === 1) {
+        setSelectedWorksheet(selectableWorksheets[0].name);
+        applyTabularRows(selectableWorksheets[0].headers, selectableWorksheets[0].rows);
+      }
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Unable to parse this CSV file.');
+      setFilename('');
+      setFileKind('');
+      setFileHash('');
+      setFileSize(0);
+      setWorksheets([]);
+      setSelectedWorksheet('');
+      setError(nextError instanceof Error ? nextError.message : `Unable to parse this ${nextFileKind.toUpperCase()} file.`);
     }
   };
 
@@ -313,8 +367,11 @@ export function PriceBookCsvReconciliationPanel({
       const nextHistory = await api.listBatches();
       setHistory(nextHistory);
       setFilename('');
+      setFileKind('');
       setFileHash('');
       setFileSize(0);
+      setWorksheets([]);
+      setSelectedWorksheet('');
       setHeaders([]);
       setRows([]);
       setMapping({});
@@ -344,7 +401,7 @@ export function PriceBookCsvReconciliationPanel({
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
         <h3 className="text-sm font-bold text-slate-950">Repeat-import reconciliation</h3>
         <p className="mt-1 text-xs leading-5 text-emerald-950">
-          Select a stable source for this catalog. ServSync matches external IDs within that source, preserves unmapped fields and conflicting manual edits, and applies confirmed actions as one transaction. The CSV file itself is not retained.
+          Select a stable source for this catalog. ServSync matches external IDs within that source, preserves unmapped fields and conflicting manual edits, and applies confirmed actions as one transaction. Uploaded CSV and XLSX files are not retained.
         </p>
       </div>
 
@@ -374,14 +431,35 @@ export function PriceBookCsvReconciliationPanel({
       <section className="rounded-xl border border-slate-200 bg-white p-4" aria-labelledby="price-book-import-file-heading">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h4 id="price-book-import-file-heading" className="text-sm font-bold text-slate-950">2. Upload and map CSV</h4>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Up to 1 MB and 500 item rows. Blank prices remain Price Required; explicit zero remains $0.</p>
+            <h4 id="price-book-import-file-heading" className="text-sm font-bold text-slate-950">2. Upload and map CSV or XLSX</h4>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Up to 1 MB and 500 item rows. XLSX uses one visible worksheet and cached values only. Blank prices remain Price Required; explicit zero remains $0.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={secondaryButtonClass} onClick={downloadSample}><Download size={16} />Sample CSV</button>
-            <label className={`${primaryButtonClass} cursor-pointer`}><Upload size={16} />Choose CSV<input key={filename || 'empty-file'} type="file" accept=".csv,text/csv" className="sr-only" disabled={executing} onChange={event => void loadFile(event.target.files?.[0] || null)} /></label>
+            <label className={`${primaryButtonClass} cursor-pointer`}><Upload size={16} />Choose CSV or XLSX<input key={filename || 'empty-file'} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" disabled={executing} onChange={event => void loadFile(event.target.files?.[0] || null)} /></label>
           </div>
         </div>
+
+        {fileKind === 'xlsx' && worksheets.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3" data-testid="price-book-xlsx-worksheet-selection">
+            <Field label="Worksheet">
+              <select className={inputClass} value={selectedWorksheet} disabled={previewing || executing} onChange={event => selectWorksheet(event.target.value)}>
+                <option value="">Select a worksheet</option>
+                {worksheets.filter(worksheet => !worksheet.hidden).map(worksheet => (
+                  <option key={worksheet.name} value={worksheet.name} disabled={Boolean(worksheet.error)}>
+                    {worksheet.name}{worksheet.error ? ` (unavailable: ${worksheet.error})` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              {selectedWorksheet
+                ? `Using ${selectedWorksheet}. Changing worksheets clears mapping and reconciliation preview state.`
+                : 'Choose the one worksheet to map. No rows are sent for reconciliation until a worksheet is selected.'}
+              {worksheets.some(worksheet => worksheet.hidden) ? ` ${worksheets.filter(worksheet => worksheet.hidden).length} hidden worksheet${worksheets.filter(worksheet => worksheet.hidden).length === 1 ? ' was' : 's were'} ignored.` : ''}
+            </p>
+          </div>
+        ) : null}
 
         {rows.length > 0 ? (
           <div className="mt-4 space-y-4">
@@ -456,7 +534,7 @@ export function PriceBookCsvReconciliationPanel({
             {history.map(batch => (
               <div key={batch.id} className="flex flex-col gap-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-bold text-slate-950">{batch.source_name} · {batch.original_filename || 'CSV import'}</p>
+                  <p className="font-bold text-slate-950">{batch.source_name} · {batch.original_filename || 'File import'}</p>
                   <p className="mt-1">{batch.add_count} added · {batch.update_count} updated · {batch.skip_count} skipped · {new Date(batch.completed_at).toLocaleString()}</p>
                   {batch.rollback ? <p className="mt-1 font-semibold text-emerald-700">Rolled back {new Date(batch.rollback.completed_at).toLocaleString()}</p> : null}
                 </div>
