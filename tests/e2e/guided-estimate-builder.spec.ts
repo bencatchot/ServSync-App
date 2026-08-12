@@ -148,22 +148,16 @@ test.describe('Guided Estimate Draft Builder Slice A-E', () => {
     expect(panelSource).toContain('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
   });
 
-  test('reference tools are collapsed by default and keep only the approved estimating references', () => {
+  test('estimate line sources use the canonical Price Book picker without a Saved Charges path', () => {
     const source = appSource();
-    const referenceSource = sourceBetween(source, 'const renderEstimateReferenceTools =', 'const startEstimateAssistantSpeech =');
+    const lineSources = sourceBetween(source, 'const renderEstimateLineItemSources =', 'const startEstimateAssistantSpeech =');
 
-    expect(source).toContain('const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false)');
-    expect(referenceSource).toContain('Reference tools');
-    expect(referenceSource).toContain('Saved charges, Price Book, templates, and helper suggestions are available when you need them.');
-    expect(referenceSource).toContain('aria-expanded={estimateReferenceToolsExpanded}');
-    expect(referenceSource).toContain('Estimate Templates');
-    expect(referenceSource).toContain('Open templates');
-    expect(referenceSource).toContain('renderSavedChargeQuickPick()');
-    expect(referenceSource).toContain('renderPriceBookQuickPick()');
-    expect(referenceSource).toContain('renderEstimateHelperPanel()');
-    expect(referenceSource).not.toContain('renderAdvancedTradeTools');
-    expect(referenceSource).not.toContain('Advanced trade tools');
-    expect(referenceSource).not.toContain('advanced calculators');
+    expect(lineSources).toContain('a saved item from your active Price Book');
+    expect(lineSources).toContain('Add saved item');
+    expect(lineSources).toContain('renderEstimateSavedItemPicker()');
+    expect(lineSources).not.toContain('Saved Charges');
+    expect(source).not.toContain('renderSavedChargeQuickPick');
+    expect(source).not.toContain('contractor_saved_estimate_charges');
     expect(source).not.toContain('TradeToolsPanel');
     expect(source).not.toContain('TRADE_TOOL_DEFINITIONS');
     expect(source).not.toContain('Show trade calculators');

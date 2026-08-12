@@ -188,6 +188,7 @@ const CORE_PRIVATE_TABLES = [
   'contractor_visit_events',
   'contractor_team_invites',
   'contractor_saved_estimate_charges',
+  'contractor_saved_charge_price_book_lineage',
   'estimate_templates',
   'home_document_upload_reservations',
   'home_document_upload_events',

@@ -6,6 +6,16 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-saved-charges-consolidation-v1`
+- Starting main SHA: `57a306dc7104514c5bfce4efba14ca08491c8064`
+- Files changed: consolidation and guarded-rollback SQL; disposable PostgreSQL validation; contractor Estimate/Price Book client and type cleanup; focused source, privacy, and security regression tests; backend rollout ledger; FB-024 backlog, master plan, completed-features ledger, Marketing Product Inventory, architecture note, and changelog.
+- Summary: Retires Saved Charges as a contractor-facing reusable library and makes Price Book canonical for reusable Service, Labor, Material, and Fee items. Legacy Estimate selection and Build Estimate Draft matching now use the existing customer-safe Price Book snapshot mapper; Business Profile management and stale navigation are removed.
+- Migration and rollout: Exact SHA-256 `89e5adc2acc21302e408c40b3246d8a303b2413eeb2838220776d4ee14b8537e` was applied Sandbox → Demo → Production on 2026-08-12. Twenty-two inactive Sandbox rows became archived items without changing 195 existing items. Production's two active rows became exactly one hourly Labor and one flat Service item. Demo remained empty.
+- Security and preservation: Retained legacy rows and immutable lineage are forced-RLS, policy-free, and unavailable to browser roles. Legacy writes fail closed. Private descriptions map only to `internal_notes`; customer descriptions remain empty. Historical contractor, Estimate, Job, and Invoice fingerprints stayed exact. Guarded rollback refuses changed migrated items.
+- Validation: Disposable PostgreSQL migration/repeat/conflict/quantity/rollback coverage, focused Playwright checks, typecheck, Production build, backend parity/rollout validation, JSON parsing, sensitive-value scan, and exact-head review.
+- Backlog impact: BACKLOG FILE UPDATED: YES. Saved Charges maturity is complete; FB-024 stays active for separately scoped advanced capabilities.
+- Master plan impact: MASTER PLAN UPDATED: YES. Records Price Book as the sole reusable individual line-item library while Templates remain reusable multi-line structures.
+
 - Branch: `codex/fb024-portable-reference-manual-edit-preservation`
 - Starting main SHA: `e8be8b706deee36b7b8ac9c92ebe9d61aa5206c9`
 - Finding: Final post-merge narrative review of PR #432 found that an agreeing selected-source mapping's `last_import_values` baseline was not reused by the new portable-reference branch. Immediate round trips and tenant isolation passed, but mapped portable rows could weaken the existing three-way manual-edit preservation contract.
