@@ -4,6 +4,7 @@ import writeExcelFile from 'write-excel-file/node';
 import {
   autoMapPriceBookCsvHeaders,
   buildPriceBookImportRows,
+  interpretPriceBookImport,
   parsePriceBookCsv,
   priceBookCsvRowsFromParsed,
   type PriceBookTabularRow,
@@ -143,6 +144,31 @@ test.describe('FB-024 Price Book XLSX Import Parity v1', () => {
     expect(xlsxRequests).toEqual(csvRequests);
     expect(xlsxRequests.map(row => row.values.default_unit_price_cents)).toEqual([null, 0, 3550, 3500]);
     expect(xlsxRequests.map(row => row.values.taxable)).toEqual([true, false, true, true]);
+  });
+
+  test('applies the same semantic interpretation to conventional XLSX and CSV exports', async ({ page }) => {
+    const sourceRows: TestCell[][] = [
+      ['SKU', 'Category', 'Item Name', 'Description', 'Item Type', 'Unit Price', 'Estimated Labor Hours', 'Estimated Material Cost', 'Taxable', 'Status'],
+      ['HVAC-001', 'Diagnostics', 'Diagnostic visit', 'Customer-safe description', 'Service', 189, 0.7, 42, true, 'Active'],
+      ['HVAC-002', 'Parts', 'Capacitor', 'Replacement capacitor', 'Part', 0, 0.5, 25, false, 'Inactive'],
+    ];
+    const [worksheet] = await parseWorkbookInBrowser(page, await workbookBuffer([{ name: 'Catalog', rows: sourceRows }]));
+    const csv = priceBookCsvRowsFromParsed(parsePriceBookCsv([
+      'SKU,Category,Item Name,Description,Item Type,Unit Price,Estimated Labor Hours,Estimated Material Cost,Taxable,Status',
+      'HVAC-001,Diagnostics,Diagnostic visit,Customer-safe description,Service,189,0.7,42,true,Active',
+      'HVAC-002,Parts,Capacitor,Replacement capacitor,Part,0,0.5,25,false,Inactive',
+    ].join('\n')));
+    const xlsxInterpretation = interpretPriceBookImport(worksheet.headers, worksheet.rows);
+    const csvInterpretation = interpretPriceBookImport(csv.headers, csv.rows);
+    const xlsxRequests = buildPriceBookImportRows(worksheet.rows, xlsxInterpretation.mapping).map(row => row.requestRow);
+    const csvRequests = buildPriceBookImportRows(csv.rows, csvInterpretation.mapping).map(row => row.requestRow);
+
+    expect(xlsxRequests).toEqual(csvRequests);
+    expect(xlsxInterpretation.ignoredHeaders).toEqual(['Estimated Material Cost']);
+    expect(xlsxRequests).toMatchObject([
+      { external_item_id: 'HVAC-001', values: { line_type: 'other', default_unit_price_cents: 18900, active: true } },
+      { external_item_id: 'HVAC-002', values: { line_type: 'material', default_unit_price_cents: 0, active: false } },
+    ]);
   });
 
   test('uses cached formula values without evaluating formulas or external references', async ({ page }) => {

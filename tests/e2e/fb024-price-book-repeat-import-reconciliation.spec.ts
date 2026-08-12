@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
   autoMapPriceBookCsvHeaders,
   buildPriceBookImportRows,
+  interpretPriceBookImport,
   parsePriceBookCsv,
   priceBookCsvRowsFromParsed,
 } from '../../src/features/price-book/priceBookCsvReconciliation';
@@ -85,6 +86,89 @@ async function installImportHarness(page: Page) {
 }
 
 test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
+  test('interprets a conventional 150-row HVAC export without translating source terminology', () => {
+    const csv = [
+      'SKU, Category, Item Name, Description, Item Type, Unit Price, Estimated Labor Hours, Estimated Material Cost, Taxable, Status',
+      ...Array.from({ length: 150 }, (_, index) => [
+        `HVAC-${String(index + 1).padStart(3, '0')}`,
+        index % 2 ? 'Repairs' : 'Diagnostics',
+        `HVAC service ${index + 1}`,
+        `Customer-safe description ${index + 1}`,
+        index % 4 === 0 ? 'Part' : index % 4 === 1 ? 'Fee' : index % 4 === 2 ? 'Labor' : 'Service',
+        index === 0 ? '$0.00' : '$189.00',
+        '0.7',
+        '$42.00',
+        index % 2 ? 'yes' : 'TRUE',
+        index % 3 ? 'Active' : 'Inactive',
+      ].join(',')),
+    ].join('\n');
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv(csv));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    const rows = buildPriceBookImportRows(parsed.rows, interpretation.mapping);
+
+    expect(interpretation.mapping).toMatchObject({
+      external_item_id: 'SKU', sku: 'SKU', category: 'Category', title: 'Item Name',
+      customer_description: 'Description', line_type: 'Item Type', default_unit_price: 'Unit Price',
+      labor_hours: 'Estimated Labor Hours', taxable: 'Taxable', active: 'Status',
+    });
+    expect(interpretation.ignoredHeaders).toEqual(['Estimated Material Cost']);
+    expect(interpretation.insights.line_type).toMatchObject({ confidence: 'review', header: 'Item Type' });
+    expect(interpretation.insights.external_item_id?.reason).toContain('stable repeat-import identity');
+    expect(rows).toHaveLength(150);
+    expect(rows.every(row => row.errors.length === 0)).toBe(true);
+    expect(rows[0].requestRow).toMatchObject({
+      external_item_id: 'HVAC-001',
+      values: { title: 'HVAC service 1', line_type: 'material', default_unit_price_cents: 0, labor_hours: 0.7, taxable: true, active: false },
+    });
+    expect(rows[3].requestRow.values.line_type).toBe('other');
+    expect(JSON.stringify(rows.map(row => row.requestRow))).not.toMatch(/material.cost|internal.cost|margin|profit/i);
+  });
+
+  test('normalizes common line types, booleans, prices, whitespace, and capitalization deterministically', () => {
+    const sourceTypes = [' Service ', 'Repair', 'Service Item', 'LABOUR', 'Part', 'Materials', 'Equipment', 'Product', 'Charge', 'Trip Charge', 'Diagnostic', 'Miscellaneous', 'Other'];
+    const expectedTypes = ['other', 'other', 'other', 'labor', 'material', 'material', 'material', 'material', 'fee', 'fee', 'other', 'other', 'other'];
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv([
+      'Item ID,Product Name,Service Description,Service Type,Selling Price,Labor Time,Tax Status,Status',
+      ...sourceTypes.map((type, index) => `ID-${index},Item ${index},Description ${index},${type},"$1,234.5","1,000",${index % 2 ? 'no' : '1'},${index % 2 ? 'disabled' : 'enabled'}`),
+    ].join('\n')));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    const rows = buildPriceBookImportRows(parsed.rows, interpretation.mapping);
+
+    expect(rows.map(row => row.requestRow.values.line_type)).toEqual(expectedTypes);
+    expect(rows.every(row => row.requestRow.values.default_unit_price_cents === 123450)).toBe(true);
+    expect(rows.every(row => row.requestRow.values.labor_hours === 1000)).toBe(true);
+    expect(rows.map(row => row.requestRow.values.taxable).slice(0, 2)).toEqual([true, false]);
+    expect(rows.map(row => row.requestRow.values.active).slice(0, 2)).toEqual([true, false]);
+    expect(rows.every(row => row.errors.length === 0)).toBe(true);
+  });
+
+  test('leaves ambiguous and cost headings unmapped while malformed mapped values still fail closed', () => {
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv('Label,Estimated Material Cost,Amount-ish,Status\nExample,$40,$90,Maybe'));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    expect(interpretation.mapping).toEqual({});
+    expect(interpretation.ignoredHeaders).toEqual(['Label', 'Estimated Material Cost', 'Amount-ish', 'Status']);
+
+    const mapped = buildPriceBookImportRows(parsed.rows, { title: 'Label', active: 'Status' });
+    expect(mapped[0].errors).toContain('Active must be true/false, yes/no, y/n, or 1/0.');
+  });
+
+  test('inspects the full column before declining a low-confidence generic mapping', () => {
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv([
+      'Item Name,Type,Status',
+      'One,Unknown,Maybe',
+      'Two,Unknown,Maybe',
+      'Three,Unknown,Maybe',
+      'Four,Unknown,Maybe',
+      'Five,Service,Active',
+    ].join('\n')));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    const rows = buildPriceBookImportRows(parsed.rows, interpretation.mapping);
+
+    expect(interpretation.mapping).toMatchObject({ line_type: 'Type', active: 'Status' });
+    expect(rows.slice(0, 4).every(row => row.errors.length === 2)).toBe(true);
+    expect(rows[4].requestRow.values).toMatchObject({ line_type: 'other', active: true });
+  });
+
   test('normalizes generic CSV rows with stable IDs, mapped-field presence, and exact price semantics', () => {
     const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv([
       'external_id,title,description,price,taxable,sku',
@@ -223,6 +307,30 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     await expect(page.getByText('Import complete: 1 added, 1 updated, 0 skipped.')).toBeVisible();
     const calls = await page.evaluate(() => (window as typeof window & { __priceBookImportHarness?: { executeCalls: number; completedCalls: number; executeActions: Record<string, string> } }).__priceBookImportHarness);
     expect(calls).toMatchObject({ executeCalls: 1, completedCalls: 1, executeActions: { 2: 'add', 3: 'update' } });
+  });
+
+  test('shows confidence-aware interpretations, ignored columns, and preserves manual override', async ({ page }) => {
+    await installImportHarness(page);
+    await page.getByLabel('Choose CSV or XLSX').setInputFiles({
+      name: 'contractor-export.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('SKU,Item Name,Description,Item Type,Unit Price,Estimated Labor Hours,Estimated Material Cost,Taxable,Status\nHVAC-1,Diagnostic visit,Customer copy,Service,$189.00,0.7,$42.00,TRUE,Active'),
+    });
+
+    await expect(page.getByText('1 rows; 0 blocked before server preview.')).toBeVisible();
+    await expect(page.getByTestId('price-book-mapping-insight-line_type')).toContainText('Service -> other');
+    await expect(page.getByTestId('price-book-mapping-insight-active')).toContainText('Active -> true');
+    await expect(page.getByTestId('price-book-mapping-insight-external_item_id')).toContainText('stable repeat-import identity');
+    await expect(page.getByTestId('price-book-ignored-columns')).toContainText('Estimated Material Cost');
+
+    await page.getByLabel('Customer description').selectOption('Item Name');
+    await expect(page.getByTestId('price-book-mapping-insight-customer_description')).toContainText('Selected by you');
+    await page.getByLabel('Customer description').selectOption('Description');
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByRole('button', { name: 'Preview reconciliation' }).click();
+    const state = await page.evaluate(() => (window as typeof window & { __priceBookImportHarness?: { previewRows: Array<{ external_item_id: string; values: Record<string, unknown> }> } }).__priceBookImportHarness);
+    expect(state?.previewRows[0]).toMatchObject({ external_item_id: 'HVAC-1', values: { line_type: 'other', default_unit_price_cents: 18900, labor_hours: 0.7, active: true } });
   });
 
   test('previews a completed batch rollback and confirms one responsive mutation', async ({ page }) => {
