@@ -188,10 +188,11 @@ export function ContractorDraftComposer({
     });
   };
 
-  const addPriceBookLine = (line: WorkComposerLineDraft) => {
+  const addPriceBookLines = (lines: WorkComposerLineDraft[]) => {
+    if (lines.length === 0) return;
     onChange({
       ...draft,
-      line_items: [...draft.line_items, line],
+      line_items: [...draft.line_items, ...lines],
     });
   };
 
@@ -595,7 +596,7 @@ export function ContractorDraftComposer({
           loadState={priceBookLoadState}
           loadError={priceBookLoadError}
           disabled={interactionDisabled || !canSave}
-          onAddLine={addPriceBookLine}
+          onAddLines={addPriceBookLines}
         />
       ) : null}
 

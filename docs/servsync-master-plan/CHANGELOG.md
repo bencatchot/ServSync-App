@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-12
+
+- Branch: `codex/fb024-draft-price-book-multi-select-staging-v1`
+- Starting main SHA: `da30f4e9c46c6395cb341cfa766a86419a38d180`
+- Files changed: Draft-first Price Book picker and composer integration; focused multi-select, persistence, privacy, and responsive tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
+- Summary of change: Completes FB-024 Draft Price Book Multi-Select Staging v1. Contractors can temporarily select several active Price Book items across search and filter changes, stage one existing-contract quantity per item, remove selections, and append the valid set to an Estimate-intent Draft in one guarded action. Selection order is retained, invalid quantities block the whole action, and successful insertion clears only the temporary staged state.
+- Architecture and privacy: Every selected item passes independently through the existing customer-safe Price Book snapshot mapper and becomes an ordinary editable Draft line. The feature creates no bundle, assembly, saved group, live Price Book link, backend request, or Price Book mutation. Blank Price Required and explicit zero remain distinct; Price Book IDs, contractor IDs, internal notes, cost/margin, SKU, source/import data, and organization metadata remain excluded from Draft and Estimate payloads.
+- Validation: Focused component coverage protects default and decimal quantities, search/filter persistence, removal, invalid-group blocking, duplicate selection/action protection, selection order, blank/zero/priced semantics, existing lines, save/reopen, Estimate payload mapping, private-field exclusion, authorization, single-item use, and 390x844 overflow. TypeScript, Production build, broader Price Book/import/rollback/privacy regressions, backend parity, rollout status, sensitive/private-field scans, exact-head checks, and independent review remain merge gates.
+- Known risks and follow-up: Staging is deliberately session-local and may clear on reload. Saved groups, bundles, assemblies, default quantities, inventory, group pricing, invoice insertion, job costing, and live linkage remain out of scope. FB-024 remains active.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records temporary Draft multi-select staging as complete while retaining broader reusable-content maturity.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the ordered temporary selection model, all-or-nothing UI append, safe independent snapshots, and explicit non-bundle boundary.
+
 ## 2026-08-11
 
 - Branch: `codex/fb024-price-book-xlsx-import-parity-v1`
