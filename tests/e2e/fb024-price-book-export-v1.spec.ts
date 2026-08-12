@@ -236,6 +236,19 @@ test.describe('FB-024 Price Book Export v1', () => {
     expect(sql).toContain("when row_value -> 'current_values' is not distinct from row_value -> 'result_values' then 'unchanged'");
   });
 
+  test('binds exported ServSync references to tenant-scoped server reconciliation', () => {
+    const migration = sourceFile('servsync-price-book-portable-reference-reconciliation.sql');
+    expect(migration).toContain("v_external_item_id ~ '^servsync-item:");
+    expect(migration).toContain('where id = v_portable_item_id');
+    expect(migration).toContain('and contractor_id = p_contractor_id');
+    expect(migration).toContain('v_mapping.servsync_entity_id is distinct from v_item.id');
+    expect(migration).toContain('The supplied item identities do not identify one available Price Book item.');
+    expect(migration).toContain('normal source-scoped reconciliation applies.');
+    expect(migration).toContain("ServSync item reference is invalid.");
+    expect(migration).not.toContain('grant execute on function public.servsync_private_preview_price_book_import');
+    expect(migration).not.toMatch(/alter table|create table|create policy|grant .*table/i);
+  });
+
   test('keeps export source-only, paginated, non-mutating, and free of private export columns', () => {
     const app = sourceFile('src/App.tsx');
     const exporter = sourceFile('src/features/price-book/priceBookExport.ts');
