@@ -35,7 +35,7 @@ test.describe('homeowner estimate payment schedule display', () => {
 
   test('homeowner schedule helpers sort rows and keep warning copy display-only', () => {
     const source = appSource();
-    const helperSource = sourceBetween(source, 'function estimatePaymentScheduleInvoiceTypeCustomerLabel', 'function createBlankSavedEstimateChargeDraft');
+    const helperSource = sourceBetween(source, 'function estimatePaymentScheduleInvoiceTypeCustomerLabel', 'function createBlankContractorPriceBookItemDraft');
     const cardSource = sourceBetween(source, 'const renderHomeownerEstimateCard =', 'const renderHomeownerRecordsSection =');
 
     expect(helperSource).toContain("case 'total':");

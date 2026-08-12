@@ -815,22 +815,6 @@ export interface EstimateTemplate {
   updated_at: string;
 }
 
-export interface ContractorSavedEstimateCharge {
-  id: string;
-  contractor_id: string;
-  name: string;
-  description: string;
-  line_type: LegacyEstimateLineType;
-  charge_type: EstimateChargeType;
-  amount_cents: number;
-  default_quantity: number;
-  unit: string | null;
-  active: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface ContractorPriceBookItem {
   id: string;
   contractor_id: string;

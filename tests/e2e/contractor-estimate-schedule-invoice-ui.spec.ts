@@ -81,7 +81,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     const summaryHelperSource = sourceBetween(
       source,
       'function estimatePaymentScheduleLinkedInvoiceSummary',
-      'function createBlankSavedEstimateChargeDraft',
+      'function createBlankContractorPriceBookItemDraft',
     );
 
     expect(scheduleRendererSource).toContain('data-testid="contractor-estimate-payment-schedule-summary"');

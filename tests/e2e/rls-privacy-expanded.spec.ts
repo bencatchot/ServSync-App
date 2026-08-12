@@ -387,18 +387,6 @@ test.describe('expanded sandbox RLS and cross-user privacy boundaries', () => {
         await expectHiddenById(contractorB.client, 'contractor_team_members', teamMember.id, 'Contractor B should not see Contractor A team member');
       }
 
-      const savedCharge = await maybeFirst(
-        contractorA.client,
-        'contractor_saved_estimate_charges',
-        'id,contractor_id',
-        query => query.eq('contractor_id', contractorAId).order('created_at', { ascending: false }),
-      );
-      if (savedCharge?.id) {
-        await expectVisibleById(contractorA.client, 'contractor_saved_estimate_charges', savedCharge.id, 'Contractor A should see own saved charge');
-        await expectHiddenById(contractorB.client, 'contractor_saved_estimate_charges', savedCharge.id, 'Contractor B should not see Contractor A saved charge');
-        await expectHiddenById(homeownerA.client, 'contractor_saved_estimate_charges', savedCharge.id, 'Homeowner should not see contractor-only saved charge');
-      }
-
       const priceBookItem = await maybeFirst(
         contractorA.client,
         'contractor_price_book_items',

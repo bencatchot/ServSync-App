@@ -390,7 +390,6 @@ import type {
   ContractorPublicProfile,
   DiscoverFeedItem,
   Estimate,
-  EstimateChargeType,
   EstimateLaborMode,
   EstimateLineItem,
   EstimateLineSupplyStatus,
@@ -424,7 +423,6 @@ import type {
   ContractorAccountStatus,
   ContractorPriceBookInternalCost,
   ContractorPriceBookItem,
-  ContractorSavedEstimateCharge,
   ConnectionAlertLevel,
   ConnectionAlertStatus,
   ContractorVisitEvent,
@@ -998,17 +996,6 @@ type EstimateHelperSuggestion = {
   quantity?: string;
   editor_source_note: string;
   duplicateKeywords: string[];
-};
-type SavedEstimateChargeDraft = {
-  name: string;
-  description: string;
-  line_type: EstimateLineType;
-  charge_type: EstimateChargeType;
-  amount: string;
-  default_quantity: string;
-  unit: string;
-  active: boolean;
-  sort_order: string;
 };
 type ContractorPriceBookItemDraft = {
   title: string;
@@ -1668,34 +1655,6 @@ function estimatePaymentScheduleLinkedInvoiceSummary(estimate: Estimate, invoice
   };
 }
 
-function createBlankSavedEstimateChargeDraft(overrides: Partial<SavedEstimateChargeDraft> = {}): SavedEstimateChargeDraft {
-  return {
-    name: '',
-    description: '',
-    line_type: 'labor',
-    charge_type: 'flat',
-    amount: '',
-    default_quantity: '1',
-    unit: '',
-    active: true,
-    sort_order: '0',
-    ...overrides,
-  };
-}
-
-function savedEstimateChargeDraftFromRecord(charge: ContractorSavedEstimateCharge): SavedEstimateChargeDraft {
-  return createBlankSavedEstimateChargeDraft({
-    name: charge.name,
-    description: charge.description || '',
-    line_type: normalizeEstimateLineType(charge.line_type),
-    charge_type: charge.charge_type,
-    amount: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
-    default_quantity: String(Number(charge.default_quantity || 1)),
-    unit: charge.unit || '',
-    active: charge.active,
-    sort_order: String(charge.sort_order || 0),
-  });
-}
 
 function createBlankContractorPriceBookItemDraft(overrides: Partial<ContractorPriceBookItemDraft> = {}): ContractorPriceBookItemDraft {
   return {
@@ -1892,30 +1851,6 @@ function parseManualJobWorkItemNumber(value: string, label: string, options: { r
   return { value: Number(parsed.toFixed(2)) };
 }
 
-function savedEstimateChargeLineDescription(charge: ContractorSavedEstimateCharge) {
-  return charge.name;
-}
-
-function savedEstimateChargeEditorNote(charge: ContractorSavedEstimateCharge) {
-  const description = charge.description?.trim();
-  return [
-    `Added from saved charge: ${charge.name}.`,
-    description ? `Saved charge note: ${description}` : '',
-  ].filter(Boolean).join(' ');
-}
-
-function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge): EstimateLineDraft {
-  return createEstimateLineDraft({
-    line_type: normalizeEstimateLineType(charge.line_type),
-    description: savedEstimateChargeLineDescription(charge),
-    line_title: charge.name,
-    customer_description: '',
-    quantity: String(Number(charge.default_quantity || 1)),
-    unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each'),
-    unit_price: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
-    editor_source_note: savedEstimateChargeEditorNote(charge),
-  });
-}
 
 function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<InvoiceDraftForm> = {}): InvoiceDraftForm {
   const dateLabel = formatShortMonthDay();
@@ -2759,48 +2694,48 @@ function estimateBuilderDefaultLineDescription(seed: EstimateDraftBuilderLineSee
   return seed.description;
 }
 
-function estimateBuilderKeywordScore(seed: EstimateDraftBuilderLineSeed, charge: ContractorSavedEstimateCharge) {
+function estimateBuilderKeywordScore(seed: EstimateDraftBuilderLineSeed, item: ContractorPriceBookItem) {
   const seedDescription = compactText(seed.description);
-  const chargeName = compactText(charge.name);
-  const chargeDescription = compactText(charge.description || '');
-  const combinedChargeText = `${chargeName} ${chargeDescription}`.trim();
-  if (!seedDescription || !chargeName) return 0;
+  const itemTitle = compactText(item.title);
+  const itemDescription = compactText(`${item.customer_description || ''} ${item.internal_notes || ''}`);
+  const combinedItemText = `${itemTitle} ${itemDescription}`.trim();
+  if (!seedDescription || !itemTitle) return 0;
 
   let score = 0;
-  if (normalizeEstimateLineType(charge.line_type) === seed.line_type) score += 25;
-  if (chargeName === seedDescription) score += 100;
-  if (chargeName && seedDescription.includes(chargeName)) score += 85;
-  if (chargeName && chargeName.includes(seedDescription)) score += 85;
+  if (normalizeEstimateLineType(item.line_type) === seed.line_type) score += 25;
+  if (itemTitle === seedDescription) score += 100;
+  if (itemTitle && seedDescription.includes(itemTitle)) score += 85;
+  if (itemTitle && itemTitle.includes(seedDescription)) score += 85;
 
   (seed.keywords || []).forEach(keyword => {
     const compactKeyword = compactText(keyword);
     if (!compactKeyword) return;
-    if (chargeName === compactKeyword) score += 60;
-    if (chargeName.includes(compactKeyword)) score += 35;
-    if (chargeDescription.includes(compactKeyword)) score += 20;
+    if (itemTitle === compactKeyword) score += 60;
+    if (itemTitle.includes(compactKeyword)) score += 35;
+    if (itemDescription.includes(compactKeyword)) score += 20;
   });
 
   const seedTokens = new Set(seedDescription.split(' ').filter(token => token.length > 3));
-  const overlap = combinedChargeText.split(' ').filter(token => seedTokens.has(token)).length;
+  const overlap = combinedItemText.split(' ').filter(token => seedTokens.has(token)).length;
   score += Math.min(overlap * 8, 32);
 
   return score;
 }
 
-function findSavedChargeMatchForEstimateBuilder(seed: EstimateDraftBuilderLineSeed, charges: ContractorSavedEstimateCharge[]) {
-  const activeCharges = charges.filter(charge => charge.active);
-  const scored = activeCharges
-    .map(charge => ({
-      charge,
-      score: estimateBuilderKeywordScore(seed, charge),
-      compatibleType: normalizeEstimateLineType(charge.line_type) === seed.line_type,
+function findPriceBookMatchForEstimateBuilder(seed: EstimateDraftBuilderLineSeed, items: ContractorPriceBookItem[]) {
+  const activeItems = items.filter(item => item.active && !item.archived_at);
+  const scored = activeItems
+    .map(item => ({
+      item,
+      score: estimateBuilderKeywordScore(seed, item),
+      compatibleType: normalizeEstimateLineType(item.line_type) === seed.line_type,
     }))
     .filter(candidate => candidate.score >= 85 && candidate.compatibleType)
     .sort((a, b) => b.score - a.score);
   if (scored.length === 0) return null;
   const [best, second] = scored;
   if (second && best.score - second.score < 20) return null;
-  return best.charge;
+  return best.item;
 }
 
 function estimateBuilderEditorSourceNote(seed: EstimateDraftBuilderLineSeed) {
@@ -2815,14 +2750,14 @@ function estimateBuilderEditorSourceNote(seed: EstimateDraftBuilderLineSeed) {
     : 'Suggested from the rough scope and selected trade.';
 }
 
-function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges: ContractorSavedEstimateCharge[], jobType: EstimateDraftBuilderJobType) {
-  const matchedCharge = findSavedChargeMatchForEstimateBuilder(seed, charges);
-  if (matchedCharge) {
+function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, priceBookItems: ContractorPriceBookItem[], jobType: EstimateDraftBuilderJobType) {
+  const matchedItem = findPriceBookMatchForEstimateBuilder(seed, priceBookItems);
+  if (matchedItem) {
     return {
       line: {
-        ...estimateLineDraftFromSavedCharge(matchedCharge),
+        ...priceBookItemToEstimateLineDraft(matchedItem),
         builderGenerated: true,
-        editor_source_note: `${estimateBuilderEditorSourceNote(seed)} Matched saved charge: ${matchedCharge.name}.`,
+        editor_source_note: `${estimateBuilderEditorSourceNote(seed)} Matched Price Book item: ${matchedItem.title}.`,
       },
       matched: true,
     };
@@ -3076,7 +3011,7 @@ function buildEstimateDraftFromLibraryBundle({
   laborMode,
   roughScope,
   subjectName,
-  savedCharges,
+  priceBookItems,
 }: {
   bundle: EstimateDraftLibraryBundle;
   trade: EstimateDraftBuilderTrade;
@@ -3084,12 +3019,12 @@ function buildEstimateDraftFromLibraryBundle({
   laborMode: EstimateDraftBuilderLaborMode;
   roughScope: string;
   subjectName: string;
-  savedCharges: ContractorSavedEstimateCharge[];
+  priceBookItems: ContractorPriceBookItem[];
 }) {
   const dateLabel = formatShortMonthDay();
   const builtLines = estimateDraftLibraryBundleItems(bundle)
     .map(item => estimateDraftLibrarySeedFromItem(bundle, item))
-    .map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
+    .map(seed => estimateBuilderLineFromSeed(seed, priceBookItems, jobType));
   return {
     title: `${bundle.display_name} Estimate - ${subjectName || 'Customer'} - ${dateLabel}`,
     scope: estimateDraftLibraryScope(bundle, roughScope),
@@ -3112,20 +3047,20 @@ function buildRuleBasedEstimateDraft({
   laborMode,
   roughScope,
   subjectName,
-  savedCharges,
+  priceBookItems,
 }: {
   trade: EstimateDraftBuilderTrade;
   jobType: EstimateDraftBuilderJobType;
   laborMode: EstimateDraftBuilderLaborMode;
   roughScope: string;
   subjectName: string;
-  savedCharges: ContractorSavedEstimateCharge[];
+  priceBookItems: ContractorPriceBookItem[];
 }) {
   const rulePack = ESTIMATE_DRAFT_BUILDER_RULE_PACKS[trade];
   const dateLabel = formatShortMonthDay();
   const cleanScope = customerFacingRoughScope(roughScope);
   const builtLines = estimateDraftBuilderSeeds({ trade, roughScope })
-    .map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
+    .map(seed => estimateBuilderLineFromSeed(seed, priceBookItems, jobType));
   const jobTypeLabel = estimateBuilderJobTypeLabel(jobType);
   const requestedScope = cleanScope
     ? `Requested scope: ${/[.!?]$/.test(cleanScope) ? cleanScope : `${cleanScope}.`}`
@@ -3440,11 +3375,6 @@ const ESTIMATE_LINE_TYPE_LABELS = WORK_COMPOSER_LINE_TYPE_LABELS;
 function estimateLineTypeLabel(lineType: LegacyEstimateLineType | string | null | undefined) {
   return ESTIMATE_LINE_TYPE_LABELS[normalizeEstimateLineType(lineType)];
 }
-const ESTIMATE_CHARGE_TYPE_OPTIONS: EstimateChargeType[] = ['flat', 'hourly'];
-const ESTIMATE_CHARGE_TYPE_LABELS: Record<EstimateChargeType, string> = {
-  flat: 'Flat',
-  hourly: 'Hourly',
-};
 const ESTIMATE_DRAFT_BUILDER_TRADES: EstimateDraftBuilderTrade[] = ['HVAC', 'Plumbing', 'Electrical', 'Carpentry', 'Other'];
 const ESTIMATE_DRAFT_BUILDER_JOB_TYPES: { value: EstimateDraftBuilderJobType; label: string }[] = [
   { value: 'replacement', label: 'Install / Replace' },
@@ -21580,7 +21510,6 @@ function ContractorDashboard({
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
   const [serviceAgreementTemplates, setServiceAgreementTemplates] = useState<ServiceAgreementTemplate[]>([]);
   const [serviceAgreementOffers, setServiceAgreementOffers] = useState<ServiceAgreementOffer[]>([]);
-  const [savedEstimateCharges, setSavedEstimateCharges] = useState<ContractorSavedEstimateCharge[]>([]);
   const [contractorPriceBookItems, setContractorPriceBookItems] = useState<ContractorPriceBookItem[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
@@ -21664,10 +21593,6 @@ function ContractorDashboard({
   const [saveEstimateTemplateModal, setSaveEstimateTemplateModal] = useState<SaveEstimateTemplateModalState | null>(null);
   const [renamingEstimateTemplateId, setRenamingEstimateTemplateId] = useState<string | null>(null);
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
-  const [savedEstimateChargeDraft, setSavedEstimateChargeDraft] = useState<SavedEstimateChargeDraft>(() => createBlankSavedEstimateChargeDraft());
-  const [editingSavedEstimateChargeId, setEditingSavedEstimateChargeId] = useState<string | null>(null);
-  const [savingSavedEstimateCharge, setSavingSavedEstimateCharge] = useState(false);
-  const [togglingSavedEstimateChargeId, setTogglingSavedEstimateChargeId] = useState<string | null>(null);
   const [renamingInspectionTemplateId, setRenamingInspectionTemplateId] = useState<string | null>(null);
   const [archivingInspectionTemplateId, setArchivingInspectionTemplateId] = useState<string | null>(null);
   const [restoringInspectionTemplateId, setRestoringInspectionTemplateId] = useState<string | null>(null);
@@ -22618,7 +22543,7 @@ function ContractorDashboard({
       if (loadedContractor?.id) {
         const loadedCanManageCustomers = canManageContractorCustomersUi(loadedContractor, loadedTeamAccess, profile.id);
         const loadedCanManageEstimateSettings = contractorPriceBookAccess(loadedContractor, loadedTeamAccess, profile.id).canManage;
-        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localHistoricalContactsRes, archivedLocalContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes, priceBookCostsRes] = await Promise.all([
+        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localHistoricalContactsRes, archivedLocalContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, priceBookItemsRes, priceBookCostsRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -22672,12 +22597,6 @@ function ContractorDashboard({
             .select('*')
             .eq('contractor_id', loadedContractor.id)
             .order('updated_at', { ascending: false }),
-          supabase
-            .from('contractor_saved_estimate_charges')
-            .select('id, contractor_id, name, description, line_type, charge_type, amount_cents, default_quantity, unit, active, sort_order, created_at, updated_at')
-            .eq('contractor_id', loadedContractor.id)
-            .order('sort_order', { ascending: true })
-            .order('created_at', { ascending: true }),
           supabase
             .from('contractor_price_book_items')
             .select('id, contractor_id, title, customer_description, internal_notes, trade, category, subcategory, line_type, unit, default_unit_price_cents, taxable, labor_hours, sku, source, active, archived_at, created_at, updated_at')
@@ -22739,7 +22658,6 @@ function ContractorDashboard({
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
-        if (!savedEstimateChargesRes.error) setSavedEstimateCharges((savedEstimateChargesRes.data || []) as ContractorSavedEstimateCharge[]);
         if (!priceBookItemsRes.error && !priceBookCostsRes.error) {
           const costsByItemId = new Map(
             ((priceBookCostsRes.data || []) as unknown as ContractorPriceBookInternalCost[])
@@ -22789,7 +22707,6 @@ function ContractorDashboard({
         setLocalCustomerDirectoryLoadState('ready');
         setLocalCustomerDirectoryLoadError('');
         setLocalClaimInvites([]);
-        setSavedEstimateCharges([]);
         setContractorPriceBookItems([]);
         setContractorPriceBookLoadState('ready');
         setContractorPriceBookLoadError('');
@@ -25491,100 +25408,6 @@ function ContractorDashboard({
     }
   };
 
-  const resetSavedEstimateChargeDraft = () => {
-    setEditingSavedEstimateChargeId(null);
-    setSavedEstimateChargeDraft(createBlankSavedEstimateChargeDraft());
-  };
-
-  const editSavedEstimateCharge = (charge: ContractorSavedEstimateCharge) => {
-    setEditingSavedEstimateChargeId(charge.id);
-    setSavedEstimateChargeDraft(savedEstimateChargeDraftFromRecord(charge));
-  };
-
-  const saveSavedEstimateCharge = async () => {
-    if (!supabase || !contractor?.id) return;
-    const name = savedEstimateChargeDraft.name.trim();
-    const amountValue = Number(savedEstimateChargeDraft.amount.replace(/[$,]/g, '').trim() || '0');
-    const defaultQuantity = Number(savedEstimateChargeDraft.default_quantity);
-    const sortOrder = Number(savedEstimateChargeDraft.sort_order);
-    if (!name) {
-      setError('Add a saved charge name before saving.');
-      return;
-    }
-    if (!Number.isFinite(amountValue) || amountValue < 0) {
-      setError('Enter an amount or rate of zero or more.');
-      return;
-    }
-    if (!Number.isFinite(defaultQuantity) || defaultQuantity <= 0) {
-      setError('Default quantity must be greater than zero.');
-      return;
-    }
-    setNotice('');
-    setError('');
-    setSavingSavedEstimateCharge(true);
-    const payload = {
-      contractor_id: contractor.id,
-      name,
-      description: savedEstimateChargeDraft.description.trim(),
-      line_type: normalizeEstimateLineType(savedEstimateChargeDraft.line_type),
-      charge_type: savedEstimateChargeDraft.charge_type,
-      amount_cents: dollarsToCents(savedEstimateChargeDraft.amount),
-      default_quantity: Number(defaultQuantity.toFixed(2)),
-      unit: savedEstimateChargeDraft.unit.trim() || (savedEstimateChargeDraft.charge_type === 'hourly' ? 'hour' : null),
-      active: savedEstimateChargeDraft.active,
-      sort_order: Number.isFinite(sortOrder) ? Math.trunc(sortOrder) : 0,
-    };
-    try {
-      const mutation = editingSavedEstimateChargeId
-        ? supabase
-            .from('contractor_saved_estimate_charges')
-            .update({
-              name: payload.name,
-              description: payload.description,
-              line_type: payload.line_type,
-              charge_type: payload.charge_type,
-              amount_cents: payload.amount_cents,
-              default_quantity: payload.default_quantity,
-              unit: payload.unit,
-              active: payload.active,
-              sort_order: payload.sort_order,
-            })
-            .eq('id', editingSavedEstimateChargeId)
-        : supabase
-            .from('contractor_saved_estimate_charges')
-            .insert(payload);
-      const { error: saveError } = await mutation;
-      if (saveError) throw saveError;
-      setNotice(editingSavedEstimateChargeId ? 'Saved charge updated.' : 'Saved charge created.');
-      resetSavedEstimateChargeDraft();
-      await loadContractor();
-    } catch (err) {
-      setError(readableError(err, 'Unable to save this charge. Make sure you have estimate settings access.'));
-    } finally {
-      setSavingSavedEstimateCharge(false);
-    }
-  };
-
-  const toggleSavedEstimateChargeActive = async (charge: ContractorSavedEstimateCharge) => {
-    if (!supabase) return;
-    setNotice('');
-    setError('');
-    setTogglingSavedEstimateChargeId(charge.id);
-    try {
-      const { error: updateError } = await supabase
-        .from('contractor_saved_estimate_charges')
-        .update({ active: !charge.active })
-        .eq('id', charge.id);
-      if (updateError) throw updateError;
-      setNotice(charge.active ? 'Saved charge deactivated.' : 'Saved charge reactivated.');
-      await loadContractor();
-    } catch (err) {
-      setError(readableError(err, 'Unable to update this saved charge.'));
-    } finally {
-      setTogglingSavedEstimateChargeId(null);
-    }
-  };
-
   const resetContractorPriceBookDraft = () => {
     setEditingContractorPriceBookItemId(null);
     setContractorPriceBookDraft(createBlankContractorPriceBookItemDraft());
@@ -26154,20 +25977,6 @@ function ContractorDashboard({
     });
   };
 
-  const addSavedChargeToEstimateDraft = (charge: ContractorSavedEstimateCharge) => {
-    const nextLine = estimateLineDraftFromSavedCharge(charge);
-    expandEstimateLineGroup(estimateLineVisualGroup(nextLine));
-    setEstimateDraft(draft => {
-      const usableLines = draft.line_items.filter(draftLineHasContent);
-      return {
-        ...draft,
-        line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
-      };
-    });
-    setEstimateLineFocusId(nextLine.id);
-    setEstimateSavedItemNotice(`Added saved charge "${charge.name}" as an editable estimate line item. Copied price — review before sending.`);
-  };
-
   const addPriceBookItemToEstimateDraft = (item: ContractorPriceBookItem) => {
     const nextLine = priceBookItemToEstimateLineDraft(item);
     expandEstimateLineGroup(estimateLineVisualGroup(nextLine));
@@ -26703,22 +26512,22 @@ function ContractorDashboard({
   };
 
   const renderEstimateSavedItemPicker = () => {
-    const hasSavedItems = activeContractorPriceBookItems.length > 0 || activeSavedEstimateCharges.length > 0;
-    const hasSearchMatches = estimatePriceBookQuickPickItems.length > 0 || estimateSavedChargeQuickPickItems.length > 0;
+    const hasSavedItems = activeContractorPriceBookItems.length > 0;
+    const hasSearchMatches = estimatePriceBookQuickPickItems.length > 0;
     return (
       <div id="estimate-saved-item-picker" className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm" data-testid="estimate-saved-item-picker">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-bold text-slate-950">Add saved item</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Reuse active Price Book items and saved charges as normal editable estimate lines. Internal notes, tax/category metadata, and source records stay private.
+              Reuse active Price Book items as normal editable estimate lines. Internal notes, tax/category metadata, and source records stay private.
             </p>
             <p className="mt-2 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
               Copied price — review before sending.
             </p>
           </div>
           <span className="w-fit rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-            {activeContractorPriceBookItems.length + activeSavedEstimateCharges.length} active
+            {activeContractorPriceBookItems.length} active
           </span>
         </div>
 
@@ -26789,55 +26598,12 @@ function ContractorDashboard({
                   </section>
                 )}
 
-                {estimateSavedChargeQuickPickItems.length > 0 && (
-                  <section className="space-y-2" aria-label="Saved charge items">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved charges</p>
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                        {estimateSavedChargeQuickPickItems.length} item{estimateSavedChargeQuickPickItems.length === 1 ? '' : 's'}
-                      </span>
-                    </div>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {estimateSavedChargeQuickPickItems.map(charge => (
-                        <div key={charge.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="min-w-0 break-words text-sm font-semibold text-slate-950">{charge.name}</p>
-                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-blue-700">Saved charge</span>
-                              </div>
-                              <p className="mt-1 text-xs font-medium text-slate-600">
-                                {estimateLineTypeLabel(charge.line_type)} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]} · {formatMoney(charge.amount_cents)}
-                                {charge.charge_type === 'hourly' ? '/hr' : ''}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Default {Number(charge.default_quantity || 1)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')}
-                              </p>
-                              {charge.description && (
-                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{charge.description}</p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              aria-label={`Add saved charge ${charge.name}`}
-                              onClick={() => addSavedChargeToEstimateDraft(charge)}
-                              className="inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 sm:w-auto"
-                            >
-                              <Plus size={13} />
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
               </div>
             )}
           </div>
         ) : (
           <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
-            No saved items yet. Add items to your Price Book or saved charges to reuse them here.
+            No saved items yet. Add items to your Price Book to reuse them here.
           </p>
         )}
 
@@ -27003,7 +26769,7 @@ function ContractorDashboard({
           laborMode: estimateDraftBuilderLaborMode,
           roughScope: estimateAssistantText,
           subjectName: subjectName || 'Customer',
-          savedCharges: activeSavedEstimateCharges,
+          priceBookItems: activeContractorPriceBookItems,
         })
       : buildRuleBasedEstimateDraft({
           trade: buildTrade,
@@ -27011,7 +26777,7 @@ function ContractorDashboard({
           laborMode: estimateDraftBuilderLaborMode,
           roughScope: estimateAssistantText,
           subjectName: subjectName || 'Customer',
-          savedCharges: activeSavedEstimateCharges,
+          priceBookItems: activeContractorPriceBookItems,
         });
     const mergeMode = chooseEstimateDraftBuilderMergeMode(estimateDraft);
     if (mergeMode === 'cancel') {
@@ -27480,7 +27246,7 @@ function ContractorDashboard({
         <div className="mb-3">
           <p className="text-sm font-bold text-slate-950">No line items yet</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Start with a blank row or a saved item from your active Price Book and saved charges. At least one line item is required before saving.
+            Start with a blank row or a saved item from your active Price Book. At least one line item is required before saving.
           </p>
         </div>
       )}
@@ -28772,9 +28538,6 @@ function ContractorDashboard({
     setHomeownerMobileDetailOpen(true);
     setContractorTab('connections');
   };
-  const activeSavedEstimateCharges = savedEstimateCharges
-    .filter(charge => charge.active)
-    .sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const activeContractorPriceBookItems = contractorPriceBookItems
     .filter(item => item.active && !item.archived_at)
     .sort((a, b) => a.title.localeCompare(b.title) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -28799,16 +28562,6 @@ function ContractorDashboard({
     ? connectedHomeList(selectedServiceAgreementOfferConnection).filter(home => Boolean(home.id))
     : [];
   const estimateSavedItemSearchText = normalizeText(estimateSavedItemSearch.trim());
-  const estimateSavedChargeQuickPickItems = activeSavedEstimateCharges
-    .filter(charge => {
-      if (!estimateSavedItemSearchText) return true;
-      return normalizeText([
-        charge.name,
-        charge.description,
-        estimateLineTypeLabel(charge.line_type),
-        charge.unit || '',
-      ].join(' ')).includes(estimateSavedItemSearchText);
-    });
   const estimatePriceBookQuickPickItems = activeContractorPriceBookItems
     .filter(item => {
       if (!estimateSavedItemSearchText) return true;
@@ -29384,9 +29137,9 @@ function ContractorDashboard({
     {
       id: 'tool-templates',
       icon: <Sparkles size={16} />,
-      title: 'Templates / Saved Charges',
-      helper: 'Reusable estimate structures, starter templates, and saved charges.',
-      meta: `${estimateTemplates.length + activeSavedEstimateCharges.length} saved`,
+      title: 'Templates',
+      helper: 'Reusable multi-line estimate structures and starter templates.',
+      meta: `${estimateTemplates.length} saved`,
       onAction: () => {
         setContractorTab('inspections');
         setContractorJobsView('templates');
@@ -33190,7 +32943,7 @@ function ContractorDashboard({
                 </span>
                 <span>
                   <span className="block text-sm font-bold text-slate-950">Tools & setup</span>
-                  <span className="block text-xs text-slate-500">Templates, saved charges, invites, billing, support, and setup.</span>
+                  <span className="block text-xs text-slate-500">Templates, Price Book, invites, billing, support, and setup.</span>
                 </span>
               </span>
               <ChevronDown size={18} className="shrink-0 text-slate-500" />
@@ -33647,196 +33400,6 @@ function ContractorDashboard({
           </div>
         </div>
 
-        <div className="mb-5 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-sm font-bold text-[#02132D]">Estimate Settings</p>
-              <p className="mt-1 max-w-2xl text-sm leading-5 text-[#223D67]">
-                Save common flat charges and hourly rates for your contractor account. These stay in settings for now and do not automatically load into estimates.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-center sm:min-w-[220px]">
-              <InfoBox label="Saved" value={String(savedEstimateCharges.length)} />
-              <InfoBox label="Active" value={String(savedEstimateCharges.filter(charge => charge.active).length)} />
-            </div>
-          </div>
-
-          {!contractor?.id ? (
-            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              Save the business profile once before adding saved estimate charges.
-            </p>
-          ) : canManageEstimateSettings ? (
-            <div className="mt-4 rounded-lg border border-[#E1E3E7] bg-[#F7F9FC] p-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[#02132D]">{editingSavedEstimateChargeId ? 'Edit saved charge' : 'Add saved charge'}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-[#223D67]/70">
-                    Use flat charges for fixed fees and hourly charges for saved labor rates.
-                  </p>
-                </div>
-                {editingSavedEstimateChargeId && (
-                  <button type="button" onClick={resetSavedEstimateChargeDraft} className={buttonClass('secondary')}>
-                    Cancel edit
-                  </button>
-                )}
-              </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-4">
-                <Field label="Name">
-                  <input
-                    className={inputClass()}
-                    value={savedEstimateChargeDraft.name}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, name: event.target.value }))}
-                    placeholder="Service call fee"
-                  />
-                </Field>
-                <Field label="Line type">
-                  <select
-                    className={inputClass()}
-                    value={savedEstimateChargeDraft.line_type}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, line_type: event.target.value as EstimateLineType }))}
-                  >
-                    {ESTIMATE_LINE_TYPE_OPTIONS.map(lineType => (
-                      <option key={lineType} value={lineType}>{ESTIMATE_LINE_TYPE_LABELS[lineType]}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Charge type">
-                  <select
-                    className={inputClass()}
-                    value={savedEstimateChargeDraft.charge_type}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({
-                      ...current,
-                      charge_type: event.target.value as EstimateChargeType,
-                      unit: current.unit.trim() || (event.target.value === 'hourly' ? 'hour' : current.unit),
-                    }))}
-                  >
-                    {ESTIMATE_CHARGE_TYPE_OPTIONS.map(chargeType => (
-                      <option key={chargeType} value={chargeType}>{ESTIMATE_CHARGE_TYPE_LABELS[chargeType]}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={savedEstimateChargeDraft.charge_type === 'hourly' ? 'Rate' : 'Amount'}>
-                  <input
-                    className={inputClass()}
-                    inputMode="decimal"
-                    value={savedEstimateChargeDraft.amount}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, amount: event.target.value }))}
-                    placeholder="125.00"
-                  />
-                </Field>
-                <Field label="Default quantity">
-                  <input
-                    className={inputClass()}
-                    inputMode="decimal"
-                    value={savedEstimateChargeDraft.default_quantity}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, default_quantity: event.target.value }))}
-                    placeholder="1"
-                  />
-                </Field>
-                <Field label="Unit">
-                  <input
-                    className={inputClass()}
-                    value={savedEstimateChargeDraft.unit}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, unit: event.target.value }))}
-                    placeholder={savedEstimateChargeDraft.charge_type === 'hourly' ? 'hour' : 'each'}
-                  />
-                </Field>
-                <Field label="Sort order">
-                  <input
-                    className={inputClass()}
-                    inputMode="numeric"
-                    value={savedEstimateChargeDraft.sort_order}
-                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, sort_order: event.target.value }))}
-                    placeholder="0"
-                  />
-                </Field>
-                <div className="flex items-end">
-                  <label className="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm font-semibold text-[#223D67]">
-                    <input
-                      type="checkbox"
-                      checked={savedEstimateChargeDraft.active}
-                      onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, active: event.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-300 text-[#0078FF]"
-                    />
-                    Active
-                  </label>
-                </div>
-                <div className="lg:col-span-4">
-                  <Field label="Description">
-                    <textarea
-                      className={inputClass()}
-                      rows={2}
-                      value={savedEstimateChargeDraft.description}
-                      onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, description: event.target.value }))}
-                      placeholder="Optional internal note or scope reminder"
-                    />
-                  </Field>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={savingSavedEstimateCharge}
-                  onClick={() => void saveSavedEstimateCharge()}
-                  className={buttonClass('primary')}
-                >
-                  <Plus size={16} />
-                  {savingSavedEstimateCharge ? 'Saving...' : editingSavedEstimateChargeId ? 'Save charge' : 'Add charge'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              You can view saved estimate charges, but only the contractor owner, admin, or office role can change estimate settings.
-            </p>
-          )}
-
-          <div className="mt-4 space-y-3">
-            {savedEstimateCharges.length === 0 ? (
-              <EmptyState text="No saved estimate charges yet." />
-            ) : (
-              savedEstimateCharges.map(charge => (
-                <div key={charge.id} className="rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] p-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold text-[#02132D]">{charge.name}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${charge.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                          {charge.active ? 'Active' : 'Inactive'}
-                        </span>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#223D67]">
-                          {estimateLineTypeLabel(charge.line_type)} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]}
-                        </span>
-                      </div>
-                      {charge.description && <p className="mt-1 text-sm leading-5 text-[#223D67]/75">{charge.description}</p>}
-                      <p className="mt-2 text-xs text-[#223D67]/70">
-                        {formatMoney(charge.amount_cents)}{charge.charge_type === 'hourly' ? '/hr' : ''} · default {Number(charge.default_quantity)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')} · sort {charge.sort_order}
-                      </p>
-                      <p className="mt-1 text-xs text-[#223D67]/55">
-                        Updated {formatShortDate(charge.updated_at)}
-                      </p>
-                    </div>
-                    {canManageEstimateSettings && (
-                      <div className="flex flex-wrap gap-2 lg:justify-end">
-                        <button type="button" onClick={() => editSavedEstimateCharge(charge)} className={buttonClass('secondary')}>
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          disabled={togglingSavedEstimateChargeId === charge.id}
-                          onClick={() => void toggleSavedEstimateChargeActive(charge)}
-                          className={buttonClass('secondary')}
-                        >
-                          {togglingSavedEstimateChargeId === charge.id ? 'Updating...' : charge.active ? 'Deactivate' : 'Reactivate'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
         <div id="contractor-profile-business-info" className="grid scroll-mt-6 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Business name">

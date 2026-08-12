@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-11",
+  "updatedOn": "2026-08-12",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -486,6 +486,24 @@
         "demo": {
           "status": "Applied",
           "reason": "Exact SHA-256 373641ab5efddfb20dffeb006791d5ce95da657ef582275ad3897afa5f68c9f8 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-12 from 17:15:50Z through 17:15:51Z. Catalog/grants and rollback-only authenticated preview/execution preservation passed with zero residue. Demo retained zero Price Book items, sources, imports, and mappings."
+        }
+      }
+    },
+    {
+      "id": "saved-charges-price-book-consolidation-v1",
+      "artifact": "servsync-saved-charges-price-book-consolidation.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 89e5adc2acc21302e408c40b3246d8a303b2413eeb2838220776d4ee14b8537e was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-12 at 18:09:53Z. All 22 supported inactive Fee rows became 22 archived canonical Price Book items with exact private-note, price, unit, timestamp, active-state, and immutable lineage preservation. The 195 pre-existing Price Book rows retained fingerprint bef6e3bca2405c7a25009e74ebf95a0f; mapping and lineage mismatches were zero, retained legacy fingerprint remained 4aae4a70d79d635d7d254b7a80e849f8, and Estimate/Invoice fingerprint 2f3b0cabd3b7119e938def9d822bf779 remained exact."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 89e5adc2acc21302e408c40b3246d8a303b2413eeb2838220776d4ee14b8537e was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-12 at approximately 18:10Z after Sandbox passed. Demo retained zero Saved Charges, Price Book items, lineage rows, Estimates, Estimate lines, Invoices, and Invoice lines. Forced-RLS policy-free retired storage, zero authenticated direct-table privileges, and exact history fingerprint 555562867d6dacab2b4b1b90ba69c32f were verified."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 89e5adc2acc21302e408c40b3246d8a303b2413eeb2838220776d4ee14b8537e was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-12 at 18:11:15Z after Sandbox and Demo passed. Two active legacy rows across two contractors became exactly two active canonical items and two immutable lineage rows: one hourly Labor preserved its hour unit and rate, and one flat Service preserved its title, price, private 604-character note, and timestamps while receiving the reviewed each-unit default. Customer descriptions remain empty. Mapping/lineage mismatches were zero, retained legacy fingerprint remained 52c51ad556a652793200082184bdc54c, and the seven-table contractor/Estimate/Job/Invoice fingerprint 494c3d91465cfffd4f9f355d45e62c43 remained exact."
         }
       }
     }

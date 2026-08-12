@@ -71,12 +71,12 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     expect(source).not.toContain('function estimateLineDraftFromPriceBookItem');
   });
 
-  test('unified saved-item picker copy explains quantity, review, and private metadata boundaries', () => {
+  test('canonical Price Book picker copy explains review and private metadata boundaries', () => {
     const source = appSource();
     const quickPickSource = sourceBetween(source, 'const renderEstimateSavedItemPicker = () => {', 'const addEstimateHelperSuggestionToDraft =');
 
     expect(quickPickSource).toContain('Price Book');
-    expect(quickPickSource).toContain('Saved charges');
+    expect(quickPickSource).not.toContain('Saved charges');
     expect(quickPickSource).toContain('editable estimate lines');
     expect(quickPickSource).toContain('Copied price — review before sending.');
     expect(quickPickSource).toContain('Search saved items');
