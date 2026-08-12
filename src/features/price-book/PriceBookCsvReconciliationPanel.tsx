@@ -32,6 +32,10 @@ import {
   parsePriceBookXlsxWorkbook,
   type PriceBookXlsxWorksheet,
 } from './priceBookXlsxImport';
+import {
+  applyPriceBookPossibleDuplicateReview,
+  type PriceBookDuplicateCandidateItem,
+} from './priceBookPossibleDuplicates';
 
 const inputClass = 'min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500';
 const primaryButtonClass = 'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
@@ -45,7 +49,7 @@ const REVIEW_FIELDS: Array<{ key: keyof PriceBookNormalizedValues; label: string
   { key: 'trade', label: 'Trade' },
   { key: 'category', label: 'Category' },
   { key: 'subcategory', label: 'Subcategory' },
-  { key: 'line_type', label: 'Line type' },
+  { key: 'line_type', label: 'Item type' },
   { key: 'unit', label: 'Unit' },
   { key: 'default_unit_price_cents', label: 'Price' },
   { key: 'taxable', label: 'Taxable' },
@@ -82,20 +86,26 @@ function valueLabel(field: keyof PriceBookNormalizedValues, value: unknown) {
     if (value === null || value === undefined) return 'Price Required';
     return `$${(Number(value) / 100).toFixed(2)}`;
   }
+  if (field === 'line_type') {
+    if (value === 'other') return 'Service';
+    if (value === 'labor') return 'Labor';
+    if (value === 'material') return 'Material';
+    if (value === 'fee') return 'Fee';
+  }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (value === null || value === undefined || value === '') return 'Blank';
   return String(value);
 }
 
 function actionLabel(action: PriceBookImportAction) {
-  if (action === 'add') return 'Add new item';
-  if (action === 'update') return 'Update matched item';
-  return 'Skip row';
+  if (action === 'add') return 'Add as new';
+  if (action === 'update') return 'Update existing';
+  return 'Skip';
 }
 
 function matchLabel(matchType: PriceBookImportPreview['rows'][number]['match_type']) {
-  if (matchType === 'external_id') return 'Stable external ID match';
-  if (matchType === 'sku_suggestion') return 'Possible SKU match';
+  if (matchType === 'external_id') return 'Matched using External Item ID';
+  if (matchType === 'sku_suggestion') return 'Possible match using SKU / code';
   if (matchType === 'exact_duplicate') return 'Possible duplicate';
   if (matchType === 'ambiguous') return 'Ambiguous';
   return 'New item';
@@ -103,7 +113,7 @@ function matchLabel(matchType: PriceBookImportPreview['rows'][number]['match_typ
 
 function reconciliationStatusLabel(status: PriceBookImportPreview['rows'][number]['reconciliation_status']) {
   if (status === 'new') return 'New';
-  if (status === 'unchanged') return 'Unchanged';
+  if (status === 'unchanged') return 'Already up to date';
   if (status === 'changed') return 'Changed';
   if (status === 'ambiguous') return 'Ambiguous';
   return 'Invalid';
@@ -111,10 +121,12 @@ function reconciliationStatusLabel(status: PriceBookImportPreview['rows'][number
 
 export function PriceBookCsvReconciliationPanel({
   api,
+  existingItems,
   onCompleted,
   onRollbackCompleted,
 }: {
   api: PriceBookImportApi;
+  existingItems?: PriceBookDuplicateCandidateItem[];
   onCompleted: (result: PriceBookImportBatchResult) => Promise<void>;
   onRollbackCompleted: (result: PriceBookImportRollbackResult) => Promise<void>;
 }) {
@@ -156,6 +168,17 @@ export function PriceBookCsvReconciliationPanel({
   const reviewMappingCount = Object.values(mappingInsights).filter(insight => insight?.confidence === 'review').length;
   const pageCount = preview ? Math.max(1, Math.ceil(preview.rows.length / PREVIEW_PAGE_SIZE)) : 1;
   const previewRows = preview?.rows.slice((previewPage - 1) * PREVIEW_PAGE_SIZE, previewPage * PREVIEW_PAGE_SIZE) || [];
+  const possibleDuplicates = useMemo(
+    () => preview ? applyPriceBookPossibleDuplicateReview(preview.rows, existingItems || []).candidates : new Map(),
+    [existingItems, preview],
+  );
+  const reviewCounts = useMemo(() => preview ? preview.rows.reduce((counts, row) => {
+    if (row.errors.length > 0 || row.reconciliation_status === 'invalid' || row.reconciliation_status === 'ambiguous' || possibleDuplicates.has(row.row_number)) counts.attention += 1;
+    else if (row.reconciliation_status === 'new') counts.new += 1;
+    else if (row.reconciliation_status === 'changed') counts.changed += 1;
+    else if (row.reconciliation_status === 'unchanged') counts.current += 1;
+    return counts;
+  }, { new: 0, changed: 0, current: 0, attention: 0 }) : null, [possibleDuplicates, preview]);
 
   const loadPrivateLists = async () => {
     setLoadingSources(true);
@@ -362,7 +385,7 @@ export function PriceBookCsvReconciliationPanel({
     try {
       const nextPreview = await api.preview(sourceId, requestRows);
       setPreview(nextPreview);
-      setActions(Object.fromEntries(nextPreview.rows.map(row => [String(row.row_number), row.recommended_action])));
+      setActions(applyPriceBookPossibleDuplicateReview(nextPreview.rows, existingItems || []).actions);
       setIdempotencyKey(crypto.randomUUID());
       setPreviewPage(1);
     } catch (nextError) {
@@ -532,18 +555,22 @@ export function PriceBookCsvReconciliationPanel({
 
       {preview ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4" aria-labelledby="price-book-import-review-heading">
-          <h4 id="price-book-import-review-heading" className="text-sm font-bold text-slate-950">3. Review Add, Update, and Skip</h4>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Updates are available only for an exact mapping or a single confirmed suggestion. Conflicting manual edits remain unchanged.</p>
+          <h4 id="price-book-import-review-heading" className="text-sm font-bold text-slate-950">3. Review Price Book changes</h4>
+          <p className="mt-1 text-xs leading-5 text-slate-500">ServSync uses stable item identity for updates and separately flags likely duplicates for your review. Conflicting manual edits remain unchanged.</p>
+          {reviewCounts?.current === preview.rows.length ? <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3" data-testid="price-book-import-up-to-date"><p className="font-bold text-emerald-900">{reviewCounts.current} {reviewCounts.current === 1 ? 'item' : 'items'} already up to date</p><p className="mt-1 text-xs leading-5 text-emerald-900">ServSync matched {reviewCounts.current === 1 ? 'this item' : 'these items'} to existing Price Book records and found no imported values that need to change. {reviewCounts.current === 1 ? 'It' : 'They'} will be skipped.</p></div> : null}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Reconciliation counts">
-            {(['add', 'update', 'skip', 'error'] as const).map(key => <div key={key} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase text-slate-500">{key}</p><p className="mt-1 text-lg font-bold text-slate-950">{preview.counts[key]}</p></div>)}
+            {reviewCounts ? ([['New', reviewCounts.new], ['Changed', reviewCounts.changed], ['Already up to date', reviewCounts.current], ['Needs attention', reviewCounts.attention]] as const).map(([label, count]) => <div key={label} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-950">{count}</p></div>) : null}
           </div>
           <div className="mt-4 space-y-3">
-            {previewRows.map(row => (
-              <article key={row.row_number} className="rounded-xl border border-slate-200 p-3" data-testid="price-book-import-review-row">
+            {previewRows.map(row => {
+              const possibleDuplicate = possibleDuplicates.get(row.row_number);
+              return (
+              <article key={row.row_number} className={`rounded-xl border p-3 ${possibleDuplicate ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200'}`} data-testid="price-book-import-review-row">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0"><p className="text-xs font-bold uppercase text-slate-500">Row {row.row_number} · {reconciliationStatusLabel(row.reconciliation_status)} · {matchLabel(row.match_type)}</p><h5 className="mt-1 truncate font-bold text-slate-950">{valueLabel('title', row.incoming_values.title)}</h5><p className="mt-1 text-xs font-semibold text-slate-600">{valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p></div>
-                  <label className="text-xs font-bold text-slate-700">Action<select className={`${inputClass} mt-1`} value={actions[String(row.row_number)]} disabled={executing} onChange={event => setActions(current => ({ ...current, [String(row.row_number)]: event.target.value as PriceBookImportAction }))}>{row.allowed_actions.map(action => <option key={action} value={action}>{actionLabel(action)}</option>)}</select></label>
+                  <div className="min-w-0"><p className="text-xs font-bold uppercase text-slate-500">Row {row.row_number} · {possibleDuplicate ? 'Needs attention · Possible duplicate' : `${reconciliationStatusLabel(row.reconciliation_status)} · ${matchLabel(row.match_type)}`}</p><h5 className="mt-1 truncate font-bold text-slate-950">{valueLabel('title', row.incoming_values.title)}</h5><p className="mt-1 text-xs font-semibold text-slate-600">{valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p></div>
+                  <label className="text-xs font-bold text-slate-700">Action<select className={`${inputClass} mt-1`} value={actions[String(row.row_number)]} disabled={executing} onChange={event => setActions(current => ({ ...current, [String(row.row_number)]: event.target.value as PriceBookImportAction }))}>{(possibleDuplicate ? (['add', 'skip'] as PriceBookImportAction[]) : row.allowed_actions).map(action => <option key={action} value={action}>{actionLabel(action)}</option>)}</select></label>
                 </div>
+                {possibleDuplicate ? <div className="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-xs" data-testid="price-book-possible-duplicate"><p className="font-bold text-amber-900">ServSync found {possibleDuplicate.additionalMatchCount > 0 ? `${possibleDuplicate.additionalMatchCount + 1} similar items` : 'a similar item'} already in this Price Book.</p><div className="mt-2 grid gap-2 sm:grid-cols-2"><p><span className="font-semibold text-slate-500">Incoming:</span> {valueLabel('title', row.incoming_values.title)} · {valueLabel('default_unit_price_cents', row.incoming_values.default_unit_price_cents)}</p><p><span className="font-semibold text-slate-500">Existing:</span> {possibleDuplicate.item.title} · {valueLabel('default_unit_price_cents', possibleDuplicate.item.default_unit_price_cents)}{possibleDuplicate.item.active ? '' : ' · Archived'}</p></div><p className="mt-2 text-slate-700"><span className="font-semibold">Why this was flagged:</span> {possibleDuplicate.reasons.join(', ')}.</p><p className="mt-1 text-slate-600">Choose Add as new only if these are intentionally separate services. Cross-source suggestions are never updated automatically.</p></div> : null}
                 {row.errors.length > 0 ? <div className="mt-2 text-xs text-red-700">{row.errors.join(' ')}</div> : null}
                 {row.warnings.length > 0 ? <div className="mt-2 text-xs text-amber-700">{row.warnings.join(' ')}</div> : null}
                 <details className="mt-3 rounded-lg bg-slate-50">
@@ -560,7 +587,7 @@ export function PriceBookCsvReconciliationPanel({
                   </div>
                 </details>
               </article>
-            ))}
+            )})}
           </div>
           {pageCount > 1 ? <nav className="mt-3 flex items-center justify-between gap-3" aria-label="Import preview pages"><button type="button" className={secondaryButtonClass} disabled={previewPage === 1 || executing} onClick={() => setPreviewPage(value => value - 1)}><ChevronLeft size={16} />Previous</button><span className="text-sm font-semibold text-slate-600">Page {previewPage} of {pageCount}</span><button type="button" className={secondaryButtonClass} disabled={previewPage === pageCount || executing} onClick={() => setPreviewPage(value => value + 1)}>Next<ChevronRight size={16} /></button></nav> : null}
           <div className="mt-4 flex justify-end"><button type="button" className={primaryButtonClass} disabled={executing} onClick={() => void executeImport()}>{executing ? 'Applying transaction...' : 'Confirm and apply import'}</button></div>

@@ -8,12 +8,18 @@ import {
   parsePriceBookCsv,
   priceBookCsvRowsFromParsed,
 } from '../../src/features/price-book/priceBookCsvReconciliation';
+import {
+  applyPriceBookPossibleDuplicateReview,
+  findPriceBookPossibleDuplicate,
+  type PriceBookDuplicateCandidateItem,
+} from '../../src/features/price-book/priceBookPossibleDuplicates';
+import type { PriceBookImportPreviewRow, PriceBookNormalizedValues } from '../../src/features/price-book/priceBookCsvReconciliation';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
-async function installImportHarness(page: Page) {
+async function installImportHarness(page: Page, existingItems: PriceBookDuplicateCandidateItem[] = []) {
   await page.goto('/');
-  await page.evaluate(async () => {
+  await page.evaluate(async importedExistingItems => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const reactModule = await dynamicImport('/node_modules/.vite/deps/react.js');
     const reactDomModule = await dynamicImport('/node_modules/.vite/deps/react-dom_client.js');
@@ -25,6 +31,7 @@ async function installImportHarness(page: Page) {
     (window as typeof window & { __priceBookImportHarness?: typeof state }).__priceBookImportHarness = state;
     document.body.innerHTML = '<main id="price-book-import-root"></main>';
     createRoot(document.getElementById('price-book-import-root') as HTMLElement).render(React.createElement(Panel, {
+      existingItems: importedExistingItems,
       api: {
         listSources: async () => [{ id: 'source-1', display_name: 'Master catalog', source_kind: 'file_upload', status: 'active', created_at: '2026-08-02T12:00:00.000Z' }],
         createSource: async (displayName: string) => ({ id: 'source-2', display_name: displayName, source_kind: 'file_upload', status: 'active', created_at: '2026-08-02T12:00:00.000Z' }),
@@ -33,27 +40,29 @@ async function installImportHarness(page: Page) {
           return {
             source: { id: 'source-1', display_name: 'Master catalog' },
             counts: { add: 1, update: 1, skip: 0, error: 0 },
-            rows: rows.map((row, index) => ({
+            rows: rows.map((row, index) => {
+              const unchanged = (row.values as { title?: string }).title === 'Unchanged service';
+              return ({
               row_number: row.row_number,
               external_item_id: row.external_item_id,
               sku: null,
               row_fingerprint: 'a'.repeat(64),
               mapped_fields: row.mapped_fields,
-              match_type: index === 0 ? 'none' : 'external_id',
-              reconciliation_status: index === 0 ? 'new' : 'changed',
-              match_confidence: index === 0 ? 'none' : 'high',
-              target_item_id: index === 0 ? null : 'item-2',
-              target_updated_at: index === 0 ? null : '2026-08-02T12:00:00.000Z',
-              current_values: index === 0 ? null : { title: 'Old follow-up', default_unit_price_cents: 100 },
+              match_type: unchanged || index > 0 ? 'external_id' : 'none',
+              reconciliation_status: unchanged ? 'unchanged' : index === 0 ? 'new' : 'changed',
+              match_confidence: unchanged || index > 0 ? 'high' : 'none',
+              target_item_id: unchanged || index > 0 ? 'item-2' : null,
+              target_updated_at: unchanged || index > 0 ? '2026-08-02T12:00:00.000Z' : null,
+              current_values: unchanged ? row.values : index === 0 ? null : { title: 'Old follow-up', default_unit_price_cents: 100 },
               incoming_values: row.values,
               result_values: row.values,
-              changed_fields: index === 0 ? [] : ['title', 'default_unit_price_cents'],
+              changed_fields: unchanged || index === 0 ? [] : ['title', 'default_unit_price_cents'],
               conflict_fields: [],
-              recommended_action: index === 0 ? 'add' : 'update',
-              allowed_actions: index === 0 ? ['add', 'skip'] : ['update', 'skip'],
+              recommended_action: unchanged ? 'skip' : index === 0 ? 'add' : 'update',
+              allowed_actions: unchanged ? ['skip'] : index === 0 ? ['add', 'skip'] : ['update', 'skip'],
               warnings: [],
               errors: [],
-            })),
+            })}),
           };
         },
         execute: async (input: { actions: Record<string, string> }) => {
@@ -82,10 +91,134 @@ async function installImportHarness(page: Page) {
       onCompleted: async () => { state.completedCalls += 1; },
       onRollbackCompleted: async () => { state.rollbackCompletedCalls += 1; },
     }));
-  });
+  }, existingItems);
+}
+
+function existingItem(index: number, values: Partial<PriceBookDuplicateCandidateItem> = {}): PriceBookDuplicateCandidateItem {
+  return {
+    id: `item-${index}`,
+    title: `HVAC service ${index}`,
+    customer_description: `Customer-safe description ${index}`,
+    trade: 'HVAC',
+    category: (index - 1) % 2 ? 'Repairs' : 'Diagnostics',
+    subcategory: null,
+    line_type: (index - 1) % 4 === 0 ? 'material' : (index - 1) % 4 === 1 ? 'fee' : (index - 1) % 4 === 2 ? 'labor' : 'other',
+    unit: null,
+    default_unit_price_cents: index === 1 ? 0 : 18900,
+    sku: `OLD-${String(index).padStart(3, '0')}`,
+    active: true,
+    ...values,
+  };
+}
+
+function previewRow(values: PriceBookNormalizedValues, overrides: Partial<PriceBookImportPreviewRow> = {}): PriceBookImportPreviewRow {
+  return {
+    row_number: 2,
+    external_item_id: 'NEW-1',
+    sku: null,
+    row_fingerprint: 'a'.repeat(64),
+    mapped_fields: Object.keys(values),
+    match_type: 'none',
+    reconciliation_status: 'new',
+    match_confidence: 'none',
+    target_item_id: null,
+    target_updated_at: null,
+    current_values: null,
+    incoming_values: values,
+    result_values: values,
+    changed_fields: [],
+    conflict_fields: [],
+    recommended_action: 'add',
+    allowed_actions: ['add', 'skip'],
+    warnings: [],
+    errors: [],
+    ...overrides,
+  };
 }
 
 test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
+  test('flags 150 alternate-source services without treating similarity as stable identity', () => {
+    const existing = Array.from({ length: 150 }, (_, index) => existingItem(index + 1));
+    const alternateCsv = [
+      'SKU,Trade,Category,Item Name,Description,Item Type,Unit Price',
+      ...existing.map((item, index) => [
+        `ALT-${String(index + 1).padStart(3, '0')}`,
+        item.trade,
+        item.category,
+        index % 2 ? item.title.toUpperCase() : ` ${item.title.replace(' ', ' - ')} `,
+        item.customer_description,
+        item.line_type === 'other' ? 'Service' : item.line_type,
+        item.default_unit_price_cents === null ? '' : (item.default_unit_price_cents / 100).toFixed(2),
+      ].join(',')),
+    ].join('\n');
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv(alternateCsv));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    const rows = buildPriceBookImportRows(parsed.rows, interpretation.mapping).map(row => previewRow(
+      row.requestRow.values,
+      { row_number: row.requestRow.row_number, external_item_id: row.requestRow.external_item_id },
+    ));
+
+    const review = applyPriceBookPossibleDuplicateReview(rows, existing);
+    expect(rows).toHaveLength(150);
+    expect(review.candidates.size).toBe(150);
+    expect(Object.values(review.actions)).toEqual(Array(150).fill('skip'));
+    expect(rows.every(row => row.match_type === 'none' && row.target_item_id === null)).toBe(true);
+  });
+
+  test('uses title-heavy bounded evidence and avoids noisy false positives', () => {
+    const capacitor = existingItem(1, {
+      title: 'Dual Run Capacitor Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 22900,
+    });
+    const exactDifferentId = previewRow({ title: 'dual-run capacitor replacement', category: 'electrical', trade: 'hvac', line_type: 'other', default_unit_price_cents: 22900, sku: 'CAP-001' });
+    const noExternalId = previewRow(exactDifferentId.incoming_values, { external_item_id: null });
+    const minorVariation = previewRow({ title: 'Dual Run Capacitor - Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 22900 });
+    const reorderedVariation = previewRow({ title: 'Replacement of Dual Run Capacitor', category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 22900 });
+    const materiallyDifferent = previewRow({ title: 'Single Run Capacitor Replacement', category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 22900 });
+    const differentCategory = previewRow({ title: capacitor.title, category: 'Maintenance', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 22900 });
+    const differentPrice = previewRow({ title: capacitor.title, category: 'Electrical', trade: 'HVAC', line_type: 'other', default_unit_price_cents: 32900 });
+
+    expect(findPriceBookPossibleDuplicate(exactDifferentId, [capacitor])?.reasons).toEqual(expect.arrayContaining(['same normalized title', 'same category', 'same price']));
+    expect(findPriceBookPossibleDuplicate(noExternalId, [capacitor])).not.toBeNull();
+    expect(findPriceBookPossibleDuplicate(minorVariation, [capacitor])).not.toBeNull();
+    expect(findPriceBookPossibleDuplicate(reorderedVariation, [capacitor])).not.toBeNull();
+    expect(findPriceBookPossibleDuplicate(materiallyDifferent, [capacitor])).toBeNull();
+    expect(findPriceBookPossibleDuplicate(differentCategory, [capacitor])).toBeNull();
+    expect(findPriceBookPossibleDuplicate(differentPrice, [capacitor])).not.toBeNull();
+  });
+
+  test('requires additional business evidence for generic titles and surfaces ambiguous ties', () => {
+    const generic = existingItem(1, { title: 'Diagnostic', category: 'Service', trade: 'HVAC', line_type: 'fee', unit: 'visit', default_unit_price_cents: 9500 });
+    expect(findPriceBookPossibleDuplicate(previewRow({ title: 'DIAGNOSTIC', default_unit_price_cents: 9500 }), [generic])).toBeNull();
+    expect(findPriceBookPossibleDuplicate(previewRow({ title: 'Diagnostic', category: 'Service', trade: 'HVAC', line_type: 'fee', default_unit_price_cents: 9500 }), [generic])).not.toBeNull();
+    const ambiguous = findPriceBookPossibleDuplicate(previewRow({ title: 'Diagnostic', category: 'Service', trade: 'HVAC', line_type: 'fee', default_unit_price_cents: 9500 }), [generic, { ...generic, id: 'item-2' }]);
+    expect(ambiguous).toMatchObject({ additionalMatchCount: 1 });
+    expect(ambiguous?.reasons).toContain('multiple similar existing items');
+    expect(findPriceBookPossibleDuplicate(previewRow({ title: 'Diagnostic', category: 'Service', trade: 'HVAC', line_type: 'fee', default_unit_price_cents: 9500 }), [{ ...generic, active: false }])).not.toBeNull();
+  });
+
+  test('never overrides stable server matches or their safe Update path', () => {
+    const item = existingItem(1);
+    const stable = previewRow({ title: item.title, category: item.category, trade: item.trade, line_type: item.line_type }, {
+      match_type: 'external_id', reconciliation_status: 'changed', target_item_id: item.id, recommended_action: 'update', allowed_actions: ['update', 'skip'],
+    });
+    const review = applyPriceBookPossibleDuplicateReview([stable], [item]);
+    expect(review.candidates.size).toBe(0);
+    expect(review.actions).toEqual({ 2: 'update' });
+  });
+
+  test('allowlists candidate evidence and excludes private Price Book fields', () => {
+    const privateItem = {
+      ...existingItem(1),
+      internal_notes: 'Private note', internal_cost_cents: 5500, margin: 44, source: 'private-import-source', contractor_id: 'contractor-1',
+    };
+    const candidate = findPriceBookPossibleDuplicate(previewRow({
+      title: privateItem.title, customer_description: privateItem.customer_description, trade: privateItem.trade,
+      category: privateItem.category, line_type: privateItem.line_type, default_unit_price_cents: privateItem.default_unit_price_cents,
+    }), [privateItem]);
+    expect(candidate).not.toBeNull();
+    expect(JSON.stringify(candidate)).not.toMatch(/Private note|internal_cost|margin|private-import-source|contractor-1/i);
+  });
+
   test('interprets a conventional 150-row HVAC export without translating source terminology', () => {
     const csv = [
       'SKU, Category, Item Name, Description, Item Type, Unit Price, Estimated Labor Hours, Estimated Material Cost, Taxable, Status',
@@ -140,6 +273,13 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     expect(rows.map(row => row.requestRow.values.taxable).slice(0, 2)).toEqual([true, false]);
     expect(rows.map(row => row.requestRow.values.active).slice(0, 2)).toEqual([true, false]);
     expect(rows.every(row => row.errors.length === 0)).toBe(true);
+  });
+
+  test('treats routine numeric formatting as automatically recognized', () => {
+    const parsed = priceBookCsvRowsFromParsed(parsePriceBookCsv('Title,Unit Price\nRoutine service,89.0'));
+    const interpretation = interpretPriceBookImport(parsed.headers, parsed.rows);
+    expect(interpretation.insights.default_unit_price).toMatchObject({ confidence: 'automatic' });
+    expect(interpretation.insights.default_unit_price?.interpretations).toEqual(['89.0 -> $89.00']);
   });
 
   test('leaves ambiguous and cost headings unmapped while malformed mapped values still fail closed', () => {
@@ -293,7 +433,7 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     await page.getByRole('button', { name: 'Preview reconciliation' }).click();
     await expect(page.getByTestId('price-book-import-review-row')).toHaveCount(2);
     await expect(page.getByText(/Row 2 · New · New item/i)).toBeVisible();
-    await expect(page.getByText(/Row 3 · Changed · Stable external ID match/i)).toBeVisible();
+    await expect(page.getByText(/Row 3 · Changed · Matched using External Item ID/i)).toBeVisible();
     await expect(page.getByLabel('Action').nth(0)).toHaveValue('add');
     await expect(page.getByLabel('Action').nth(1)).toHaveValue('update');
     await expect(page.getByText('Price Required').first()).toBeVisible();
@@ -318,7 +458,8 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     });
 
     await expect(page.getByText('1 rows; 0 blocked before server preview.')).toBeVisible();
-    await expect(page.getByTestId('price-book-mapping-insight-line_type')).toContainText('Service -> other');
+    await expect(page.getByTestId('price-book-mapping-insight-line_type')).toContainText('Recognized');
+    await expect(page.getByTestId('price-book-mapping-insight-line_type')).not.toContainText('other');
     await expect(page.getByTestId('price-book-mapping-insight-active')).toContainText('Active -> true');
     await expect(page.getByTestId('price-book-mapping-insight-external_item_id')).toContainText('stable repeat-import identity');
     await expect(page.getByTestId('price-book-ignored-columns')).toContainText('Estimated Material Cost');
@@ -331,6 +472,35 @@ test.describe('FB-024 Price Book Repeat-Import Reconciliation v1', () => {
     await page.getByRole('button', { name: 'Preview reconciliation' }).click();
     const state = await page.evaluate(() => (window as typeof window & { __priceBookImportHarness?: { previewRows: Array<{ external_item_id: string; values: Record<string, unknown> }> } }).__priceBookImportHarness);
     expect(state?.previewRows[0]).toMatchObject({ external_item_id: 'HVAC-1', values: { line_type: 'other', default_unit_price_cents: 18900, labor_hours: 0.7, active: true } });
+  });
+
+  test('shows cross-source duplicate evidence, defaults to Skip, and permits an intentional Add as new', async ({ page }) => {
+    await installImportHarness(page, [existingItem(1, { title: 'Diagnostic visit', category: '', trade: '', line_type: 'other', default_unit_price_cents: null })]);
+    await page.getByLabel('Choose CSV or XLSX').setInputFiles({
+      name: 'alternate-source.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('external_id,title,description,line_type,price\nALT-1,Diagnostic visit,Customer-safe description 1,Service,'),
+    });
+    await page.getByRole('button', { name: 'Preview reconciliation' }).click();
+    await expect(page.getByTestId('price-book-possible-duplicate')).toContainText('same normalized title');
+    await expect(page.getByText(/Needs attention · Possible duplicate/i)).toBeVisible();
+    await expect(page.getByLabel('Action')).toHaveValue('skip');
+    await expect(page.getByLabel('Action').locator('option')).toHaveText(['Add as new', 'Skip']);
+    await page.getByLabel('Action').selectOption('add');
+    await expect(page.getByLabel('Action')).toHaveValue('add');
+  });
+
+  test('explains a fully unchanged repeat import in contractor language', async ({ page }) => {
+    await installImportHarness(page);
+    await page.getByLabel('Choose CSV or XLSX').setInputFiles({
+      name: 'repeat.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('external_id,title,price\nSAME-1,Unchanged service,89'),
+    });
+    await page.getByRole('button', { name: 'Preview reconciliation' }).click();
+    await expect(page.getByTestId('price-book-import-up-to-date')).toContainText('1 item already up to date');
+    await expect(page.getByText(/Already up to date · Matched using External Item ID/i)).toBeVisible();
+    await expect(page.getByLabel('Action')).toHaveValue('skip');
   });
 
   test('previews a completed batch rollback and confirms one responsive mutation', async ({ page }) => {

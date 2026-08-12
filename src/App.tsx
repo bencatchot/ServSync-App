@@ -40934,6 +40934,7 @@ function ContractorDashboard({
                     onBulkUpdate={bulkUpdateContractorPriceBookItems}
                     csvTools={(
                       <PriceBookCsvReconciliationPanel
+                        existingItems={contractorPriceBookItems}
                         api={{
                           listSources: listPriceBookImportSources,
                           createSource: createPriceBookImportSource,

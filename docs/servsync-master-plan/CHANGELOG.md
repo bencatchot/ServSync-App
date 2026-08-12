@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-12
 
+- Branch: `codex/fb024-cross-source-duplicates-v1`
+- Starting main SHA: `c49a7867534107d5eeefbd79fa7fa9a2eafeb4af`
+- Files changed: deterministic Price Book possible-duplicate review helper; existing CSV/XLSX reconciliation UI; Price Book/Draft-picker presentation labels; focused tests; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.
+- Summary of change: Completes FB-024 Cross-Source Possible-Duplicate Review v1 and contractor-facing reconciliation terminology. After the server preview classifies a row as new, the authenticated client compares it with already-loaded private Price Book items using deterministic normalized title, category/subcategory, trade, item type, unit, customer description, and price evidence. Strong candidates are shown side by side with plain-language reasons, default to Skip, and offer only Add as new or Skip. Similarity never becomes stable identity, never auto-merges, and never fabricates an Update target; existing server-authoritative matching, manual-edit preservation, validation, idempotent execution, immutable audit, and guarded rollback remain unchanged.
+- UX and safety: Summaries now use New, Changed, Already up to date, and Needs attention. Canonical `other` is presented as Service across directly related Price Book surfaces without a schema change. Routine display formatting such as `89.0` to `$89.00` remains transparent but is Automatically recognized. A 150-item alternate-source regression flags 150/150 likely duplicates while stable-ID Update remains untouched; focused CSV/XLSX, generic-title, false-positive, archived/multiple-candidate, action, privacy, and mobile coverage is included.
+- Architecture: No SQL, schema, RPC, RLS, grant, environment, database data, raw-file persistence, AI/provider dependency, Price Book export, or tenant-authority change is included. Candidate review is temporary UI state derived from already-authorized private data and an explicit field allowlist; cost, margin, internal notes, import metadata, and source mappings are excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-024 records cross-source duplicate review and contractor-facing import explanations as complete while keeping export and broader reusable-content maturity active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the stable-identity versus advisory-similarity boundary, safe actions, and presentation-only Service vocabulary.
+
 - Branch: `codex/fb024-price-book-semantic-import-v1`
 - Starting main SHA: `fa3f9f688a144b5bab34f76fc05c512eb4f01929`
 - Files changed: shared Price Book CSV/XLSX semantic interpretation and canonical value normalization; existing import mapping/review UI; realistic CSV/XLSX regression coverage; FB-024 backlog; master plan; completed-features ledger; marketing product inventory; changelog.

@@ -16,14 +16,14 @@ const TYPE_FILTERS: Array<{ value: PriceBookTypeFilter; label: string }> = [
   { value: 'labor', label: 'Labor' },
   { value: 'material', label: 'Material' },
   { value: 'fee', label: 'Fee' },
-  { value: 'other', label: 'Service / Other' },
+  { value: 'other', label: 'Service' },
 ];
 
 const LINE_TYPE_LABELS: Record<EstimateLineType, string> = {
   labor: 'Labor',
   material: 'Material',
   fee: 'Fee',
-  other: 'Service / Other',
+  other: 'Service',
 };
 
 function priceLabel(item: ContractorPriceBookItem) {
