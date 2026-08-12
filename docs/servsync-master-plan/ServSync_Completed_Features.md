@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-12
 
-Last reconciled against `origin/main` at `c6630b7c0dad538cbcd011ac29df78a25ec9d271`.
+Last reconciled against `origin/main` at `03484f662eb478a91e58a3be12d1411b36b93d36`.
 
 ## Purpose
 
@@ -49,4 +49,5 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 - FB-013 and FB-028: provider-neutral integration foundations exist; accounting export and QuickBooks readiness remains active.
 - FB-014 and FB-023: payment schedules and invoice generation foundations exist; actual payment collection remains active.
 - FB-016 and FB-020: controlled-beta operational baseline is complete; public-launch operational readiness remains active.
+- FB-035: Estimate-Derived Invoice Eligibility v1 completes accepted-only ordinary Estimate-to-Invoice product consistency by using the existing duplicate-safe server RPC and retaining historical linked-Invoice access. FB-035 remains active for separately governed operational evidence and later Draft-first maturity.
 - FB-029 and FB-032: Service Plans foundation v1 is complete; recurring service automation remains future.

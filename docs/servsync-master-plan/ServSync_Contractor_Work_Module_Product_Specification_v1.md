@@ -114,8 +114,8 @@ Product rules:
 - A Draft may have an initial intended output.
 - The intended output may change before launch.
 - Launching creates exactly one initial first-class record.
-- The initial launch output may be an Estimate or a Job.
-- Direct Invoice launch is deferred until separately approved in a later slice.
+- The initial launch output may be an Estimate, Job, or Invoice Draft when the current user has the output-specific authority.
+- Direct Invoice Draft launch is implemented as a customer-private, unsent first-class Invoice; it does not send, collect payment, or create a second workflow output.
 - Once launched, the Draft is consumed and no longer remains an active Draft.
 - The created record becomes the first active record in the workflow.
 - Later records are created from the active workflow, not from the consumed Draft.
@@ -574,8 +574,8 @@ Expected Draft lifecycle:
 2. Continue and edit.
 3. Optionally choose or change intended output.
 4. Save Draft and return later, or launch the Draft.
-5. Launch creates exactly one initial first-class record: Estimate or Job in the first shared-composer launch path.
-6. Direct Invoice launch is deferred until separately approved.
+5. Launch creates exactly one initial first-class record: Estimate, Job, or an unsent Invoice Draft under output-specific authority.
+6. Direct Invoice Draft launch uses the installed durable launch contract and creates no customer-facing side effect by itself.
 7. The created record becomes the first active record in the workflow.
 8. Later Estimate, Job, Invoice, or additional-work records are created from the active workflow, not from the consumed Draft.
 9. Or discard/archive when no longer useful.
@@ -586,7 +586,7 @@ Consumed Draft behavior:
 - A Draft launched as an Estimate should leave Drafts because the Estimate is now the first active workflow record.
 - The consumed Draft should retain immutable source/linkage evidence needed for auditability, duplicate prevention, and later workflow relationship resolution.
 - A consumed Draft should not remain editable as an active planning hub after a successful launch.
-- Later records should link through the active Estimate or Job workflow, not by repeatedly reusing the consumed Draft as a permanent creation hub.
+- Later records should link through the active Estimate, Job, or Invoice workflow, not by repeatedly reusing the consumed Draft as a permanent creation hub.
 
 Mobile behavior:
 
@@ -651,14 +651,11 @@ Fields:
 - available launch actions
 - outcome-specific guidance where needed
 
-Initial approved intended output options:
+Implemented intended output options:
 
 - Estimate
 - Job
-
-Deferred:
-
-- Direct Invoice launch is not part of the first shared Draft Composer launch slice.
+- Invoice Draft
 
 Rules:
 
@@ -1639,8 +1636,8 @@ Approved product behavior:
 - Intended output may change before launch.
 - Launching creates exactly one initial first-class workflow record.
 - Launching consumes the Draft so it no longer remains an active Draft.
-- Later records are created from the launched Estimate or Job workflow, not from a permanent active Draft hub.
-- Direct Invoice launch is deferred until separately approved.
+- Later records are created from the launched Estimate, Job, or Invoice workflow, not from a permanent active Draft hub.
+- Direct Invoice Draft launch is implemented and remains unsent/customer-private until an authorized user takes a separate Invoice action.
 - Starting new work and managing existing Work are distinct contractor intentions.
 - Work is primarily the management, continuation, attention, and history destination.
 - Start New Draft is a controlled creation action, not a separate global destination.

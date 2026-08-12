@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-12 - FB-035 Estimate-Derived Invoice Eligibility v1
+
+- Branch: `codex/fb035-estimate-derived-invoice-eligibility-v1`
+- Starting main SHA: `03484f662eb478a91e58a3be12d1411b36b93d36`
+- Files changed: the existing Estimate action path in `src/App.tsx`; focused Estimate/Invoice and durable-Draft source regressions; FB-035 backlog and rollout matrix; master plan; Contractor Work Module product specification; completed-features reconciliation; Marketing Product Inventory; and this changelog.
+- Summary of change: Aligns ordinary Estimate-derived Invoice creation with the installed server contract. Only an accepted Estimate exposes new-Invoice creation, and the client invokes `servsync_create_invoice_from_estimate` so the server rechecks state and billing authority, serializes concurrent attempts, creates one linked Invoice Draft, and returns the existing linked Invoice on replay. Existing linked Invoices remain openable from later Estimate states. Connected/local customer paths share the same Estimate-ID RPC boundary, while payment-schedule invoices, Estimate-to-Job, standalone Invoice Drafts, Job invoices, send/payment behavior, and Draft-first launch remain unchanged.
+- Reason for change: The client still offered an obsolete unsaved composer path for draft and sent Estimates even though the canonical backend had long enforced accepted-only, duplicate-safe conversion. That mismatch made eligibility unclear and left the visible action weaker than the established server lifecycle.
+- Tests/checks run: Focused Estimate-to-Invoice, payment-schedule, role/privacy, durable-Draft, desktop/mobile source-contract, TypeScript, Production build, backend parity/rollout, sensitive-value, and diff validation are recorded in the task report.
+- Known risks or follow-ups: No SQL, schema, RPC, RLS, grants, environment, configuration, database data, payment, Stripe, provider, notification, Home History, or automatic send behavior changes. Mutating Production smoke, optional role-account evidence, telemetry, and broader Draft-first maturity remain separately governed FB-035 follow-ups.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now separates completed accepted-only Estimate-derived Invoice product consistency from remaining operational evidence and later Draft-first maturity.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor lifecycle now accurately records accepted-only, server-authoritative Estimate-to-Invoice creation and linked-Invoice reuse instead of the obsolete draft/sent local-composer behavior.
+
 ## 2026-08-12 - FB-024 Invoice Draft Price Book Selection v1
 
 - Branch: `codex/fb024-invoice-draft-price-book-selection-v1`

@@ -98,6 +98,7 @@ import {
   type EstimateDraftLibraryWorkCategory,
 } from './data/estimateDraftLibrary';
 import {
+  estimateCanCreateInvoice,
   estimateStatusLabel,
 } from './features/estimates/status';
 import { StatusBadge } from './features/status/StatusBadge';
@@ -21590,6 +21591,7 @@ function ContractorDashboard({
   const [savingServiceAgreementOffer, setSavingServiceAgreementOffer] = useState(false);
   const [sendingServiceAgreementOfferId, setSendingServiceAgreementOfferId] = useState<string | null>(null);
   const [creatingInvoiceSourceId, setCreatingInvoiceSourceId] = useState<string | null>(null);
+  const creatingEstimateInvoiceIdsRef = useRef(new Set<string>());
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
   const [saveEstimateTemplateModal, setSaveEstimateTemplateModal] = useState<SaveEstimateTemplateModalState | null>(null);
@@ -24656,7 +24658,7 @@ function ContractorDashboard({
     return true;
   };
 
-  const beginInvoiceDraftFromEstimate = (estimate: Estimate, subjectName: string) => {
+  const beginInvoiceDraftFromEstimate = async (estimate: Estimate) => {
     setNotice('');
     setError('');
     const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void');
@@ -24665,12 +24667,40 @@ function ContractorDashboard({
       setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this estimate.' : 'Opened the invoice linked to this estimate.');
       return;
     }
-    beginInvoiceDraftForCustomer(subjectName || 'Customer', {
-      sourceEstimate: estimate,
-      homeId: estimate.home_id,
-      localHomeId: estimate.local_home_id,
-    });
-    setNotice('Invoice draft started from this estimate. Review it before saving or sending.');
+    if (!supabase) return;
+    if (estimate.status !== 'accepted') {
+      setError('An invoice can be created after the estimate is accepted.');
+      return;
+    }
+    if (createInvoiceCapability.disabled) {
+      setError(createInvoiceCapability.reason);
+      return;
+    }
+
+    const actionKey = `estimate:${estimate.id}`;
+    if (creatingEstimateInvoiceIdsRef.current.has(estimate.id)) return;
+    creatingEstimateInvoiceIdsRef.current.add(estimate.id);
+    setCreatingInvoiceSourceId(actionKey);
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_estimate', {
+        p_estimate_id: estimate.id,
+      });
+      if (createError) throw createError;
+      const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
+      if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
+      const invoice = await loadInvoiceById(result.invoice_id);
+      if (result.created === false) openInvoiceRecord(invoice);
+      else focusSavedInvoiceRecord(invoice);
+      setNotice(result.created === false
+        ? 'Opened the existing invoice for this accepted estimate.'
+        : 'Draft invoice created from the accepted estimate. Review it before sending.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create an invoice from this accepted estimate.'));
+    } finally {
+      creatingEstimateInvoiceIdsRef.current.delete(estimate.id);
+      setCreatingInvoiceSourceId(null);
+    }
   };
 
   const createInvoiceFromEstimateScheduleItem = async (estimate: Estimate, scheduleItemId: string) => {
@@ -37878,8 +37908,8 @@ function ContractorDashboard({
                                       const scheduleRows = sortedEstimatePaymentScheduleRows(estimate);
                                       const hasPaymentScheduleRows = scheduleRows.length > 0;
                                       const propertyLabel = recordPropertyLabelForContractor(estimate);
-                                      const canCreateInvoiceDraftFromEstimate = ['draft', 'sent', 'accepted'].includes(estimate.status);
-                                      const canUseGenericEstimateInvoiceAction = canCreateInvoiceDraftFromEstimate && !hasPaymentScheduleRows;
+                                      const canCreateInvoiceDraftFromEstimate = estimateCanCreateInvoice(estimate.status);
+                                      const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows;
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -38036,12 +38066,15 @@ function ContractorDashboard({
                                             {!SERVSYNC_DEMO_PRESENTATION_MODE && canUseGenericEstimateInvoiceAction && !isInvoiceWorkspaceTab && (
                                               <button
                                                 type="button"
-                                                onClick={() => beginInvoiceDraftFromEstimate(estimate, headerName)}
-                                                className={buttonClass(estimate.status === 'accepted' || linkedInvoice ? 'secondary' : 'primary')}
+                                                onClick={() => void beginInvoiceDraftFromEstimate(estimate)}
+                                                disabled={!linkedInvoice && (creatingInvoiceSourceId === `estimate:${estimate.id}` || createInvoiceCapability.disabled)}
+                                                className={buttonClass('secondary')}
                                               >
                                                 <Receipt size={15} />
-                                                {linkedInvoice
-                                                  ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                                {creatingInvoiceSourceId === `estimate:${estimate.id}` && !linkedInvoice
+                                                  ? 'Creating...'
+                                                  : linkedInvoice
+                                                  ? linkedInvoice.status === 'draft' ? 'Open draft invoice' : 'Open invoice'
                                                   : 'Create invoice from estimate'}
                                               </button>
                                             )}
@@ -39991,8 +40024,8 @@ function ContractorDashboard({
                           const scheduleRows = sortedEstimatePaymentScheduleRows(estimate);
                           const hasPaymentScheduleRows = scheduleRows.length > 0;
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
-                          const canCreateInvoiceDraftFromEstimate = !isInvoice && ['draft', 'sent', 'accepted'].includes(estimate.status);
-                          const canUseGenericEstimateInvoiceAction = canCreateInvoiceDraftFromEstimate && !hasPaymentScheduleRows;
+                          const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);
+                          const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows;
                           return (
                             <div
                               key={estimate.id}
@@ -40164,13 +40197,16 @@ function ContractorDashboard({
                                     type="button"
                                     onClick={() => {
                                       setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-                                      beginInvoiceDraftFromEstimate(estimate, customerName);
+                                      void beginInvoiceDraftFromEstimate(estimate);
                                     }}
-                                    className={mobileButtonClass(estimate.status === 'accepted' || linkedInvoice ? 'secondary' : 'primary')}
+                                    disabled={!linkedInvoice && (creatingInvoiceSourceId === `estimate:${estimate.id}` || createInvoiceCapability.disabled)}
+                                    className={mobileButtonClass('secondary')}
                                   >
                                     <Receipt size={15} />
-                                    {linkedInvoice
-                                      ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                    {creatingInvoiceSourceId === `estimate:${estimate.id}` && !linkedInvoice
+                                      ? 'Creating...'
+                                      : linkedInvoice
+                                      ? linkedInvoice.status === 'draft' ? 'Open draft invoice' : 'Open invoice'
                                       : 'Create invoice from estimate'}
                                   </button>
                                 )}
