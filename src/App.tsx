@@ -277,6 +277,8 @@ import {
   type PriceBookLoadState,
 } from './features/price-book/ContractorPriceBookWorkspace';
 import { contractorPriceBookAccess } from './features/price-book/priceBookAccess';
+import { PriceBookExportPanel } from './features/price-book/PriceBookExportPanel';
+import { PRICE_BOOK_EXPORT_MAX_ITEMS, type PriceBookExportItem } from './features/price-book/priceBookExport';
 import { priceBookItemToEstimateLineDraft } from './features/price-book/priceBookEstimateLineSnapshot';
 import { PriceBookCsvReconciliationPanel } from './features/price-book/PriceBookCsvReconciliationPanel';
 import type {
@@ -25744,6 +25746,54 @@ function ContractorDashboard({
     }
   };
 
+  const loadCompletePriceBookForExport = async () => {
+    if (!supabase || !contractor?.id || !priceBookAccess.canView || contractorPriceBookLoadState !== 'ready') {
+      throw new Error('Price Book export is unavailable until the authorized catalog finishes loading.');
+    }
+    const exportClient = supabase;
+    const contractorId = contractor.id;
+    const pageSize = 500;
+    const exportedItems: PriceBookExportItem[] = [];
+    const countCatalogItems = async () => {
+      const { count, error: countError } = await exportClient
+        .from('contractor_price_book_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('contractor_id', contractorId);
+      if (countError) throw countError;
+      if (count === null) throw new Error('ServSync could not verify the complete Price Book item count. No export was created.');
+      return count;
+    };
+    const expectedCount = await countCatalogItems();
+    if (expectedCount > PRICE_BOOK_EXPORT_MAX_ITEMS) {
+      throw new Error(`Price Book export supports up to ${PRICE_BOOK_EXPORT_MAX_ITEMS.toLocaleString()} items at a time. Narrow the catalog before exporting.`);
+    }
+    while (exportedItems.length < expectedCount) {
+      const requestSize = Math.min(pageSize, expectedCount - exportedItems.length);
+      const from = exportedItems.length;
+      const { data, error: loadError } = await exportClient
+        .from('contractor_price_book_items')
+        .select('id, title, customer_description, trade, category, subcategory, line_type, unit, default_unit_price_cents, taxable, labor_hours, sku, active, archived_at')
+        .eq('contractor_id', contractorId)
+        .order('active', { ascending: false })
+        .order('title', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + requestSize - 1);
+      if (loadError) throw loadError;
+      const pageItems = (data || []) as PriceBookExportItem[];
+      exportedItems.push(...pageItems);
+      if (pageItems.length !== requestSize) break;
+    }
+    const verifiedCount = await countCatalogItems();
+    if (
+      verifiedCount !== expectedCount
+      || exportedItems.length !== expectedCount
+      || new Set(exportedItems.map(item => item.id)).size !== expectedCount
+    ) {
+      throw new Error('The Price Book changed while ServSync was preparing the export. Try again so the download contains one complete catalog snapshot.');
+    }
+    return exportedItems;
+  };
+
   const resetServiceAgreementTemplateDraft = () => {
     setEditingServiceAgreementTemplateId(null);
     setServiceAgreementTemplateDraft(createBlankServiceAgreementTemplateDraft());
@@ -40932,6 +40982,12 @@ function ContractorDashboard({
                     onEdit={editContractorPriceBookItem}
                     onToggleActive={item => void toggleContractorPriceBookItemActive(item)}
                     onBulkUpdate={bulkUpdateContractorPriceBookItems}
+                    exportTools={(
+                      <PriceBookExportPanel
+                        loadedItems={contractorPriceBookItems}
+                        loadAllItems={loadCompletePriceBookForExport}
+                      />
+                    )}
                     csvTools={(
                       <PriceBookCsvReconciliationPanel
                         existingItems={contractorPriceBookItems}
