@@ -1,4 +1,5 @@
-import { createR2BackupStorage, createSupabaseStorageSource } from './storageBackupProviders.ts';
+import { createR2BackupStorage, createSupabaseStorageSource } from './storageBackupProviders.js';
+import { parseStorageBackupRetention } from './storageBackupConfigContract.js';
 
 function required(name: string) {
   const value = process.env[name]?.trim();
@@ -18,10 +19,7 @@ export function storageBackupConfig() {
   if (new URL(endpoint).hostname !== `${accountId}.r2.cloudflarestorage.com`) {
     throw new Error('Storage backup endpoint does not match the configured R2 account identity.');
   }
-  const retentionRuns = Number(required('SERVSYNC_STORAGE_BACKUP_RETENTION_DAYS'));
-  if (!Number.isSafeInteger(retentionRuns) || retentionRuns < 1 || retentionRuns > 365) {
-    throw new Error('Storage backup retention must be a whole number from 1 through 365.');
-  }
+  const retentionRuns = parseStorageBackupRetention(required('SERVSYNC_STORAGE_BACKUP_RETENTION_DAYS'));
   return {
     sourceProjectRef,
     accountId,

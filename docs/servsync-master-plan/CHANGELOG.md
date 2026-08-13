@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - FB-016 Storage Backup Vercel Runtime Import Correction
+
+- Branch: `codex/fb016-storage-backup-runtime-import-fix`.
+- Starting main SHA: `9857d965148b2135b8582f606fb199d378769a62`.
+- Files changed: Storage backup and health API imports; extracted HTTP and configuration-contract helpers; focused endpoint tests; and this changelog.
+- Summary of change: Corrected Vercel function packaging discovered by the post-merge Production smoke for PR #444. Server runtime imports now use the repository's emitted-JavaScript convention, while pure injected HTTP/configuration contracts remain directly testable without Production credentials.
+- Reason for change: The first merged deployment returned HTTP 500 before either handler ran because Vercel preserved `.ts` server import specifiers that were absent from the emitted function bundle. Backup data, R2 objects, Supabase Storage, credentials, schedules, and restore behavior were not changed.
+- Tests/checks run: Storage backup/API tests; TypeScript; Production build; backend parity; exact Preview endpoint smoke; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: Production must deploy this correction before the protected route, authenticated health, and one post-deploy read-only backup can complete the scheduler gate. The inherited dependency audit remains unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This restores the already-governed FB-016 runtime route and does not change feature status, scope, or remaining recovery work.
+
 ## 2026-08-13 - FB-016 Encrypted Versioned Storage Backup & Restore v1
 
 - Branch: `codex/fb016-encrypted-storage-backup-v1`.

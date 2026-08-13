@@ -13,7 +13,7 @@ import type {
   SourceStorage,
   SourceStorageObject,
   StorageBucket,
-} from './storageBackup.ts';
+} from './storageBackup.js';
 
 type StorageListEntry = {
   id: string | null;
