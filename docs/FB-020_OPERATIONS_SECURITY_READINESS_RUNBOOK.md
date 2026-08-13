@@ -1,12 +1,12 @@
 # FB-020 Operations And Security Readiness Runbook
 
-Status: controlled private beta baseline met; follow-up runbook for public go-live, paid-subscription, full restore, storage restore, and backup/PITR readiness.
+Status: historical controlled-private-beta baseline. Active public-launch recovery ownership is FB-016.
 
 This runbook is part of FB-020: Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness. It documents the process ServSync should follow before broad beta expansion, public launch, or paid contractor subscriptions.
 
 This document is not approval to change production, apply SQL, modify RLS/storage policies, create users, or run production smoke tests. Those remain separate approval gates.
 
-FB-020 has met the controlled private beta baseline for the current beta stage. The baseline is supported by production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, a first non-production database-only schema restore drill, schema restore verification matching 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no committed secrets/artifacts. FB-020 is not fully complete: full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production role credentials remain future/not configured, optional stable production smoke record IDs remain future/not configured, public go-live readiness remains a separate gate, and paid-subscription readiness remains a separate gate.
+FB-020 met the controlled private beta baseline. Active restore, Storage-byte, backup/PITR, retention, recovery, and public-launch readiness work is consolidated under FB-016. The authoritative current procedure and 2026-08-13 drill evidence are in [FB-016 Recovery Runbook](FB-016_RECOVERY_RUNBOOK.md). That drill proved database/Auth restore and local application smoke but remains blocked on independent Storage-byte recovery and an unexplained August 9-11 Production backup gap.
 
 Controlled-operations packet policy is documented in [Controlled Operations Policy And Runbook](CONTROLLED_OPERATIONS_RUNBOOK.md). That runbook covers the local/provider-neutral evidence foundation through Slice 2D-A and the Slice 3 documentation closeout. It does not approve live provider adapters, credentials, SQL, deployment, Supabase, Vercel, Production, Sandbox, Preview, Demo, or customer-data access.
 
@@ -145,13 +145,9 @@ Drill checklist:
 
 FB-020 Slice 1F adds blank/sanitized templates for restore drill results, applied-SQL ledger entries, production SQL rollout captures, storage backup/readiness worksheets, and Edge Function/env/secret restore notes in `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`. These templates do not complete a restore drill and are not approval to run backups, restores, SQL, Supabase CLI commands, storage access, production checks, settings changes, or deploys.
 
-Latest restore drill evidence as of 2026-07-02: a controlled database-only drill restored the sandbox public schema into isolated throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`, then verified 66 public tables, 179 public functions, and 66 public RLS-enabled tables. Public data restore stopped safely because public rows reference `auth.users`, and auth-user restore was not explicitly approved. Storage restore was not in scope. Production was not touched. The throwaway target was deleted, the local link was restored to sandbox `zpzdkoaubyjtsomccxya`, and private local dump/restore artifacts were deleted.
+Historical 2026-07-02 evidence: a controlled database-only drill restored the Sandbox public schema into isolated throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`, verified 66 public tables, 179 public functions, and 66 public RLS-enabled tables, then stopped before Auth/data restore under that drill's authorization boundary. The target and local artifacts were deleted. The later FB-016 drill supersedes this as the current recovery evidence; see `docs/FB-016_RECOVERY_RUNBOOK.md`.
 
-Future drill decision options:
-
-- Approve a future full database restore including required auth schema/user rows into a throwaway target.
-- Create a sanitized matching auth fixture/export for restore drills.
-- Accept schema-only restore as the first drill milestone and defer full data restore.
+Current follow-up decisions are governed by FB-016: create and test independent Storage-byte backup/restore, resolve and monitor the backup inventory gap, maintain secure external-configuration inventories, and repeat a timed full recovery drill.
 
 ## Applied-SQL Ledger And Deployed-State Tracking
 

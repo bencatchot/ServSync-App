@@ -56,8 +56,8 @@ Related controlled beta docs:
 - [x] A non-production restore drill operator checklist exists for future go/no-go review.
 - [x] A first non-production database-only schema restore drill completed against an isolated throwaway target and was cleaned up.
 - [x] Schema restore verification matched 66 public tables, 179 public functions, and 66 RLS-enabled public tables; the throwaway restore target and local artifacts were cleaned up, and no secrets/artifacts were committed.
-- [ ] Full data restore remains open because public rows reference `auth.users`, and auth-user restore was not approved for the first drill.
-- [ ] Backup/PITR verification, storage restore, and storage-object backup/restore strategy remain tracked as FB-020 follow-ups until separately verified.
+- [x] The 2026-08-13 FB-016 isolated Production-backup drill restored full database/Auth state, proved approved contractor/homeowner authentication, passed sanitized integrity checks, and loaded ServSync against the recovery target.
+- [ ] Full recovery remains blocked: Storage metadata restored without object bytes, no independent tested Storage-byte backup exists, August 9-11 backup points remain unexplained, PITR is disabled, and external configuration rebuild remains a separate manual path. See `docs/FB-016_RECOVERY_RUNBOOK.md`.
 - [ ] Public go-live readiness and paid-subscription readiness remain separate gates from controlled private beta.
 - [ ] Public, auth, legal, trust, and beta copy avoid fake/demo claims, unsupported compliance claims, or misleading data.
 
