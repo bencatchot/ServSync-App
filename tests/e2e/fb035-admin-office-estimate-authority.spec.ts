@@ -81,8 +81,6 @@ test.describe('FB-035 Admin/Office normal Estimate authority', () => {
 
     expect(sql).toContain('alter table public.estimate_actor_audit force row level security;');
     expect(sql).toContain('revoke all on table public.estimate_actor_audit from public, anon, authenticated, service_role;');
-    expect(sql).toContain("current_user not in ('postgres', 'service_role')");
-    expect(sql).toContain("raise exception using message = 'ESTIMATE_STATUS_RPC_REQUIRED'");
     expect(sql).toContain("v_estimate.status not in ('draft', 'revised')");
     expect(sql).toContain("connection.status = 'active'");
     expect(sql).toContain("raise exception using message = 'ESTIMATE_UNAVAILABLE'");

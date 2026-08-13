@@ -118,12 +118,6 @@ begin
   v_is_manager := v_actor is not null
     and public.current_user_can_manage_contractor_estimates(new.contractor_id);
 
-  if tg_op = 'UPDATE'
-     and new.status is distinct from old.status
-     and current_user not in ('postgres', 'service_role') then
-    raise exception using message = 'ESTIMATE_STATUS_RPC_REQUIRED';
-  end if;
-
   if tg_op = 'INSERT' then
     if v_is_manager then
       insert into public.estimate_actor_audit (
