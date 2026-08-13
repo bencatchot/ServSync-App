@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-12 - FB-035 Role-Aware Financial Action Visibility v1
+
+- Branch: `codex/fb035-role-aware-financial-actions-v1`
+- Starting main SHA: `078badf70407d3c4f59ba22aa0f0fa83496f0aba`
+- Files changed: contractor financial-action presentation and fail-closed handlers in `src/App.tsx`; the shared financial visibility adapter; focused role, Estimate, Invoice, Job, schedule, priced-work, and stale-route regressions; FB-035 backlog/rollout status; master plan; Contractor Work specification; completed-features ledger; Marketing Product Inventory; and this changelog.
+- Summary of change: Aligns contractor UI financial actions with the existing server-resolved billing capability. Owner/Admin/Office and applicable contractor-context platform admins retain current billing actions. Field Technician and Viewer contexts retain authorized record/PDF access but no longer receive Invoice creation/edit/send/void/payment, Job billing, payment-schedule billing, or priced-work financial mutation controls. A readable linked draft Invoice opens as a record for non-billing roles instead of entering the editable composer. Field Technician accepted-Estimate-to-Job authority remains intact; Viewer Estimate-to-Job is hidden.
+- Reason for change: The backend already denied unauthorized financial mutations, but scattered client rendering led lower-authority roles into workflows that ended in permission errors.
+- Tests/checks run: Focused role-capability and financial-action Playwright source/logic coverage; existing Estimate-to-Invoice and payment-schedule suites; broader Draft/Estimate/Job/Invoice/Price Book/payment regressions; typecheck; Production build; backend parity and rollout-ledger validation; sensitive-value scan; `git diff --check`; exact-head Preview checks and detached review.
+- Known risks or follow-ups: This slice changes presentation only. Server RLS/RPC/tenant/lifecycle authority remains authoritative and unchanged. Admin/Office Estimate launch/edit/send remains an unresolved product-policy decision. Broad Viewer Job lifecycle controls remain a separately scoped immediate follow-up. Authenticated lower-role Production smoke remains optional operational evidence when approved credentials are available.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records role-aware financial presentation as complete while retaining the Admin/Office Estimate decision, Viewer Job lifecycle visibility, optional role smoke, telemetry, and later Draft-first maturity.
+
 ## 2026-08-12 - FB-035 Estimate-Derived Invoice Eligibility v1
 
 - Branch: `codex/fb035-estimate-derived-invoice-eligibility-v1`

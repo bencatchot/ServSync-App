@@ -40,7 +40,7 @@ test.describe('FB-024 Invoice Draft Price Book Selection v1', () => {
     const invoiceFromCustomer = sourceBetween(app, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
     const jobInvoice = sourceBetween(app, 'const createInvoiceFromJob = async', 'const openPartialInvoiceReview =');
     const partialInvoice = sourceBetween(app, 'const createPartialInvoiceFromSelectedItems = async', 'const manualWorkItemCanEdit =');
-    expect(openInvoice).toContain("if (invoice.status === 'draft')");
+    expect(openInvoice).toContain('if (invoiceRecordOpensEditable(invoice.status, financialActionVisibility))');
     expect(openInvoice).toContain('setInvoiceComposerOpen(true)');
     expect(openInvoice).toContain('setInvoiceComposerOpen(false)');
     expect(saveInvoice).toContain("currentInvoice.status !== 'draft'");

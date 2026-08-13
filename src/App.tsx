@@ -273,6 +273,10 @@ import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvaila
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
 import { contractorJobsNeedsAttentionCount } from './features/work/contractorWorkSelectors';
 import {
+  contractorFinancialActionVisibility,
+  invoiceRecordOpensEditable,
+} from './features/work/financialActionVisibility';
+import {
   ContractorPriceBookWorkspace,
   type ContractorPriceBookBulkChanges,
   type PriceBookLoadState,
@@ -22213,6 +22217,22 @@ function ContractorDashboard({
     ...durableDraftCapabilities,
     canLaunchInvoice: durableDraftCapabilities.canLaunchInvoice && !createInvoiceCapability.disabled,
   };
+  const financialActionVisibility = contractorFinancialActionVisibility(durableDraftCapabilities);
+  const canManageFinancialActions = financialActionVisibility.canManageBilling;
+  const authorizedInvoiceComposerOpen = canManageFinancialActions && invoiceComposerOpen;
+  useEffect(() => {
+    if (durableDraftCapabilityLoading || canManageFinancialActions) return;
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    if (contractorJobsView === 'new_financial' && contractorFinancialRecordKind === 'invoices') {
+      setContractorJobsView('open_financial');
+    }
+  }, [
+    canManageFinancialActions,
+    contractorFinancialRecordKind,
+    contractorJobsView,
+    durableDraftCapabilityLoading,
+  ]);
   const durableDraftInvoiceLaunchAvailable = sharedDraftComposerEnabled
     && !durableDraftCapabilityLoading
     && !durableDraftCapabilityError
@@ -23850,6 +23870,10 @@ function ContractorDashboard({
     subjectName: string,
     options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate; homeId?: string | null; localHomeId?: string | null } = {},
   ) => {
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoice Drafts.');
+      return;
+    }
     if (createInvoiceCapability.disabled) {
       setError(createInvoiceCapability.reason);
       return;
@@ -24289,6 +24313,10 @@ function ContractorDashboard({
   }, options?: { closeComposer?: boolean }) => {
     setNotice('');
     setError('');
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow saving Invoice Drafts.');
+      return null;
+    }
     if (!supabase) {
       setError('Unable to save invoice draft because ServSync is still connecting. Refresh and try again.');
       return null;
@@ -24426,6 +24454,10 @@ function ContractorDashboard({
 
   const sendInvoiceToHomeowner = async (invoice: Invoice) => {
     if (!supabase) return false;
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow sending Invoices.');
+      return false;
+    }
     setNotice('');
     setError('');
     if (!invoice.homeowner_user_id) {
@@ -24480,7 +24512,7 @@ function ContractorDashboard({
   };
 
   const openRecordInvoicePayment = (invoice: Invoice) => {
-    if (!canManageInvoicePayments) {
+    if (!canManageFinancialActions) {
       setError('Only the contractor owner, admin, or office role can record Invoice payments.');
       return;
     }
@@ -24531,6 +24563,10 @@ function ContractorDashboard({
 
   const voidInvoice = async (invoice: Invoice) => {
     if (!supabase) return;
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow voiding Invoices.');
+      return;
+    }
     if (!window.confirm('Void this invoice? This will remove it from active billing lists.')) return;
     setNotice('');
     setError('');
@@ -24560,7 +24596,7 @@ function ContractorDashboard({
   const openInvoiceRecord = (invoice: Invoice) => {
     setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
-    setFocusedInvoiceRecordId(null);
+    setFocusedInvoiceRecordId(invoice.id);
     setInvoiceTemplateStartNotice('');
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localCustomerContext.find(item => item.id === invoice.local_contact_id) : null;
@@ -24568,7 +24604,8 @@ function ContractorDashboard({
     setContractorTab('inspections');
     setInspectionView('list');
     setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
-    if (invoice.status === 'draft') {
+    if (invoiceRecordOpensEditable(invoice.status, financialActionVisibility)) {
+      setFocusedInvoiceRecordId(null);
       setEditingInvoiceId(invoice.id);
       setInvoiceDraft(invoiceDraftFromInvoice(invoice));
       setInvoiceComposerOpen(true);
@@ -24667,6 +24704,10 @@ function ContractorDashboard({
       setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this estimate.' : 'Opened the invoice linked to this estimate.');
       return;
     }
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoices.');
+      return;
+    }
     if (!supabase) return;
     if (estimate.status !== 'accepted') {
       setError('An invoice can be created after the estimate is accepted.');
@@ -24705,6 +24746,10 @@ function ContractorDashboard({
 
   const createInvoiceFromEstimateScheduleItem = async (estimate: Estimate, scheduleItemId: string) => {
     if (!supabase) return;
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoices.');
+      return;
+    }
     if (createInvoiceCapability.disabled) {
       setError(createInvoiceCapability.reason);
       return;
@@ -24754,11 +24799,15 @@ function ContractorDashboard({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-sm font-bold text-slate-950">Payment schedule</p>
-            {estimate.status === 'accepted' ? (
-              <p className="text-xs text-slate-500">Request billing deliberately from the accepted schedule. Draft Invoices are never sent automatically.</p>
-            ) : (
-              <p className="text-xs text-slate-500">Invoices can be created after homeowner approval.</p>
-            )}
+            <p className="text-xs text-slate-500">
+              {estimate.status === 'accepted'
+                ? canManageFinancialActions
+                  ? 'Request billing deliberately from the accepted schedule. Draft Invoices are never sent automatically.'
+                  : 'Review the accepted billing schedule and linked Invoice status.'
+                : canManageFinancialActions
+                  ? 'Invoices can be created after homeowner approval.'
+                  : 'Review the proposed payment schedule.'}
+            </p>
           </div>
           <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600">
             Schedule total {formatMoney(scheduleSummary.scheduledTotalCents)}
@@ -24814,7 +24863,7 @@ function ContractorDashboard({
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {estimate.status === 'accepted' && canRequest && (
+                    {canManageFinancialActions && estimate.status === 'accepted' && canRequest && (
                       <button
                         type="button"
                         onClick={() => void createInvoiceFromEstimateScheduleItem(estimate, row.id)}
@@ -24859,6 +24908,11 @@ function ContractorDashboard({
       && (invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false))
     );
     if (existingInvoice) {
+      if (!canManageFinancialActions) {
+        openInvoiceRecord(existingInvoice);
+        setNotice('Opened the invoice linked to this job.');
+        return;
+      }
       try {
         const closedRequest = await autoCloseServiceRequestForJobInvoice(job, existingInvoice);
         openInvoiceRecord(existingInvoice);
@@ -24870,6 +24924,10 @@ function ContractorDashboard({
       } catch (err) {
         setError(readableError(err, 'Unable to close the linked service request.'));
       }
+      return;
+    }
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoices.');
       return;
     }
     if (workItemsForJob(job.id).length > 0) {
@@ -24907,6 +24965,10 @@ function ContractorDashboard({
   };
 
   const openPartialInvoiceReview = (job: Inspection) => {
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoices.');
+      return;
+    }
     const readyItems = groupedWorkItemsForJob(job.id).ready.filter(jobWorkItemCanInvoice);
     if (readyItems.length === 0) {
       setError('This job has no completed, priced, unbilled work items ready for partial invoicing.');
@@ -24930,6 +24992,10 @@ function ContractorDashboard({
 
   const createPartialInvoiceFromSelectedItems = async () => {
     if (!supabase || !partialInvoiceJob) return;
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoices.');
+      return;
+    }
     const selectedIds = workItemsForJob(partialInvoiceJob.id)
       .filter(item => partialInvoiceSelectedIds.has(item.id) && jobWorkItemCanInvoice(item))
       .map(item => item.id);
@@ -24970,6 +25036,10 @@ function ContractorDashboard({
     && !item.invoiced_invoice_id;
 
   const openManualWorkItemEditor = (job: Inspection, item?: JobWorkItem) => {
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow changing priced Job work.');
+      return;
+    }
     setError('');
     setNotice('');
     setManualWorkItemJob(job);
@@ -25012,6 +25082,10 @@ function ContractorDashboard({
 
   const saveManualWorkItem = async () => {
     if (!supabase || !manualWorkItemJob) return;
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow changing priced Job work.');
+      return;
+    }
     const parsed = manualWorkItemRpcPayload();
     if ('error' in parsed) {
       setError(parsed.error || 'Check the manual work item fields and try again.');
@@ -25041,6 +25115,10 @@ function ContractorDashboard({
 
   const removeManualWorkItem = async (job: Inspection, item: JobWorkItem) => {
     if (!supabase || !manualWorkItemCanEdit(item)) return;
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow changing priced Job work.');
+      return;
+    }
     const confirmed = window.confirm(`Remove "${item.title}" from billable work items? It will stay on the job as removed/not billable and will not affect invoice history.`);
     if (!confirmed) return;
     setRemovingManualWorkItemId(item.id);
@@ -25108,7 +25186,7 @@ function ContractorDashboard({
             <p>{item.quantity} {item.unit || 'each'}</p>
             <p>{jobWorkItemPriceLabel(item)}</p>
             <p className="font-bold text-slate-950">{jobWorkItemTotalLabel(item)}</p>
-            {!options.selectable && partialInvoiceJob === null && manualWorkItemJob === null && activeInspection && manualWorkItemCanEdit(item) && (
+            {canManageFinancialActions && !options.selectable && partialInvoiceJob === null && manualWorkItemJob === null && activeInspection && manualWorkItemCanEdit(item) && (
               <div className="mt-2 flex flex-wrap gap-1 sm:justify-end">
                 <button
                   type="button"
@@ -25159,13 +25237,15 @@ function ContractorDashboard({
       <div data-testid="partial-invoicing-work-items-panel" className="rounded-2xl border border-blue-200 bg-blue-50/45 p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Partial invoicing</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">{canManageFinancialActions ? 'Partial invoicing' : 'Work items'}</p>
             <h3 className="mt-1 text-sm font-bold text-slate-950">Durable job work items</h3>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">
-              Create a draft invoice from completed, priced work items only. Open backlog stays attached to the job and is not included in invoice totals.
+              {canManageFinancialActions
+                ? 'Create a draft invoice from completed, priced work items only. Open backlog stays attached to the job and is not included in invoice totals.'
+                : 'Review the current work-item status. Billing and pricing changes are limited to authorized billing roles.'}
             </p>
           </div>
-          <button
+          {canManageFinancialActions && <button
             type="button"
             onClick={() => openPartialInvoiceReview(job)}
             disabled={invoiceableItems.length === 0 || creatingInvoiceSourceId === `partial-job:${job.id}`}
@@ -25174,8 +25254,8 @@ function ContractorDashboard({
           >
             <Receipt size={15} />
             {creatingInvoiceSourceId === `partial-job:${job.id}` ? 'Creating...' : 'Create invoice from completed items'}
-          </button>
-          <button
+          </button>}
+          {canManageFinancialActions && <button
             type="button"
             onClick={() => openManualWorkItemEditor(job)}
             data-testid="add-manual-job-work-item"
@@ -25183,14 +25263,14 @@ function ContractorDashboard({
           >
             <Plus size={15} />
             Add work item
-          </button>
+          </button>}
         </div>
-        {allItems.length === 0 && (
+        {canManageFinancialActions && allItems.length === 0 && (
           <p className="mt-3 rounded-xl border border-blue-100 bg-white/75 px-3 py-2 text-xs leading-5 text-slate-600">
             No durable work items yet. Add a manual work item or save simple service tasks to make partial invoicing available.
           </p>
         )}
-        {missingPriceCount > 0 && (
+        {canManageFinancialActions && missingPriceCount > 0 && (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
             {missingPriceCount} completed item{missingPriceCount === 1 ? '' : 's'} need pricing before partial invoicing.
           </p>
@@ -25200,7 +25280,7 @@ function ContractorDashboard({
             Open backlog remains on this job and is not included in item-based invoices.
           </p>
         )}
-        {allItems.length > 0 && invoiceableItems.length === 0 && unavailableReason && (
+        {canManageFinancialActions && allItems.length > 0 && invoiceableItems.length === 0 && unavailableReason && (
           <p className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600">
             {unavailableReason}
           </p>
@@ -28957,13 +29037,13 @@ function ContractorDashboard({
       actionLabel: 'Create estimate',
       onAction: () => openFinancialOnboardingWorkspace('estimates'),
     },
-    {
+    ...(canManageFinancialActions ? [{
       label: 'Send your first invoice',
       helper: 'Create and send an invoice when work is ready to bill.',
       complete: onboardingSentInvoiceCount > 0,
       actionLabel: 'Create invoice',
       onAction: () => openFinancialOnboardingWorkspace('invoices'),
-    },
+    }] : []),
     {
       label: 'Invite a homeowner to ServSync',
       helper: 'Send a customer an invitation link for their ServSync account.',
@@ -29810,6 +29890,10 @@ function ContractorDashboard({
   };
 
   const startDraftFirstInvoiceComposer = () => {
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoice Drafts.');
+      return;
+    }
     setContractorFinancialRecordKind('invoices');
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
@@ -29831,6 +29915,10 @@ function ContractorDashboard({
   };
 
   const startCleanDraftFirstInvoiceComposer = () => {
+    if (!canManageFinancialActions) {
+      setError('Your current access does not allow creating Invoice Drafts.');
+      return;
+    }
     setContractorFinancialRecordKind('invoices');
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
@@ -31400,10 +31488,8 @@ function ContractorDashboard({
   const canManageDraftJobs = currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
-  const canManageLocalInvoiceDelivery = currentContractorTeamRole === 'owner'
-    || currentContractorTeamRole === 'admin'
-    || currentContractorTeamRole === 'office';
-  const canManageInvoicePayments = canManageLocalInvoiceDelivery;
+  const canManageLocalInvoiceDelivery = canManageFinancialActions;
+  const canManageInvoicePayments = canManageFinancialActions;
   const canManageLocalEstimateDelivery = canManageLocalInvoiceDelivery;
   const canManageFinalizedReportDelivery = canManageLocalInvoiceDelivery;
   const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
@@ -37674,7 +37760,9 @@ function ContractorDashboard({
                                     <h3 className="font-bold text-slate-950">{isInvoiceWorkspaceTab ? 'Invoices' : 'Estimates'}</h3>
                                     <p className="mt-1 text-xs text-slate-500">
                                       {isInvoiceWorkspaceTab
-                                        ? 'Create invoice-style records for completed or billable work without starting a job.'
+                                        ? canManageFinancialActions
+                                          ? 'Create invoice-style records for completed or billable work without starting a job.'
+                                          : 'Review Invoice status and customer-facing records.'
                                         : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
@@ -37909,7 +37997,7 @@ function ContractorDashboard({
                                       const hasPaymentScheduleRows = scheduleRows.length > 0;
                                       const propertyLabel = recordPropertyLabelForContractor(estimate);
                                       const canCreateInvoiceDraftFromEstimate = estimateCanCreateInvoice(estimate.status);
-                                      const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows;
+                                      const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate)) && !hasPaymentScheduleRows;
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -37958,7 +38046,7 @@ function ContractorDashboard({
                                           <div className="mt-3 flex flex-wrap gap-2">
                                             {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
                                               <>
-                                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && (
+                                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && financialActionVisibility.canCreateJobFromEstimate && (
                                                   <button
                                                     type="button"
                                                     onClick={() => void createJobFromAcceptedEstimate(estimate)}
@@ -38012,7 +38100,7 @@ function ContractorDashboard({
                                                   <Download size={15} />
                                                   Download PDF
                                                 </button>
-                                                <button
+                                                {canManageEstimateSettings && <button
                                                   type="button"
                                                   onClick={() => openSaveEstimateTemplateModal(estimate)}
                                                   disabled={savingEstimateTemplateId === estimate.id}
@@ -38020,8 +38108,8 @@ function ContractorDashboard({
                                                 >
                                                   <Receipt size={15} />
                                                   {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
-                                                </button>
-                                                {estimate.status === 'draft' && (
+                                                </button>}
+                                                {estimate.status === 'draft' && effectiveDurableDraftCapabilities.canLaunchEstimate && (
                                                   <>
                                                     <button
                                                       type="button"
@@ -38074,7 +38162,7 @@ function ContractorDashboard({
                                                 {creatingInvoiceSourceId === `estimate:${estimate.id}` && !linkedInvoice
                                                   ? 'Creating...'
                                                   : linkedInvoice
-                                                  ? linkedInvoice.status === 'draft' ? 'Open draft invoice' : 'Open invoice'
+                                                  ? invoiceRecordOpensEditable(linkedInvoice.status, financialActionVisibility) ? 'Edit draft invoice' : 'Open invoice'
                                                   : 'Create invoice from estimate'}
                                               </button>
                                             )}
@@ -38630,7 +38718,7 @@ function ContractorDashboard({
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_financial' as const, label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> }] : []),
+                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE && (effectiveDurableDraftCapabilities.canLaunchEstimate || canManageFinancialActions) ? [{ id: 'new_financial' as const, label: canManageFinancialActions ? 'New Estimate/Invoice' : 'New Estimate', value: '+', helper: 'Create document', icon: <Receipt size={15} /> }] : []),
                         { id: 'open_financial' as const, label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
                         { id: 'closed_financial' as const, label: 'Closed / Billed Records', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Paid invoices and closed estimates', icon: <Receipt size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName?: string }>).map((item, index) => {
@@ -38736,9 +38824,9 @@ function ContractorDashboard({
                   </div>
                 </Card>
                 ) : (
-                <Card title={invoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
+                <Card title={authorizedInvoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
                   <div className="space-y-4">
-                    {!invoiceComposerOpen && (
+                    {!authorizedInvoiceComposerOpen && (
                       <>
                         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
@@ -38826,7 +38914,7 @@ function ContractorDashboard({
                               <Plus size={15} />
                               Create estimate
                             </button>
-                          ) : (
+                          ) : canManageFinancialActions ? (
                             <button
                               type="button"
                               disabled={!selectedJobsCustomerName || createInvoiceCapability.disabled}
@@ -38837,11 +38925,11 @@ function ContractorDashboard({
                               <Receipt size={15} />
                               Create invoice
                             </button>
-                          )}
+                          ) : null}
                         </div>
                         )}
 
-                        {sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen ? (
+                        {canManageFinancialActions && sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen ? (
                           <div
                             className={`rounded-2xl border p-4 ${durableDraftInvoiceLaunchAvailable ? 'border-blue-200 bg-blue-50' : 'border-amber-200 bg-amber-50'}`}
                             data-testid={durableDraftInvoiceLaunchAvailable ? 'durable-draft-invoice-planning-entry' : 'durable-draft-invoice-planning-unavailable'}
@@ -39143,7 +39231,7 @@ function ContractorDashboard({
                       </div>
                     )}
 
-                    {invoiceComposerOpen && selectedJobsCustomerName && (
+                    {authorizedInvoiceComposerOpen && selectedJobsCustomerName && (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -39595,7 +39683,7 @@ function ContractorDashboard({
                                   New estimate
                                 </button>
                               )}
-                              {!focusedEstimateRecord && !focusedInvoiceRecord && !showingEstimates && (
+                              {!focusedEstimateRecord && !focusedInvoiceRecord && !showingEstimates && canManageFinancialActions && (
                                 <button
                                   type="button"
                                   onClick={durableDraftCohortSafeHold ? () => {
@@ -39934,7 +40022,7 @@ function ContractorDashboard({
                                         Download PDF
                                       </button>
                                     </div>
-                                    {invoice.status === 'draft' && (
+                                    {invoice.status === 'draft' && canManageFinancialActions && (
                                       <div className="mt-3 space-y-2">
                                         {!invoice.homeowner_user_id && (
                                           <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
@@ -40025,7 +40113,7 @@ function ContractorDashboard({
                           const hasPaymentScheduleRows = scheduleRows.length > 0;
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
                           const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);
-                          const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows;
+                          const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate)) && !hasPaymentScheduleRows;
                           return (
                             <div
                               key={estimate.id}
@@ -40090,7 +40178,7 @@ function ContractorDashboard({
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {estimate.status === 'accepted' && !isInvoice && (
                                   <>
-                                    {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && (
+                                    {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && financialActionVisibility.canCreateJobFromEstimate && (
                                       <button
                                         type="button"
                                         onClick={() => void createJobFromAcceptedEstimate(estimate)}
@@ -40144,11 +40232,11 @@ function ContractorDashboard({
                                       <Download size={15} />
                                       Download PDF
                                     </button>
-                                    <button type="button" onClick={() => openSaveEstimateTemplateModal(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
+                                    {canManageEstimateSettings && <button type="button" onClick={() => openSaveEstimateTemplateModal(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
                                       <Receipt size={15} />
                                       {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
-                                    </button>
-                                    {estimate.status === 'draft' && (
+                                    </button>}
+                                    {estimate.status === 'draft' && effectiveDurableDraftCapabilities.canLaunchEstimate && (
                                       <>
                                         <button
                                           type="button"
@@ -40206,7 +40294,7 @@ function ContractorDashboard({
                                     {creatingInvoiceSourceId === `estimate:${estimate.id}` && !linkedInvoice
                                       ? 'Creating...'
                                       : linkedInvoice
-                                      ? linkedInvoice.status === 'draft' ? 'Open draft invoice' : 'Open invoice'
+                                      ? invoiceRecordOpensEditable(linkedInvoice.status, financialActionVisibility) ? 'Edit draft invoice' : 'Open invoice'
                                       : 'Create invoice from estimate'}
                                   </button>
                                 )}
@@ -40419,7 +40507,7 @@ function ContractorDashboard({
                           const hasInvoiceableWorkItems = jobWorkItems.some(jobWorkItemCanInvoice);
                           const workItemSummary = getJobWorkItemSummary(jobWorkItems, linkedInvoice);
                           const primaryWorkItemBadge = getJobWorkItemSummaryBadges(workItemSummary)[0] ?? null;
-                          const showJobInvoiceAction = inspectionIsClosedJob(insp);
+                          const showJobInvoiceAction = inspectionIsClosedJob(insp) && Boolean(linkedInvoice || canManageFinancialActions);
                           const messageIndicator = workflowJobMessageIndicators[insp.id];
                           return (
                             <div
@@ -40467,12 +40555,12 @@ function ContractorDashboard({
                                   {!checklistStyle && insp.summary && (
                                     <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>
                                   )}
-                                  {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && !hasDurableWorkItems && (
+                                  {canManageFinancialActions && !checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && !hasDurableWorkItems && (
                                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
                                       {COMPLETED_JOB_INVOICE_RECOMMENDATION}
                                     </p>
                                   )}
-                                  {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && hasDurableWorkItems && (
+                                  {canManageFinancialActions && !checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && hasDurableWorkItems && (
                                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
                                       {ITEM_BASED_INVOICE_RECOMMENDATION}
                                     </p>
@@ -40515,7 +40603,7 @@ function ContractorDashboard({
                                     {creatingInvoiceSourceId === `job:${insp.id}` && !hasDurableWorkItems
                                       ? 'Creating...'
                                         : linkedInvoice
-                                          ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                          ? invoiceRecordOpensEditable(linkedInvoice.status, financialActionVisibility) ? 'Edit Draft Invoice' : 'View Invoice'
                                         : hasDurableWorkItems
                                           ? hasInvoiceableWorkItems ? 'Create invoice from completed items' : 'Review work items'
                                         : 'Create Invoice'}
@@ -41483,9 +41571,9 @@ function ContractorDashboard({
                                     <span className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
                                       Use for Estimate
                                     </span>
-                                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                                    {canManageFinancialActions && <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
                                       Create Invoice Draft - Future
-                                    </span>
+                                    </span>}
                                     <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
                                       Start Direct Job - Future
                                     </span>
@@ -44292,12 +44380,12 @@ function ContractorDashboard({
                           {activeInspection.status === 'draft' && (!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0) ? 'Close to Preview PDF' : 'Download Preview PDF'}
                         </button>}
 
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && activeInspection.status !== 'finalized' && (
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageFinancialActions && activeInspection.status !== 'finalized' && (
                           <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-5 text-amber-800">
                             Finalize this report before creating the invoice from the completed work.
                           </p>
                         )}
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && (linkedInvoiceForJob || canManageFinancialActions) && <button
                           type="button"
                           disabled={
                             activeInspection.status !== 'finalized'
@@ -44327,7 +44415,7 @@ function ContractorDashboard({
                             : activeInspection.status !== 'finalized'
                               ? 'Finalize Report First'
                               : linkedInvoiceForJob
-                                ? linkedInvoiceForJob.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                ? invoiceRecordOpensEditable(linkedInvoiceForJob.status, financialActionVisibility) ? 'Edit Draft Invoice' : 'View Invoice'
                                 : activeJobHasDurableWorkItems
                                   ? 'Create invoice from completed items'
                                   : 'Create Invoice'}
@@ -44400,7 +44488,7 @@ function ContractorDashboard({
         />
       )}
 
-      {partialInvoiceJob && partialInvoiceModalItems && (
+      {canManageFinancialActions && partialInvoiceJob && partialInvoiceModalItems && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -44478,7 +44566,7 @@ function ContractorDashboard({
         </div>
       )}
 
-      {manualWorkItemJob && (
+      {canManageFinancialActions && manualWorkItemJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="manual-work-item-title">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
