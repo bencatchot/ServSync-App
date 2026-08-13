@@ -136,9 +136,73 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(script).toContain("const NON_RESET_RUN_STATUSES = ['started', 'failed', 'succeeded']");
     expect(script).toMatch(/async function getScenarioRuns[\s\S]*\.eq\('operation', 'seed'\)[\s\S]*\.in\('status', statuses\)/);
     expect(script).toMatch(/async function inspectNonResetRuns[\s\S]*getRegisteredRecordsForRun/);
-    expect(script).toMatch(/async function resetNonResetRuns[\s\S]*for \(const run of runs\)[\s\S]*await resetRun\(service, run\.id\)/);
+    expect(script).toMatch(/async function resetNonResetRuns[\s\S]*for \(const run of runs\)[\s\S]*await resetRun\(service, run\)/);
     expect(script).toMatch(/const previousReset = await resetNonResetRuns\(service, scenarioKey, 'pre-seed-reconciliation'\)/);
     expect(script).not.toMatch(/getLatestSucceededRun|resetLatestIfPresent/);
+  });
+
+  test('revision-aware reset retains only the exact canonical property graph', () => {
+    const script = read(scriptPath);
+
+    expect(script).toMatch(/const REVISION_RETAINED_RECORD_ROLES = \{[\s\S]*homes: 'demo_home'[\s\S]*home_rooms: 'demo_utility_room'[\s\S]*home_assets: 'demo_water_heater_asset'/);
+    expect(script).toMatch(/async function retainRevisionBackedPropertyGraph/);
+    expect(script).toMatch(/await loadCanonicalPropertyGraph\(service, homeownerId\)/);
+    expect(script).toMatch(/\.from\('demo_scenario_records'\)\.delete\(\)\.eq\('run_id', run\.id\)\.in\('id', registryIds\)/);
+    expect(script).toMatch(/await service\.rpc\('servsync_demo_reset_registered_run'/);
+    expect(script).toMatch(/revision_aware_retained: true/);
+    expect(script).not.toMatch(/\.from\('home_asset_revisions'\)\.delete\(/);
+    expect(script).not.toMatch(/disable trigger|drop constraint|disable row level security/i);
+  });
+
+  test('property asset lineage accepts one immutable baseline plus contiguous history', async () => {
+    const module = await import('../../scripts/demo/seed-demo-scenario.mjs');
+    const asset = {
+      id: 'asset-a',
+      revision_number: 3,
+      home_id: 'home-a',
+      home_room_id: 'room-a',
+      asset_kind: 'plumbing',
+      asset_category: 'plumbing',
+      asset_type: 'water_heater',
+      name: 'Existing 40-gallon water heater',
+      manufacturer: 'DemoHome',
+      model: 'WH-40-FICTIONAL',
+      install_date: '2020-01-01',
+      warranty_expires_on: '2030-01-01',
+      notes: 'Fictional asset record for Demo Mode. Serial numbers and real property details are intentionally omitted.',
+      lifecycle_status: 'active',
+    };
+    const revisions = [1, 2, 3].map((revisionNumber) => ({
+      ...asset,
+      id: `revision-${revisionNumber}`,
+      asset_id: asset.id,
+      revision_number: revisionNumber,
+      change_kind: revisionNumber === 1 ? 'baseline' : 'updated',
+    }));
+
+    expect(module.validatePropertyAssetRevisionLineage(asset, revisions)).toEqual([]);
+  });
+
+  test('property asset lineage rejects missing, duplicate, stale, and orphan revision state', async () => {
+    const module = await import('../../scripts/demo/seed-demo-scenario.mjs');
+    const asset = { id: 'asset-a', revision_number: 2, name: 'Current' };
+    const issues = module.validatePropertyAssetRevisionLineage(asset, [
+      { id: 'revision-1', asset_id: 'asset-a', revision_number: 1, change_kind: 'baseline', name: 'Prior' },
+      { id: 'revision-3', asset_id: 'asset-b', revision_number: 3, change_kind: 'baseline', name: 'Stale' },
+    ]);
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        'Canonical demo asset asset-a must have exactly one baseline revision.',
+        'Revision revision-3 does not belong to canonical demo asset asset-a.',
+        'Canonical demo asset revision lineage is not contiguous at revision 2.',
+        'Canonical demo asset current revision does not match its latest immutable revision.',
+        'Canonical demo asset field name does not match its current immutable revision.',
+      ])
+    );
+    expect(module.validatePropertyAssetRevisionLineage(asset, [])).toEqual([
+      'Canonical demo asset asset-a has no immutable revision history.',
+    ]);
   });
 
   test('script fails closed on likely unregistered scenario residue and avoids broad cleanup fallbacks', () => {
@@ -153,7 +217,7 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(script).not.toMatch(/truncate|delete from auth\.users/i);
   });
 
-  test('script reduces insert-before-register risk with exact compensation only', () => {
+  test('script uses exact compensation before bridge history and recoverable registration after it', () => {
     const script = read(scriptPath);
 
     expect(script).toMatch(/async function registerCreatedRecord/);
@@ -164,6 +228,9 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'service_requests'/);
     expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'estimates'/);
     expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'inspections'/);
+    expect(script).toMatch(/homeownerClient\.rpc\('servsync_create_property_asset'/);
+    expect(script).toMatch(/await registerRecord\(service, runId, 'home_assets'/);
+    expect(script).toMatch(/revision_aware_recovery: true/);
   });
 
   test('verify checks complete workflow linkage, identities, registry, and duplicate absence', () => {

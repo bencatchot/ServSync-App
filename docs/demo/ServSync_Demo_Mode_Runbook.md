@@ -170,6 +170,10 @@ Checkpoint seed uses one canonical lifecycle path and advances only as far as th
 
 Before any seed, the runner resets all non-reset seed runs for the scenario, including `started`, `failed`, and `succeeded` runs. Moving from a later checkpoint to an earlier checkpoint therefore uses reset-and-rebuild behavior. For example, seeding `job_created` and then seeding `request_ready` removes the registered job, estimate, workflow-event, and request rows from the old run, then rebuilds only the request-ready graph while preserving the demo auth identities.
 
+Property Asset Bridge history changes one part of that reset contract. The canonical Demo Bay Home, its Garage utility area, and its curated water-heater asset are retained together because the asset's immutable baseline revision intentionally prevents hard deletion. Before deleting disposable records, the runner proves the exact homeowner, property markers, one-room/one-asset graph, active asset identity, and contiguous immutable revision lineage; it then detaches only those three exact registry rows from the old run. Reseed revalidates and registers the same IDs to the new run. It never deletes `home_asset_revisions`, creates another baseline revision, disables a trigger, drops a constraint, or broadens browser authority.
+
+This retained graph is also the recovery marker for interruption after registry detachment and before reseed. A later run may reuse it only after the complete exact graph and revision chain pass again. Partial, ambiguous, cross-owner, non-canonical, stale-current-revision, or extra room/asset state fails closed for operator review. New dedicated-demo installations create the first asset through the authenticated Property Asset Bridge RPC rather than a direct table insert.
+
 The `contractor_discovery_ready` checkpoint intentionally stops before creating a connection. During recording, the homeowner may use the real UI to send the existing connection request, which creates a pending `homeowner_request` connection. On the next guarded reset/seed, the runner may register that exact pending Sarah-to-Gulf-Coast connection, its permission row, and its connection audit events to the discovery run before invoking the canonical registered-record reset. This is limited to the exact demo homeowner, exact demo contractor, status `pending`, and source `homeowner_request`; it does not add a broad cleanup path and it does not auto-accept the connection.
 
 The `connected_request_ready` checkpoint creates the normal active demo-seed connection and required permission row, then stops before creating `Replace leaking water heater`. It is intended for recording the homeowner "new service request" path after the connection already exists, not for recording the connection-request submission itself.
@@ -180,7 +184,7 @@ The `connected_request_ready` checkpoint creates the normal active demo-seed con
 - With `--checkpoint=<key>`, it requires the requested checkpoint, the active run metadata, and the database graph to match.
 - Lower checkpoints explicitly require later records to be absent. For example, `request_ready` fails if an estimate or job remains, and `estimate_accepted` fails if a linked job or `job_created` event exists.
 
-Registry rows record the creation step/checkpoint for each resettable row, and every resettable row remains tied to the exact run that created it. No `is_demo` fields are added to product tables. Slice 2B extends the reset allowlist only for registered `contractor_visit_events` rows created by the demo scheduling checkpoint.
+Registry rows record the creation step/checkpoint for each resettable row. Disposable rows remain tied to the exact run that created them; the revision-backed canonical property graph is transferred to the next successful run after exact revalidation. No `is_demo` fields are added to product tables. Slice 2B extends the reset allowlist only for registered `contractor_visit_events` rows created by the demo scheduling checkpoint.
 
 ## Scenario Contents
 
@@ -251,6 +255,7 @@ Reset does not:
 - Delete records by user ID as a fallback.
 - Touch unregistered records.
 - Clean broad production or sandbox data.
+- Delete, rewrite, or duplicate Property Asset Bridge revisions.
 
 If registry ownership is incomplete, stop and audit rather than adding an unsafe cleanup shortcut.
 
@@ -320,6 +325,7 @@ If reset fails:
 - Confirm `DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop`.
 - Confirm all prior `started`, `failed`, and `succeeded` seed runs can be inspected.
 - Do not perform broad manual deletes. Audit the registry rows first.
+- If the failure occurred after the canonical property graph was detached, rerun the guarded seed. The runner recognizes only the exact retained graph, rechecks its immutable lineage, and either recovers it or fails with a specific ownership/lineage error.
 
 If repeated seed shows duplicates:
 

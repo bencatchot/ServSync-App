@@ -223,7 +223,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(script).toMatch(/registerRecord\(service, run\.id, 'homeowner_contractor_connections', connection\.id, 'demo_recording_connection_request'/);
     expect(script).toMatch(/registerRecord\(service, run\.id, 'connection_permissions', permissions\.connection_id, 'demo_recording_connection_permissions'/);
     expect(script).toMatch(/registerRecord\(service, run\.id, 'connection_audit_events', event\.id, 'demo_recording_connection_audit_event'/);
-    expect(script).toMatch(/const removed = await resetRun\(service, run\.id\)/);
+    expect(script).toMatch(/const resetResult = await resetRun\(service, run\)/);
   });
 
   test('production, shared sandbox, and external-effect guards still apply', async () => {
