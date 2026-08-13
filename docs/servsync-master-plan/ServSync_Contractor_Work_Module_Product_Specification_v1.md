@@ -241,6 +241,10 @@ Work-only actions:
 - Finalize reports.
 - Start Similar Draft from prior Work.
 
+Financial action presentation follows the established output capability rather than duplicating role-name checks. Owner/Admin/Office and applicable platform-admin contractor contexts may receive Invoice authoring, billing, priced-work, and payment actions when record lifecycle rules also allow them. Field Technician may retain operational Job actions, including accepted Estimate to Job where authorized, but receives no Invoice authoring, Job billing, priced-work financial mutation, or payment actions. Viewer remains read-only. A linked Invoice that is readable but not editable opens in record/detail presentation with status and PDF access rather than an editable composer. These client rules do not replace server authorization.
+
+Estimate authority remains intentionally asymmetric: Admin/Office may prepare eligible Draft scope under current Draft persistence authority, but Owner remains required for canonical Estimate launch/edit/send. A later preparer/approval model requires a separate product-policy decision.
+
 `Start New Draft` may be reachable from more than one place, but it should not automatically become a global destination. A contextual Draft action is justified only when:
 
 - the current screen has trusted context,

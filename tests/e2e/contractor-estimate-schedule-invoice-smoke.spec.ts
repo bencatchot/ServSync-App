@@ -458,7 +458,7 @@ test.describe('contractor schedule invoice smoke source guards', () => {
 
     expect(source).toContain('servsync_create_invoice_from_estimate_schedule_item');
     expect(source).toContain('contractor-create-schedule-invoice');
-    expect(source).toContain('canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows');
+    expect(source).toContain('canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate)) && !hasPaymentScheduleRows');
     expect(source).toContain('The voided Invoice remains in history. A replacement draft uses this schedule amount and does not rewrite the old Invoice.');
 
     const scheduleInvoiceHandlerStart = source.indexOf('const createInvoiceFromEstimateScheduleItem = async');

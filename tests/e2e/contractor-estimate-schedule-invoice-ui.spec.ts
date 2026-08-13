@@ -115,7 +115,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
 
     expect(scheduleRendererSource).toContain('Invoices can be created after homeowner approval.');
     expect(financialEstimateCards).toContain('const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);');
-    expect(financialEstimateCards).toContain('const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate) && !hasPaymentScheduleRows;');
+    expect(financialEstimateCards).toContain('const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate)) && !hasPaymentScheduleRows;');
     expect(financialEstimateCards).toContain('canUseGenericEstimateInvoiceAction &&');
     expect(financialEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate)');
     expect(financialEstimateCards).not.toContain('Create draft invoice');

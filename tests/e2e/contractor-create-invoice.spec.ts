@@ -50,13 +50,14 @@ test.describe('contractor estimate-to-invoice eligibility', () => {
     expect(source).toContain('Create invoice from estimate');
     expect(selectedWorkspaceEstimateCards).toContain('const canCreateInvoiceDraftFromEstimate = estimateCanCreateInvoice(estimate.status);');
     expect(focusedEstimateCards).toContain('const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);');
-    expect(selectedWorkspaceEstimateCards).toContain('Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate)');
-    expect(focusedEstimateCards).toContain('Boolean(linkedInvoice || canCreateInvoiceDraftFromEstimate)');
+    expect(selectedWorkspaceEstimateCards).toContain('Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate))');
+    expect(focusedEstimateCards).toContain('Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate))');
     expect(selectedWorkspaceEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate)');
     expect(focusedEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate)');
     expect(selectedWorkspaceEstimateCards).toContain('Invoice created');
     expect(focusedEstimateCards).toContain('Invoice created');
-    expect(selectedWorkspaceEstimateCards).toContain('Open draft invoice');
+    expect(selectedWorkspaceEstimateCards).toContain('Edit draft invoice');
+    expect(selectedWorkspaceEstimateCards).toContain('Open invoice');
     expect(focusedEstimateCards).toContain('Open invoice');
 
     expect(directDraftSource).toContain('const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== \'void\')');
@@ -141,7 +142,7 @@ test.describe('contractor estimate-to-invoice eligibility', () => {
     );
     const invoiceComposerSource = sourceBetween(
       source,
-      '{invoiceComposerOpen && selectedJobsCustomerName && (',
+      '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (',
       "{contractorJobsView === 'templates' && (",
     );
 
