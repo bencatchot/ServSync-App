@@ -6,14 +6,16 @@ This is the authoritative ServSync incident-recovery procedure and sanitized dri
 
 ## Current Readiness
 
-The 2026-08-13 drill proved that a Production Supabase physical backup can restore PostgreSQL data, Auth identities/password hashes, and a usable read-only ServSync application into an isolated project. It did not prove full recovery:
+The 2026-08-13 database drill proved that a Production Supabase physical backup can restore PostgreSQL data, Auth identities/password hashes, and a usable read-only ServSync application into an isolated project. The follow-up Storage drill closed the previously critical object-byte gap:
 
-- Supabase restored Storage bucket and object metadata, but none of the four object bytes.
-- ServSync has no independent, tested Storage-byte backup. A bounded public-object copy from the live source proved mechanics only, not backup recovery.
+- A private Cloudflare R2 Standard bucket now receives source-ref-scoped, content-addressed object versions, immutable manifests, a latest-success health pointer, deletion tombstones, and 90 retained daily runs.
+- Two read-only Production runs captured all seven buckets and four objects (5,274,400 bytes). The second run reused all four verified object versions and wrote zero duplicate object bytes.
+- The latest exact manifest restored all four objects into a new isolated Supabase project. Restored bytes, paths, bucket privacy/settings, and SHA-256 checks passed; two contractor-logo references and one service-request-media reference resolved to recovered objects.
+- Public-object access succeeded, anonymous private-object access failed, and server-authorized private-object access succeeded. The isolated project was deleted after validation.
 - Production backup inventory omitted August 9, 10, and 11. The cause remains unresolved, and PITR is disabled.
 - Auth, Realtime, Edge Functions, secrets, Vercel, and external-provider settings need separate secure reapplication.
 
-Consequently, full ServSync recovery readiness is `BLOCKED`. Database/Auth recovery is a completed bounded milestone, not proof of full application recovery.
+Consequently, full ServSync recovery readiness remains `BLOCKED`, but independent Storage-byte backup and isolated restore are now completed bounded milestones. The remaining blockers are database backup-point reliability/PITR posture, secure configuration recovery, scheduler observation, and a timed full-application drill.
 
 ## Recovery Objectives
 
@@ -21,7 +23,7 @@ Observed evidence, not adopted objectives:
 
 - Database restore duration: 3 minutes 57 seconds from accepted restore request to `ACTIVE_HEALTHY`.
 - Database RPO evidence: insufficient for 24 hours. The widest observed completed-backup interval was about 95 hours 56 minutes (August 8 to August 12).
-- Storage RPO evidence: undefined/unbounded because no independent recoverable object-byte backup exists.
+- Storage RPO evidence: one successful initial backup and one immediate unchanged replay on 2026-08-13. A daily 04:17 UTC schedule and a 36-hour stale-health threshold are configured, but 24-hour Storage RPO performance is not yet proven by elapsed scheduled runs.
 - Full application RPO evidence: undefined/unbounded, governed by the weakest critical layer.
 - Full application RTO evidence: not established. Database restore time excludes Storage, configuration, deployment, provider recovery, validation, and cutover.
 
@@ -30,7 +32,7 @@ Recommended controlled-beta targets, pending owner adoption and prerequisite wor
 - Full application RPO: 24 hours.
 - Full application RTO: 4 hours.
 
-Those targets require daily independently recoverable Storage-byte backups, backup-gap monitoring and resolution, secured configuration inventories, and recurring timed drills. They are not currently achieved.
+Those targets require successful daily scheduler observation, backup-gap monitoring and resolution, secured configuration inventories, and recurring timed full drills. They are not currently achieved.
 
 ## Recovery Procedure
 
@@ -69,9 +71,9 @@ SUPABASE_ACCESS_TOKEN="$(security find-generic-password -s 'Supabase CLI' -w)" \
 
 The validator rejects the immutable Production, Demo, and Sandbox refs, verifies exact target identity and `ACTIVE_HEALTHY`, runs read-only catalog and integrity queries, and emits sanitized counts/fingerprints. It cannot prove object bytes, application behavior, external configuration, or a complete recovery by itself.
 
-## Storage Recovery Contract
+## Storage Backup And Recovery Contract
 
-Supabase database backups do not contain Storage object bytes. The recovery process therefore requires a separate encrypted, access-controlled, versioned object backup that preserves:
+Supabase database backups do not contain Storage object bytes. ServSync therefore uses the private `servsync-production-storage-backup` Cloudflare R2 Standard bucket for a separate encrypted-at-rest, HTTPS-transported, access-controlled, versioned object backup that preserves:
 
 - bucket identity and intended public/private state;
 - object bytes and stable object paths;
@@ -79,7 +81,11 @@ Supabase database backups do not contain Storage object bytes. The recovery proc
 - enough metadata to reconnect objects to restored application rows;
 - deletion/version retention and an auditable restore manifest.
 
-Restore to an isolated project first. Compare manifests, restore representative bytes, verify checksums and access controls, then restore the bounded required set. Never rely on copying from a damaged live source as the only recovery procedure.
+The bucket is not public and the service credential is scoped to Object Read & Write for this bucket only. Production-only sensitive Vercel configuration supplies the R2 endpoint/identity, bucket credential, exact Production Supabase source identity/credential, retention, and Cron bearer secret. Secret values must never enter Git, logs, reports, screenshots, or restore artifacts.
+
+Backup runs are all-or-nothing: a run writes its immutable manifest and advances the latest-success health pointer only after every source object is downloaded, hashed, copied or verified in R2, independently re-downloaded, and hash-verified. Any source identity, R2 identity, bucket-inventory, byte-size, hash, or retention error fails the run. The daily Vercel Cron invokes `/api/storage-backup` at `04:17 UTC`; `/api/storage-backup-health` reports unhealthy after 36 hours without a successful run. Both endpoints require the Cron bearer secret and emit only aggregate evidence.
+
+Restore always targets a separately approved project whose name starts with `servsync-recovery-drill-`. The operator refuses the immutable Production, Demo, and Sandbox refs, validates the manifest envelope and every object hash, requires exact bucket privacy/upload-policy metadata, and re-downloads each restored object for a second SHA-256 comparison. Restore Production data before Storage bytes so application references exist, then validate record-to-bucket/path linkage and public/private access. Never rely on copying from a damaged live source as the recovery procedure.
 
 The current Storage-dependent classes include contractor/discovery/email assets, service-request media, inspection media, home documents, support attachments, and any generated or filed document/media stored in those buckets. An incident inventory must use the then-current bucket catalog.
 
@@ -99,6 +105,31 @@ Physical restore did not recreate the complete operating environment. Maintain n
 Secret values belong only in the approved password manager/provider configuration. Do not put them in this runbook, Git, chat, screenshots, test artifacts, or terminal captures.
 
 ## 2026-08-13 Drill Evidence
+
+### Independent Storage Backup And Restore
+
+- R2 account: BJC Ventures account ID `3078d46a3ad90fa7e8ead3e53cf09691`.
+- Private destination: `servsync-production-storage-backup`, Standard storage, no public access, no custom domain, and no `r2.dev` exposure.
+- Credential: account API token `ServSync Production Storage Backup`, Object Read & Write, restricted to the one bucket, revocable, with no account/bucket administration. No value is retained in this document.
+- Runtime configuration: Vercel Production project `serv-sync-app-refresh` / `prj_UfNB5L1kMcDP9p0fLd4Dc60bpDPP`, which owns `servsync.app`. All ten backup/Cron variables are sensitive and Production-only. The unrelated legacy `serv-sync-app` project retains none of them.
+- First Production run: `66167ebe-d2d1-49d0-971f-23c888b44af8`, completed `2026-08-13T21:07:18.912Z`, manifest SHA-256 `c872f9afdf335c3524c30e7ce094118a9018cee3ccf30554e30529066eb7ef91`; 7 buckets, 4 objects, 5,274,400 source/R2 bytes, 4 new versions, 0 failures.
+- Unchanged replay: `37284738-0c90-43bf-9093-283006c1b658`, completed `2026-08-13T21:07:29.451Z`, manifest SHA-256 `f24f9ffba725a42c3b1ba0cd81890cd248f665a1b59f438430f996808848402d`; 4 verified unchanged versions, 0 new object bytes, 0 failures.
+- Exact inventory: `contractor-assets` 2 / 144,409 bytes; `discover-media` 0; `email-assets` 1 / 1,059,521 bytes; `home-documents` 0; `inspection-media` 0; `service-request-media` 1 / 4,070,470 bytes; `support-attachments` 0.
+- Isolated target: `servsync-recovery-drill-storage-2026-08-13` / `qafqvjpoalgcqzmskgxd`, restored from the same `2026-08-13T06:15:58.460Z` Production physical backup. It reached `ACTIVE_HEALTHY` in 4m26s.
+- The latest R2 manifest restored 4 objects / 5,274,400 bytes. Every R2 source and restored target byte sequence passed SHA-256 verification. The recovery catalog and integrity fingerprints remained `c5ec9df19bdb0ba610a95b37b6294465d36d1c0bc2ce9f76818ca421a73caf01` and `b0aab4708c530251d3535604a57b4bce07a9ccf589314f05e7cceec61d8e6c14`.
+- Application linkage found two contractor-profile logo references and the one service-request-media record at their recovered bucket/path. Public access returned 200 with the expected hash; anonymous private access failed; server-authorized private access returned 200 with the expected hash.
+- Approved contractor-owner and homeowner smoke identities authenticated normally and signed out. Neither account owned the recovered private service-request media, so user-scoped rendering of that specific object was not available without changing data or credentials; the canonical service-record linkage and private Storage authorization path were validated instead.
+- The target had no public alias, Vercel project, Edge Functions, provider configuration, or external delivery. It was deleted after evidence capture, ending temporary compute/disk exposure.
+- A synthetic real-R2 matrix separately passed initial, unchanged, add, update, delete/tombstone, current/prior-manifest restore, corruption rejection, missing-object rejection, 90-run retention, and residue cleanup.
+- Successful restore output reports restored, tombstone-skipped, and failed object counts; restore remains fail-fast and reports no successful completion when integrity validation fails.
+
+Official provider references reviewed 2026-08-13:
+
+- [Cloudflare R2 data security](https://developers.cloudflare.com/r2/reference/data-security/)
+- [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/)
+- [Cloudflare R2 storage classes](https://developers.cloudflare.com/r2/buckets/storage-classes/)
+- [Supabase Restore to a new project](https://supabase.com/docs/guides/platform/clone-project)
+- [Supabase database backups](https://supabase.com/docs/guides/platform/backups)
 
 ### Provisioning
 

@@ -25,7 +25,11 @@
     "backend:parity:test": "node --test tests/backend-parity/*.test.mjs",
     "backend:rollout:status": "node scripts/backend-parity/rollout-status.mjs",
     "ops:recovery:validate": "node scripts/recovery/validate-restored-project.mjs",
+    "ops:storage-backup:run": "node scripts/storage-backup/run-storage-backup.ts",
+    "ops:storage-backup:health": "node scripts/storage-backup/check-storage-backup-health.ts",
+    "ops:storage-backup:restore": "node scripts/recovery/restore-storage-from-r2.ts",
     "test:recovery-validator": "node --test tests/recovery/*.test.mjs",
+    "test:storage-backup": "node --test tests/storage-backup/*.test.ts",
     "test:trade-pack-domain-contracts": "bash scripts/validation/validate-trade-pack-domain-contracts.sh",
     "test:property-asset-bridge": "bash scripts/validation/validate-property-asset-bridge.sh",
     "test:durable-trade-sections": "bash scripts/validation/validate-durable-trade-sections.sh",
@@ -61,6 +65,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1110.0",
     "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^2.0.1",
     "@vercel/firewall": "1.2.2",

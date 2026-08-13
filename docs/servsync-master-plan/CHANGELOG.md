@@ -4,6 +4,20 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - FB-016 Encrypted Versioned Storage Backup & Restore v1
+
+- Branch: `codex/fb016-encrypted-storage-backup-v1`.
+- Starting main SHA: `5d69543bd424c0fa1afb807c2b19487ca74838a4`.
+- Files changed: Storage backup/restore core and providers; authenticated Vercel Cron and health routes; backup/health/restore operator scripts; focused unit and endpoint tests; R2 SDK dependency; Vercel Cron schedule; authoritative recovery runbook; FB-016 backlog/master-plan/readiness/completed-milestone records; and this changelog.
+- Summary of change: Added a Production-only, read-only Supabase Storage backup to private bucket-scoped Cloudflare R2 using source-ref-scoped content-addressed versions, immutable manifests, deletion tombstones, latest-success health, SHA-256 verification, and 90-run retention. A daily 04:17 UTC Vercel Cron and 36-hour stale-health endpoint are bearer protected and expose aggregate evidence only. Restore refuses Production/Demo/Sandbox, requires an isolated `servsync-recovery-drill-` target and exact bucket policy, and independently verifies every restored object.
+- Operational evidence: Real R2 synthetic add/update/delete/prior-version/corrupt/missing/retention tests passed with no residue. Production remained read-only while two runs captured all 7 buckets and 4 objects / 5,274,400 bytes; the replay verified all four existing versions and wrote zero duplicate bytes. The latest manifest restored all bytes into isolated project `qafqvjpoalgcqzmskgxd`; catalog/integrity fingerprints, object hashes, bucket/path references, and public/private access passed, then the target was deleted. Sensitive runtime configuration is Production-only on the exact `serv-sync-app-refresh` project that owns `servsync.app`; the unrelated legacy Vercel project retains none of these variables.
+- Reason for change: Supabase physical backups restore Storage metadata but not object bytes. FB-016 required an independently recoverable, versioned object layer before ServSync can claim full recovery readiness.
+- Tests/checks run: Storage backup/restore/API unit tests; real R2 credential and lifecycle matrix; two Production read-only backup runs; isolated physical-database plus R2 object restore; recovery validator; application-reference/access checks; approved Auth smoke; TypeScript; Production build; backend parity; dependency audit/baseline comparison; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: Daily scheduling and 36-hour health require elapsed Production observation after merge. The August 9-11 Supabase database-backup gap remains unresolved, PITR remains disabled, external configuration recovery remains manual, and a complete cutover/timed full drill is not yet proven. The inherited dependency audit remains 1 moderate / 4 high with no new vulnerability attributable to `@aws-sdk/client-s3`.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: The critical independent Storage-byte milestone is complete; FB-016 remains High/Blocked on database backup continuity/PITR, scheduler observation, secure configuration recovery, and a timed full drill.
+
 ## 2026-08-13 - FB-016 Backup/PITR Restore Verification & Recovery Drill v1
 
 - Branch: `codex/fb016-backup-pitr-recovery-drill-v1`.
