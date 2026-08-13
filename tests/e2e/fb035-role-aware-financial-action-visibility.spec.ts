@@ -63,6 +63,7 @@ function resolvedCapabilities(options: {
     currentUserId: tenant ? 'user-1' : null,
     contractorOwnerUserId: options.owner ? 'user-1' : 'owner-1',
     canAccessContractor: options.access ?? tenant,
+    canManageEstimates: options.billing ?? false,
     canManageBilling: options.billing ?? false,
     canWriteJobs: options.jobs ?? false,
   });

@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - FB-035 Admin/Office Normal Estimate Authority v1
+
+- Branch: `codex/fb035-admin-office-estimate-authority-v1`
+- Starting main SHA: `d004daba852e4bf9928016ee60c78a7e17ebe343`
+- Files changed: additive Estimate authority/send/audit SQL; durable Draft capability adapter and connected-send client wiring; disposable PostgreSQL and focused role/security regressions; backend rollout ledger after controlled application; FB-035 backlog; master plan; Contractor Work specification; completed-features ledger; Marketing Product Inventory; and this changelog.
+- Summary of change: Implements approved Model B Estimate policy. Active Owner, Admin, and Office users share one server-resolved normal Estimate-management capability for Draft launch, draft-only Estimate/line/payment-schedule mutation, connected send, and existing secure local delivery. Connected send uses a lifecycle-aware, idempotent RPC wherever the reviewed foundation is installed. During staggered source/database rollout only, an exact missing-routine `PGRST202` response may use the prior Owner-only table update; permission, lifecycle, and all other RPC failures remain fail-closed. Field Technician and Viewer authority is unchanged.
+- Audit and security: Future creator, Draft launcher, last editor, and sender attribution is server-derived. A postgres-owned forced-RLS, policy-free table retains private Estimate actor evidence; the authenticated audit RPC requires the same tenant-scoped Estimate capability, historical Estimates are not backfilled, and homeowner-readable activity events do not expose contractor actor identity. Customer acceptance, accepted-only Estimate-derived Invoice creation, Job authority, billing authority, Price Book privacy, and connected/local recipient boundaries remain separate and unchanged.
+- Tests/checks run: PostgreSQL 16 prerequisite, role matrix, RLS, connected-send lifecycle/idempotency, direct-status denial, child-edit attribution, private audit ACL, historical-null, and activity-event validation; focused client capability/send and existing Draft/Estimate/local-delivery regressions; TypeScript; Production build; backend parity/rollout; sensitive-value; diff; exact-head Preview; and independent review. Environment-specific rollout evidence is recorded in the backend rollout ledger.
+- Known risks or follow-ups: Existing historical Estimates honestly retain unknown actor attribution. Authenticated lower-role browser smoke depends on approved role fixtures; where unavailable, exact SQL role probes and source tests remain the evidence. FB-035 narrows to operational evidence, telemetry, minor consistency findings from real use, and eventual compatibility-fallback retirement rather than another major Draft-first feature.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: The final known FB-035 product-policy blocker is resolved; the active item now tracks separately governed operational evidence and residual maturity only.
+
 ## 2026-08-12 - FB-035 Viewer Job Lifecycle Visibility v1
 
 - Branch: `codex/fb035-viewer-job-lifecycle-visibility-v1`

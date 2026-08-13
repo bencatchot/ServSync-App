@@ -23,6 +23,7 @@ export type DurableDraftCompatibilityChecks = {
   currentUserId: string | null;
   contractorOwnerUserId: string | null;
   canAccessContractor: boolean;
+  canManageEstimates: boolean;
   canManageBilling: boolean;
   canWriteJobs: boolean;
 };
@@ -50,7 +51,7 @@ export function capabilitiesFromCompatibilityChecks(
     canPersistDraft: checks.canManageBilling || checks.canWriteJobs,
     canImportLegacyDraft: checks.canManageBilling,
     canLaunchJob: checks.canWriteJobs,
-    canLaunchEstimate: checks.contractorOwnerUserId === checks.currentUserId,
+    canLaunchEstimate: checks.canManageEstimates,
     canLaunchInvoice: checks.canManageBilling,
   };
 }
@@ -104,14 +105,16 @@ export async function loadDurableDraftCapabilities(
       currentUserId: userId,
       contractorOwnerUserId: null,
       canAccessContractor: false,
+      canManageEstimates: false,
       canManageBilling: false,
       canWriteJobs: false,
     });
   }
 
   const helperArgs = { p_contractor_id: profile.id };
-  const [canAccess, canManageBilling, canWriteJobs] = await Promise.all([
+  const [canAccess, canManageEstimates, canManageBilling, canWriteJobs] = await Promise.all([
     capabilityRpc(client, 'current_user_can_access_contractor', helperArgs),
+    capabilityRpc(client, 'current_user_can_manage_contractor_estimates', helperArgs),
     capabilityRpc(client, 'current_user_can_manage_contractor_billing', helperArgs),
     capabilityRpc(client, 'current_user_can_write_contractor_jobs', helperArgs),
   ]);
@@ -121,6 +124,7 @@ export async function loadDurableDraftCapabilities(
     currentUserId: userId,
     contractorOwnerUserId: profile.owner_user_id,
     canAccessContractor: canAccess === true,
+    canManageEstimates: canManageEstimates === true,
     canManageBilling: canManageBilling === true,
     canWriteJobs: canWriteJobs === true,
   });
