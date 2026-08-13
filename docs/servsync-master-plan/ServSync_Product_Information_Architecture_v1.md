@@ -151,7 +151,7 @@ Likely capabilities:
 
 `Work` is the current working module name for the redesigned contractor work area. This document does not require that `Work` become the final sidebar label immediately.
 
-Draft-first Work belongs here. The upcoming Draft-first Work redesign should be specified in a separate Work Module Product Specification that uses this architecture as its boundary map.
+Draft-first Work belongs here. The implemented Work Module Product Specification uses this architecture as its boundary map.
 
 Work owns the transformation from internal contractor planning into customer-facing and operational outcomes. It should not own contractor discovery, company settings, subscription administration, or homeowner property master data.
 
@@ -1028,7 +1028,7 @@ The Work module should become the contractor's operational center for:
 - work templates
 - operational history
 
-The Draft-first redesign should not be treated as a global navigation redesign by itself. It should first be specified as a Work Module Product Specification that answers:
+The Draft-first redesign was not treated as a global navigation redesign by itself. Its Work Module Product Specification answered:
 
 - What is the Work landing page?
 - What belongs in Drafts?
@@ -1042,10 +1042,11 @@ The Draft-first redesign should not be treated as a global navigation redesign b
 
 Current production state:
 
-- Production serves the legacy Jobs workflow because all three Draft/Work gates are absent/off.
-- The corrected canonical durable Draft backend is installed and verified; Production durable Draft tables remain empty and no authenticated Production durable workflow has run.
-- Create Estimate and Create Job from durable Draft exist in gated code, including canonical consumption and guarded same-session output navigation. Direct Draft-to-Invoice remains unimplemented.
-- Default-deny contractor cohort gating is implemented in draft PR #322. In Sandbox, the cohort SQL is installed and the staged role/runtime matrix passed: one test contractor was temporarily enrolled and restored to false, all entitlement rows are currently false, runtime-created Draft/Estimate records were cleaned, temporary branch variables were removed, and the final Preview is gates-off. In Production, the cohort column and RPC remain absent, no contractor is enrolled, the Draft/Work gates remain off, and no authenticated durable Draft runtime validation has occurred. PR mark-ready/merge, Production SQL, enrollment, gates, and smoke remain separately unauthorized. An uninterrupted active tab has no guaranteed autonomous entitlement-revocation maximum, so supervised rollback requires reload and broader-beta revocation semantics remain a separate decision.
+- Draft-first Work is the standard contractor Jobs experience under the reviewed `all_contractors` exposure mode and three enabled global gates.
+- The canonical durable Draft backend is installed and verified. Authorized Drafts save/reopen and launch stale-safely and idempotently as Estimate, Job/checklist Job, or Invoice outputs.
+- Owner/Admin/Office share normal Estimate and financial authority; Field Technician retains operational Job authority without normal financial mutation; Viewer remains read-only. Output-specific RLS/RPC, tenant, and lifecycle checks remain authoritative.
+- Connected and local Customers use the same contractor lifecycle with deliberately different authenticated or secure document-specific delivery. Accepted Estimate-to-Job, accepted-only Estimate-to-Invoice, Job billing, payment, PDFs, and Customer History are supported contextual continuations.
+- The global gates retain emergency rollback value. Legacy Job/composer presentation, historical Draft import, and whole-Job billing for historical Jobs without durable work items are compatibility paths rather than the canonical workflow.
 
 ## 11. Expansion Rules
 
@@ -1128,13 +1129,13 @@ Different profiles may see different labels for the same underlying object when 
 
 ## 13. Current-State Guardrails
 
-This document defines direction. It does not ship behavior.
+This document defines information architecture; current behavior is recorded explicitly where rollout has completed.
 
 Current guardrails:
 
-- Do not imply Production has the Draft-first Work redesign.
-- Do not imply Production exposes Create Estimate or Create Job from Draft while the gates and tenant entitlement remain off; direct Draft-to-Invoice is not implemented.
-- Do not imply the legacy Jobs workflow has been removed.
+- Describe Draft-first Work as the standard Production Jobs experience only within its verified role, tenant, lifecycle, and gate boundaries.
+- Do not imply every contractor role can create every Draft output; the enabled gates do not replace output-specific authority.
+- Do not imply emergency rollback presentation or historical compatibility paths have been removed.
 - Do not imply subscription plans are live enforcement unless separately verified.
 - Do not imply advanced dispatch, routing, native mobile apps, payment collection, accounting sync, or automated reminders are live.
 - Do not move or rename application navigation based solely on this document.

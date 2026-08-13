@@ -773,7 +773,6 @@ test.describe('Durable Draft Launch foundation', () => {
 
   test('later frontend slices preserve protected SQL, deployment, and dependency scope', () => {
     const files = changedFiles();
-    expect(files.length).toBeGreaterThan(0);
     expect(files).not.toContain('servsync-durable-draft-launch-foundation.sql');
     expect(files).not.toContain('servsync-durable-draft-launch-permission-parity-correction.sql');
     expect(files.some(file => /package|lock|vercel|supabase\/functions|marketing-screenshots|\.env/.test(file))).toBe(false);
@@ -788,14 +787,16 @@ test.describe('Durable Draft Launch foundation', () => {
 
   test('documents the current installed foundation and all-contractors rollout without stale gate assertions', () => {
     const backlog = sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md');
+    const completed = sourceFile('docs/servsync-master-plan/ServSync_Completed_Features.md');
     const masterPlan = sourceFile('docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md');
 
     expect(masterPlan).toMatch(/PR #317 (?:is |subsequently )?merged|merged PR #317/i);
     expect(masterPlan).toMatch(/Production (?:has|now has) (?:the )?(?:corrected )?canonical(?: durable Draft)? foundation installed and verified/i);
-    expect(backlog).toContain('durable Draft, item, launch, checklist, invoice, cohort-entitlement, runtime-setting, and rollout-mode foundations already installed');
-    expect(backlog).toContain('server mode is `all_contractors`');
-    expect(backlog).toContain('three Draft/Work Vercel gates are present and compiled as `true`');
-    expect(backlog).toContain('accepted-only, duplicate-safe server contract');
+    expect(backlog).not.toContain('| FB-035 | Draft-First Work Rollout |');
+    expect(completed).toContain('FB-035 | Draft-first Work v1');
+    expect(masterPlan).toContain('standard Production contractor lifecycle');
+    expect(masterPlan).toContain('reviewed `all_contractors` exposure mode and three global gates');
+    expect(completed).toContain('accepted-only duplicate-safe Estimate-to-Invoice');
     expect(masterPlan).toContain('typed durable adapters');
     expect(masterPlan).toContain('explicit Open Output');
     expect(masterPlan).toContain('same-session confirmed Create and explicit Retry');

@@ -245,7 +245,7 @@ Financial action presentation follows the established output capability rather t
 
 Job operational presentation follows the separately resolved Job-write capability plus record lifecycle. Viewer may inspect authorized Job status, customer/property context, work items, checklist results, findings, notes, photos, reports, linked records, and PDFs, but receives no Job Draft, save, complete, delete, work-item, checklist/finding, report-finalization, or upload controls. Mutable browser draft snapshots are not applied or autosaved in Viewer context. Field Technician retains server-authorized operational Job controls while remaining subject to the financial restrictions above. Server denial remains authoritative for stale or crafted requests.
 
-Estimate authority remains intentionally asymmetric: Admin/Office may prepare eligible Draft scope under current Draft persistence authority, but Owner remains required for canonical Estimate launch/edit/send. A later preparer/approval model requires a separate product-policy decision.
+Estimate authority uses approved Model B: active Owner/Admin/Office share the server-resolved capability for eligible Estimate Draft launch, normal edit, and send. Field Technician remains operational/non-financial and Viewer remains read-only. Customer acceptance, lifecycle rules, and server authorization remain authoritative.
 
 `Start New Draft` may be reachable from more than one place, but it should not automatically become a global destination. A contextual Draft action is justified only when:
 
@@ -288,7 +288,7 @@ Current implementation state:
 - Current operational Job detail is too billing-heavy for the target Job Overview experience.
 - Current navigation retains the existing `Jobs` product identity while following the broader Work ownership model.
 
-This specification does not make the Work redesign live.
+This specification originally preceded rollout. The implemented Draft-first Work experience is now the standard Production Jobs experience under the reviewed `all_contractors` mode and enabled global gates; the architecture below remains the canonical module model, while historical rollout tables preserve the sequence that produced it.
 
 ## 6. Target Work Architecture
 
@@ -1120,9 +1120,9 @@ Backend-dependent areas:
 
 Invoices are customer-facing billing snapshots.
 
-Supported or target invoice paths:
+Supported invoice paths:
 
-- Direct Invoice launch from Draft, deferred until separately approved.
+- Direct Invoice launch from Draft for billing-authorized contexts.
 - Invoice from Job.
 - Simple/full Invoice.
 - Deposit Invoice.
@@ -1134,8 +1134,8 @@ Billing rules:
 
 - Invoice options provide contractor flexibility.
 - Billing is not the primary identity of active Job work.
-- The first shared Draft Composer launch slice should not include direct Invoice launch.
-- Invoices should usually be created from the active workflow record after launch, such as a Job or Estimate, unless a later direct-Invoice launch slice approves a safe exception.
+- Direct Invoice Draft launch and contextual Job/accepted-Estimate Invoice creation use the existing billing capability and lifecycle rules.
+- Contextual Invoice creation remains preferred when an Estimate, Job, completed work item, or payment-schedule item already provides the billing source.
 - ServSync should not become the accounting system.
 - ServSync should not become the payment processor.
 - Accounting and payment integrations remain boundaries unless separately approved.
@@ -1511,8 +1511,8 @@ Complete redesigned Work module acceptance criteria:
 - Reports/checklists remain tied to Work.
 - Templates prefill Drafts instead of competing with Draft creation.
 - Mobile navigation remains one Work destination and remains manageable.
-- Production legacy Jobs remains unaffected during sandbox development.
-- No Draft-first Production re-enable occurs until full approval.
+- Historical Sandbox development did not alter the Production legacy Jobs experience before the reviewed rollout.
+- Production enablement required the cohesive Work validation and explicit gate approval that have now completed.
 
 ## 26. Testing and Sandbox Validation
 
@@ -1559,9 +1559,9 @@ Sandbox validation scenarios:
 
 Do not mutate Production for implementation validation unless a separate production validation prompt approves it.
 
-## 27. Recommended Future Implementation Slices
+## 27. Historical Implementation Sequence
 
-These slices are planning recommendations only. Each requires its own audit and owner approval.
+The table below preserves the reviewed rollout sequence and the gates that applied at each stage. It is historical evidence, not a statement that Draft-first Work remains pending.
 
 Hidden code-integration slices may merge to `main`, but the shared Draft Composer should not be enabled for owner-facing Preview testing as a complete workflow until the backend launch foundation and both Estimate and Job launch outcomes are ready.
 
@@ -1573,8 +1573,8 @@ Hidden code-integration slices may merge to `main`, but the shared Draft Compose
 | 2B. Durable Draft Launch Foundation | Backend foundation required for both launch outcomes: persisted intended output, supported notes, consumed state, launched output type/id, launched timestamp/user, source-Draft linkage, duplicate-launch prevention, idempotency, atomic transaction boundaries, rollback behavior, consumed Draft exclusion, RLS/grants/RPC contracts | API wrappers/types/selectors only as needed to consume new contracts | SQL/RPC probes, duplicate launch, consumed Draft filtering, idempotent retry, rollback behavior | Required; sandbox-first SQL deployment and validation | Keep shared launch gate off for ordinary Preview users until 2C | Validate SQL/RPC in sandbox before app exposure | Revert/disable app use; SQL rollback requires separately approved database plan | None |
 | 2C. Complete Estimate and Job launch experience | First coherent Preview-visible shared Draft launch workflow: intended output controls primary launch action, contractor may switch before launch, Create Estimate and Create Job both work, chosen-outcome validation runs, successful launch consumes Draft, duplicate launch is prevented, navigation opens launched record, client navigation failure does not duplicate | Connect shared composer to both approved launch paths | E2E for Create Estimate, Create Job, switch intent, resume, consumed Draft lists, duplicate retry, navigation failure recovery, Production fallback | Uses 2B launch contracts; Create Job may continue using/adapt current activation; Create Estimate uses atomic launch path | Enable only in approved Preview/sandbox after 2B passes; Production remains off | First coherent owner-facing Preview validation happens here | Disable shared launch gate and return to existing Draft/legacy paths | None until final rollout approval |
 | 2D. Contextual starts and workflow handoffs | Service Request -> Draft with Estimate default, accepted Estimate -> Job, Customer/Property -> clean Draft with trusted context, Calendar -> Draft, Template -> Draft, Job -> later Estimate, Estimate -> later Job | Contextual entry points and handoff routing | source-link, duplicate-prevention, default intent, no side effects | Possible source/linkage hardening | Shared launch gate plus context-specific gating | Validate each trusted context separately | Disable individual entry points | None |
-| 2E. Legacy path migration | Migrate existing Start New Draft paths and direct Job creation where appropriate; preserve valid direct paths until parity is proven; retire duplicate UI only after end-to-end approval | Replace/de-emphasize legacy surfaces | full regression, role/entitlement, mobile nav, Production fallback | None or cleanup unless data migration is approved | Final rollout gates only after approval | End-to-end parity validation | Restore legacy route emphasis/gates | Production remains legacy until final rollout |
-| Later. Invoice workflow integration | Job -> Invoice, Estimate -> Invoice where valid, direct Invoice exceptions, partial billing, payment schedules, workflow linkage, financial permissions | Billing workflow surfaces | invoice lifecycle and financial permission coverage | Likely required | Separate future approval | Validate billing separately | Disable invoice launch/handoff changes | None until approved |
+| 2E. Legacy path migration | Migrate existing Start New Draft paths and direct Job creation where appropriate; preserve valid direct paths until parity is proven; retire duplicate UI only after end-to-end approval | Replace/de-emphasize legacy surfaces | full regression, role/entitlement, mobile nav, Production fallback | None or cleanup unless data migration is approved | Final rollout gates only after approval | End-to-end parity validation | Restore legacy route emphasis/gates | Historical gate: Production remained legacy until final rollout |
+| Later. Invoice workflow integration | Job -> Invoice, Estimate -> Invoice where valid, direct Invoice exceptions, partial billing, payment schedules, workflow linkage, financial permissions | Billing workflow surfaces | invoice lifecycle and financial permission coverage | Likely required | Separate future approval | Validate billing separately | Disable invoice launch/handoff changes | Historical gate: Invoice integration required separate approval |
 
 ## 28. Open Product Decisions
 
@@ -1589,12 +1589,12 @@ Hidden code-integration slices may merge to `main`, but the shared Draft Compose
 | Should mobile Start New Draft use a header action, action menu, or Work-scoped floating action? | Defer to screen-design audit. | The specification approves the hybrid architecture, not the final visual control. | Screen design, not product specification. | Yes |
 | What is the exact visual treatment of the Work header Start New Draft action? | Defer to screen-design audit. | It must remain secondary when existing Work needs attention, but the exact placement and styling require layout design. | Screen design. | Yes |
 | Should similar-Draft warnings be informational, confirmatory, or source-linked only? | Defer until Draft list and contextual start behavior are designed. | Warnings should reduce duplicate clutter without becoming intrusive. | Draft guardrail implementation. | Yes |
-| When should Production Draft-first UI be re-enabled? | Only after cohesive Work redesign validation and explicit production gate. | Avoids another partial replacement. | Production rollout. | No for rollout |
+| When should Production Draft-first UI be re-enabled? | Historical decision: only after cohesive Work redesign validation and explicit production gate; that rollout gate has now completed. | Avoided another partial replacement. | Completed Production rollout. | No for rollout |
 
 Settled decisions not reopened:
 
 - Work is the current working module name.
-- Production stays legacy until Work is complete.
+- Historical decision: Production stayed legacy until the cohesive Work rollout was approved; Draft-first Work is now the standard Production Jobs experience.
 - Draft-first model.
 - Save Draft optional.
 - Job Overview operational first.
@@ -1660,7 +1660,7 @@ Approved product behavior:
 - Job History is the preferred historical destination.
 - Templates are internal, secondary, and Draft-prefill oriented.
 - Work remains one global navigation destination, especially on mobile.
-- Production remains legacy until the redesigned Work experience is cohesive, validated, and approved.
+- Production uses the cohesive, validated Draft-first Jobs experience; legacy presentation remains available only behind the existing emergency rollback/compatibility gates.
 
 Deferred decisions:
 

@@ -220,7 +220,10 @@ test.describe('FB-007 Draft-first Inspection Path Completion v1', () => {
     expect(app).toContain('Finalize saves and files the PDF. For connected customers, it becomes available in Documents and Home History and creates an in-app notification.');
     expect(app).toContain('Complete job & send closes the linked request and sends the completion notice.');
     expect(app).toContain("const reportSentAndCompleted = Boolean(activeInspection.homeowner_user_id)");
-    expect(app).toContain('This report can be filed with the customer record, but it cannot be sent until the customer connects a ServSync account.');
+    expect(app).toContain('<FinalizedReportDeliveryPanel');
+    expect(app).toContain("activeInspection.status === 'finalized'");
+    expect(app).toContain('!activeInspection.homeowner_user_id');
+    expect(app).toContain('This report is for a not-connected customer who does not have a ServSync account yet.');
     expect(app).not.toContain('It does not send anything until you choose to send it.');
   });
 

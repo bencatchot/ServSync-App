@@ -56,7 +56,7 @@ test.describe('contractor estimate creation UI structure', () => {
     const lineSourceSource = sourceBetween(source, 'const renderEstimateLineItemSources =', 'const startEstimateAssistantSpeech =');
     const lineEditorSource = sourceBetween(source, 'const renderStructuredLineDraftEditor =', 'const renderLaborModeButton =');
     const groupedRendererSource = sourceBetween(source, 'const renderEstimateDraftLineGroups = () => {', 'const renderEstimateLineItemSources =');
-    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (');
 
     expect(source).not.toContain('renderEstimateReferenceTools');
     expect(source).not.toContain('Optional tools');
@@ -91,7 +91,7 @@ test.describe('contractor estimate creation UI structure', () => {
     const pdfSource = pdfDocumentsSource();
     const scheduleSource = sourceBetween(source, 'const renderEstimatePaymentScheduleEditor =', 'const renderInvoiceDraftTotals =');
     const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
-    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (');
 
     expect(scheduleSource).toContain('Payment schedule');
     expect(scheduleSource).toContain('After homeowner approval, accepted schedule items can be used to create draft invoices; creating a draft does not send it automatically.');
