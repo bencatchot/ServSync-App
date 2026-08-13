@@ -528,22 +528,23 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       currentUserId: 'user-1',
       contractorOwnerUserId: 'owner-1',
       canAccessContractor: true,
+      canManageEstimates: false,
     };
-    expect(capabilitiesFromCompatibilityChecks({ ...base, canManageBilling: true, canWriteJobs: false })).toMatchObject({
+    expect(capabilitiesFromCompatibilityChecks({ ...base, canManageEstimates: true, canManageBilling: true, canWriteJobs: false })).toMatchObject({
       canPersistDraft: true,
       canImportLegacyDraft: true,
       canLaunchJob: false,
-      canLaunchEstimate: false,
+      canLaunchEstimate: true,
       canLaunchInvoice: true,
     });
-    expect(capabilitiesFromCompatibilityChecks({ ...base, canManageBilling: false, canWriteJobs: true })).toMatchObject({
+    expect(capabilitiesFromCompatibilityChecks({ ...base, canManageEstimates: false, canManageBilling: false, canWriteJobs: true })).toMatchObject({
       canPersistDraft: true,
       canImportLegacyDraft: false,
       canLaunchJob: true,
       canLaunchEstimate: false,
       canLaunchInvoice: false,
     });
-    expect(capabilitiesFromCompatibilityChecks({ ...base, canManageBilling: false, canWriteJobs: false })).toMatchObject({
+    expect(capabilitiesFromCompatibilityChecks({ ...base, canManageEstimates: false, canManageBilling: false, canWriteJobs: false })).toMatchObject({
       canReadDrafts: true,
       canPersistDraft: false,
       canLaunchJob: false,
@@ -552,12 +553,14 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     expect(capabilitiesFromCompatibilityChecks({
       ...base,
       contractorOwnerUserId: 'user-1',
+      canManageEstimates: true,
       canManageBilling: true,
       canWriteJobs: true,
     })).toMatchObject({ canLaunchEstimate: true, canLaunchInvoice: true });
     expect(capabilitiesFromCompatibilityChecks({
       ...base,
       contractorId: null,
+      canManageEstimates: true,
       canManageBilling: true,
       canWriteJobs: true,
     })).toMatchObject({
@@ -574,6 +577,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     expect(source).not.toMatch(/field_tech|office|viewer|\badmin\b|\bowner\b/);
     expect(source).not.toContain('servsync_private_can_persist_work_draft');
     expect(source).toContain('current_user_can_manage_contractor_billing');
+    expect(source).toContain('current_user_can_manage_contractor_estimates');
     expect(source).toContain('current_user_can_write_contractor_jobs');
     expect(source).toContain('servsync_current_contractor_profile');
   });
@@ -589,6 +593,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
         const dataByFunction: Record<string, unknown> = {
           servsync_current_contractor_profile: [{ id: CONTRACTOR_ID, owner_user_id: 'owner-1' }],
           current_user_can_access_contractor: true,
+          current_user_can_manage_contractor_estimates: false,
           current_user_can_manage_contractor_billing: false,
           current_user_can_write_contractor_jobs: true,
         };
@@ -608,6 +613,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     expect(calls).toEqual([
       'servsync_current_contractor_profile',
       'current_user_can_access_contractor',
+      'current_user_can_manage_contractor_estimates',
       'current_user_can_manage_contractor_billing',
       'current_user_can_write_contractor_jobs',
     ]);

@@ -56,6 +56,7 @@ import {
 import { QRCodeCanvas } from 'qrcode.react';
 import { supabase, supabaseConfigured } from './supabaseClient';
 import { createPropertyAssetAdapter, type PropertyAssetDataClient } from './propertyAssetAdapter';
+import { isExactMissingEstimateSendRpcError } from './features/estimates/estimateSendCompatibility';
 import {
   APP_ROUTE_NAMES,
   appHashRoute,
@@ -25317,10 +25318,17 @@ function ContractorDashboard({
     }
     setSendingEstimateId(estimate.id);
     try {
-      const { error: sendError } = await supabase
-        .from('estimates')
-        .update({ status: 'sent' })
-        .eq('id', estimate.id);
+      const { error: rpcError } = await supabase.rpc('servsync_send_estimate', {
+        p_estimate_id: estimate.id,
+      });
+      let sendError = rpcError;
+      if (isExactMissingEstimateSendRpcError(rpcError)) {
+        const fallback = await supabase
+          .from('estimates')
+          .update({ status: 'sent' })
+          .eq('id', estimate.id);
+        sendError = fallback.error;
+      }
       if (sendError) throw sendError;
       setNotice(actionFeedbackMessage(
         'Estimate sent',

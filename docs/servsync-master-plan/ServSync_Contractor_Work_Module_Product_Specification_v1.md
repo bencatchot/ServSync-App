@@ -1353,9 +1353,9 @@ Draft visibility:
 
 Contractor roles:
 
-- Owner/admin/office users can manage Drafts and financial outcomes where current permissions allow.
+- Approved Model B makes active Owner/admin/office users the normal Estimate-management roles through one distinct server-resolved capability. The exact foundation is applied in Sandbox, Demo, and Production; authenticated Demo role/lifecycle validation passed before the Production rollout. Billing and Job authority remain separate capabilities.
 - Field technicians should focus on operational execution, notes, photos, checklist/work completion, and similar non-financial work unless explicit company permission is approved later.
-- Field technician Draft creation and financial outcomes depend on future role permissions. Do not assume access to Estimates or Invoices.
+- Field technicians do not receive Estimate or Invoice financial mutation through this policy; separately authorized Estimate-to-Job and operational Job behavior remains intact.
 - Viewers remain read-only.
 - Viewers should not receive Draft creation actions.
 

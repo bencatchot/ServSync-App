@@ -23,6 +23,7 @@ function resolvedCapabilities(options: { jobs: boolean; billing?: boolean; tenan
     currentUserId: tenant ? 'user-1' : null,
     contractorOwnerUserId: 'owner-1',
     canAccessContractor: tenant,
+    canManageEstimates: false,
     canManageBilling: options.billing ?? false,
     canWriteJobs: options.jobs,
   });
