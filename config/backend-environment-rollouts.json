@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-12",
+  "updatedOn": "2026-08-13",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -504,6 +504,24 @@
         "production": {
           "status": "Applied",
           "reason": "Exact SHA-256 89e5adc2acc21302e408c40b3246d8a303b2413eeb2838220776d4ee14b8537e was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-12 at 18:11:15Z after Sandbox and Demo passed. Two active legacy rows across two contractors became exactly two active canonical items and two immutable lineage rows: one hourly Labor preserved its hour unit and rate, and one flat Service preserved its title, price, private 604-character note, and timestamps while receiving the reviewed each-unit default. Customer descriptions remain empty. Mapping/lineage mismatches were zero, retained legacy fingerprint remained 52c51ad556a652793200082184bdc54c, and the seven-table contractor/Estimate/Job/Invoice fingerprint 494c3d91465cfffd4f9f355d45e62c43 remained exact."
+        }
+      }
+    },
+    {
+      "id": "admin-office-normal-estimate-authority-v1",
+      "artifact": "servsync-admin-office-estimate-authority.sql (SHA-256 ae13c0f227a744d7435901ad2f7b8e4f35a892fff5c371780045ee150400625b)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact reviewed migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-13 from 13:40:47Z through 13:40:49Z. Catalog, postgres ownership, forced-RLS/policy-free private audit storage, exact authenticated-only RPC grants, Owner/Admin/Office allow, Field Technician/Viewer/inactive/anonymous/cross-tenant denial, secure local delivery, exact-snapshot guest acceptance, accepted-to-Job behavior, and zero-residue cleanup passed. Sandbox returned to 138 Estimates, 317 lines, 3 schedules, 9 Draft launches, zero delivery links, zero actor-audit rows, 21 workflow events, and exact business fingerprint e7d9ffb01664e9dbeb945ed3189e60e5."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production uqgtheclhxqlnjpfmheq remains completely unapplied. Rollout stopped before Production because the approved Demo contractor credential failed normal authentication at the mandatory post-migration authenticated gate."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact reviewed migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-13 from 13:49:54Z through 13:49:56Z. Catalog, ownership, forced RLS, ACL/RPC boundaries, zero audit backfill, zero business counts, and exact business fingerprint 43844d59220756db572e31cdafd41ac8 passed. Authenticated post-migration smoke is blocked because the approved stored Demo contractor credential returned invalid_credentials; no credential was changed or manufactured."
         }
       }
     }
