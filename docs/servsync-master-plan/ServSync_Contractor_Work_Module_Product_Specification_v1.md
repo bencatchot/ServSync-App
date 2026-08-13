@@ -1353,7 +1353,7 @@ Draft visibility:
 
 Contractor roles:
 
-- Approved Model B makes active Owner/admin/office users the normal Estimate-management roles through one distinct server-resolved capability. Draft PR #440 and its backend rollout must complete before this is treated as Production behavior; Sandbox and Demo are applied, while Production is pending the blocked Demo authenticated gate. Billing and Job authority remain separate capabilities.
+- Approved Model B makes active Owner/admin/office users the normal Estimate-management roles through one distinct server-resolved capability. The exact foundation is applied in Sandbox, Demo, and Production; authenticated Demo role/lifecycle validation passed before the Production rollout. Billing and Job authority remain separate capabilities.
 - Field technicians should focus on operational execution, notes, photos, checklist/work completion, and similar non-financial work unless explicit company permission is approved later.
 - Field technicians do not receive Estimate or Invoice financial mutation through this policy; separately authorized Estimate-to-Job and operational Job behavior remains intact.
 - Viewers remain read-only.
