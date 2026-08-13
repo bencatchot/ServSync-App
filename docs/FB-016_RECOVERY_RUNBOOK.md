@@ -13,9 +13,12 @@ The 2026-08-13 database drill proved that a Production Supabase physical backup 
 - The latest exact manifest restored all four objects into a new isolated Supabase project. Restored bytes, paths, bucket privacy/settings, and SHA-256 checks passed; two contractor-logo references and one service-request-media reference resolved to recovered objects.
 - Public-object access succeeded, anonymous private-object access failed, and server-authorized private-object access succeeded. The isolated project was deleted after validation.
 - Production backup inventory omitted August 9, 10, and 11. The cause remains unresolved, and PITR is disabled.
+- The gap remained present when rechecked on 2026-08-13: Production exposed completed restore points for August 6, 7, 8, 12, and 13 only, while Demo and Sandbox exposed a completed daily point for every day from August 6 through 13. No failed, in-progress, or hidden state was returned by the Management API.
+- A sanitized Supabase support request titled `Missing Production physical backup restore points for August 9-11, 2026` was submitted for Production during the 2026-08-13 22:12-22:20 UTC audit window. The Dashboard confirmed submission to the ServSync Production project and owner email but did not expose a case ID or exact timestamp; the acknowledgment reference and provider explanation remain pending.
+- The next natural R2 Cron execution after this audit is 2026-08-14 at 04:17 UTC. The earlier post-deployment run was manual and does not count as autonomous scheduler evidence.
 - Auth, Realtime, Edge Functions, secrets, Vercel, and external-provider settings need separate secure reapplication.
 
-Consequently, full ServSync recovery readiness remains `BLOCKED`, but independent Storage-byte backup and isolated restore are now completed bounded milestones. The remaining blockers are database backup-point reliability/PITR posture, secure configuration recovery, scheduler observation, and a timed full-application drill.
+Consequently, full ServSync recovery readiness remains `BLOCKED`, but independent Storage-byte backup and isolated restore are now completed bounded milestones. The executable configuration and timed-drill checklist is `docs/FB-016_FULL_RECOVERY_DRILL_CHECKLIST.md`. The remaining blockers are database backup-point reliability/PITR posture, natural scheduler observation, and a timed full-application drill.
 
 ## Recovery Objectives
 
@@ -104,6 +107,26 @@ Physical restore did not recreate the complete operating environment. Maintain n
 
 Secret values belong only in the approved password manager/provider configuration. Do not put them in this runbook, Git, chat, screenshots, test artifacts, or terminal captures.
 
+The authoritative executable classification and timing worksheet is `docs/FB-016_FULL_RECOVERY_DRILL_CHECKLIST.md`. During drills, Stripe, outbound email/SMS, public domains, webhooks, and Production Cron remain disabled; authenticated core application and recovered-record validation do not require side-effectful providers.
+
+## Scheduled Backup Observation
+
+Natural scheduler acceptance requires two independent facts:
+
+1. Vercel runtime/Cron evidence identifies a scheduled invocation of `/api/storage-backup` at the configured `04:17 UTC` window. Record only the non-secret invocation identifier and timestamps.
+2. The R2 latest-success health and immutable manifest identify the same resulting backup window, exact Production source ref, zero failures, every source object accounted for, and a valid manifest SHA-256.
+
+After obtaining the Vercel invocation identifier, validate the R2 side without exposing object paths:
+
+```bash
+npm run ops:storage-backup:observe-scheduled -- \
+  --expected-after 2026-08-14T04:17:00.000Z \
+  --expected-before 2026-08-14T04:47:00.000Z \
+  --vercel-invocation-id <non-secret-vercel-cron-invocation-id>
+```
+
+Use the actual natural-run date and a narrowly justified completion window. The command rejects missing scheduler evidence, wrong source identity, out-of-window/manual health, stale/future health, invalid manifest hashes, failures, and incomplete object accounting. It emits aggregate evidence only. It does not independently query Vercel, so the operator must retain the corresponding Vercel Cron/runtime evidence.
+
 ## 2026-08-13 Drill Evidence
 
 ### Independent Storage Backup And Restore
@@ -177,7 +200,9 @@ Official provider references reviewed 2026-08-13:
 
 ### Backup Inventory Gap
 
-The Management API exposed completed physical backups on August 6, 7, 8, 12, and 13, with no August 9, 10, or 11 entries. WAL-G was enabled and PITR was disabled. Provider status history did not explain the gap. The cause remains unresolved and requires a Supabase support case with the Production project ref and missing dates. Until explained and monitored, ServSync must not claim a 24-hour database RPO.
+The Management API exposed completed physical backups on August 6, 7, 8, 12, and 13, with no August 9, 10, or 11 entries. WAL-G was enabled and PITR was disabled. A same-day recheck still exposed no failed/in-progress metadata and confirmed Demo/Sandbox daily continuity for August 6-13. The sanitized Supabase support request asks whether physical backups existed, what caused any missed jobs, what RPO a Pro project without PITR should assume, and whether missing physical backups can be monitored automatically. Its case ID and provider response are pending. Until explained and monitored, ServSync must not claim a 24-hour database RPO.
+
+PITR remains an owner decision. Current Supabase documentation lists seven-day PITR at approximately `$100/month` per project and requires at least the Small compute add-on; longer 14- and 28-day retention is approximately `$200/month` and `$400/month`. PITR materially reduces database recovery-point granularity but does not back up Storage object bytes. If support confirms a real physical-backup failure or cannot establish a sufficiently reliable daily-backup expectation, the recommended first option is seven-day PITR while retaining the independent R2 Storage backup.
 
 Official provider references reviewed 2026-08-13:
 

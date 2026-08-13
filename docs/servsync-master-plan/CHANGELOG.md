@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - FB-016 Database Continuity & Full Recovery Closeout v1 (observation gate)
+
+- Branch: `codex/fb016-database-continuity-full-recovery-closeout-v1`.
+- Starting main SHA: `6dd8b4683230e8f6fb8c860756ac23b61ea376e1`.
+- Files changed: Storage backup configuration/observation contracts and operator command; focused scheduler/failure tests; executable full-recovery configuration/timing checklist; authoritative recovery runbook; FB-016 backlog/master-plan records; and this changelog.
+- Summary of change: Rechecked Production physical-backup inventory, confirmed the August 9-11 gap remains while Demo/Sandbox stayed daily, and submitted a sanitized Supabase support request with its acknowledgment reference pending. Added fail-closed aggregate observation for a naturally scheduled Storage backup and explicit enumeration/download/R2 object/manifest failure coverage proving failed runs do not advance latest-success health. Added the executable database/Auth/R2/config/application timing and cleanup worksheet for the final isolated drill.
+- Reason for change: ServSync cannot adopt evidence-based RPO/RTO values until the scheduler runs naturally, the unexplained database gap has a truthful disposition, and one incident-to-authenticated-application recovery is timed end to end.
+- Tests/checks run: 15 Storage backup/configuration/observation tests; 4 recovery-validator tests; 16 backend parity unit tests; TypeScript; Production build; backend rollout-ledger status; sensitive-value scan; and `git diff --check`. Live Production/Demo parity passed with documented intentional differences. Live Production/Sandbox parity retained the inherited 22-difference Sandbox drift already governed by FB-016. The unchanged dependency baseline remains 1 moderate Production dependency issue and 1 moderate / 4 high overall. Provider inventory/support submission and Vercel environment/schedule inspection were read-only; no natural Cron run or full timed recovery is claimed yet.
+- Known risks or follow-ups: The next eligible natural Cron run is 2026-08-14 at 04:17 UTC. The timed full drill remains gated on that observation. Supabase has not yet returned a case ID/explanation, database 24-hour RPO remains unproven, PITR remains disabled, and seven-day PITR is an owner decision if provider assurance is insufficient. Existing Sandbox parity drift and the inherited dependency findings remain separate. No Production/Demo/Sandbox data or configuration changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 remains High/Blocked, but its current next gate, support status, and executable recovery procedure are now explicit.
+
 ## 2026-08-13 - FB-016 Storage Backup Vercel Runtime Import Correction
 
 - Branch: `codex/fb016-storage-backup-runtime-import-fix`.

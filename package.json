@@ -27,6 +27,7 @@
     "ops:recovery:validate": "node scripts/recovery/validate-restored-project.mjs",
     "ops:storage-backup:run": "node scripts/storage-backup/run-storage-backup.ts",
     "ops:storage-backup:health": "node scripts/storage-backup/check-storage-backup-health.ts",
+    "ops:storage-backup:observe-scheduled": "node scripts/storage-backup/observe-scheduled-storage-backup.ts",
     "ops:storage-backup:restore": "node scripts/recovery/restore-storage-from-r2.ts",
     "test:recovery-validator": "node --test tests/recovery/*.test.mjs",
     "test:storage-backup": "node --test tests/storage-backup/*.test.ts",

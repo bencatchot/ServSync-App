@@ -249,6 +249,45 @@ test('retention failure does not advance the latest-success health pointer', asy
   assert.deepEqual(await destination.getObject(healthKey), previousHealth);
 });
 
+test('source enumeration and download failures do not advance latest-success health', async () => {
+  for (const failure of ['enumeration', 'download'] as const) {
+    const source = new FakeSource();
+    const destination = new FakeBackup();
+    await backup(source, destination, 'baseline', '2026-08-13T01:00:00.000Z');
+    const healthKey = `health/${SOURCE_REF}/latest.json`;
+    const previousHealth = await destination.getObject(healthKey);
+    if (failure === 'enumeration') source.listObjects = async () => { throw new Error('enumeration unavailable'); };
+    else source.downloadObject = async () => { throw new Error('download unavailable'); };
+    await assert.rejects(
+      () => backup(source, destination, `failed-${failure}`, '2026-08-14T01:00:00.000Z'),
+      new RegExp(`${failure} unavailable`),
+    );
+    assert.deepEqual(await destination.getObject(healthKey), previousHealth);
+  }
+});
+
+test('R2 object and manifest write failures do not advance latest-success health', async () => {
+  for (const failure of ['object', 'manifest'] as const) {
+    const source = new FakeSource();
+    const destination = new FakeBackup();
+    await backup(source, destination, 'baseline', '2026-08-13T01:00:00.000Z');
+    const healthKey = `health/${SOURCE_REF}/latest.json`;
+    const previousHealth = await destination.getObject(healthKey);
+    source.set('service-request-media', 'request/photo.jpg', `changed-${failure}`, 'image/jpeg');
+    const originalPut = destination.putObject.bind(destination);
+    destination.putObject = async (key, bytes) => {
+      if (failure === 'object' && key.startsWith(`objects/${SOURCE_REF}/`)) throw new Error('R2 upload unavailable');
+      if (failure === 'manifest' && key.startsWith(`manifests/${SOURCE_REF}/`)) throw new Error('manifest unavailable');
+      await originalPut(key, bytes);
+    };
+    await assert.rejects(
+      () => backup(source, destination, `failed-${failure}`, '2026-08-14T01:00:00.000Z'),
+      failure === 'object' ? /R2 upload unavailable/ : /manifest unavailable/,
+    );
+    assert.deepEqual(await destination.getObject(healthKey), previousHealth);
+  }
+});
+
 test('restore bucket policy comparison requires exact privacy and upload limits', () => {
   const expected: StorageBucket = {
     name: 'home-documents',
