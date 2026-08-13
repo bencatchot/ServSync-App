@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - FB-016 Backup/PITR Restore Verification & Recovery Drill v1
+
+- Branch: `codex/fb016-backup-pitr-recovery-drill-v1`.
+- Starting main SHA: `bb6311f061c7db11b6af34ca99a27af444958ea1`.
+- Files changed: authoritative FB-016 recovery runbook; fail-closed read-only recovery validator/query and unit tests; package scripts; FB-016 backlog; master plan; beta/go-live readiness evidence; historical FB-020 recovery crosswalk; and this changelog.
+- Summary of change: Recorded the approved 2026-08-13 Production physical-backup recovery drill. An isolated Supabase target restored PostgreSQL/Auth in 3m57s, matched the expected historical catalog, passed relationship and bounded financial validation, authenticated approved contractor/homeowner identities, and loaded ServSync locally against recovered data. Recovery remains `BLOCKED`: Storage metadata restored without any of four object bytes, ServSync lacks an independent tested object-byte backup, August 9-11 Production backup points remain unexplained, PITR is disabled, and external configuration requires separate secure reapplication.
+- Reason for change: FB-016 required real evidence rather than template-only readiness claims. The new runbook separates the proven database/Auth milestone from unresolved full-application recovery and records realistic RPO/RTO limits.
+- Tests/checks run: recovery-validator unit tests; live read-only recovery validator; catalog and business relationship fingerprints; financial invariants; contractor/homeowner Auth; local desktop/mobile application smoke; Storage metadata/byte probes and one bounded public-object copy-mechanics test; external configuration inventory; backup inventory/status review; repository typecheck/build/governance checks; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: Open a Supabase support case for the August 9-11 backup gap; implement encrypted versioned Storage-byte backup and restore manifests; maintain secure Supabase/Vercel/provider configuration inventories; then repeat a timed full drill. Production/Demo/Sandbox data, Auth, configuration, providers, and public aliases were not changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 records database/Auth recovery as proven while remaining High and blocked on critical Storage-byte recovery and backup-point reliability.
+
 ## 2026-08-13 - FB-035 Draft-first Work closure
 
 - Branch: `codex/fb035-draft-first-work-closure`.

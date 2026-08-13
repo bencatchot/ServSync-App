@@ -24,6 +24,8 @@
     "backend:parity:check": "node scripts/backend-parity/check.mjs",
     "backend:parity:test": "node --test tests/backend-parity/*.test.mjs",
     "backend:rollout:status": "node scripts/backend-parity/rollout-status.mjs",
+    "ops:recovery:validate": "node scripts/recovery/validate-restored-project.mjs",
+    "test:recovery-validator": "node --test tests/recovery/*.test.mjs",
     "test:trade-pack-domain-contracts": "bash scripts/validation/validate-trade-pack-domain-contracts.sh",
     "test:property-asset-bridge": "bash scripts/validation/validate-property-asset-bridge.sh",
     "test:durable-trade-sections": "bash scripts/validation/validate-durable-trade-sections.sh",
