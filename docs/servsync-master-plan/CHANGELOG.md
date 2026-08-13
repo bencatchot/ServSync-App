@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - Demo Scenario Runner Property Asset Bridge Revision-Aware Reset v1
+
+- Branch: `codex/demo-property-asset-revision-aware-reset-v1`
+- Starting main SHA: `fd8e69a53be78c673f2e337bfc1de7c16604be58`
+- Files changed: private Demo seed/reset/verify runner; focused Demo runner tests; Demo Mode runbook; FB-034A/FB-035 backlog context; master plan; completed-features ledger; and this changelog.
+- Summary of change: Updated the dedicated-Demo runner to retain the exact canonical home, room, asset, and immutable Property Asset Bridge revision chain while resetting only disposable registered workflow rows. Reseed revalidates exact ownership, markers, one-room/one-asset shape, contiguous revision lineage, and the current revision snapshot before re-registering the same IDs. New installations create the asset through the authenticated bridge RPC. Interrupted runs can recover only the same exact retained graph and otherwise fail closed.
+- Reason for change: The former generic registered-row deletion reached `home_assets`, where the bridge's intentional `home_asset_revisions.asset_id ... on delete restrict` lineage correctly blocked reset. Validation infrastructure needed to follow the durable product model without deleting history or weakening triggers, RLS, constraints, or grants.
+- Validation: Focused Demo/checkpoint/job-lifecycle/bridge source tests passed; disposable PostgreSQL 16 Property Asset Bridge validation passed; two guarded live Demo reset/reseed/authentication/verify cycles passed at `contractor_discovery_ready` with the same homeowner, contractor, property, room, and asset identities, exactly one active run, one registered asset, one baseline revision, and no downstream workflow records. The inherited `home-assets-ui` platform-admin source-marker test remains separately stale on current main.
+- Security and scope: No SQL, migration, RPC, RLS, grant, environment configuration, browser reset surface, Production reset, Production data mutation, or missing-RPC fallback change. Secrets remained in the ignored mode-600 local credential file or transient process environment and were not printed or committed.
+- Known follow-up: Extended Demo scenarios remain separately governed under FB-034A; FB-035 remains active for operational evidence, telemetry, minor consistency findings, and eventual separately reviewed compatibility-fallback retirement.
+
 ## 2026-08-13 - FB-035 Admin/Office Normal Estimate Authority v1
 
 - Branch: `codex/fb035-admin-office-estimate-authority-v1`

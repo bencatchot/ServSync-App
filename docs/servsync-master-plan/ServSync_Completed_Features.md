@@ -1,8 +1,8 @@
 # ServSync Completed Features
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
-Last reconciled against `origin/main` at `03484f662eb478a91e58a3be12d1411b36b93d36`.
+Last reconciled against `origin/main` at `fd8e69a53be78c673f2e337bfc1de7c16604be58`.
 
 ## Purpose
 
@@ -36,7 +36,7 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 | FB-030 | Shared Home / Home Access foundation v1 | Home membership foundation, invite/accept/decline/revoke RPCs, pending email invite UI, shared-home shells, shared reminder shells, disabled delivery function scaffold, DB delivery-enable contract, and boundary tests are merged/applied where required. | Invite-email enablement and additional shared-record surfaces remain active under FB-030. |
 | FB-031 | Contractor Beta Billing / Entitlement Readiness v1 | Billing-account/entitlement SQL, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied while beta remains free and no Stripe/paywall is live. | Pricing, packaging, checkout, enforcement, and paid subscription rollout remain active/future under FB-017. |
 | FB-032 | Service Plans foundation v1 | Service plan SQL/RLS/RPC foundation (with stable internal `service_agreement` identifiers), contractor template/offer UI, homeowner offer review/accept/decline, and read-only active plan display are merged/applied where required. | Recurring visits, renewals, reminders, notifications, recurring billing, and automation remain active/future under FB-029. |
-| FB-034 | Demo Mode request-to-job capture milestone | Dedicated demo environment foundation, private runner checkpoints through request-to-job and job lifecycle states, and frontend-only presentation controls are merged and documented. | Extended demo coverage remains future under FB-034A if later prioritized. |
+| FB-034 | Demo Mode request-to-job capture milestone | Dedicated demo environment foundation, private runner checkpoints through request-to-job and job lifecycle states, frontend-only presentation controls, and Property Asset Bridge revision-aware reset/reseed maintenance are merged and documented. The reset runner preserves the exact canonical property graph and immutable revision chain; two consecutive live Demo cycles passed without duplicate records or history. | Extended demo coverage remains future under FB-034A if later prioritized. |
 
 ## Consolidated Completion Notes
 

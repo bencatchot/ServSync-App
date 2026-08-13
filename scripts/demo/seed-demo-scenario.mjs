@@ -45,6 +45,11 @@ const FORBIDDEN_EXTERNAL_FLAGS = [
 const ENABLED_BOOLEAN_VALUES = new Set(['true', '1', 'yes', 'on', 'enabled']);
 const DISABLED_BOOLEAN_VALUES = new Set(['false', '0', 'no', 'off', 'disabled']);
 const NON_RESET_RUN_STATUSES = ['started', 'failed', 'succeeded'];
+const REVISION_RETAINED_RECORD_ROLES = {
+  homes: 'demo_home',
+  home_rooms: 'demo_utility_room',
+  home_assets: 'demo_water_heater_asset',
+};
 const WORKFLOW_EVENT_TYPES = {
   estimateApproved: 'estimate_approved',
   jobCreated: 'job_created',
@@ -407,7 +412,7 @@ async function signInDemoUser(makeUserClient, email, password) {
   return client;
 }
 
-async function startRun(service, scenarioKey, operation, target, dates, checkpointKey = DEFAULT_CHECKPOINT_KEY) {
+async function startRun(service, scenarioKey, operation, target, dates, checkpointKey = DEFAULT_CHECKPOINT_KEY, metadata = {}) {
   const scenario = SCENARIOS[scenarioKey];
   const checkpoint = getCheckpointDefinition(checkpointKey);
   const runId = await ensureOk(
@@ -426,6 +431,7 @@ async function startRun(service, scenarioKey, operation, target, dates, checkpoi
         expected_checkpoint_graph: checkpoint.expected,
         required_steps: checkpoint.requiredSteps,
         external_effects_disabled: true,
+        ...metadata,
       },
     }),
     'Unable to start demo scenario run. Apply servsync-demo-mode-foundation.sql to the dedicated demo project first'
@@ -487,6 +493,172 @@ async function getRegisteredRecordsForRun(service, runId) {
   );
 }
 
+export function validatePropertyAssetRevisionLineage(asset, revisions) {
+  const issues = [];
+  const ordered = [...(revisions || [])].sort((left, right) => Number(left.revision_number) - Number(right.revision_number));
+
+  if (!asset?.id) {
+    return ['Canonical demo asset is missing.'];
+  }
+  if (ordered.length === 0) {
+    return [`Canonical demo asset ${asset.id} has no immutable revision history.`];
+  }
+  if (ordered.filter((revision) => revision.change_kind === 'baseline').length !== 1) {
+    issues.push(`Canonical demo asset ${asset.id} must have exactly one baseline revision.`);
+  }
+  ordered.forEach((revision, index) => {
+    const expectedRevision = index + 1;
+    if (revision.asset_id !== asset.id) {
+      issues.push(`Revision ${revision.id || expectedRevision} does not belong to canonical demo asset ${asset.id}.`);
+    }
+    if (Number(revision.revision_number) !== expectedRevision) {
+      issues.push(`Canonical demo asset revision lineage is not contiguous at revision ${expectedRevision}.`);
+    }
+  });
+
+  const current = ordered.at(-1);
+  if (Number(asset.revision_number) !== Number(current?.revision_number)) {
+    issues.push(`Canonical demo asset current revision does not match its latest immutable revision.`);
+  }
+  for (const field of [
+    'home_id',
+    'home_room_id',
+    'asset_kind',
+    'asset_category',
+    'asset_type',
+    'name',
+    'manufacturer',
+    'model',
+    'install_date',
+    'warranty_expires_on',
+    'notes',
+    'lifecycle_status',
+  ]) {
+    if ((asset[field] ?? null) !== (current?.[field] ?? null)) {
+      issues.push(`Canonical demo asset field ${field} does not match its current immutable revision.`);
+    }
+  }
+  return issues;
+}
+
+function assertCanonicalPropertyGraph({ home, room, asset, revisions, homeownerId }) {
+  const issues = [];
+  if (!home || home.homeowner_user_id !== homeownerId) issues.push('Canonical demo home ownership does not match the approved homeowner.');
+  if (home && (home.nickname !== DEMO_PROPERTY.nickname || home.address_line1 !== DEMO_PROPERTY.address_line1 || home.zip_code !== DEMO_PROPERTY.zip_code)) {
+    issues.push('Canonical demo home identity markers do not match the approved scenario.');
+  }
+  if (!room || room.home_id !== home?.id || room.name !== 'Garage utility area' || room.room_type !== 'garage') {
+    issues.push('Canonical demo room identity or property linkage is invalid.');
+  }
+  if (
+    !asset ||
+    asset.home_id !== home?.id ||
+    asset.home_room_id !== room?.id ||
+    asset.created_by !== homeownerId ||
+    asset.asset_category !== 'plumbing' ||
+    asset.asset_kind !== 'plumbing' ||
+    asset.asset_type !== 'water_heater' ||
+    asset.name !== 'Existing 40-gallon water heater' ||
+    asset.manufacturer !== 'DemoHome' ||
+    asset.model !== 'WH-40-FICTIONAL' ||
+    asset.lifecycle_status !== 'active'
+  ) {
+    issues.push('Canonical demo asset identity, ownership, lifecycle, or property linkage is invalid.');
+  }
+  issues.push(...validatePropertyAssetRevisionLineage(asset, revisions));
+  if (issues.length > 0) {
+    throw new Error(`Revision-aware Demo reset refused: ${issues.join(' ')}`);
+  }
+}
+
+async function loadCanonicalPropertyGraph(service, homeownerId) {
+  const homes = await ensureOk(
+    await service
+      .from('homes')
+      .select('id, homeowner_user_id, nickname, address_line1, zip_code')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('nickname', DEMO_PROPERTY.nickname)
+      .eq('address_line1', DEMO_PROPERTY.address_line1)
+      .eq('zip_code', DEMO_PROPERTY.zip_code),
+    'Unable to inspect the canonical demo home for revision-aware reset'
+  );
+  if (homes.length === 0) return null;
+  if (homes.length !== 1) throw new Error(`Revision-aware Demo reset refused: expected one canonical demo home, found ${homes.length}.`);
+
+  const home = homes[0];
+  const rooms = await ensureOk(
+    await service.from('home_rooms').select('id, home_id, name, room_type').eq('home_id', home.id),
+    'Unable to inspect the canonical demo room for revision-aware reset'
+  );
+  const assets = await ensureOk(
+    await service
+      .from('home_assets')
+      .select('id, home_id, home_room_id, asset_kind, asset_category, asset_type, name, manufacturer, model, install_date, warranty_expires_on, notes, lifecycle_status, revision_number, created_by')
+      .eq('home_id', home.id),
+    'Unable to inspect the canonical demo asset for revision-aware reset'
+  );
+  if (rooms.length !== 1 || assets.length !== 1) {
+    throw new Error(`Revision-aware Demo reset refused: canonical property graph is partial or ambiguous (rooms=${rooms.length}, assets=${assets.length}).`);
+  }
+  const room = rooms[0];
+  const asset = assets[0];
+  const revisions = await ensureOk(
+    await service
+      .from('home_asset_revisions')
+      .select('id, asset_id, revision_number, change_kind, home_id, home_room_id, asset_kind, asset_category, asset_type, name, manufacturer, model, install_date, warranty_expires_on, notes, lifecycle_status')
+      .eq('asset_id', asset.id)
+      .order('revision_number', { ascending: true }),
+    'Unable to inspect canonical demo asset revisions'
+  );
+  assertCanonicalPropertyGraph({ home, room, asset, revisions, homeownerId });
+  return { home, room, asset, revisions };
+}
+
+async function retainRevisionBackedPropertyGraph(service, run) {
+  let graphRecords = run.records.filter((record) => Object.hasOwn(REVISION_RETAINED_RECORD_ROLES, record.table_name));
+  if (graphRecords.length === 0) return null;
+
+  const expected = Object.entries(REVISION_RETAINED_RECORD_ROLES);
+  const homeownerId = run.metadata?.homeowner_user_id;
+  if (!homeownerId) throw new Error('Revision-aware Demo reset refused: run metadata is missing the approved homeowner identity.');
+  const graph = await loadCanonicalPropertyGraph(service, homeownerId);
+  if (!graph) throw new Error('Revision-aware Demo reset refused: registered canonical property graph is missing.');
+
+  const expectedIds = { homes: graph.home.id, home_rooms: graph.room.id, home_assets: graph.asset.id };
+  for (const [tableName, recordRole] of expected) {
+    const matches = graphRecords.filter((record) => record.table_name === tableName);
+    if (matches.length > 1 || (matches[0] && matches[0].record_role !== recordRole)) {
+      throw new Error(`Revision-aware Demo reset refused: registered ${tableName}/${recordRole} ownership is ambiguous or invalid.`);
+    }
+    if (matches.length === 0) {
+      await registerRecord(service, run.id, tableName, expectedIds[tableName], recordRole, 'property_ready', {
+        revision_aware_recovery: true,
+      });
+    }
+  }
+  graphRecords = (await getRegisteredRecordsForRun(service, run.id)).filter((record) =>
+    Object.hasOwn(REVISION_RETAINED_RECORD_ROLES, record.table_name)
+  );
+  if (graphRecords.length !== expected.length) {
+    throw new Error('Revision-aware Demo reset refused: canonical property graph recovery was incomplete.');
+  }
+  for (const record of graphRecords) {
+    if (record.record_id !== expectedIds[record.table_name]) {
+      throw new Error(`Revision-aware Demo reset refused: registered ${record.table_name} does not match the canonical property graph.`);
+    }
+  }
+
+  const registryIds = graphRecords.map((record) => record.id);
+  const removedRegistryRows = await ensureOk(
+    await service.from('demo_scenario_records').delete().eq('run_id', run.id).in('id', registryIds).select('id'),
+    'Unable to detach the retained canonical property graph from the prior demo run'
+  );
+  if (removedRegistryRows.length !== registryIds.length) {
+    throw new Error('Revision-aware Demo reset refused: canonical property graph registry detachment was incomplete.');
+  }
+  return { homeId: graph.home.id, roomId: graph.room.id, assetId: graph.asset.id, revisionCount: graph.revisions.length };
+}
+
 async function inspectNonResetRuns(service, scenarioKey) {
   const runs = await getScenarioRuns(service, scenarioKey);
   const inspected = [];
@@ -497,12 +669,13 @@ async function inspectNonResetRuns(service, scenarioKey) {
   return inspected;
 }
 
-async function resetRun(service, runId) {
+async function resetRun(service, run) {
+  const retainedPropertyGraph = await retainRevisionBackedPropertyGraph(service, run);
   const data = await ensureOk(
-    await service.rpc('servsync_demo_reset_registered_run', { p_run_id: runId }),
+    await service.rpc('servsync_demo_reset_registered_run', { p_run_id: run.id }),
     'Unable to reset registered demo records'
   );
-  return data || [];
+  return { removed: data || [], retainedPropertyGraph };
 }
 
 async function resetNonResetRuns(service, scenarioKey, reason) {
@@ -515,13 +688,14 @@ async function resetNonResetRuns(service, scenarioKey, reason) {
         run.records = await getRegisteredRecordsForRun(service, run.id);
         run.recordCount = run.records.length;
       }
-      const removed = await resetRun(service, run.id);
+      const resetResult = await resetRun(service, run);
       considered.push({
         runId: run.id,
         previousStatus: run.status,
         registeredRecords: run.recordCount,
         reconciledRecordingConnections,
-        removed,
+        removed: resetResult.removed,
+        retainedPropertyGraph: resetResult.retainedPropertyGraph,
         action: 'reset',
         reason,
       });
@@ -649,16 +823,16 @@ async function findRegisteredRecord(service, tableName, recordId) {
   );
 }
 
-async function addUnregisteredFindings(service, findings, tableName, records) {
+async function addUnregisteredFindings(service, findings, tableName, records, allowedRecordIds = new Set()) {
   for (const record of records || []) {
     const registered = await findRegisteredRecord(service, tableName, record.id);
-    if (!registered) {
+    if (!registered && !allowedRecordIds.has(record.id)) {
       findings.push({ tableName, recordId: record.id });
     }
   }
 }
 
-async function assertNoLikelyUnregisteredScenarioRecords(service, { homeownerId, contractorId }) {
+async function assertNoLikelyUnregisteredScenarioRecords(service, { homeownerId, contractorId, retainedPropertyGraph = null }) {
   const findings = [];
 
   const homes = await ensureOk(
@@ -671,7 +845,13 @@ async function assertNoLikelyUnregisteredScenarioRecords(service, { homeownerId,
       .eq('zip_code', DEMO_PROPERTY.zip_code),
     'Unable to inspect possible unregistered demo homes'
   );
-  await addUnregisteredFindings(service, findings, 'homes', homes);
+  await addUnregisteredFindings(
+    service,
+    findings,
+    'homes',
+    homes,
+    new Set(retainedPropertyGraph ? [retainedPropertyGraph.home.id] : [])
+  );
 
   const connections = await ensureOk(
     await service
@@ -815,7 +995,17 @@ async function upsertProfileRecords(service, runId, homeownerUser, contractorUse
   return { contractorId: contractor.id };
 }
 
-async function createProperty(service, runId, homeownerId, dates) {
+async function createProperty(service, homeownerClient, runId, homeownerId, dates, retainedPropertyGraph = null) {
+  if (retainedPropertyGraph) {
+    await registerRecord(service, runId, 'homes', retainedPropertyGraph.home.id, 'demo_home', 'property_ready', { revision_aware_retained: true });
+    await registerRecord(service, runId, 'home_rooms', retainedPropertyGraph.room.id, 'demo_utility_room', 'property_ready', { revision_aware_retained: true });
+    await registerRecord(service, runId, 'home_assets', retainedPropertyGraph.asset.id, 'demo_water_heater_asset', 'property_ready', {
+      revision_aware_retained: true,
+      revision_count: retainedPropertyGraph.revisions.length,
+    });
+    return { homeId: retainedPropertyGraph.home.id, roomId: retainedPropertyGraph.room.id, assetId: retainedPropertyGraph.asset.id };
+  }
+
   const home = await ensureOk(
     await service
       .from('homes')
@@ -853,28 +1043,23 @@ async function createProperty(service, runId, homeownerId, dates) {
   await registerCreatedRecord(service, runId, 'home_rooms', room.id, 'demo_utility_room', 'property_ready');
 
   const asset = await ensureOk(
-    await service
-      .from('home_assets')
-      .insert({
-        home_id: home.id,
-        home_room_id: room.id,
-        asset_category: 'plumbing',
-        asset_type: 'water_heater',
-        name: 'Existing 40-gallon water heater',
-        manufacturer: 'DemoHome',
-        model: 'WH-40-FICTIONAL',
-        install_date: dates.waterHeaterInstallDate,
-        warranty_expires_on: dates.waterHeaterWarrantyDate,
-        notes: 'Fictional asset record for Demo Mode. Serial numbers and real property details are intentionally omitted.',
-        created_by: homeownerId,
-        created_at: dates.propertyCreatedAt,
-        updated_at: dates.propertyCreatedAt,
-      })
-      .select('id')
-      .single(),
+    await homeownerClient.rpc('servsync_create_property_asset', {
+      p_home_id: home.id,
+      p_home_room_id: room.id,
+      p_asset_kind: 'plumbing',
+      p_asset_type: 'water_heater',
+      p_name: 'Existing 40-gallon water heater',
+      p_manufacturer: 'DemoHome',
+      p_model: 'WH-40-FICTIONAL',
+      p_install_date: dates.waterHeaterInstallDate,
+      p_warranty_expires_on: dates.waterHeaterWarrantyDate,
+      p_notes: 'Fictional asset record for Demo Mode. Serial numbers and real property details are intentionally omitted.',
+    }),
     'Unable to create demo home asset'
   );
-  await registerCreatedRecord(service, runId, 'home_assets', asset.id, 'demo_water_heater_asset', 'property_ready');
+  // The bridge creates an immutable baseline revision in the same RPC transaction.
+  // If registration fails, the exact graph is recoverable on the next run and must not be hard-deleted.
+  await registerRecord(service, runId, 'home_assets', asset.id, 'demo_water_heater_asset', 'property_ready');
 
   return { homeId: home.id, roomId: room.id, assetId: asset.id };
 }
@@ -1687,6 +1872,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
 
   const records = run.records;
   const counts = countBy(records, 'table_name');
+  let verifiedPropertyGraph = null;
   const requiredTables = REQUIRED_SCENARIO_TABLES.filter((tableName) => {
     if (['homeowner_contractor_connections', 'connection_permissions'].includes(tableName)) {
       return requiresConnection;
@@ -1723,6 +1909,30 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
 
   const homeownerUser = await verifyAuthUser(service, homeownerEmail, scenarioKey, 'homeowner', issues);
   const contractorUser = await verifyAuthUser(service, contractorEmail, scenarioKey, 'contractor_owner', issues);
+  if (homeownerUser) {
+    try {
+      const propertyGraph = await loadCanonicalPropertyGraph(service, homeownerUser.id);
+      if (!propertyGraph) {
+        issues.push('Canonical revision-backed demo property graph is missing.');
+      } else {
+        verifiedPropertyGraph = propertyGraph;
+        const registeredIds = new Map(
+          records
+            .filter((record) => Object.hasOwn(REVISION_RETAINED_RECORD_ROLES, record.table_name))
+            .map((record) => [record.table_name, record.record_id])
+        );
+        if (
+          registeredIds.get('homes') !== propertyGraph.home.id ||
+          registeredIds.get('home_rooms') !== propertyGraph.room.id ||
+          registeredIds.get('home_assets') !== propertyGraph.asset.id
+        ) {
+          issues.push('Canonical revision-backed demo property graph does not match the active run registry.');
+        }
+      }
+    } catch (error) {
+      issues.push(error.message);
+    }
+  }
   if (homeownerUser && contractorUser) {
     if (homeownerUser.id === contractorUser.id) {
       issues.push('Homeowner and contractor auth users resolved to the same ID.');
@@ -2220,6 +2430,15 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         invoices: scenarioInvoices.length,
         homeHistoryRows: homeHistoryRows.length,
       },
+      propertyAssetBridge: verifiedPropertyGraph
+        ? {
+            homeId: verifiedPropertyGraph.home.id,
+            roomId: verifiedPropertyGraph.room.id,
+            assetId: verifiedPropertyGraph.asset.id,
+            revisionNumber: verifiedPropertyGraph.asset.revision_number,
+            revisionCount: verifiedPropertyGraph.revisions.length,
+          }
+        : null,
       registry: {
         tables: counts,
         recordsChecked: records.length,
@@ -2246,14 +2465,22 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
     const homeownerUser = await ensureAuthUser(service, homeownerEmail, homeownerPassword, scenarioKey, 'homeowner');
     const contractorUser = await ensureAuthUser(service, contractorEmail, contractorPassword, scenarioKey, 'contractor_owner');
     assertDistinctDemoIdentities(homeownerEmail, contractorEmail, homeownerUser, contractorUser);
+    const homeownerClient = await signInDemoUser(makeUserClient, homeownerEmail, homeownerPassword);
+    const contractorClient = await signInDemoUser(makeUserClient, contractorEmail, contractorPassword);
 
     const { contractorId } = await upsertProfileRecords(service, runId, homeownerUser, contractorUser, dates, env);
+    const retainedPropertyGraph = await loadCanonicalPropertyGraph(service, homeownerUser.id);
     await assertNoLikelyUnregisteredScenarioRecords(service, {
       homeownerId: homeownerUser.id,
       contractorId,
+      retainedPropertyGraph,
     });
 
-    runId = await startRun(service, scenarioKey, 'seed', target, dates, checkpointKey);
+    runId = await startRun(service, scenarioKey, 'seed', target, dates, checkpointKey, {
+      homeowner_user_id: homeownerUser.id,
+      contractor_user_id: contractorUser.id,
+      contractor_id: contractorId,
+    });
     const created = {
       contractorId,
       homeId: null,
@@ -2271,7 +2498,7 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
     const executedSteps = ['identities', 'profilesAndCompany'];
 
     if (checkpointRequires(checkpointKey, 'property')) {
-      const { homeId } = await createProperty(service, runId, homeownerUser.id, dates);
+      const { homeId } = await createProperty(service, homeownerClient, runId, homeownerUser.id, dates, retainedPropertyGraph);
       created.homeId = homeId;
       executedSteps.push('property');
     }
@@ -2285,9 +2512,6 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       created.connectionId = connectionId;
       executedSteps.push('connection');
     }
-
-    const homeownerClient = await signInDemoUser(makeUserClient, homeownerEmail, homeownerPassword);
-    const contractorClient = await signInDemoUser(makeUserClient, contractorEmail, contractorPassword);
 
     if (checkpointRequires(checkpointKey, 'request')) {
       const { requestId } = await createServiceRequest(homeownerClient, service, runId, created.connectionId, created.homeId, dates);
@@ -2436,8 +2660,18 @@ async function resetScenario(env, target, scenarioKey) {
         action,
       })),
       removed_count: resetResult.removed.length,
+      retained_property_graphs: resetResult.considered
+        .map((item) => item.retainedPropertyGraph)
+        .filter(Boolean),
     });
-    return { operation: 'reset', runId: null, resetRunId, removed: resetResult.removed, considered: resetResult.considered };
+    return {
+      operation: 'reset',
+      runId: null,
+      resetRunId,
+      removed: resetResult.removed,
+      retainedPropertyGraphs: resetResult.considered.map((item) => item.retainedPropertyGraph).filter(Boolean),
+      considered: resetResult.considered,
+    };
   } catch (error) {
     await finishRun(service, resetRunId, 'failed', { error: error.message }).catch(() => {});
     throw error;
@@ -2471,6 +2705,7 @@ function summarize(result, target, scenarioKey) {
       : undefined,
     records: result.records,
     removedCount: result.removed?.length || result.previousReset?.removed?.length || 0,
+    retainedPropertyGraphs: result.retainedPropertyGraphs,
     verification: result.verification,
     externalEffects: result.externalEffects || 'No external effects were triggered by this runner.',
     success: true,
