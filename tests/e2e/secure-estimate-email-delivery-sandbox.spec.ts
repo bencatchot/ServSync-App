@@ -122,10 +122,17 @@ test.describe.serial('Secure Estimate email delivery Sandbox probes', () => {
 
   test.afterAll(async () => {
     if (operator && estimateIds.length > 0) {
-      await operator.from('estimate_line_items').delete().in('estimate_id', estimateIds);
-      await operator.from('estimates').delete().in('id', estimateIds);
+      const deletedEvents = await operator.from('workflow_activity_events').delete().in('estimate_id', estimateIds);
+      expect(deletedEvents.error).toBeNull();
+      const deletedLines = await operator.from('estimate_line_items').delete().in('estimate_id', estimateIds);
+      expect(deletedLines.error).toBeNull();
+      const deletedEstimates = await operator.from('estimates').delete().in('id', estimateIds);
+      expect(deletedEstimates.error).toBeNull();
     }
-    if (operator && contactId) await operator.from('contractor_local_contacts').delete().eq('id', contactId);
+    if (operator && contactId) {
+      const deletedContact = await operator.from('contractor_local_contacts').delete().eq('id', contactId);
+      expect(deletedContact.error).toBeNull();
+    }
     await Promise.all(Object.values(accounts).map(account => account.auth.signOut().catch(() => undefined)));
   });
 
