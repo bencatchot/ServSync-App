@@ -276,6 +276,7 @@ import {
   contractorFinancialActionVisibility,
   invoiceRecordOpensEditable,
 } from './features/work/financialActionVisibility';
+import { contractorJobActionVisibility } from './features/work/jobActionVisibility';
 import {
   ContractorPriceBookWorkspace,
   type ContractorPriceBookBulkChanges,
@@ -22219,6 +22220,8 @@ function ContractorDashboard({
   };
   const financialActionVisibility = contractorFinancialActionVisibility(durableDraftCapabilities);
   const canManageFinancialActions = financialActionVisibility.canManageBilling;
+  const jobActionVisibility = contractorJobActionVisibility(durableDraftCapabilities);
+  const canManageJobOperations = jobActionVisibility.canManageJobOperations;
   const authorizedInvoiceComposerOpen = canManageFinancialActions && invoiceComposerOpen;
   useEffect(() => {
     if (durableDraftCapabilityLoading || canManageFinancialActions) return;
@@ -30437,6 +30440,10 @@ function ContractorDashboard({
     options?: { silent?: boolean },
   ) => {
     if (!supabase) return;
+    if (!canManageJobOperations) {
+      if (!options?.silent) setError('This Job is read-only for your role.');
+      return;
+    }
     if (!inspectionCanSaveProgress(insp)) {
       if (!options?.silent) setError('Completed jobs must be reopened before editing.');
       return;
@@ -30467,7 +30474,7 @@ function ContractorDashboard({
     const shouldClearDraft = next && 'inspectionId' in next && next.inspectionId === null;
     const draftSnapshot = shouldClearDraft
       ? null
-      : activeInspection && inspectionCanSaveProgress(activeInspection)
+      : activeInspection && canManageJobOperations && inspectionCanSaveProgress(activeInspection)
         ? {
             inspectionId: activeInspection.id,
             rooms_with_findings: buildInspectionRoomsSnapshot(),
@@ -30520,6 +30527,10 @@ function ContractorDashboard({
 
   // ── Inspection helpers ────────────────────────────────────────────────────
   const startNewInspection = async () => {
+    if (!canManageJobOperations) {
+      setError('This role cannot create Jobs.');
+      return;
+    }
     const hasSubject = inspectionNewDraft.subject_type === 'connected'
       ? Boolean(inspectionNewDraft.homeowner_user_id)
       : Boolean(inspectionNewDraft.local_contact_id);
@@ -30728,6 +30739,10 @@ function ContractorDashboard({
 
   const saveInspectionProgress = async (insp: Inspection, options?: { silent?: boolean }) => {
     if (!supabase) return;
+    if (!canManageJobOperations) {
+      if (!options?.silent) setError('This Job is read-only for your role.');
+      return;
+    }
     if (!options?.silent) setSavingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
@@ -30743,6 +30758,10 @@ function ContractorDashboard({
     setError('');
     if (!supabase || !contractor) {
       setError('We could not finalize this report because your contractor session is not ready. Please refresh and try again.');
+      return;
+    }
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
       return;
     }
     if (!options?.skipConfirmation) {
@@ -30850,6 +30869,10 @@ function ContractorDashboard({
     if (!supabase) return;
     setNotice('');
     setError('');
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     if (!insp.homeowner_user_id) {
       setError('This report is for a not-connected customer who does not have a ServSync account yet.');
       return;
@@ -30909,6 +30932,10 @@ function ContractorDashboard({
     if (!supabase) return;
     setNotice('');
     setError('');
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     const completedAt = new Date().toISOString();
     const summaryText = inspectionSummary.trim()
       ? cleanHumanWrittenText(inspectionSummary)
@@ -30975,6 +31002,10 @@ function ContractorDashboard({
 
   const deleteInspection = async (insp: Inspection) => {
     if (!supabase) return;
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     if (isComposerDraftJob(insp)) {
       setError('Draft Jobs can only be managed from the Drafts section.');
       return;
@@ -31026,7 +31057,7 @@ function ContractorDashboard({
     } catch {
       stored = null;
     }
-    const storedDraft = insp.status === 'draft' && stored?.draftSnapshot?.inspectionId === insp.id
+    const storedDraft = canManageJobOperations && insp.status === 'draft' && stored?.draftSnapshot?.inspectionId === insp.id
       ? stored.draftSnapshot
       : null;
     const roomsWithFindings = storedDraft?.rooms_with_findings ?? insp.rooms_with_findings;
@@ -31100,6 +31131,10 @@ function ContractorDashboard({
 
   const reopenJobFromInvoice = async (jobId: string) => {
     if (!supabase) return;
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     const currentJob = inspections.find(item => item.id === jobId) ?? null;
     if (currentJob?.status === 'finalized') {
       setError('Filed report jobs cannot be reopened from the invoice screen yet. Open the job report if you need to review it.');
@@ -31245,7 +31280,7 @@ function ContractorDashboard({
   }, [contractorTab, contractorJobsView, inspectionView, loading, inspections, activeInspection]);
 
   useEffect(() => {
-    if (!activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;
+    if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;
     const signature = JSON.stringify({
       id: activeInspection.id,
       rooms: activeRooms,
@@ -31262,10 +31297,14 @@ function ContractorDashboard({
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection]);
+  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection, canManageJobOperations]);
 
   const handleInspectionPhotoUpload = async (key: string, file: File) => {
     if (!supabase || !contractor || !activeInspection) return;
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     setUploadingInspectionPhotoKey(key);
     try {
       const ext = file.name.split('.').pop() ?? 'jpg';
@@ -31291,6 +31330,10 @@ function ContractorDashboard({
   };
 
   const removeInspectionPhoto = async (key: string, url: string) => {
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     const current = localFindings[key];
     if (!current) return;
     const nextFindings = { ...localFindings, [key]: { ...current, photos: (current.photos ?? []).filter(p => p !== url) } };
@@ -31373,6 +31416,10 @@ function ContractorDashboard({
 
   const saveActiveFieldWorkAsTemplate = async () => {
     if (!supabase || !contractor || !activeInspection) return;
+    if (!canManageJobOperations) {
+      setError('This Job is read-only for your role.');
+      return;
+    }
     const rooms: InspectionTemplateRoom[] = buildInspectionRoomsSnapshot()
       .map(room => ({
         room: room.room,
@@ -40571,7 +40618,7 @@ function ContractorDashboard({
                                     </p>
                                   )}
                                 </div>
-                                {!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                                   <button
                                     type="button"
                                     onClick={() => void deleteInspection(insp)}
@@ -40584,9 +40631,9 @@ function ContractorDashboard({
                                 <button type="button" onClick={() => openInspection(insp)} className={mobileButtonClass('secondary')}>
                                   {SERVSYNC_DEMO_PRESENTATION_MODE
                                     ? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'
-                                    : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
+                                    : !canManageJobOperations ? 'View Job' : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                                 </button>
-                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !checklistStyle && inspectionIsOpenJob(insp) && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && !checklistStyle && inspectionIsOpenJob(insp) && (
                                   <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={mobileButtonClass('primary')}>
                                     <CheckCircle2 size={15} />
                                     Complete Job
@@ -41713,7 +41760,7 @@ function ContractorDashboard({
                             </p>
                             {!checklistStyle && insp.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>}
                           </div>
-                          {!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
+                          {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                             <button
                               type="button"
                               onClick={() => void deleteInspection(insp)}
@@ -41727,7 +41774,7 @@ function ContractorDashboard({
                           <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
                             {SERVSYNC_DEMO_PRESENTATION_MODE
                               ? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'
-                              : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
+                              : !canManageJobOperations ? 'View Job' : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                           </button>
                         </div>
                       );
@@ -42444,7 +42491,7 @@ function ContractorDashboard({
               const approvedScopeRooms = workingRooms.filter(room => roomIsApprovedScope(room.room));
               const approvedWorkItems = approvedScopeRooms.flatMap(room => room.findings);
               const completed = inspectionIsClosedJob(activeInspection);
-              const simpleJobReadonly = activeInspection.status !== 'draft' || completed;
+              const simpleJobReadonly = !canManageJobOperations || activeInspection.status !== 'draft' || completed;
               const simpleWorkRooms = workingRooms.filter(room => !roomIsApprovedScope(room.room));
               const simpleTaskRows = simpleWorkRooms.flatMap(room =>
                 room.findings.map(finding => ({
@@ -42624,7 +42671,7 @@ function ContractorDashboard({
                 );
               };
               return (
-                <div className="space-y-4">
+                <div className="space-y-4" data-testid={canManageJobOperations ? 'contractor-job-operational-detail' : 'contractor-job-readonly-detail'}>
                   <button
                     type="button"
                     onClick={() => {
@@ -42671,21 +42718,24 @@ function ContractorDashboard({
                                   className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3"
                                 >
                                   <div className="flex flex-wrap items-start gap-3">
-                                    <label className="mt-0.5 flex items-center gap-2 text-sm font-semibold text-slate-950">
-                                      <input
-                                        type="checkbox"
-                                        aria-label={`Complete approved work: ${item.title}`}
-                                        data-testid="contractor-approved-work-checkbox"
-                                        checked={taskComplete}
-                                        disabled={simpleJobReadonly}
-                                        onChange={event => setSimpleTaskValue(room, item.title, {
-                                          status: event.target.checked ? 'Fixed On Site' : 'Monitor',
-                                          action: event.target.checked ? 'Completed approved work.' : item.action,
-                                        })}
-                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
-                                      />
-                                      <span>{item.title}</span>
-                                    </label>
+                                    {simpleJobReadonly ? (
+                                      <p className="mt-0.5 text-sm font-semibold text-slate-950">{item.title}</p>
+                                    ) : (
+                                      <label className="mt-0.5 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                                        <input
+                                          type="checkbox"
+                                          aria-label={`Complete approved work: ${item.title}`}
+                                          data-testid="contractor-approved-work-checkbox"
+                                          checked={taskComplete}
+                                          onChange={event => setSimpleTaskValue(room, item.title, {
+                                            status: event.target.checked ? 'Fixed On Site' : 'Monitor',
+                                            action: event.target.checked ? 'Completed approved work.' : item.action,
+                                          })}
+                                          className="h-4 w-4 accent-blue-600"
+                                        />
+                                        <span>{item.title}</span>
+                                      </label>
+                                    )}
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${taskComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                                       {taskComplete ? 'Complete' : 'Not complete'}
                                     </span>
@@ -42715,52 +42765,64 @@ function ContractorDashboard({
                                 return (
                                   <div key={row.key} data-testid="contractor-work-item" data-work-title={row.finding.title} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
-                                      <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                        <input
-                                          type="checkbox"
-                                          aria-label={`${taskComplete ? 'Mark incomplete' : 'Complete work item'}: ${row.finding.title}`}
-                                          data-testid="contractor-work-item-checkbox"
-                                          checked={taskComplete}
-                                          disabled={simpleJobReadonly}
-                                          onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, {
-                                            status: event.target.checked ? 'Fixed On Site' : 'Monitor',
-                                            action: event.target.checked ? 'Completed.' : row.finding.action,
-                                          })}
-                                          className="h-4 w-4 accent-blue-600 disabled:opacity-50"
-                                        />
-                                        {taskComplete ? 'Complete' : 'Not complete'}
-                                      </label>
+                                      {simpleJobReadonly ? (
+                                        <span className={`mt-2 rounded-full px-2 py-1 text-xs font-semibold ${taskComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                          {taskComplete ? 'Complete' : 'Not complete'}
+                                        </span>
+                                      ) : (
+                                        <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                          <input
+                                            type="checkbox"
+                                            aria-label={`${taskComplete ? 'Mark incomplete' : 'Complete work item'}: ${row.finding.title}`}
+                                            data-testid="contractor-work-item-checkbox"
+                                            checked={taskComplete}
+                                            onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, {
+                                              status: event.target.checked ? 'Fixed On Site' : 'Monitor',
+                                              action: event.target.checked ? 'Completed.' : row.finding.action,
+                                            })}
+                                            className="h-4 w-4 accent-blue-600"
+                                          />
+                                          {taskComplete ? 'Complete' : 'Not complete'}
+                                        </label>
+                                      )}
                                       <div className="min-w-0 flex-1 basis-full sm:basis-0">
                                         <label className="block text-xs font-semibold text-slate-500">Task</label>
-                                        <input
-                                          key={`${row.key}-title`}
-                                          className={`${inputClass()} mt-1`}
-                                          {...writingAssistProps}
-                                          data-prose-cleanup="true"
-                                          defaultValue={row.finding.title}
-                                          disabled={simpleJobReadonly}
-                                          onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, cleanHumanLabelText(event.target.value))}
-                                        />
+                                        {simpleJobReadonly ? (
+                                          <p className="mt-1 text-sm font-medium text-slate-900">{row.finding.title}</p>
+                                        ) : (
+                                          <input
+                                            key={`${row.key}-title`}
+                                            className={`${inputClass()} mt-1`}
+                                            {...writingAssistProps}
+                                            data-prose-cleanup="true"
+                                            defaultValue={row.finding.title}
+                                            onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, cleanHumanLabelText(event.target.value))}
+                                          />
+                                        )}
                                       </div>
-                                      <button
-                                        type="button"
-                                        disabled={simpleJobReadonly}
-                                        onClick={() => removeSimpleTask(row.roomKey, row.finding.title)}
-                                        className="w-full rounded-lg border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40 sm:mt-6 sm:w-auto"
-                                      >
-                                        Remove
-                                      </button>
+                                      {!simpleJobReadonly && (
+                                        <button
+                                          type="button"
+                                          onClick={() => removeSimpleTask(row.roomKey, row.finding.title)}
+                                          className="w-full rounded-lg border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 sm:mt-6 sm:w-auto"
+                                        >
+                                          Remove
+                                        </button>
+                                      )}
                                     </div>
                                     {renderSimpleTaskPhotoControls(row.key, row.finding.title, row.finding.photos ?? [])}
                                     <label className="mt-3 block text-xs font-semibold text-slate-500">Notes</label>
-                                    <textarea
-                                      className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
-                                      {...writingAssistProps}
-                                      value={row.finding.notes}
-                                      disabled={simpleJobReadonly}
-                                      onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, { notes: event.target.value })}
-                                      placeholder="Add parts used, location, completion detail, or follow-up notes..."
-                                    />
+                                    {simpleJobReadonly ? (
+                                      <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700">{row.finding.notes || 'No notes recorded.'}</p>
+                                    ) : (
+                                      <textarea
+                                        className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
+                                        {...writingAssistProps}
+                                        value={row.finding.notes}
+                                        onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, { notes: event.target.value })}
+                                        placeholder="Add parts used, location, completion detail, or follow-up notes..."
+                                      />
+                                    )}
                                   </div>
                                 );
                               })}
@@ -42798,18 +42860,21 @@ function ContractorDashboard({
                       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-950">Work Notes</h3>
                         <p className="mt-1 text-xs text-slate-500">Use this for the contractor-facing scope, progress notes, or completion summary. Full service job photo notes can be expanded in a later PR without changing this workflow.</p>
-                        <textarea
-                          className={`${inputClass()} mt-3 min-h-[150px] resize-y`}
-                          {...writingAssistProps}
-                          value={inspectionSummary}
-                          onChange={event => setInspectionSummary(event.target.value)}
-                          disabled={activeInspection.status !== 'draft' || completed}
-                          placeholder="Describe work performed, materials used, open follow-up, or completion notes..."
-                        />
+                        {simpleJobReadonly ? (
+                          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{inspectionSummary || 'No work notes recorded.'}</p>
+                        ) : (
+                          <textarea
+                            className={`${inputClass()} mt-3 min-h-[150px] resize-y`}
+                            {...writingAssistProps}
+                            value={inspectionSummary}
+                            onChange={event => setInspectionSummary(event.target.value)}
+                            placeholder="Describe work performed, materials used, open follow-up, or completion notes..."
+                          />
+                        )}
                       </div>
                     </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  {canManageJobOperations && <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
@@ -42837,12 +42902,12 @@ function ContractorDashboard({
                         )}
                       </div>
                     </div>
-                  </div>
+                  </div>}
                 </div>
               );
             }
             return (
-              <div className="space-y-4">
+              <div className="space-y-4" data-testid={canManageJobOperations ? 'contractor-job-operational-detail' : 'contractor-job-readonly-detail'}>
                 <button
                   type="button"
                   onClick={() => {
@@ -42897,17 +42962,19 @@ function ContractorDashboard({
                 {/* ── CHECKLIST SUB-TAB ── */}
                 {inspectionSubTab === 'checklist' && (
                   <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <div className="flex" style={{ height: 'calc(100vh - 360px)', minHeight: '560px' }}>
+                    <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-360px)] lg:min-h-[560px]">
                       {/* Left: Sections sidebar */}
-                      <div className="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+                      <div className="flex max-h-64 w-full shrink-0 flex-col border-b border-slate-200 bg-white lg:max-h-none lg:w-64 lg:border-b-0 lg:border-r">
                         <div className="px-4 py-4 border-b border-slate-100 flex items-center justify-between">
                           <div>
                             <h2 className="font-semibold text-slate-800 text-sm">Sections</h2>
                             <p className="text-xs text-slate-400 mt-0.5">{activeRooms.length} section{activeRooms.length === 1 ? '' : 's'}</p>
                           </div>
-                          <button type="button" onClick={() => setShowAddRoom(true)} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
-                            <Plus size={14} /> Add
-                          </button>
+                          {canManageJobOperations && (
+                            <button type="button" onClick={() => setShowAddRoom(true)} className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700">
+                              <Plus size={14} /> Add
+                            </button>
+                          )}
                         </div>
                         <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
                           {activeRooms.length === 0 ? (
@@ -42931,7 +42998,7 @@ function ContractorDashboard({
                                   <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>{roomLabel}</p>
                                   <p className="text-xs text-slate-400">{rm.items.length} items{flagged > 0 ? ` · ${flagged} flagged` : ''}</p>
                                 </div>
-                                <button
+                                {canManageJobOperations && <button
                                   type="button"
                                   onClick={e => {
                                     e.stopPropagation();
@@ -42949,7 +43016,7 @@ function ContractorDashboard({
                                   className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
                                 >
                                   <Trash2 size={13} />
-                                </button>
+                                </button>}
                               </div>
                             );
                           })}
@@ -42991,6 +43058,40 @@ function ContractorDashboard({
                         if (!roomData || !availableRoomData) return null;
                         const selectedRoomKey = roomIdentityKey(roomData);
                         const selectedRoomLabel = roomDisplayLabel(roomData);
+
+                        if (!canManageJobOperations) {
+                          return (
+                            <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6" data-testid="viewer-job-checklist-readonly">
+                              <div className="max-w-2xl space-y-4">
+                                <div>
+                                  <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+                                    <span>{getRoomInspectionIcon(selectedRoomLabel)}</span>
+                                    {selectedRoomLabel}
+                                  </h2>
+                                  <p className="text-sm text-slate-500">{roomData.items.length} checklist item{roomData.items.length === 1 ? '' : 's'}</p>
+                                </div>
+                                {roomData.items.length === 0 ? (
+                                  <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">No checklist items recorded.</p>
+                                ) : (
+                                  <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                    {roomData.items.map(item => {
+                                      const finding = localFindings[findingStateKey(roomData, item)];
+                                      return (
+                                        <div key={item} className="px-4 py-3">
+                                          <div className="flex flex-wrap items-start justify-between gap-2">
+                                            <p className="text-sm font-semibold text-slate-800">{item}</p>
+                                            {finding && <StatusBadge {...findingStatusPresentation(finding.status)} />}
+                                          </div>
+                                          {finding?.notes && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{finding.notes}</p>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
 
                         const recommended = recommendedItemsForRoom(selectedRoomLabel);
                         const currentSet = new Set(roomData.items.map(item => normalizeChecklistItem(item)));
@@ -43257,7 +43358,7 @@ function ContractorDashboard({
                     </div>
 
                     {/* Add Section modal */}
-                    {showAddRoom && (
+                    {showAddRoom && canManageJobOperations && (
                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowAddRoom(false)}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -43327,6 +43428,41 @@ function ContractorDashboard({
                 {inspectionSubTab === 'inspect' && (() => {
                   const activeWorkRoom = findRoomByIdentity(activeRooms, selectedChecklistRoom) ?? activeRooms[0] ?? null;
                   const activeWorkRoomKey = activeWorkRoom ? roomIdentityKey(activeWorkRoom) : null;
+                  if (!canManageJobOperations) {
+                    return (
+                      <div className="space-y-4" data-testid="viewer-job-findings-readonly">
+                        {workingRooms.length === 0 ? (
+                          <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">No work notes recorded.</p>
+                        ) : workingRooms.map(room => (
+                          <div key={room.room} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <div className="border-b border-slate-100 px-4 py-3">
+                              <h3 className="font-semibold text-slate-800">{room.room}</h3>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                              {room.findings.map(finding => (
+                                <div key={finding.title} className="px-4 py-3">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-800">{finding.title}</p>
+                                    <StatusBadge {...findingStatusPresentation(finding.status)} />
+                                  </div>
+                                  {finding.notes && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{finding.notes}</p>}
+                                  {finding.action && <p className="mt-2 text-sm font-medium text-blue-700">{finding.action}</p>}
+                                  {finding.due && <p className="mt-1 text-xs text-slate-500">Follow-up: {finding.due}</p>}
+                                  {(finding.photos ?? []).length > 0 && (
+                                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                      {(finding.photos ?? []).map((photo, index) => (
+                                        <InspectionPhotoImage key={`${photo}-${index}`} photo={photo} alt={finding.title} className="h-20 w-full rounded-lg object-cover" />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
                   return (
                     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                       <div className="flex flex-col" style={{ height: 'calc(100vh - 360px)', minHeight: '600px' }}>
@@ -43860,7 +43996,7 @@ function ContractorDashboard({
                         </div>
                       </div>
 
-                      {activeInspection.status === 'draft' && (
+                      {canManageJobOperations && activeInspection.status === 'draft' && (
                         inspectionClosedForReview ? (
                           <VisibilityNotice
                             title="Closed for review"
@@ -43905,7 +44041,7 @@ function ContractorDashboard({
                       )}
 
                       {/* Repair estimate draft */}
-                      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                      {canManageFinancialActions && <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
                         <div className="border-b border-slate-200 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-sm font-semibold text-slate-950">Repair Estimate Draft</p>
@@ -44045,10 +44181,10 @@ function ContractorDashboard({
                             </div>
                           )}
                         </div>
-                      </div>
+                      </div>}
 
                       {/* PDF output options */}
-                      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                      {canManageJobOperations && <div className="bg-white rounded-2xl border border-slate-200 p-5">
                         <div className="mb-4">
                           <h3 className="font-semibold text-slate-800 text-sm">PDF Output Options</h3>
                           <p className="text-xs text-slate-400 mt-0.5">Choose which narrative sections should appear on the homeowner-facing PDF.</p>
@@ -44099,7 +44235,7 @@ function ContractorDashboard({
                             </Field>
                           )}
                         </div>
-                      </div>
+                      </div>}
 
                       {/* Professional Summary card */}
                       <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -44114,7 +44250,7 @@ function ContractorDashboard({
                         </div>
 
                         {/* Editable homeowner summary (only when closed for review + draft) */}
-                        {activeInspection.status === 'draft' && inspectionClosedForReview && (
+                        {canManageJobOperations && activeInspection.status === 'draft' && inspectionClosedForReview && (
                           <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
                             <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Edit homeowner summary before filing</p>
                             <textarea
@@ -44289,7 +44425,7 @@ function ContractorDashboard({
                               localContact={reportLocalContact}
                             />
                           )}
-                        {reportSentAndCompleted ? (
+                        {canManageJobOperations && (reportSentAndCompleted ? (
                           <VisibilityNotice
                             title="Report sent · Job complete"
                             body={linkedServiceRequest ? 'The linked service request is closed for the homeowner.' : 'The finalized report has been sent to the homeowner.'}
@@ -44316,8 +44452,8 @@ function ContractorDashboard({
                           >
                             <Send size={14} /> {sendingInspectionReportId === activeInspection.id ? 'Completing...' : 'Complete job & send report'}
                           </button>
-                        ) : null}
-                        {!reportSentAndCompleted && !SERVSYNC_DEMO_PRESENTATION_MODE && (
+                        ) : null)}
+                        {canManageJobOperations && !reportSentAndCompleted && !SERVSYNC_DEMO_PRESENTATION_MODE && (
                           <VisibilityNotice
                             title="Send after finalization"
                             body={reportSendHelperText}
@@ -44327,7 +44463,7 @@ function ContractorDashboard({
                           />
                         )}
 
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && (activeInspection.status === 'draft' ? (
+                        {canManageJobOperations && !SERVSYNC_DEMO_PRESENTATION_MODE && (activeInspection.status === 'draft' ? (
                           <button
                             type="button"
                             disabled={!inspectionClosedForReview || unansweredReportFindings.length > 0 || recordedReportFindings.length === 0 || finalizingInspection}
@@ -44347,7 +44483,7 @@ function ContractorDashboard({
                             testId="report-filed-notice"
                           />
                         ))}
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+                        {canManageJobOperations && !SERVSYNC_DEMO_PRESENTATION_MODE && (
                           <VisibilityNotice
                             title={activeInspection.status === 'finalized' ? 'Report finalized' : inspectionClosedForReview ? 'Finalize report' : 'Close for review first'}
                             body={finalizeReportHelperText}
@@ -44357,7 +44493,7 @@ function ContractorDashboard({
                           />
                         )}
 
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="text-[11px] leading-relaxed text-slate-400 px-1">
+                        {canManageJobOperations && !SERVSYNC_DEMO_PRESENTATION_MODE && <p className="text-[11px] leading-relaxed text-slate-400 px-1">
                           Finalize saves and files the PDF. Connected customers can then view it in Documents and Home History and receive an in-app notification. Complete job & send closes the linked request and sends the completion notice.
                         </p>}
 
@@ -44421,7 +44557,7 @@ function ContractorDashboard({
                                   : 'Create Invoice'}
                         </button>}
 
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && <button
                           type="button"
                           disabled
                           title="Standalone scheduling coming soon"
@@ -44435,7 +44571,7 @@ function ContractorDashboard({
                   );
                 })()}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                {canManageJobOperations && <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
@@ -44460,7 +44596,7 @@ function ContractorDashboard({
                       )}
                     </div>
                   </div>
-                </div>
+                </div>}
 
               </div>
             );

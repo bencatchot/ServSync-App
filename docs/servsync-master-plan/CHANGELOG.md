@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-12 - FB-035 Viewer Job Lifecycle Visibility v1
+
+- Branch: `codex/fb035-viewer-job-lifecycle-visibility-v1`
+- Starting main SHA: `12d774313fbf5633efd0c8a97ad9f1d198c864fa`
+- Files changed: contractor Job presentation and fail-closed handlers in `src/App.tsx`; a shared Job-action visibility adapter; focused role, lifecycle, work-item, checklist/report, stale-route, and responsive regressions; FB-035 backlog/rollout status; master plan; Contractor Work specification; completed-features ledger; Marketing Product Inventory; and this changelog.
+- Summary of change: Aligns Viewer Job presentation with the existing server-resolved Job-write capability. Viewer retains authorized Job, customer/property, work-item, checklist/finding, linked-record, report, and PDF reads through clean display-only surfaces, while Job create/save/complete/delete, checklist/finding/photo/report mutation, local draft autosave, and financial controls remain unavailable. Owner/Admin/Office and Field Technician retain their established lifecycle-eligible operational Job controls; PR #438 billing restrictions remain separate and intact.
+- Reason for change: The server already denied Viewer Job mutations, but shared client components still exposed editable inputs and lifecycle actions that ended in permission errors.
+- Tests/checks run: Focused Job capability and Viewer lifecycle Playwright source/logic coverage; PR #438 financial visibility regression; existing Draft/Estimate-to-Job/Job/work-item/checklist/report/billing/customer/mobile suites; typecheck; Production build; backend parity and rollout-ledger validation; sensitive-value scan; focused lint where available; `git diff --check`; exact-head Preview checks and detached review.
+- Known risks or follow-ups: This slice changes presentation only. Server RLS/RPC/tenant/lifecycle/inactive-member/cross-tenant authority remains authoritative and unchanged. Admin/Office Estimate launch/edit/send remains an unresolved product-policy decision. Authenticated lower-role Production mutation smoke remains separately governed optional evidence.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 records Viewer Job lifecycle presentation as complete while retaining the Admin/Office Estimate decision, operational evidence, telemetry, and later Draft-first maturity.
+
 ## 2026-08-12 - FB-035 Role-Aware Financial Action Visibility v1
 
 - Branch: `codex/fb035-role-aware-financial-actions-v1`
