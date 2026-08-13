@@ -4,6 +4,16 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-13 - FB-035 Draft-first Work closure
+
+- Branch: `codex/fb035-draft-first-work-closure`.
+- Starting main SHA: `07996fdfb85e0859f43ad03ea38dd9073e322f85`.
+- Files changed: FB-035 backlog disposition; master plan; completed-features ledger; Contractor Work specification; Product Information Architecture; Marketing Product Inventory; focused Draft/Estimate/report source-contract tests; and this changelog.
+- Summary of change: Formally closes FB-035 as the completed canonical contractor workflow: Customer -> Create Draft -> Estimate, Job/checklist Job, or Invoice -> downstream Job/billing/payment -> Customer History. Current-state documentation now records normal Owner/Admin/Office Estimate and financial authority, Field Technician operational/non-financial authority, Viewer read-only presentation, connected/local delivery parity, accepted-only Estimate Invoice creation, historical whole-Job billing compatibility, and the standard Production `all_contractors` exposure. Historical rollout facts remain historical. Five stale assertions now protect current composer authorization boundaries, clean-main scope audits, completed accepted-only Invoice documentation, and secure local finalized-report delivery instead of obsolete source markers or wording.
+- Reason for change: The approved closure audit found no remaining contractor-visible lifecycle defect. Recurring role smoke and fixture health belong under FB-016; Draft telemetry, compatibility retirement, billing maturity, and later workflow enhancements are separately governed and no longer keep FB-035 active.
+- Tests/checks run: focused FB-035 and lifecycle Playwright coverage; backend parity and rollout-ledger validation; typecheck; Production build; documentation/current-state searches; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: The exact missing-routine `PGRST202` Estimate-send fallback remains unchanged pending a fresh catalog/compatibility retirement review. Feature-gated legacy Job/composer presentation, historical Draft import, and whole-Job billing for no-work-item historical Jobs remain intentional compatibility paths. No Production mutation was required or performed, and this closure does not add telemetry or a contractor-facing feature.
+
 ## 2026-08-13 - Demo Scenario Runner Property Asset Bridge Revision-Aware Reset v1
 
 - Branch: `codex/demo-property-asset-revision-aware-reset-v1`
