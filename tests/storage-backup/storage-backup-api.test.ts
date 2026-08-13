@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createStorageBackupHandler } from '../../api/storage-backup.ts';
-import { createStorageBackupHealthHandler } from '../../api/storage-backup-health.ts';
-import { storageBackupConfig } from '../../server/storageBackupConfig.ts';
+import { createStorageBackupHandler, createStorageBackupHealthHandler } from '../../server/storageBackupHttp.ts';
+import { parseStorageBackupRetention } from '../../server/storageBackupConfigContract.ts';
 
 test('backup endpoint requires the Cron bearer secret and returns only aggregate evidence', async () => {
   const original = process.env.CRON_SECRET;
@@ -55,37 +54,8 @@ test('health endpoint treats backups older than 36 hours as unhealthy', async ()
   }
 });
 
-test('backup configuration rejects invalid retention without constructing an operational run', () => {
-  const names = [
-    'SERVSYNC_STORAGE_BACKUP_SOURCE_PROJECT_REF',
-    'SERVSYNC_STORAGE_BACKUP_SOURCE_URL',
-    'SERVSYNC_STORAGE_BACKUP_SOURCE_SECRET_KEY',
-    'SERVSYNC_STORAGE_BACKUP_R2_ACCOUNT_ID',
-    'SERVSYNC_STORAGE_BACKUP_R2_BUCKET',
-    'SERVSYNC_STORAGE_BACKUP_R2_ENDPOINT',
-    'SERVSYNC_STORAGE_BACKUP_R2_ACCESS_KEY_ID',
-    'SERVSYNC_STORAGE_BACKUP_R2_SECRET_ACCESS_KEY',
-    'SERVSYNC_STORAGE_BACKUP_RETENTION_DAYS',
-  ] as const;
-  const original = Object.fromEntries(names.map(name => [name, process.env[name]]));
-  Object.assign(process.env, {
-    SERVSYNC_STORAGE_BACKUP_SOURCE_PROJECT_REF: 'sourceprojectref',
-    SERVSYNC_STORAGE_BACKUP_SOURCE_URL: 'https://sourceprojectref.supabase.co',
-    SERVSYNC_STORAGE_BACKUP_SOURCE_SECRET_KEY: 'test-secret',
-    SERVSYNC_STORAGE_BACKUP_R2_ACCOUNT_ID: 'account-id',
-    SERVSYNC_STORAGE_BACKUP_R2_BUCKET: 'backup-bucket',
-    SERVSYNC_STORAGE_BACKUP_R2_ENDPOINT: 'https://account-id.r2.cloudflarestorage.com',
-    SERVSYNC_STORAGE_BACKUP_R2_ACCESS_KEY_ID: 'test-access',
-    SERVSYNC_STORAGE_BACKUP_R2_SECRET_ACCESS_KEY: 'test-secret',
-    SERVSYNC_STORAGE_BACKUP_RETENTION_DAYS: 'NaN',
-  });
-  try {
-    assert.throws(storageBackupConfig, /whole number from 1 through 365/);
-  } finally {
-    for (const name of names) {
-      const value = original[name];
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-  }
+test('backup configuration rejects invalid retention before constructing an operational run', () => {
+  assert.throws(() => parseStorageBackupRetention('NaN'), /whole number from 1 through 365/);
+  assert.throws(() => parseStorageBackupRetention('90.5'), /whole number from 1 through 365/);
+  assert.equal(parseStorageBackupRetention('90'), 90);
 });
