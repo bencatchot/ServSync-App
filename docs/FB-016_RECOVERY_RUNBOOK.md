@@ -12,20 +12,20 @@ The 2026-08-13 database drill proved that a Production Supabase physical backup 
 - Two read-only Production runs captured all seven buckets and four objects (5,274,400 bytes). The second run reused all four verified object versions and wrote zero duplicate object bytes.
 - The latest exact manifest restored all four objects into a new isolated Supabase project. Restored bytes, paths, bucket privacy/settings, and SHA-256 checks passed; two contractor-logo references and one service-request-media reference resolved to recovered objects.
 - Public-object access succeeded, anonymous private-object access failed, and server-authorized private-object access succeeded. The isolated project was deleted after validation.
-- Production backup inventory omitted August 9, 10, and 11. The cause remains unresolved, and PITR is disabled.
-- The gap remained present when rechecked on 2026-08-13: Production exposed completed restore points for August 6, 7, 8, 12, and 13 only, while Demo and Sandbox exposed a completed daily point for every day from August 6 through 13. No failed, in-progress, or hidden state was returned by the Management API.
-- A sanitized Supabase support request titled `Missing Production physical backup restore points for August 9-11, 2026` was submitted for Production during the 2026-08-13 22:12-22:20 UTC audit window. The Dashboard confirmed submission to the ServSync Production project and owner email but did not expose a case ID or exact timestamp; the acknowledgment reference and provider explanation remain pending.
+- Production backup inventory omitted visible August 9, 10, and 11 restore points. Supabase ticket `SU-445711` classified this as a resolved provider restore-point visibility incident, not an observed data-protection gap.
+- The visible interval remained present when rechecked on 2026-08-13: Production exposed completed restore points for August 6, 7, 8, 12, and 13 only, while Demo and Sandbox exposed a completed daily point for every day from August 6 through 13. Supabase confirmed the affected Production data remained safe and fully recoverable for August 9-11 even though those points may remain hidden in the Dashboard.
+- Supabase stated that enabling PITR should expose an affected hidden restore date if a restore from that period becomes necessary and offered to credit the affected-timeframe PITR cost. This is recovery evidence, not authorization for ongoing PITR activation.
 - The next natural R2 Cron execution after this audit is 2026-08-14 at 04:17 UTC. The earlier post-deployment run was manual and does not count as autonomous scheduler evidence.
 - Auth, Realtime, Edge Functions, secrets, Vercel, and external-provider settings need separate secure reapplication.
 
-Consequently, full ServSync recovery readiness remains `BLOCKED`, but independent Storage-byte backup and isolated restore are now completed bounded milestones. The executable configuration and timed-drill checklist is `docs/FB-016_FULL_RECOVERY_DRILL_CHECKLIST.md`. The remaining blockers are database backup-point reliability/PITR posture, natural scheduler observation, and a timed full-application drill.
+Consequently, full ServSync recovery readiness remains `BLOCKED`, but independent database/Auth recovery, Storage-byte backup/restore, and the provider disposition of the August 9-11 visibility incident are completed bounded milestones. The executable configuration and timed-drill checklist is `docs/FB-016_FULL_RECOVERY_DRILL_CHECKLIST.md`. The remaining completion gates are natural scheduler observation and a timed full-application drill; formal Pro daily-backup RPO expectations and automatic hidden-point monitoring remain bounded provider follow-ups.
 
 ## Recovery Objectives
 
 Observed evidence, not adopted objectives:
 
 - Database restore duration: 3 minutes 57 seconds from accepted restore request to `ACTIVE_HEALTHY`.
-- Database RPO evidence: insufficient for 24 hours. The widest observed completed-backup interval was about 95 hours 56 minutes (August 8 to August 12).
+- Database RPO evidence: Supabase confirmed the August 9-11 data remained safe and recoverable, so the approximately 95-hour 56-minute August 8-to-August 12 interval is only the observed Dashboard/API visibility interval. It is not evidence of an equivalent data-loss window. Supabase has not supplied a formal Pro daily physical-backup RPO commitment without PITR.
 - Storage RPO evidence: one successful initial backup and one immediate unchanged replay on 2026-08-13. A daily 04:17 UTC schedule and a 36-hour stale-health threshold are configured, but 24-hour Storage RPO performance is not yet proven by elapsed scheduled runs.
 - Full application RPO evidence: undefined/unbounded, governed by the weakest critical layer.
 - Full application RTO evidence: not established. Database restore time excludes Storage, configuration, deployment, provider recovery, validation, and cutover.
@@ -198,11 +198,15 @@ Official provider references reviewed 2026-08-13:
 - No Vercel project, public alias, Edge Function secret, Stripe, email, SMS, maps, or AI provider was attached to the target.
 - Application validation used local process-only browser-public recovery configuration. No Production/Demo/Sandbox configuration changed.
 
-### Backup Inventory Gap
+### Backup Restore-Point Visibility Incident
 
-The Management API exposed completed physical backups on August 6, 7, 8, 12, and 13, with no August 9, 10, or 11 entries. WAL-G was enabled and PITR was disabled. A same-day recheck still exposed no failed/in-progress metadata and confirmed Demo/Sandbox daily continuity for August 6-13. The sanitized Supabase support request asks whether physical backups existed, what caused any missed jobs, what RPO a Pro project without PITR should assume, and whether missing physical backups can be monitored automatically. Its case ID and provider response are pending. Until explained and monitored, ServSync must not claim a 24-hour database RPO.
+The Management API exposed completed physical backups on August 6, 7, 8, 12, and 13, with no visible August 9, 10, or 11 entries. WAL-G was enabled and PITR was disabled. A same-day recheck still exposed no failed/in-progress metadata and confirmed Demo/Sandbox daily continuity for August 6-13.
 
-PITR remains an owner decision. Current Supabase documentation lists seven-day PITR at approximately `$100/month` per project and requires at least the Small compute add-on; longer 14- and 28-day retention is approximately `$200/month` and `$400/month`. PITR materially reduces database recovery-point granularity but does not back up Storage object bytes. If support confirms a real physical-backup failure or cannot establish a sufficiently reliable daily-backup expectation, the recommended first option is seven-day PITR while retaining the independent R2 Storage backup.
+Supabase ticket `SU-445711` confirmed that an issue caused daily physical backups to appear missing for some projects and that Supabase resolved that issue. Supabase stated that ServSync Production data for August 9-11 is safe and fully recoverable, although affected restore points may not be visible in the Dashboard. If restoration from one of those hidden dates becomes necessary, Supabase stated that enabling PITR should expose the point and that it will credit PITR cost for the affected timeframe. The approximately 95-hour 56-minute visible interval triggered the support case but is not an established database data-loss exposure.
+
+Two questions remain open: the formal durability/RPO expectation for Pro daily physical backups without PITR, and whether Supabase supports automatic monitoring for missing or hidden physical-backup restore points. These limit a provider-guarantee claim but do not reopen the resolved August 9-11 recoverability finding.
+
+PITR remains a separate owner cost/operations decision. It is not required merely to complete this drill, and the provider's affected-timeframe credit offer does not authorize ongoing activation. PITR should be reconsidered only if later technical evidence shows that the adopted recovery objective cannot be met without it. It still does not back up Storage object bytes, so independent R2 backup remains required.
 
 Official provider references reviewed 2026-08-13:
 

@@ -58,7 +58,7 @@ Related controlled beta docs:
 - [x] Schema restore verification matched 66 public tables, 179 public functions, and 66 RLS-enabled public tables; the throwaway restore target and local artifacts were cleaned up, and no secrets/artifacts were committed.
 - [x] The 2026-08-13 FB-016 isolated Production-backup drill restored full database/Auth state, proved approved contractor/homeowner authentication, passed sanitized integrity checks, and loaded ServSync against the recovery target.
 - [x] The 2026-08-13 FB-016 R2 follow-up independently backed up and hash-restored all 4 Production Storage objects / 5,274,400 bytes into an isolated target, validated bucket policies and application references, and cleaned up the target.
-- [ ] Full recovery remains blocked: August 9-11 database backup points remain unexplained, PITR is disabled, successful elapsed daily Storage scheduling needs observation, and external configuration rebuild remains a separate manual path. See `docs/FB-016_RECOVERY_RUNBOOK.md`.
+- [ ] Full recovery remains blocked: Supabase ticket `SU-445711` resolved the August 9-11 restore-point visibility incident and confirmed affected data recoverability, but successful natural daily Storage scheduling and a timed external-configuration/application recovery still need evidence. Formal Pro daily-backup RPO and automatic hidden-point monitoring remain bounded follow-ups; PITR is not a drill prerequisite. See `docs/FB-016_RECOVERY_RUNBOOK.md`.
 - [ ] Public go-live readiness and paid-subscription readiness remain separate gates from controlled private beta.
 - [ ] Public, auth, legal, trust, and beta copy avoid fake/demo claims, unsupported compliance claims, or misleading data.
 

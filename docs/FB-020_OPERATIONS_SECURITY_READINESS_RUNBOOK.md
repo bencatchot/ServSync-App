@@ -6,7 +6,7 @@ This runbook is part of FB-020: Security, Records Reliability, Backup/Restore, S
 
 This document is not approval to change production, apply SQL, modify RLS/storage policies, create users, or run production smoke tests. Those remain separate approval gates.
 
-FB-020 met the controlled private beta baseline. Active restore, Storage-byte, backup/PITR, retention, recovery, and public-launch readiness work is consolidated under FB-016. The authoritative current procedure and 2026-08-13 drill evidence are in [FB-016 Recovery Runbook](FB-016_RECOVERY_RUNBOOK.md). That drill proved database/Auth restore and local application smoke but remains blocked on independent Storage-byte recovery and an unexplained August 9-11 Production backup gap.
+FB-020 met the controlled private beta baseline. Active restore, Storage-byte, backup/PITR, retention, recovery, and public-launch readiness work is consolidated under FB-016. The authoritative current procedure and 2026-08-13 drill evidence are in [FB-016 Recovery Runbook](FB-016_RECOVERY_RUNBOOK.md). Database/Auth restore, independent R2 Storage recovery, and local application smoke are proven. Supabase ticket `SU-445711` resolved the August 9-11 condition as a restore-point visibility incident with the affected data safe and recoverable. Natural scheduler evidence and a timed full recovery drill remain pending.
 
 Controlled-operations packet policy is documented in [Controlled Operations Policy And Runbook](CONTROLLED_OPERATIONS_RUNBOOK.md). That runbook covers the local/provider-neutral evidence foundation through Slice 2D-A and the Slice 3 documentation closeout. It does not approve live provider adapters, credentials, SQL, deployment, Supabase, Vercel, Production, Sandbox, Preview, Demo, or customer-data access.
 
