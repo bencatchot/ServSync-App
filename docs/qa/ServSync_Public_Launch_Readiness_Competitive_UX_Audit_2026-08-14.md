@@ -18,6 +18,13 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 - Authenticated exact-head Sandbox validation used the approved Owner identity to open Jobs, start an unsaved Draft, and select an existing authorized Customer. It created no fixture and persisted no Draft or business record.
 - Public-beta confidence improves, but the first natural PR #447 schedule, real contractor/homeowner trials, and candid capability boundaries remain release gates.
 
+### 2026-08-14 Human Validation Preparation Addendum
+
+- The governed [Limited Public Beta Human Validation v1 package](limited-public-beta-human-validation-v1/README.md) converts the real-user gate into an executable owner-led study rather than another internal polish cycle.
+- The package targets 5-8 unfamiliar small contractor owner/operators and 5-8 unfamiliar homeowners, uses neutral real-world tasks, records 0-4 intervention levels and behavioral evidence, and applies P0-P3 plus repeat-signal rules.
+- Mutable sessions are Sandbox-only with fictional tagged records and exact cleanup. The dedicated Demo scenario may support verified read-only/checkpoint tasks but does not cover Invoice, payment, or Home History. Production mutation is prohibited.
+- No human sessions have occurred yet, and internal dry runs are not usability evidence. The first natural PR #447 schedule and completed human cohorts remain limited-beta gates.
+
 ## 2. Confidence Scores
 
 | Area | Score | Material uncertainty |
