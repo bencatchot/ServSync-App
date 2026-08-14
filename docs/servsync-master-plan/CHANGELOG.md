@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-14 - Limited Public Beta Human Validation Preparation v1
+
+- Branch: `codex/limited-public-beta-human-validation-v1`.
+- Starting main SHA: `a88646ec013fa81fd9e662343314e61c2b59fcc3`.
+- Files changed: fifteen governed human-study artifacts; public-launch audit evidence; FB-016 backlog/master-plan beta-readiness context; and this changelog.
+- Summary of change: Adds an owner-executable, privacy-conscious human-validation program for 5-8 small contractor owner/operators and 5-8 homeowners. It includes separate neutral task studies and facilitator scripts, 0-4 intervention scoring, behavioral metrics, participant and cross-session synthesis templates, P0-P3/repeat-signal rules, recruitment guidance, candid beta limitations, and exact non-Production setup/cleanup controls. The package explicitly separates automated/dry-run feasibility from real human evidence.
+- Reason for change: Extensive source, browser, security, recovery, competitive, and AI-led validation cannot establish whether unfamiliar people understand ServSync. The next release evidence must come from observed participant behavior rather than additional speculative product polish.
+- Tests/checks run: current workflow/source mapping; dedicated Demo checkpoint-contract review; bounded authenticated Sandbox contractor/homeowner read-only smoke; local Markdown file/link validation; sensitive-value and private-data scans; `git diff --check`; and exact-scope review. The existing 322-option automated Customer-selector evidence supports study feasibility but is not human evidence. Focused ESLint remains a separately governed inherited startup incompatibility and was not changed.
+- Known risks or follow-ups: No human sessions have occurred, no large persistent study Customer fixture was created, and Demo cannot stage the full Invoice/payment/Home History sequence. Mutable end-to-end sessions require approved Sandbox fixtures and exact cleanup. The first genuine scheduled PR #447 role-smoke run has not yet occurred and remains a limited-beta gate. No runtime, SQL, RLS, RPC, schema, environment, provider, Production data, or permission behavior changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the prepared real-user evidence program while keeping FB-016 active for natural role-smoke acceptance, completed contractor/homeowner sessions, recurring operations evidence, and broader launch readiness.
+
 ## 2026-08-14 - Public Beta UX P1 Closeout v1
 
 - Branch: `codex/public-beta-ux-p1-closeout-v1`.
