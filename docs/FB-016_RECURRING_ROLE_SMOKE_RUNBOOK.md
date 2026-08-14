@@ -10,7 +10,7 @@ GitHub Actions workflow `.github/workflows/fb016-recurring-role-smoke.yml` runs 
 
 Each run retains sanitized JSON for 30 days with the GitHub run/attempt identity, trigger, environment, check names, pass/fail counts, and bounded failure summaries. Do not upload Playwright traces, videos, screenshots, HTML reports, raw network captures, emails, record identifiers, object paths, or tokens. Those artifacts can contain authenticated request headers or private fixture content.
 
-The schedule becomes active only from the default branch. A manual dispatch from a PR validates mechanics but cannot satisfy the first-natural-run merge gate for this slice.
+The schedule becomes active only from the default branch. Because GitHub cannot naturally schedule a newly introduced workflow before that workflow is merged, this slice uses a controlled post-merge natural-run acceptance gate: normal independent validation permits source merge, then the first genuine `schedule` event determines operational acceptance. A manual dispatch, local run, repository dispatch, or rerun cannot satisfy that gate.
 
 ## Environment Scope
 
