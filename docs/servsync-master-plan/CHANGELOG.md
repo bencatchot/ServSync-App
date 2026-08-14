@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-14 - Public-launch audit test-confidence correction v1
+
+- Branch: `codex/public-launch-audit-test-confidence-v1`.
+- Starting main SHA: `23152e77b3f4ad9498b7c3a85892d9908531f609`.
+- Files changed: recurring role-smoke denial classification; connected full-core-loop Estimate-send wait; shared browser console filtering; the durable public-launch/competitive audit report; and this changelog.
+- Summary of change: Corrected three audit-infrastructure mismatches without changing application behavior. The recurring role smoke now recognizes the Price Book cost RPC's exact established `P0001` custom denial while retaining strict `42501` handling elsewhere. The connected lifecycle test waits for the installed `servsync_send_estimate` RPC instead of the retired direct table update. Local browser runs ignore only the expected missing Vercel Analytics script on loopback hosts while continuing to fail on all other console and page errors.
+- Reason for change: The public-launch audit reproduced successful secured product behavior that the canonical tests misclassified as failure, weakening confidence in role and lifecycle evidence.
+- Tests/checks run: focused exact-head Sandbox role smoke; connected full-core-loop and account-free lifecycle browser validation with exact cleanup; TypeScript; Production build; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: This correction does not resolve the product UX findings from the audit, does not change permissions or SQL, and does not substitute for the first natural scheduled role-smoke observation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: The correction restores the already-governed FB-016 operational evidence path without changing feature scope, status, or remaining launch-readiness work.
+
 ## 2026-08-14 - FB-016 Recurring Authenticated Role Smoke & Fixture Health v1
 
 - Branch: `codex/fb016-recurring-role-smoke-v1`.

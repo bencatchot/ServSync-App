@@ -35,9 +35,16 @@ function firstRow(value: unknown): Record<string, unknown> | null {
 
 const assert: typeof requireSmokeInvariant = requireSmokeInvariant;
 
-function assertPermissionDenied(error: { code?: string } | null, check: string, message: string) {
+function assertPermissionDenied(
+  error: { code?: string; message?: string } | null,
+  check: string,
+  message: string,
+  expectedCustomMessage?: string,
+) {
   assert(Boolean(error), 'AUTHORIZATION FAILURE', check, message);
-  assert(error?.code === '42501', 'PROVIDER/EXTERNAL FAILURE', check, 'A denial probe failed for a reason other than authorization.');
+  const isStandardDenial = error?.code === '42501';
+  const isExpectedCustomDenial = error?.code === 'P0001' && error.message === expectedCustomMessage;
+  assert(isStandardDenial || isExpectedCustomDenial, 'PROVIDER/EXTERNAL FAILURE', check, 'A denial probe failed for a reason other than authorization.');
 }
 
 async function addCheck(
@@ -119,7 +126,12 @@ async function verifyCapabilities(account: AuthenticatedAccount, role: Exclude<C
   if (expected.cost) {
     assert(!cost.error, 'AUTHORIZATION FAILURE', `${role}_authorization`, `${role} private-cost authority drifted.`);
   } else {
-    assertPermissionDenied(cost.error, `${role}_authorization`, `${role} unexpectedly received private-cost authority.`);
+    assertPermissionDenied(
+      cost.error,
+      `${role}_authorization`,
+      `${role} unexpectedly received private-cost authority.`,
+      'Price Book internal cost is unavailable for this account.',
+    );
   }
 }
 

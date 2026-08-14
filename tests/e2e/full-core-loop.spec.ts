@@ -309,7 +309,7 @@ async function createAndSendEstimateFromRequest(page: Page, requestTitle: string
   await expect(estimateCard).toBeVisible({ timeout: 30_000 });
 
   const sendEstimateResponse = page.waitForResponse(
-    response => response.url().includes('/rest/v1/estimates') && response.request().method() === 'PATCH',
+    response => response.url().includes('/rpc/servsync_send_estimate') && response.request().method() === 'POST',
     { timeout: 30_000 },
   );
   await estimateCard.getByTestId('contractor-send-estimate').click();
