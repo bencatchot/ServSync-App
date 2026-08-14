@@ -1,7 +1,9 @@
 # ServSync Public Launch Readiness + Competitive UX Audit v1
 
-Date: 2026-08-14  
-Audited base: `23152e77b3f4ad9498b7c3a85892d9908531f609`  
+Date: 2026-08-14
+
+Audited base: `23152e77b3f4ad9498b7c3a85892d9908531f609`
+
 Environment discipline: Production read-only; Sandbox used for tagged lifecycle validation with exact cleanup.
 
 ## 1. Executive Verdict
@@ -152,9 +154,12 @@ Do not market ServSync as better at dispatch, payments, reporting, integrations,
 
 ## 20. Table Stakes vs Differentiation
 
-**Met:** Customers/properties, Estimates, approval, Jobs, Invoices, offline payment state, PDFs, Price Book, roles, mobile web, customer read portal, history.  
-**Not yet met for broad launch:** mature dispatch, live payments, accounting integrations, strong reporting, migration/onboarding at scale, established support/training, native/offline field workflow.  
-**Genuine differentiation:** relationship-state continuity, homeowner-retained property history, explicit Draft planning, security/role rigor.  
+**Met:** Customers/properties, Estimates, approval, Jobs, Invoices, offline payment state, PDFs, Price Book, roles, mobile web, customer read portal, history.
+
+**Not yet met for broad launch:** mature dispatch, live payments, accounting integrations, strong reporting, migration/onboarding at scale, established support/training, native/offline field workflow.
+
+**Genuine differentiation:** relationship-state continuity, homeowner-retained property history, explicit Draft planning, security/role rigor.
+
 **Not strong enough yet:** generic simplicity, Discover marketplace value, automation/AI, growth/marketing capabilities.
 
 ## 21. Competitive Weaknesses Worth Fixing Before Launch
@@ -209,7 +214,10 @@ Do not open a broad public launch. Prepare a limited public beta only after: (1)
 
 ## Final Comparison Summary
 
-**If ServSync were marketing against Jobber and Housecall Pro today:** Choose ServSync when you want a simpler, relationship-centered workflow that supports local customers now, optional homeowner connection later, and a durable home record without weakening role or financial boundaries.  
-**If Jobber were marketing against ServSync today:** Choose the proven platform with faster onboarding, mature scheduling, payments, reports, integrations, training, and lower switching risk.  
-**If Housecall Pro were marketing against ServSync today:** Choose the deeper home-service operating suite for dispatch, online booking, payments, Price Book depth, reporting, marketing, and crew operations.  
+**If ServSync were marketing against Jobber and Housecall Pro today:** Choose ServSync when you want a simpler, relationship-centered workflow that supports local customers now, optional homeowner connection later, and a durable home record without weakening role or financial boundaries.
+
+**If Jobber were marketing against ServSync today:** Choose the proven platform with faster onboarding, mature scheduling, payments, reports, integrations, training, and lower switching risk.
+
+**If Housecall Pro were marketing against ServSync today:** Choose the deeper home-service operating suite for dispatch, online booking, payments, Price Book depth, reporting, marketing, and crew operations.
+
 **Neutral auditor conclusion:** Jobber has the strongest overall proposition today for most small established contractors; Housecall Pro is strongest for feature-dense dispatch/revenue operations; ServSync's clearest opportunity is owner-operated and small service businesses that value low-friction customer continuity and a genuinely useful homeowner property record, provided the first-run UX and launch boundaries are corrected.
