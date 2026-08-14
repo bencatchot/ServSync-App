@@ -48,14 +48,17 @@ test.describe('contractor customer terminology and connection status', () => {
     const durableComposer = read('src/features/drafts/ContractorDraftComposer.tsx');
     const legacyComposer = read('src/features/jobs/DraftJobComposer.tsx');
     const mappings = read('src/features/jobs/draftJobMappings.ts');
+    const selector = read('src/features/drafts/DraftCustomerCombobox.tsx');
 
     for (const composer of [durableComposer, legacyComposer]) {
-      expect(composer).toContain("composerField('Customer'");
-      expect(composer).toContain('draftCustomerOptionLabel(option)');
+      expect(composer).toContain('<DraftCustomerCombobox');
       expect(composer).toContain('applyDraftCustomerSelection(draft, option)');
       expect(composer).not.toContain("composerField('Connection status'");
     }
 
+    expect(selector).toContain("draftCustomerOptionLabel(selectedOption)");
+    expect(selector).toContain('option.statusLabel');
+    expect(selector).toContain('option.properties.map(property => property.label)');
     expect(app).toContain('buildDraftCustomerOptions({');
     expect(app).toContain("draftCustomerOptionKey('connected'");
     expect(app).toContain("draftCustomerOptionKey('local'");

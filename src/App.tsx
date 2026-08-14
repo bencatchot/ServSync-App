@@ -263,6 +263,10 @@ import {
   OPEN_JOB_STATUSES,
 } from './features/jobs/status';
 import { DraftJobComposer } from './features/jobs/DraftJobComposer';
+import {
+  ContractorScheduleSnapshot,
+  type ContractorScheduleSnapshotItem,
+} from './features/dashboard/ContractorScheduleSnapshot';
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
@@ -29078,16 +29082,9 @@ function ContractorDashboard({
   ];
   const completedContractorOnboardingCount = contractorOnboardingItems.filter(item => item.complete).length;
   const showContractorOnboardingChecklist = !SERVSYNC_DEMO_PRESENTATION_MODE && completedContractorOnboardingCount < contractorOnboardingItems.length;
-  type ContractorScheduleSnapshotItem = {
-    id: string;
+  type DatedContractorScheduleSnapshotItem = ContractorScheduleSnapshotItem & {
     dayKey: string;
-    timeLabel: string;
     sortTime: number;
-    title: string;
-    meta: string;
-    statusLabel: string;
-    tone: 'amber' | 'emerald' | 'sky' | 'violet';
-    onOpen: () => void;
   };
   const scheduleDayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   const scheduleDateFromValue = (value?: string | null) => {
@@ -29132,18 +29129,6 @@ function ContractorDashboard({
       dateLabel: formatShortMonthDay(date),
     };
   });
-  const scheduleItemToneClass = (tone: ContractorScheduleSnapshotItem['tone']) => ({
-    amber: 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100',
-    emerald: 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100',
-    sky: 'border-sky-200 bg-sky-50 hover:border-sky-300 hover:bg-sky-100',
-    violet: 'border-violet-200 bg-violet-50 hover:border-violet-300 hover:bg-violet-100',
-  }[tone]);
-  const scheduleItemStatusClass = (tone: ContractorScheduleSnapshotItem['tone']) => ({
-    amber: 'text-amber-800',
-    emerald: 'text-emerald-800',
-    sky: 'text-sky-800',
-    violet: 'text-violet-800',
-  }[tone]);
   const linkedStandaloneOccurrenceKeys = new Set(calendarEventJobLinks.map(link => {
     const date = new Date(link.occurrence_starts_at);
     return `${link.calendar_event_id}:${Number.isNaN(date.getTime()) ? link.occurrence_starts_at : date.toISOString()}`;
@@ -29152,7 +29137,7 @@ function ContractorDashboard({
     const date = new Date(exclusion.occurrence_starts_at);
     return `${exclusion.calendar_event_id}:${Number.isNaN(date.getTime()) ? exclusion.occurrence_starts_at : date.toISOString()}`;
   }));
-  const scheduleSnapshotItems: ContractorScheduleSnapshotItem[] = [
+  const scheduleSnapshotItems: DatedContractorScheduleSnapshotItem[] = [
     ...homeownerAppointmentRequests.flatMap(request => {
       const date = scheduleDateFromValue(request.appointment?.proposed_at);
       if (!date || !scheduleItemInSnapshot(date)) return [];
@@ -29224,7 +29209,6 @@ function ContractorDashboard({
     acc[day.key] = scheduleSnapshotItems.filter(item => item.dayKey === day.key);
     return acc;
   }, {});
-  const scheduleSnapshotCount = scheduleSnapshotItems.length;
   const actionReviewCount = connectionRequests.length
     + homeownerAppointmentRequests.length
     + contractorFollowUpCount
@@ -32588,12 +32572,12 @@ function ContractorDashboard({
       tabs={[
         { id: 'overview',     label: 'Dashboard',          icon: <LayoutDashboard size={17} />, group: 'Workspace' },
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
+        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Customer Work' },
         { id: 'connections',  label: 'Customers',          icon: <Users size={17} />, badge: contractorHomeownersBadgeCount, group: 'Customer Work' },
         { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorServiceRequestsBadgeCount, group: 'Customer Work' },
         { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, group: 'Customer Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
-        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
         { id: 'trust',        label: 'Trust & Safety',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: contractorSupportBadgeCount, group: 'Help' },
@@ -32933,103 +32917,16 @@ function ContractorDashboard({
           </section>
 
           <Card title="Schedule snapshot" icon={<Calendar size={18} />}>
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-sm font-bold text-slate-950">Week of {scheduleWeekLabel}</p>
-                  <p className="mt-1 text-sm leading-5 text-slate-500">
-                    Monday through Sunday, including appointment requests, confirmed appointments, scheduled visits, and standalone calendar events.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
-                    onClick={() => setDashboardWeekOffset(-1)}
-                    aria-label="Previous week"
-                  >
-                    <ChevronRight size={16} className="rotate-180" />
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
-                    onClick={() => setDashboardWeekOffset(1)}
-                    aria-label="Next week"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`${buttonClass('secondary')} bg-white`}
-                    onClick={resetDashboardScheduleWeek}
-                    disabled={isCurrentDashboardWeek}
-                  >
-                    <RotateCcw size={15} />
-                    This week
-                  </button>
-                  <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                    {scheduleSnapshotCount} scheduled
-                  </span>
-                </div>
-              </div>
-
-              <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
-                {scheduleSnapshotDays.map(day => {
-                  const items = scheduleItemsByDay[day.key] ?? [];
-                  return (
-                    <div key={day.key} className={`grid gap-3 p-3 md:grid-cols-[150px_1fr] ${day.isToday ? 'bg-blue-50/50' : ''}`}>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-bold text-slate-950">{day.label}</p>
-                          {day.isToday && (
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700">
-                              Today
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-xs font-medium text-slate-500">{day.dateLabel}</p>
-                      </div>
-                      <div className="space-y-2">
-                        {items.map(item => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={item.onOpen}
-                            className={`w-full rounded-lg border p-2.5 text-left transition ${scheduleItemToneClass(item.tone)}`}
-                          >
-                            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
-                                <p className="mt-0.5 text-xs text-slate-600">{item.meta} · {item.timeLabel}</p>
-                              </div>
-                              <span className={`w-fit shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold ${scheduleItemStatusClass(item.tone)}`}>
-                                {item.statusLabel}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                        {items.length === 0 && (
-                          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                            {day.isToday ? 'No appointments or scheduled work today.' : 'No scheduled items.'}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="pt-1">
-                <button
-                  type="button"
-                  className={`${buttonClass('secondary')} w-full justify-center bg-white`}
-                  onClick={() => setContractorTab('calendar')}
-                >
-                  <Calendar size={16} />
-                  Open full calendar
-                </button>
-              </div>
-            </div>
+            <ContractorScheduleSnapshot
+              days={scheduleSnapshotDays}
+              itemsByDay={scheduleItemsByDay}
+              weekLabel={scheduleWeekLabel}
+              isCurrentWeek={isCurrentDashboardWeek}
+              onPreviousWeek={() => setDashboardWeekOffset(-1)}
+              onNextWeek={() => setDashboardWeekOffset(1)}
+              onThisWeek={resetDashboardScheduleWeek}
+              onOpenCalendar={() => setContractorTab('calendar')}
+            />
           </Card>
 
           <Card title="Workflow overview" icon={<LayoutDashboard size={18} />}>

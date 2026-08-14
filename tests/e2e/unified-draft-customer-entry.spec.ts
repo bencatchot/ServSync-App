@@ -11,6 +11,10 @@ import {
   selectedDraftCustomerKey,
   type DraftCustomerOption,
 } from '../../src/features/drafts/draftCustomerOptions';
+import {
+  DRAFT_CUSTOMER_VISIBLE_RESULT_LIMIT,
+  filterDraftCustomerOptions,
+} from '../../src/features/drafts/DraftCustomerCombobox';
 import { createBlankDraftJobComposerDraft, draftJobMetadataPayload } from '../../src/features/jobs/draftJobMappings';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -61,6 +65,15 @@ async function installUnifiedComposerHarness(page: Page) {
         key: 'connected:same-id', subjectType: 'connected', customerId: 'same-id', label: 'Alex Customer',
         status: 'connected', statusLabel: 'Connected', properties: [{ id: 'home-1', label: 'Main Home' }],
       },
+      ...Array.from({ length: 320 }, (_, index) => ({
+        key: `local:fixture-${String(index).padStart(3, '0')}`,
+        subjectType: 'local',
+        customerId: `fixture-${String(index).padStart(3, '0')}`,
+        label: `Fixture Customer ${String(index).padStart(3, '0')}`,
+        status: 'not_connected',
+        statusLabel: 'Not connected',
+        properties: [{ id: `fixture-home-${index}`, label: `${100 + index} Oak Avenue` }],
+      })),
       {
         key: 'local:same-id', subjectType: 'local', customerId: 'same-id', label: 'Alex Customer',
         status: 'invitation_pending', statusLabel: 'Invitation pending', properties: [
@@ -128,6 +141,25 @@ test.describe('unified Draft customer options', () => {
       'Alex Customer — Connected · Main Home',
       'Alex Customer — Not connected · 123 Main Street',
     ]);
+  });
+
+  test('searches a 300-plus unified list by name and property without rendering it all', () => {
+    const options = buildDraftCustomerOptions({
+      contractorId: 'contractor-a',
+      connectedCustomers: [],
+      localCustomers: Array.from({ length: 320 }, (_, index) => localCandidate({
+        customerId: `customer-${index}`,
+        label: `Customer ${String(index).padStart(3, '0')}`,
+        properties: [{ id: `home-${index}`, label: `${1000 + index} Oak Avenue` }],
+      })),
+    });
+
+    expect(options).toHaveLength(320);
+    expect(filterDraftCustomerOptions(options, 'Customer 219')).toHaveLength(1);
+    expect(filterDraftCustomerOptions(options, '1219 Oak')).toEqual([
+      expect.objectContaining({ customerId: 'customer-219' }),
+    ]);
+    expect(DRAFT_CUSTOMER_VISIBLE_RESULT_LIMIT).toBe(40);
   });
 });
 
@@ -255,13 +287,12 @@ test.describe('unified Draft property defaults and saved subjects', () => {
 });
 
 test.describe('unified Draft UI wiring', () => {
-  test('both composers expose one Customer selector and no Connection status selector', () => {
+  test('both composers expose one shared searchable Customer selector and no Connection status selector', () => {
     const durable = read('src/features/drafts/ContractorDraftComposer.tsx');
     const legacy = read('src/features/jobs/DraftJobComposer.tsx');
 
     for (const source of [durable, legacy]) {
-      expect(source).toContain("composerField('Customer'");
-      expect(source).toContain('draftCustomerOptionLabel(option)');
+      expect(source).toContain('<DraftCustomerCombobox');
       expect(source).toContain('applyDraftCustomerSelection(draft, option)');
       expect(source).not.toContain("composerField('Connection status'");
       expect(source).not.toContain('durable-draft-customer-type');
@@ -302,18 +333,31 @@ test.describe('unified Draft UI wiring', () => {
       await expect(customer).toBeVisible();
       await expect(customer).toHaveAccessibleName('Customer');
       await expect(page.getByTestId('durable-draft-customer-type')).toHaveCount(0);
-      await expect(customer.locator('option')).toContainText([
-        'Choose customer...',
-        'Alex Customer — Connected · Main Home',
-        'Alex Customer — Invitation pending · 2 properties',
-      ]);
-
-      await customer.focus();
-      await customer.selectOption('connected:same-id');
+      await customer.click();
+      const customerResults = page.getByRole('listbox', { name: 'Customer search results' });
+      await expect(customerResults.getByRole('option')).toHaveCount(DRAFT_CUSTOMER_VISIBLE_RESULT_LIMIT);
+      await expect(page.getByText('322 matches. Keep typing to narrow the list.')).toBeVisible();
+      await customer.fill('Alex Connected Home');
+      await expect(customerResults.getByRole('option')).toHaveCount(1);
+      await customer.press('ArrowDown');
+      await customer.press('Enter');
       await expect(property).toHaveValue('home-1');
-      await customer.selectOption('local:same-id');
+      await customer.click();
+      await customer.fill('456 Oak');
+      await customer.press('Enter');
       await expect(property).toHaveValue('');
       await expect(property.locator('option')).toContainText(['Choose property...', '123 Main Street', '456 Oak Street']);
+      await customer.click();
+      await customer.fill('customer who does not exist');
+      await expect(page.getByTestId('durable-draft-customer-empty')).toHaveText('No customers match that search.');
+      await customer.press('Escape');
+      await expect(customer).toHaveValue('Alex Customer — Invitation pending · 2 properties');
+      await customer.click();
+      await customer.fill('419 Oak Avenue');
+      await customer.press('Enter');
+      await customer.click();
+      await expect(customerResults.getByText('Fixture Customer 319', { exact: true })).toBeVisible();
+      await customer.press('Escape');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
     });
   }

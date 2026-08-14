@@ -7,10 +7,10 @@ import type { WorkComposerLineDraft } from '../work-composer/types';
 import { createWorkComposerLineDraft, workComposerDraftFinancialBreakdown } from '../work-composer/workComposerDrafts';
 import type { DraftJobComposerDraft } from './draftJobMappings';
 import { draftJobTotalsRows } from './draftJobMappings';
+import { DraftCustomerCombobox } from '../drafts/DraftCustomerCombobox';
 import {
   applyDraftCustomerSelection,
   clearDraftCustomerSelection,
-  draftCustomerOptionLabel,
   selectedDraftCustomerKey,
   type DraftCustomerOption,
 } from '../drafts/draftCustomerOptions';
@@ -122,24 +122,14 @@ export function DraftJobComposer({
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
 
       <div className="grid gap-3 md:grid-cols-2">
-        {composerField('Customer', (
-          <select
-            data-testid="draft-job-customer"
-            className={fieldClass()}
-            value={selectedCustomerKey}
-            onChange={event => {
-              const option = customerOptions.find(item => item.key === event.target.value) ?? null;
-              onChange(option
-                ? applyDraftCustomerSelection(draft, option)
-                : clearDraftCustomerSelection(draft));
-            }}
-          >
-            <option value="">Choose customer...</option>
-            {customerOptions.map(option => (
-              <option key={option.key} value={option.key}>{draftCustomerOptionLabel(option)}</option>
-            ))}
-          </select>
-        ))}
+        <DraftCustomerCombobox
+          testId="draft-job-customer"
+          options={customerOptions}
+          value={selectedCustomerKey}
+          onChange={option => onChange(option
+            ? applyDraftCustomerSelection(draft, option)
+            : clearDraftCustomerSelection(draft))}
+        />
         {composerField('Property', (
           <select
             className={fieldClass()}

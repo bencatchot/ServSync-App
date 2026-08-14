@@ -43,7 +43,7 @@ test.describe('contractor read-only smoke', () => {
 
     await openSidebarTab(page, /^Jobs\b/i);
     await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { level: 2, name: /^Jobs$/i })).toBeVisible();
+    await expect(main.getByTestId('contractor-jobs-overview').getByRole('heading', { level: 2, name: /^Jobs$/i })).toBeVisible();
     await expect(main.getByRole('heading', { level: 3, name: /^Estimates \/ Invoices$/i })).toBeVisible();
 
     await openSidebarTab(page, /^Calendar\b/i);
