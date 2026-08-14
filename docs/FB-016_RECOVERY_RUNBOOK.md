@@ -87,7 +87,7 @@ Supabase database backups do not contain Storage object bytes. ServSync therefor
 
 The bucket is not public and the service credential is scoped to Object Read & Write for this bucket only. Production-only sensitive Vercel configuration supplies the R2 endpoint/identity, bucket credential, exact Production Supabase source identity/credential, retention, and Cron bearer secret. Secret values must never enter Git, logs, reports, screenshots, or restore artifacts.
 
-Backup runs are all-or-nothing: a run writes its immutable manifest and advances the latest-success health pointer only after every source object is downloaded, hashed, copied or verified in R2, independently re-downloaded, and hash-verified. Any source identity, R2 identity, bucket-inventory, byte-size, hash, or retention error fails the run. The daily Vercel Cron invokes `/api/storage-backup` at `04:17 UTC`; `/api/storage-backup-health` reports unhealthy after 36 hours without a successful run. Both endpoints require the Cron bearer secret and emit only aggregate evidence.
+Backup runs are all-or-nothing: a run writes its immutable manifest and advances the latest-success health pointer only after every source object is downloaded, hashed, copied or verified in R2, independently re-downloaded, and hash-verified. Any source identity, R2 identity, bucket-inventory, byte-size, hash, or retention error fails the run. The daily Vercel Cron invokes `/api/storage-backup` at `04:17 UTC`; `/api/storage-backup-health` reports unhealthy after 36 hours without a successful run. Backup execution continues to require the Cron bearer secret. Aggregate health accepts either that operator secret or the narrower read-only recurring-smoke health token; the health token cannot invoke backup execution.
 
 Restore always targets a separately approved project whose name starts with `servsync-recovery-drill-`. The operator refuses the immutable Production, Demo, and Sandbox refs, validates the manifest envelope and every object hash, requires exact bucket privacy/upload-policy metadata, and re-downloads each restored object for a second SHA-256 comparison. Restore Production data before Storage bytes so application references exist, then validate record-to-bucket/path linkage and public/private access. Never rely on copying from a damaged live source as the recovery procedure.
 
@@ -107,6 +107,8 @@ Physical restore did not recreate the complete operating environment. Maintain n
 - email, SMS, geocoding/maps, AI, and any other external providers.
 
 Secret values belong only in the approved password manager/provider configuration. Do not put them in this runbook, Git, chat, screenshots, test artifacts, or terminal captures.
+
+Recurring authenticated identity, fixture, authorization, browser, and latest-success health procedures live in `docs/FB-016_RECURRING_ROLE_SMOKE_RUNBOOK.md`. That daily read-only evidence does not replace mutating core-loop validation or recovery drills.
 
 The authoritative executable classification and timing worksheet is `docs/FB-016_FULL_RECOVERY_DRILL_CHECKLIST.md`. During drills, Stripe, outbound email/SMS, public domains, webhooks, and Production Cron remain disabled; authenticated core application and recovered-record validation do not require side-effectful providers.
 

@@ -23,15 +23,18 @@ function json(body: Record<string, unknown>, status = 200) {
   });
 }
 
-function authorized(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  return Boolean(cronSecret && request.headers.get('authorization') === `Bearer ${cronSecret}`);
+function authorized(request: Request, secretNames: string[]) {
+  const authorization = request.headers.get('authorization');
+  return secretNames.some(name => {
+    const secret = process.env[name]?.trim();
+    return Boolean(secret && authorization === `Bearer ${secret}`);
+  });
 }
 
 export function createStorageBackupHandler(dependencies: BackupHandlerDependencies) {
   return async function handler(request: Request) {
     if (request.method !== 'GET' && request.method !== 'POST') return json({ status: 'failed', reason: 'method_not_allowed' }, 405);
-    if (!authorized(request)) return json({ status: 'failed', reason: 'unauthorized' }, 401);
+    if (!authorized(request, ['CRON_SECRET'])) return json({ status: 'failed', reason: 'unauthorized' }, 401);
     try {
       const config = dependencies.configured();
       const result = await dependencies.run({
@@ -61,7 +64,9 @@ export function createStorageBackupHandler(dependencies: BackupHandlerDependenci
 export function createStorageBackupHealthHandler(dependencies: HealthHandlerDependencies) {
   return async function handler(request: Request) {
     if (request.method !== 'GET') return json({ status: 'failed', reason: 'method_not_allowed' }, 405);
-    if (!authorized(request)) return json({ status: 'failed', reason: 'unauthorized' }, 401);
+    if (!authorized(request, ['CRON_SECRET', 'SERVSYNC_STORAGE_BACKUP_HEALTH_TOKEN'])) {
+      return json({ status: 'failed', reason: 'unauthorized' }, 401);
+    }
     try {
       const config = dependencies.configured();
       const health = await dependencies.read(config.backup, config.sourceProjectRef);

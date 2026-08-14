@@ -1,0 +1,175 @@
+name: FB-016 Recurring Authenticated Role Smoke
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: fb016-recurring-role-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-role-fixture-health:
+    name: Sandbox role, fixture, UI, and backup health
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SERVSYNC_ROLE_SMOKE_TARGET: sandbox
+      ROLE_SMOKE_SUPABASE_PROJECT_REF: zpzdkoaubyjtsomccxya
+      ROLE_SMOKE_SUPABASE_URL: https://zpzdkoaubyjtsomccxya.supabase.co
+      ROLE_SMOKE_SUPABASE_ANON_KEY: ${{ secrets.SERVSYNC_SANDBOX_ANON_KEY }}
+      ROLE_SMOKE_APP_URL: http://127.0.0.1:4173
+      ROLE_SMOKE_INCLUDE_BACKUP_HEALTH: 'true'
+      ROLE_SMOKE_BACKUP_HEALTH_URL: https://servsync.app/api/storage-backup-health
+      ROLE_SMOKE_BACKUP_HEALTH_TOKEN: ${{ secrets.SERVSYNC_STORAGE_BACKUP_HEALTH_TOKEN }}
+      ROLE_SMOKE_REPORT_PATH: artifacts/sandbox-role-smoke.json
+      VITE_SUPABASE_URL: https://zpzdkoaubyjtsomccxya.supabase.co
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.SERVSYNC_SANDBOX_ANON_KEY }}
+      SERVSYNC_VALIDATION_TARGET: sandbox
+      TEST_APP_URL: http://127.0.0.1:4173
+      TEST_SUPABASE_PROJECT_REF: zpzdkoaubyjtsomccxya
+      TEST_SUPABASE_URL: https://zpzdkoaubyjtsomccxya.supabase.co
+      TEST_CONTRACTOR_EMAIL: ${{ secrets.TEST_CONTRACTOR_EMAIL }}
+      TEST_CONTRACTOR_PASSWORD: ${{ secrets.TEST_CONTRACTOR_PASSWORD }}
+      TEST_CONTRACTOR_ADMIN_EMAIL: ${{ secrets.TEST_CONTRACTOR_ADMIN_EMAIL }}
+      TEST_CONTRACTOR_ADMIN_PASSWORD: ${{ secrets.TEST_CONTRACTOR_ADMIN_PASSWORD }}
+      TEST_CONTRACTOR_OFFICE_EMAIL: ${{ secrets.TEST_CONTRACTOR_OFFICE_EMAIL }}
+      TEST_CONTRACTOR_OFFICE_PASSWORD: ${{ secrets.TEST_CONTRACTOR_OFFICE_PASSWORD }}
+      TEST_CONTRACTOR_FIELD_TECH_EMAIL: ${{ secrets.TEST_CONTRACTOR_FIELD_TECH_EMAIL }}
+      TEST_CONTRACTOR_FIELD_TECH_PASSWORD: ${{ secrets.TEST_CONTRACTOR_FIELD_TECH_PASSWORD }}
+      TEST_CONTRACTOR_VIEWER_EMAIL: ${{ secrets.TEST_CONTRACTOR_VIEWER_EMAIL }}
+      TEST_CONTRACTOR_VIEWER_PASSWORD: ${{ secrets.TEST_CONTRACTOR_VIEWER_PASSWORD }}
+      TEST_CONTRACTOR_B_EMAIL: ${{ secrets.TEST_CONTRACTOR_B_EMAIL }}
+      TEST_CONTRACTOR_B_PASSWORD: ${{ secrets.TEST_CONTRACTOR_B_PASSWORD }}
+      TEST_HOMEOWNER_EMAIL: ${{ secrets.TEST_HOMEOWNER_EMAIL }}
+      TEST_HOMEOWNER_PASSWORD: ${{ secrets.TEST_HOMEOWNER_PASSWORD }}
+      TEST_HOMEOWNER_B_EMAIL: ${{ secrets.TEST_HOMEOWNER_B_EMAIL }}
+      TEST_HOMEOWNER_B_PASSWORD: ${{ secrets.TEST_HOMEOWNER_B_PASSWORD }}
+      SERVSYNC_RECURRING_ROLE_UI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Build exact head for Sandbox
+        run: npm run build
+      - name: Start local exact-head app
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/servsync-role-smoke-vite.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          echo 'APPLICATION FAILURE: exact-head app did not become ready.' >&2
+          exit 1
+      - name: Run fail-closed API identity, fixture, authorization, and backup checks
+        run: npm run ops:role-smoke:api
+      - name: Run read-only role browser smoke
+        run: npm run qa:e2e:role-smoke
+      - name: Record browser result
+        if: always()
+        run: |
+          mkdir -p artifacts
+          status='${{ job.status }}'
+          category=null
+          if [ "$status" != success ]; then category='"APPLICATION FAILURE"'; fi
+          printf '{"run_id":"github-%s-%s","environment":"sandbox","check":"browser","status":"%s","category":%s,"trigger":"%s"}\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$status" "$category" "$GITHUB_EVENT_NAME" > artifacts/sandbox-browser-smoke.json
+      - name: Upload sanitized operational evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fb016-role-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  demo-readonly-health:
+    name: Demo approved read-only identities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SERVSYNC_VALIDATION_TARGET: demo
+      TEST_APP_URL: https://servsync-demo.vercel.app
+      TEST_SUPABASE_PROJECT_REF: bdytwgejqnlblhrnqxkp
+      TEST_SUPABASE_URL: https://bdytwgejqnlblhrnqxkp.supabase.co
+      DEMO_CONTRACTOR_EMAIL: ${{ secrets.DEMO_CONTRACTOR_EMAIL }}
+      DEMO_CONTRACTOR_PASSWORD: ${{ secrets.DEMO_CONTRACTOR_PASSWORD }}
+      DEMO_HOMEOWNER_EMAIL: ${{ secrets.DEMO_HOMEOWNER_EMAIL }}
+      DEMO_HOMEOWNER_PASSWORD: ${{ secrets.DEMO_HOMEOWNER_PASSWORD }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Run Demo read-only navigation
+        run: npm run qa:e2e:role-smoke:demo
+      - name: Record sanitized Demo result
+        if: always()
+        run: |
+          mkdir -p artifacts
+          status='${{ job.status }}'
+          category=null
+          if [ "$status" != success ]; then category='"APPLICATION FAILURE"'; fi
+          printf '{"run_id":"github-%s-%s","environment":"demo","check":"bounded_readonly_browser","status":"%s","category":%s,"trigger":"%s"}\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$status" "$category" "$GITHUB_EVENT_NAME" > artifacts/demo-readonly-smoke.json
+      - name: Upload sanitized Demo evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fb016-demo-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/demo-readonly-smoke.json
+          if-no-files-found: error
+          retention-days: 30
+
+  production-readonly-health:
+    name: Production approved read-only identities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TEST_APP_URL: https://servsync.app
+      PROD_SMOKE_CONTRACTOR_OWNER_EMAIL: ${{ secrets.PROD_SMOKE_CONTRACTOR_OWNER_EMAIL }}
+      PROD_SMOKE_CONTRACTOR_OWNER_PASSWORD: ${{ secrets.PROD_SMOKE_CONTRACTOR_OWNER_PASSWORD }}
+      PROD_SMOKE_HOMEOWNER_EMAIL: ${{ secrets.PROD_SMOKE_HOMEOWNER_EMAIL }}
+      PROD_SMOKE_HOMEOWNER_PASSWORD: ${{ secrets.PROD_SMOKE_HOMEOWNER_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Run Production public smoke
+        run: npm run qa:e2e:production-public-smoke
+      - name: Run approved Production authenticated read-only smoke
+        run: npm run qa:e2e:production-auth-readonly-smoke
+      - name: Record sanitized Production result
+        if: always()
+        run: |
+          mkdir -p artifacts
+          status='${{ job.status }}'
+          category=null
+          if [ "$status" != success ]; then category='"APPLICATION FAILURE"'; fi
+          printf '{"run_id":"github-%s-%s","environment":"production","check":"approved_readonly_browser","status":"%s","category":%s,"trigger":"%s"}\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$status" "$category" "$GITHUB_EVENT_NAME" > artifacts/production-readonly-smoke.json
+      - name: Upload sanitized Production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fb016-production-readonly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/production-readonly-smoke.json
+          if-no-files-found: error
+          retention-days: 30

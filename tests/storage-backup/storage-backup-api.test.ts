@@ -54,6 +54,36 @@ test('health endpoint treats backups older than 36 hours as unhealthy', async ()
   }
 });
 
+test('health endpoint accepts the narrow observer token without granting backup execution', async () => {
+  const originalCron = process.env.CRON_SECRET;
+  const originalHealth = process.env.SERVSYNC_STORAGE_BACKUP_HEALTH_TOKEN;
+  process.env.CRON_SECRET = 'test-cron-secret';
+  process.env.SERVSYNC_STORAGE_BACKUP_HEALTH_TOKEN = 'test-health-secret';
+  try {
+    const healthHandler = createStorageBackupHealthHandler({
+      configured: () => ({ backup: {}, sourceProjectRef: 'source' }) as never,
+      read: async () => ({
+        sourceProjectRef: 'source', status: 'healthy', healthVersion: 1, lastRunId: 'run', manifestKey: 'manifest', manifestSha256: 'a'.repeat(64),
+        lastSuccessfulBackupAt: '2026-08-13T00:00:00.000Z',
+        metrics: { bucketCount: 7, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 0, unchangedObjectVersions: 4, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 0 },
+      }),
+      now: () => new Date('2026-08-13T01:00:00.000Z'),
+    });
+    const backupHandler = createStorageBackupHandler({
+      configured: () => ({ source: {}, backup: {}, sourceProjectRef: 'source', accountId: 'account', bucket: 'bucket', retentionRuns: 90 }) as never,
+      run: async () => { throw new Error('must not run'); },
+    });
+    const headers = { Authorization: 'Bearer test-health-secret' };
+    assert.equal((await healthHandler(new Request('https://servsync.app/api/storage-backup-health', { headers }))).status, 200);
+    assert.equal((await backupHandler(new Request('https://servsync.app/api/storage-backup', { headers }))).status, 401);
+  } finally {
+    if (originalCron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalCron;
+    if (originalHealth === undefined) delete process.env.SERVSYNC_STORAGE_BACKUP_HEALTH_TOKEN;
+    else process.env.SERVSYNC_STORAGE_BACKUP_HEALTH_TOKEN = originalHealth;
+  }
+});
+
 test('backup configuration rejects invalid retention before constructing an operational run', () => {
   assert.throws(() => parseStorageBackupRetention('NaN'), /whole number from 1 through 365/);
   assert.throws(() => parseStorageBackupRetention('90.5'), /whole number from 1 through 365/);
