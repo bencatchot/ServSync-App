@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-14 - Public Beta UX P1 Closeout v1
+
+- Branch: `codex/public-beta-ux-p1-closeout-v1`.
+- Starting main SHA: `2582fbf81d437190ab32eb982467f8d695f31265`.
+- Files changed: contractor navigation and schedule presentation; shared Draft Customer search; both Draft composer integrations; focused navigation, schedule, Customer, Draft, mobile, terminology, and read-only Sandbox smoke tests; public-launch audit evidence; FB-016 backlog/master-plan readiness context; and this changelog.
+- Summary of change: Promotes Jobs from the former `Add-ons` group to the first position in `Customer Work`, compresses empty and lightly populated dashboard schedule states without hiding real scheduled work, and replaces both Draft composers' native Customer select with one bounded ARIA combobox that searches authorized connected/local Customer names, status context, and property labels. The selector renders at most 40 results, keeps an existing selected Customer recoverable, preserves explicit multi-property selection, and changes no Customer identity or Draft persistence semantics.
+- Reason for change: The public-launch audit found three contractor-facing P1 usability problems that made core work harder to discover, buried useful dashboard content, and made Draft creation unreasonable at a roughly 300-Customer scale.
+- Tests/checks run: 127 focused Draft/navigation/role/Price Book/browser regressions passed with 7 credential-gated role cases skipped; the 322-Customer desktop/mobile selector matrix passed 14/14; empty/light/populated schedule coverage passed; authenticated read-only Sandbox contractor navigation passed; the exact-head Sandbox Draft flow selected an existing authorized Customer without saving; TypeScript, Production build, 16 backend-parity tests, rollout-ledger status, sensitive-value/scope checks, and `git diff --check` passed. Focused ESLint still stops before evaluating changed code because of the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` rule-loader incompatibility.
+- Known risks or follow-ups: The first genuine `schedule`-triggered run for PR #447 has not yet occurred. Real contractor and homeowner usability testing remains required, and limited beta must state that Production online payments, advanced dispatch, deep reporting, and broad integrations are not live. No broad-public-launch claim is made.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records closure of the three launch-audit UX P1s while keeping FB-016 and the remaining natural-smoke, real-user, positioning, and operational gates active.
+
 ## 2026-08-14 - Public-launch audit test-confidence correction v1
 
 - Branch: `codex/public-launch-audit-test-confidence-v1`.

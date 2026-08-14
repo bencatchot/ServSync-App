@@ -384,7 +384,10 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await installWorkspaceHarness(page);
     await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Request-backed')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await page.getByTestId('durable-draft-customer').selectOption(`connected:${HOMEOWNER_B}`);
+    const customer = page.getByTestId('durable-draft-customer');
+    await customer.click();
+    await customer.fill('Customer B');
+    await customer.press('Enter');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     let calls = await page.evaluate(() => window.__durableHarness.calls());
     expect(calls.find(call => call.name === 'servsync_save_work_draft')?.args).toMatchObject({ p_metadata: { service_request_id: null } });

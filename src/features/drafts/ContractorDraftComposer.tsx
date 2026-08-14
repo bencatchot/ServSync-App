@@ -14,6 +14,7 @@ import {
   type DraftChecklistSourceOption,
 } from './checklistDraftScope';
 import { DraftOutcomeSelector } from './DraftOutcomeSelector';
+import { DraftCustomerCombobox } from './DraftCustomerCombobox';
 import type { DraftIntendedOutput, SharedDraftComposerDraft } from './draftComposerTypes';
 import {
   applyEstimateTemplateToSharedDraft,
@@ -24,7 +25,6 @@ import type { ContractorPriceBookItem, EstimateLaborMode, EstimateTemplate } fro
 import {
   applyDraftCustomerSelection,
   clearDraftCustomerSelection,
-  draftCustomerOptionLabel,
   selectedDraftCustomerKey,
   type DraftCustomerOption,
 } from './draftCustomerOptions';
@@ -331,24 +331,15 @@ export function ContractorDraftComposer({
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        {composerField('Customer', (
-          <select
-            data-testid="durable-draft-customer"
-            className={fieldClass()}
-            value={selectedCustomerKey}
-            onChange={event => {
-              const option = customerOptions.find(item => item.key === event.target.value) ?? null;
-              updateDraftSubject(option
-                ? applyDraftCustomerSelection(draft, option)
-                : clearDraftCustomerSelection(draft));
-            }}
-          >
-            <option value="">Choose customer...</option>
-            {customerOptions.map(option => (
-              <option key={option.key} value={option.key}>{draftCustomerOptionLabel(option)}</option>
-            ))}
-          </select>
-        ))}
+        <DraftCustomerCombobox
+          testId="durable-draft-customer"
+          options={customerOptions}
+          value={selectedCustomerKey}
+          disabled={interactionDisabled}
+          onChange={option => updateDraftSubject(option
+            ? applyDraftCustomerSelection(draft, option)
+            : clearDraftCustomerSelection(draft))}
+        />
         {composerField('Property', (
           <select
             data-testid="durable-draft-property"

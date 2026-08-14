@@ -8,7 +8,15 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 
 ## 1. Executive Verdict
 
-**READY AFTER BLOCKING FIXES** for a limited public beta. ServSync's core connected and account-free work lifecycles are real, durable, role-aware, tenant-isolated, and usable on mobile. It is not ready for a broader public launch because first-run contractor prioritization and navigation still obscure the core workflow, large-customer selection does not scale, online payments remain inactive outside Sandbox, competitive reporting/integration depth is limited, and the first natural recurring role-smoke schedule has not yet been observed.
+**P1 PRODUCT FIXES COMPLETE; LIMITED PUBLIC BETA STILL GATED.** ServSync's core connected and account-free work lifecycles are real, durable, role-aware, tenant-isolated, and usable on mobile. The closeout branch promotes Jobs to first-class Customer Work, compresses empty/light schedule states, and replaces the large native Draft Customer list with a bounded searchable connected/local selector. It is not ready for a broader public launch: online payments remain inactive outside Sandbox, dispatch/reporting/integration depth remains limited, real contractor/homeowner usability evidence is still required, and the first natural recurring role-smoke schedule has not yet been observed.
+
+### 2026-08-14 P1 Closeout Addendum
+
+- Jobs is the first destination under `Customer Work` on desktop and remains a primary mobile destination; no `Add-ons` group contains Jobs.
+- Empty schedule presentation is one compact, actionable state. Light schedules show only populated days plus an empty-day summary. Populated schedules retain every event, week navigation, and the full-calendar action.
+- Both current Draft composers use one ARIA Customer combobox. It searches only already-authorized visible Customer name, connection label, and property context; displays at most 40 of 322 test options; keeps the selected Customer recoverable; preserves explicit multi-property selection; and has desktop/mobile, keyboard, no-result, clear, and reopen coverage.
+- Authenticated exact-head Sandbox validation used the approved Owner identity to open Jobs, start an unsaved Draft, and select an existing authorized Customer. It created no fixture and persisted no Draft or business record.
+- Public-beta confidence improves, but the first natural PR #447 schedule, real contractor/homeowner trials, and candid capability boundaries remain release gates.
 
 ## 2. Confidence Scores
 
@@ -17,16 +25,16 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 | Functional correctness | 8.4 | Broad lifecycle proof is strong; exception coverage is less complete than the happy paths. |
 | Security/data integrity | 9.0 | Role, cross-tenant, direct-record, and private-cost boundaries passed; no P0 found. |
 | Reliability/operations | 7.7 | Recovery is proven; only one natural Storage run/drill and no natural role-smoke run yet. |
-| Contractor UX | 6.4 | Powerful workflow, but core work is visually demoted and large-tenant selection is slow. |
+| Contractor UX | 7.5 | Core work is now prominent and Customer selection scales; unfamiliar-user evidence remains simulated/internal. |
 | Contractor visual polish | 7.5 | Consistent, restrained system; hierarchy and internal wording need refinement. |
-| Contractor mobile | 7.2 | No overflow and controls remain usable; scrolling burden is high. |
+| Contractor mobile | 7.8 | Jobs, compact schedule, and Customer search remain usable at 390x844; broader real-device evidence remains limited. |
 | Homeowner UX | 7.6 | Clear attention and history concepts; dense financial pages and long explanations remain. |
 | Homeowner visual polish | 7.7 | Trustworthy and coherent; some screens are card-heavy and text-heavy. |
 | Homeowner mobile | 7.3 | Functional with persistent navigation; estimate review is long but understandable. |
-| First-time-user intuitiveness | 5.9 | Draft meaning is explained, but Jobs location and dashboard priority are misleading. |
+| First-time-user intuitiveness | 7.0 | Navigation and first-viewport hierarchy are materially clearer; real cold-user trials remain required. |
 | Competitive table stakes | 6.0 | Core CRM/work lifecycle is credible; dispatch, live payments, reporting, integrations, and automation lag. |
 | Differentiation strength | 7.2 | Connected plus account-free continuity and homeowner-owned home history are defensible. |
-| Limited-public-beta readiness | 7.1 | Viable after the ranked P1 launch fixes and natural smoke observation. |
+| Limited-public-beta readiness | 7.7 | Product P1s are closed; natural role smoke, real-user trials, and beta-boundary communication remain. |
 | Broad-public-launch readiness | 5.4 | Operational breadth, ecosystem, and market proof are not mature enough. |
 
 ## 3. P0 Launch Blockers
@@ -35,9 +43,9 @@ None reproduced. No cross-tenant access, financial corruption, private-cost leak
 
 ## 4. P1 Pre-Launch Fixes
 
-1. **UX/Competitive:** Move Jobs out of `ADD-ONS` and present Draft -> Estimate -> Job -> Invoice as core customer work.
-2. **UX/Mobile:** Collapse or greatly compress an empty seven-day contractor schedule so `Needs review`, accepted Estimates, and invoice-ready Jobs appear in the first viewport.
-3. **UX/Scale:** Replace the Draft composer's native 288-option Customer select with a searchable, keyboard-safe customer/property chooser.
+1. **CLOSED - UX/Competitive:** Jobs is first in `Customer Work` and no longer appears under `Add-ons`.
+2. **CLOSED - UX/Mobile:** Empty/light schedule states are compact while populated schedules retain every event and week control.
+3. **CLOSED - UX/Scale:** Both Draft composers use one searchable, keyboard-safe customer/property chooser with a 40-result rendering bound and 322-option evidence.
 4. **Reliability/Test Gap:** Observe and pass the first genuine scheduled recurring role/fixture smoke after PR #447; local/manual evidence cannot substitute.
 5. **Positioning/Product:** State plainly that Production online payments, advanced dispatch, broad integrations, and deep reporting are not live. Either gate public beta to users who accept that boundary or complete separately approved launch slices.
 
@@ -53,7 +61,7 @@ None reproduced. No cross-tenant access, financial corruption, private-cost leak
 
 **Reticle A:** The account-free Estimate approval -> Job -> Invoice -> offline Paid -> PDF/history path and direct Draft Invoice -> Paid path both passed. The connected request -> Estimate -> homeowner acceptance -> Job -> Invoice -> partial/final payment -> Home History/reminder suite passed 2/2. Draft lines, Price Book snapshots, payment state, reload persistence, and cleanup behaved correctly.
 
-**Reticle B:** Jobs overview and Draft composer are conceptually strong once found. `Not decided`, `Estimate`, `Job`, and `Draft Invoice` explain the Draft-first model well. The largest friction is reaching that model: Jobs is an add-on, urgent work is below an empty calendar, and the Customer chooser becomes unreasonable at tenant scale. Price Book itself is organized and clear but is discoverable only through Jobs.
+**Reticle B (closeout):** Navigation alone now presents Jobs as the first Customer Work destination. Empty/light schedules no longer spend the first viewport on seven empty rows. From Jobs, Start New Draft opens a searchable Customer selector that narrows hundreds of connected/local records by visible name and property context before the normal property handoff. The flow remains more explanation-heavy than a mature guided onboarding and still needs real cold-contractor evidence.
 
 ## 7. Homeowner Journey Findings
 
@@ -61,7 +69,7 @@ The low-activity homeowner dashboard clearly explains property context, request 
 
 ## 8. Mobile Findings
 
-Contractor and homeowner pages at 390x844 had `scrollWidth === clientWidth`. Bottom navigation, estimate review, Jobs controls, and read surfaces remained usable. Human-eye quality is lower than the overflow result suggests: the contractor dashboard puts actionable work roughly 1,366 px down after a 1,099 px empty schedule; the homeowner financial section spans roughly 3,800 px; long cards require substantial scrolling. No severe tap-target or clipping defect was observed.
+Contractor and homeowner pages at 390x844 had `scrollWidth === clientWidth`. Bottom navigation, estimate review, Jobs controls, and read surfaces remained usable. The closeout removes the seven-row empty schedule that previously pushed contractor work roughly 1,366 px down and keeps Customer search/property handoff usable at 390x844. Homeowner financial density and other long-card scrolling remain. No severe tap-target or clipping defect was observed.
 
 ## 9. Role / Security / Isolation Findings
 
@@ -198,12 +206,12 @@ No runtime source, SQL, RLS, RPC, grants, environment variables, Production data
 
 1. Define the first public-beta contractor cohort: owner-operators/small offices that can accept offline payments and light scheduling, or wait for broader table stakes.
 2. Decide whether online payments are a public-beta gate or an explicitly excluded beta capability.
-3. Approve the information-architecture correction that moves Jobs into core Customer Work and reprioritizes the dashboard.
+3. Observe the first genuine PR #447 `schedule` run and complete real cold-contractor and homeowner task testing.
 4. Choose migration/support promises for contractors leaving another system. Do not promise unsupported white-glove migration.
 
 ## 27. Launch Recommendation
 
-Do not open a broad public launch. Prepare a limited public beta only after: (1) correcting Jobs/dashboard/customer-selection P1s, (2) observing the first natural recurring role smoke, and (3) publishing a candid capability boundary for payments, dispatch, reporting, integrations, and support. Recruit 5-8 owner-operators or two-to-five-person HVAC/plumbing/electrical businesses plus 5-8 homeowners. Give them outcome tasks without naming UI controls: add a customer, quote work, respond, complete it, invoice it, find it later, and repeat on mobile. Observe time to first correct action, backtracks, help requests, abandoned tasks, task completion, confidence, and whether they can explain status. Do not ask "Was this easy?" or explain Draft/Home History before the task.
+Do not open a broad public launch. The Jobs/dashboard/customer-selection P1s are closed. Prepare a limited public beta only after: (1) observing the first natural recurring role smoke, (2) publishing a candid capability boundary for payments, dispatch, reporting, integrations, and support, and (3) confirming no new P0/P1 through real cold-user trials. Recruit 5-8 owner-operators or two-to-five-person HVAC/plumbing/electrical businesses plus 5-8 homeowners. Give them outcome tasks without naming UI controls: add a customer, quote work, respond, complete it, invoice it, find it later, and repeat on mobile. Observe time to first correct action, backtracks, help requests, abandoned tasks, task completion, confidence, and whether they can explain status. Do not ask "Was this easy?" or explain Draft/Home History before the task.
 
 ## Evidence Sources
 

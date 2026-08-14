@@ -98,7 +98,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     );
     const contractorJobsMobileNavSource = sourceBetween(contractorNavSource, "id: 'jobs'", "id: 'dashboard'");
     const contractorCalendarTabSource = sourceBetween(contractorTabsSource, "id: 'calendar'", "id: 'invites'");
-    const contractorJobsTabSource = sourceBetween(contractorTabsSource, "id: 'inspections'", "id: 'trust'");
+    const contractorJobsTabSource = sourceBetween(contractorTabsSource, "id: 'inspections'", "id: 'connections'");
 
     expect(appSource).toContain('const contractorHomeownersBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : connectionRequests.length;');
     expect(appSource).toContain('const contractorServiceRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : contractorFollowUpCount || openServiceRequestCount;');
@@ -216,7 +216,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsOverviewSource).toContain("if (item.id !== 'new_jobs') setInspectionView('list')");
     expect(jobsOverviewSource).not.toContain('overflow-x-auto');
 
-    expect(financialOverviewSource).toContain("id: 'new_financial' as const, label: 'New Estimate/Invoice'");
+    expect(financialOverviewSource).toContain("label: canManageFinancialActions ? 'New Estimate/Invoice' : 'New Estimate'");
     expect(financialOverviewSource).toContain("id: 'open_financial' as const, label: 'Open Estimates / Invoices'");
     expect(financialOverviewSource).toContain("id: 'closed_financial' as const, label: 'Closed / Billed Records'");
     expect(financialOverviewSource).toContain("mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1'");
