@@ -35,6 +35,11 @@ function firstRow(value: unknown): Record<string, unknown> | null {
 
 const assert: typeof requireSmokeInvariant = requireSmokeInvariant;
 
+function assertPermissionDenied(error: { code?: string } | null, check: string, message: string) {
+  assert(Boolean(error), 'AUTHORIZATION FAILURE', check, message);
+  assert(error?.code === '42501', 'PROVIDER/EXTERNAL FAILURE', check, 'A denial probe failed for a reason other than authorization.');
+}
+
 async function addCheck(
   checks: SmokeCheckResult[],
   name: string,
@@ -111,7 +116,11 @@ async function verifyCapabilities(account: AuthenticatedAccount, role: Exclude<C
   assert(customer === expected.customer, 'AUTHORIZATION FAILURE', `${role}_authorization`, `${role} customer-management authority drifted.`);
   assert(billing === expected.billing, 'AUTHORIZATION FAILURE', `${role}_authorization`, `${role} billing authority drifted.`);
   assert(jobs === expected.jobs, 'AUTHORIZATION FAILURE', `${role}_authorization`, `${role} Job-write authority drifted.`);
-  assert((cost.error === null) === expected.cost, 'AUTHORIZATION FAILURE', `${role}_authorization`, `${role} private-cost authority drifted.`);
+  if (expected.cost) {
+    assert(!cost.error, 'AUTHORIZATION FAILURE', `${role}_authorization`, `${role} private-cost authority drifted.`);
+  } else {
+    assertPermissionDenied(cost.error, `${role}_authorization`, `${role} unexpectedly received private-cost authority.`);
+  }
 }
 
 async function verifyHomeownerIdentity(account: AuthenticatedAccount, role: 'homeowner' | 'homeownerB') {
@@ -172,7 +181,7 @@ async function verifyCrossTenant(
     assert(!result.error, 'PROVIDER/EXTERNAL FAILURE', 'cross_tenant_denial', 'Cross-tenant read probe could not be evaluated.');
     assert(result.data.length === 0, 'AUTHORIZATION FAILURE', 'cross_tenant_denial', 'A private cross-tenant record was unexpectedly visible.');
   }
-  assert(Boolean(foreignCustomer.error), 'AUTHORIZATION FAILURE', 'cross_tenant_denial', 'Cross-tenant Customer management detail was unexpectedly visible.');
+  assertPermissionDenied(foreignCustomer.error, 'cross_tenant_denial', 'Cross-tenant Customer management detail was unexpectedly visible.');
 }
 
 async function verifyBackupHealth() {
