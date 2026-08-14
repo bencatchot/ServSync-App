@@ -4,13 +4,13 @@ This checklist turns the ServSync recovery runbook into one timed, fail-closed o
 
 ## Entry Gates
 
-- [ ] A completed Production physical database backup is visible and selected.
-- [ ] A Production R2 run has executed naturally through the `04:17 UTC` Vercel Cron.
-- [ ] The Cron invocation is independently visible in Vercel runtime evidence and the corresponding aggregate R2 health record passes `npm run ops:storage-backup:observe-scheduled`.
-- [ ] The selected R2 manifest is complete, SHA-verified, and no older than the accepted Storage recovery point.
-- [ ] Temporary recovery-project authority and required provider access are still approved.
-- [ ] Approved contractor and homeowner smoke identities are available without resetting Production passwords.
-- [ ] No public domain, live Stripe traffic, email/SMS sending, or Production Cron will point at the recovery target.
+- [x] A completed Production physical database backup is visible and selected.
+- [x] A Production R2 run has executed naturally through the `04:17 UTC` Vercel Cron.
+- [x] The Cron invocation is independently visible in Vercel runtime evidence and the corresponding aggregate R2 health record passed independent manifest/health validation.
+- [x] The selected R2 manifest is complete, SHA-verified, and no older than the accepted Storage recovery point.
+- [x] Temporary recovery-project authority and required provider access are still approved.
+- [x] Approved contractor and homeowner smoke identities are available without resetting Production passwords.
+- [x] No public domain, live Stripe traffic, email/SMS sending, or Production Cron will point at the recovery target.
 
 Stop if any entry gate is false. A manual Storage backup invocation cannot satisfy the scheduler gate.
 
@@ -46,56 +46,56 @@ All timestamps use UTC. Record provider-generated identifiers only when they are
 
 | Milestone | Timestamp | Duration from prior milestone | Evidence/result |
 | --- | --- | --- | --- |
-| Synthetic incident declaration (`T0`) |  |  |  |
-| Database recovery point selected |  |  | Backup ID and completed timestamp |
-| R2 recovery point selected |  |  | Run ID, completed timestamp, manifest SHA only |
-| Isolated project provisioning requested |  |  | Project name/ref |
-| Database `ACTIVE_HEALTHY` |  |  | Restore duration |
-| Recovery validator passed |  |  | Catalog/integrity fingerprints |
-| Contractor Auth passed and signed out |  |  | Role/profile relationship only |
-| Homeowner Auth passed and signed out |  |  | Profile relationship only |
-| R2-only Storage restore started |  |  |  |
-| R2-only Storage restore verified |  |  | Object count, bytes, SHA result, duration |
-| Minimum configuration reconstructed |  |  | Enabled/disabled inventory |
-| Local/protected recovery app ready |  |  | Recovery target identity verified |
-| Contractor desktop smoke passed |  |  | Routes/requests/console result |
-| Homeowner desktop smoke passed |  |  | Routes/requests/console result |
-| Contractor mobile smoke passed |  |  | `390x844`, overflow/result |
-| Storage-backed record passed |  |  | Public/private authorization result |
-| Recovery complete (`T_recovered`) |  |  | No critical integrity failure |
+| Synthetic incident declaration (`T0`) | 2026-08-14 12:02:05.146 | n/a | Recovery points selected; incident clock started. |
+| Database recovery point selected | 2026-08-14 06:15:14.081 | 5h46m51.065s before `T0` | Physical backup ID `1370181993`. |
+| R2 recovery point selected | 2026-08-14 04:17:40.942 | 7h44m24.204s before `T0` | Natural run `2508eaaf-b124-4498-8660-4ba0cbf4efd0`; manifest `27247251b2acacea2dcd161d01107cab7bd49dc1935733871645961ddd09abfd`. |
+| Isolated project provisioning requested | 2026-08-14 12:02:37.241 | 32.095s | `servsync-recovery-drill-full-2026-08-14` / `zizojbqbsikymrdhfebd`. |
+| Post-restore `ACTIVE_HEALTHY` | 2026-08-14 12:07:05.772 | 4m28.531s | `RESTORING` was observed first; stable health confirmed at 12:07:20.992. |
+| Recovery validator passed | before 2026-08-14 12:09:31.268 | bounded before Auth operation | Catalog `75680d...f1fe`; integrity `b0aab470...e6c14`; exact Production correspondence. |
+| Contractor Auth passed and signed out | 2026-08-14 12:09:32.307 | included below | Owner/profile relationship resolved. |
+| Homeowner Auth passed and signed out | 2026-08-14 12:09:32.307 | 1.039s final Auth operation | Homeowner profile resolved; no reset. |
+| R2-only Storage restore started | 2026-08-14 12:10:23.182 | 50.875s | Natural manifest only; no Production fallback. |
+| R2-only Storage restore verified | 2026-08-14 12:10:28.491 | 5.309s | 4 objects / 5,274,400 bytes; all hashes passed. |
+| Minimum configuration reconstructed | 2026-08-14 12:11 | under 1m | Process-only recovery Supabase URL/anon; side-effectful providers disabled. |
+| Local/protected recovery app ready | 2026-08-14 12:11 | 174ms server startup | Local-only app; recovery ref verified before Auth. |
+| Contractor desktop smoke passed | 2026-08-14 12:28 | included in app-smoke window | Core routes, Jobs presentation, and Price Book; no major console/5xx. |
+| Homeowner desktop smoke passed | 2026-08-14 12:28 | included in app-smoke window | Core routes and a real Invoice PDF download. |
+| Contractor mobile smoke passed | 2026-08-14 12:28 | included in app-smoke window | `390x844`; no horizontal overflow or major console/5xx. |
+| Storage-backed record passed | 2026-08-14 12:28 | included in app-smoke window | Recovered canonical profile logo rendered; private object anonymous 400 / server-authorized 200. |
+| Recovery complete (`T_recovered`) | 2026-08-14 12:29:08.539 | 27m03.393s from `T0` | No critical integrity failure. |
 
 Calculate and record:
 
-- Database recovery point to `T0`: ____
-- Storage recovery point to `T0`: ____
-- Database/Storage timestamp skew: ____
-- Evidence-supported database RPO: ____
-- Evidence-supported Storage RPO: ____
-- Evidence-supported full-system RPO (worst critical subsystem): ____
-- Database restore duration: ____
-- Auth validation duration: ____
-- Storage restore duration: ____
-- Configuration/deployment duration: ____
-- Full application RTO (`T_recovered - T0`): ____
-- Comparison with provisional 24-hour RPO / 4-hour RTO goals: ____
+- Database recovery point to `T0`: 5h46m51.065s.
+- Storage recovery point to `T0`: 7h44m24.204s.
+- Database/Storage timestamp skew: 1h57m33.139s, with the database point newer.
+- Evidence-supported database RPO: selected physical point was under 6 hours old; Supabase confirms hidden August 9-11 points remained recoverable, but no formal Pro daily-backup guarantee is documented.
+- Evidence-supported Storage RPO: approximately 24-hour operating cadence, proven by one natural scheduled run and guarded by a 36-hour stale threshold.
+- Evidence-supported full-system RPO (worst critical subsystem): tested recovery-point age 7h44m24.204s; 24-hour operating target supported, not guaranteed.
+- Database restore duration: 4m28.531s to first post-restore healthy; 4m43.751s to stable health.
+- Auth validation duration: 1.039s final operation; complete role validation finished 7m27.161s after `T0`.
+- Storage restore duration: 5.309s.
+- Configuration/deployment/application-correction/smoke duration: approximately 18m40s after Storage restore, including discovery and correction of portable public Storage URL consumption.
+- Full application RTO (`T_recovered - T0`): 27m03.393s.
+- Comparison with provisional 24-hour RPO / 4-hour RTO goals: both supported by this isolated drill; neither is a contractual SLA.
 
 ## Application Smoke
 
-- [ ] Contractor login, Dashboard, Customers, Customer profile, Drafts, Estimates, Jobs, Invoices, payment/history presentation, Price Book.
-- [ ] Contractor can access one recovered Storage-backed document/media record under its established authorization.
-- [ ] Homeowner login, Dashboard, Estimates/Invoices, Home History.
-- [ ] Homeowner can access one recovered Storage-backed record when a suitable authorized record exists.
-- [ ] Contractor mobile smoke at approximately `390x844` has no critical console/request failure or horizontal overflow.
-- [ ] No missing required RPC, role-boundary regression, broken object authorization, or unexplained 4xx/5xx remains.
+- [x] Contractor login plus Dashboard, Customers, Service Requests, Jobs/Estimate-Invoice presentation, Calendar, and Price Book passed. The approved owner had no accessible customer/profile/Draft record cards, so those record-specific clicks were not manufactured.
+- [x] A restored public contractor asset rendered through the canonical ServSync public-profile route against the recovery project.
+- [x] Homeowner login, Dashboard, Properties, Contractors, Service Requests, Estimates/Invoices, Home History, and Documents passed; one real Invoice PDF downloaded.
+- [x] Homeowner canonical public-profile rendering used a recovered R2-derived Storage object. The approved accounts did not own the restored private service-request media, so private user-scoped rendering was not manufactured.
+- [x] Contractor mobile at `390x844` had no critical console/request failure or horizontal overflow.
+- [x] No missing required RPC, role-boundary regression, broken object authorization, or unexplained 4xx/5xx remained.
 
 ## Cleanup
 
-- [ ] Stop local/Preview recovery application and delete protected temporary environment configuration.
-- [ ] Confirm no public domain, webhook, Cron, email, SMS, or live provider points to the target.
-- [ ] Delete the exact isolated recovery project and verify the provider no longer returns it.
-- [ ] Confirm Production, Demo, and Sandbox remain `ACTIVE_HEALTHY` and public app endpoints remain healthy.
-- [ ] Confirm the Production R2 backup and latest-success health remain intact.
-- [ ] Confirm no local database, Storage-byte, credential, screenshot, or log artifact remains.
-- [ ] Record residual findings without repairing historical Production data during the drill.
+- [x] Stopped the local recovery application; process-only configuration was discarded.
+- [x] No public domain, webhook, Cron, email, SMS, Stripe, or live provider pointed to the target.
+- [x] Deleted exact isolated project `zizojbqbsikymrdhfebd`; it is absent from the project inventory.
+- [x] Production/Demo/Stripe Sandbox public endpoints returned HTTP 200; no standing environment was mutated.
+- [x] Production R2 natural-run backup and latest-success evidence remained intact; daily Cron remains configured.
+- [x] No temporary credential file or recovery application process remained; transient R2 credentials were cleared and the provider credential-success page was exited.
+- [x] The historical paid-Invoice ledger mismatch was recorded unchanged and was not repaired.
 
 Recovery is complete only when database, Auth, critical Storage, minimum configuration, and authenticated application smoke all pass. Database-only or Storage-only timing is not a full ServSync RTO.

@@ -1,41 +1,42 @@
 # FB-016 ServSync Recovery Runbook
 
-Status: active and blocked for public-launch recovery readiness.
+Status: active; full recovery closeout passed with bounded findings on 2026-08-14.
 
 This is the authoritative ServSync incident-recovery procedure and sanitized drill record. It does not authorize a restore, cutover, provider activation, production mutation, or secret access. Every incident still requires an approved source, recovery point, isolated target, operator, and cutover decision.
 
 ## Current Readiness
 
-The 2026-08-13 database drill proved that a Production Supabase physical backup can restore PostgreSQL data, Auth identities/password hashes, and a usable read-only ServSync application into an isolated project. The follow-up Storage drill closed the previously critical object-byte gap:
+The 2026-08-13 database and Storage drills proved the individual recovery layers. The timed 2026-08-14 drill then exercised them together from synthetic incident declaration through a usable isolated ServSync application:
 
 - A private Cloudflare R2 Standard bucket now receives source-ref-scoped, content-addressed object versions, immutable manifests, a latest-success health pointer, deletion tombstones, and 90 retained daily runs.
-- Two read-only Production runs captured all seven buckets and four objects (5,274,400 bytes). The second run reused all four verified object versions and wrote zero duplicate object bytes.
+- The first natural Vercel Cron execution ran on 2026-08-14 at 04:17 UTC and independently matched a healthy R2 manifest for all seven buckets and four objects (5,274,400 bytes), with zero failures.
 - The latest exact manifest restored all four objects into a new isolated Supabase project. Restored bytes, paths, bucket privacy/settings, and SHA-256 checks passed; two contractor-logo references and one service-request-media reference resolved to recovered objects.
 - Public-object access succeeded, anonymous private-object access failed, and server-authorized private-object access succeeded. The isolated project was deleted after validation.
 - Production backup inventory omitted visible August 9, 10, and 11 restore points. Supabase ticket `SU-445711` classified this as a resolved provider restore-point visibility incident, not an observed data-protection gap.
 - The visible interval remained present when rechecked on 2026-08-13: Production exposed completed restore points for August 6, 7, 8, 12, and 13 only, while Demo and Sandbox exposed a completed daily point for every day from August 6 through 13. Supabase confirmed the affected Production data remained safe and fully recoverable for August 9-11 even though those points may remain hidden in the Dashboard.
 - Supabase stated that enabling PITR should expose an affected hidden restore date if a restore from that period becomes necessary and offered to credit the affected-timeframe PITR cost. This is recovery evidence, not authorization for ongoing PITR activation.
-- The next natural R2 Cron execution after this audit is 2026-08-14 at 04:17 UTC. The earlier post-deployment run was manual and does not count as autonomous scheduler evidence.
-- Auth, Realtime, Edge Functions, secrets, Vercel, and external-provider settings need separate secure reapplication.
+- A fresh isolated target restored the August 14 physical database backup, Auth, and the natural-run R2 bytes; matched current Production catalog and integrity fingerprints; passed contractor/homeowner authentication; generated a real Invoice PDF; rendered a recovered contractor logo through the canonical profile route; and passed private Storage authorization checks.
+- The full drill ran from `2026-08-14T12:02:05.146Z` through `2026-08-14T12:29:08.539Z`, a measured RTO of 27 minutes 3.393 seconds. The recovery target and local app were deleted/stopped after evidence capture.
+- Core application recovery required only process-local Supabase URL/anon configuration. Auth, Realtime, and Storage behavior came from the restored target. Public aliases, Stripe, email, SMS, webhooks, Edge Functions, and Production Cron remained disabled on the isolated target and remain separate pre-cutover reconstruction steps.
 
-Consequently, full ServSync recovery readiness remains `BLOCKED`, but independent database/Auth recovery, Storage-byte backup/restore, and the provider disposition of the August 9-11 visibility incident are completed bounded milestones. The executable configuration and timed-drill checklist is `docs/FB-016_FULL_RECOVERY_DRILL_CHECKLIST.md`. The remaining completion gates are natural scheduler observation and a timed full-application drill; formal Pro daily-backup RPO expectations and automatic hidden-point monitoring remain bounded provider follow-ups.
+Consequently, this bounded database/Auth/Storage/configuration/application closeout is `PASS WITH FINDINGS`. The provisional 24-hour full-system RPO operating target and 4-hour RTO target are supported by this drill, not guaranteed as an SLA. Formal Pro daily-backup RPO wording, automatic hidden-restore-point monitoring, recurring autonomous-backup observations, repeated full drills, and automation of external configuration remain active FB-016 work.
 
 ## Recovery Objectives
 
 Observed evidence, not adopted objectives:
 
-- Database restore duration: 3 minutes 57 seconds from accepted restore request to `ACTIVE_HEALTHY`.
+- Database restore duration: 4 minutes 28.531 seconds from accepted August 14 restore request to the first post-`RESTORING` `ACTIVE_HEALTHY`; stable health was confirmed after 4 minutes 43.751 seconds.
 - Database RPO evidence: Supabase confirmed the August 9-11 data remained safe and recoverable, so the approximately 95-hour 56-minute August 8-to-August 12 interval is only the observed Dashboard/API visibility interval. It is not evidence of an equivalent data-loss window. Supabase has not supplied a formal Pro daily physical-backup RPO commitment without PITR.
-- Storage RPO evidence: one successful initial backup and one immediate unchanged replay on 2026-08-13. A daily 04:17 UTC schedule and a 36-hour stale-health threshold are configured, but 24-hour Storage RPO performance is not yet proven by elapsed scheduled runs.
-- Full application RPO evidence: undefined/unbounded, governed by the weakest critical layer.
-- Full application RTO evidence: not established. Database restore time excludes Storage, configuration, deployment, provider recovery, validation, and cutover.
+- Storage RPO evidence: the daily 04:17 UTC Cron executed naturally once and backed up the complete current inventory; the operational cadence is approximately 24 hours with a 36-hour stale-health alarm. One autonomous observation proves scheduler operation, not long-term reliability.
+- Full application RPO evidence: the selected database point was 5h46m51.065s before `T0`, the selected Storage point was 7h44m24.204s before `T0`, and their skew was 1h57m33.139s. The tested recovery-point age was therefore 7h44m24.204s, within the provisional 24-hour operating target.
+- Full application RTO evidence: 27m03.393s from `T0` through database/Auth/R2/configuration/application/PDF/media acceptance, within the provisional 4-hour target.
 
-Recommended controlled-beta targets, pending owner adoption and prerequisite work:
+Evidence-supported controlled-beta operating targets, still not contractual guarantees:
 
 - Full application RPO: 24 hours.
 - Full application RTO: 4 hours.
 
-Those targets require successful daily scheduler observation, backup-gap monitoring and resolution, secured configuration inventories, and recurring timed full drills. They are not currently achieved.
+The August 14 drill supports both targets under isolated-drill conditions. Real incidents may add containment, provider escalation, DNS, provider credential recovery, data reconciliation, and cutover time; recurring observation and drills remain required.
 
 ## Recovery Procedure
 
@@ -126,6 +127,39 @@ npm run ops:storage-backup:observe-scheduled -- \
 ```
 
 Use the actual natural-run date and a narrowly justified completion window. The command rejects missing scheduler evidence, wrong source identity, out-of-window/manual health, stale/future health, invalid manifest hashes, failures, and incomplete object accounting. It emits aggregate evidence only. It does not independently query Vercel, so the operator must retain the corresponding Vercel Cron/runtime evidence.
+
+## 2026-08-14 Natural Backup And Full Recovery Evidence
+
+### Natural Vercel Cron And R2
+
+- Configured schedule: `/api/storage-backup` at `17 4 * * *`; 36-hour stale threshold remains enabled.
+- Vercel invocation: `2026-08-14T04:17:38.115Z`, HTTP 200, runtime request `78cqw-1786681058115-67995f5dbf0a`, deployment `dpl_rznE5TVbhuhbmbatSqkpSCHoABgR`. The exact schedule, Vercel Cron host, protected route, and runtime timestamp establish scheduler origin; no manual invocation was used for this evidence.
+- R2 run: `2508eaaf-b124-4498-8660-4ba0cbf4efd0`, started `2026-08-14T04:17:38.255Z`, completed `2026-08-14T04:17:40.942Z`, source `uqgtheclhxqlnjpfmheq`.
+- Aggregate result: 7 buckets, 4 source/backed-up objects, 5,274,400 bytes, 0 new, 4 unchanged, 0 tombstones, 0 failures, and 0 duplicate R2 bytes written.
+- Manifest SHA-256: `27247251b2acacea2dcd161d01107cab7bd49dc1935733871645961ddd09abfd`. Canonical manifest hashing, all four R2 object hashes/sizes, and the latest-success pointer were independently verified.
+- The Production Storage inventory was 4 objects / 5,274,400 bytes. Its sanitized bucket/path/size fingerprint `1d665e27bb5e76daba4df9e030a56bec6ca09773d82cf95f1bd880f2b2bb2884` exactly matched the active natural-run manifest.
+
+### Timed Full Drill
+
+- `T0`: `2026-08-14T12:02:05.146Z`.
+- Database recovery point: physical backup `2026-08-14T06:15:14.081Z` (backup ID `1370181993`), 5h46m51.065s before `T0`.
+- Storage recovery point: natural R2 completion `2026-08-14T04:17:40.942Z`, 7h44m24.204s before `T0`; database/Storage skew was 1h57m33.139s.
+- Isolated target: `servsync-recovery-drill-full-2026-08-14` / `zizojbqbsikymrdhfebd`, `us-east-1`, PostgreSQL 17 / provider release `17.6.1.155`. The provider UI showed zero additional monthly compute/disk charge for this temporary target.
+- Restore accepted `2026-08-14T12:02:37.241Z`; `RESTORING` was observed at `12:06:24.458Z`; first post-restore `ACTIVE_HEALTHY` was `12:07:05.772Z`; stable health was confirmed at `12:07:20.992Z`. Request-to-healthy duration was 4m28.531s and request-to-stable duration was 4m43.751s.
+- The recovery validator matched current Production exactly: catalog fingerprint `75680d18283b3ebf95164e92ea067aa767a218d1b1a4b689fd9759df1b41f1fe`, integrity fingerprint `b0aab4708c530251d3535604a57b4bce07a9ccf589314f05e7cceec61d8e6c14`, and zero relationship/financial violations except the same known historical paid-Invoice ledger mismatch present in Production.
+- Contractor-owner and homeowner password authentication, profile/role resolution, and sign-out passed. Auth validation completed at `2026-08-14T12:09:32.307Z`; the final authentication operation took 1.039s. No password was reset or exposed.
+- R2-only Storage restore ran from `12:10:23.182Z` through `12:10:28.491Z` (5.309s): 4 objects / 5,274,400 bytes, zero skipped/failed objects, and exact SHA-256 verification. No Production Storage fallback was used.
+- Private Storage evidence matched one restored application metadata row to its restored object. Anonymous access returned 400; server-authorized access returned 200 for 4,070,470 bytes with SHA-256 `2024289f351db2a7d807c6618310c3ac40fe28fcb71273f8a934ee796f359649`.
+- The recovered application used process-only browser-public Supabase configuration and no public alias. Contractor desktop loaded Dashboard, Customers, Service Requests, Jobs, Calendar, and Price Book. Homeowner desktop loaded Dashboard, Properties, Contractors, Service Requests, Estimates/Invoices, Home History, and Documents. Contractor mobile at 390x844 had no horizontal overflow. No major console errors or 5xx responses occurred.
+- A real restored contractor logo rendered at 710x712 through the canonical public profile using the recovery project, and a real accessible Invoice PDF downloaded successfully. During rehearsal, absolute historical Supabase public-logo URLs were found to point back to Production; the client now resolves only recognized `contractor-assets` public URLs against the configured Supabase project without altering stored values or external URLs.
+- `T_recovered`: `2026-08-14T12:29:08.539Z`. Full measured RTO: 27m03.393s.
+- Cleanup passed: the local recovery app stopped, the isolated project was deleted, no public domain/provider/Cron was attached, temporary secret material was absent, the private R2 backup remained intact, and Production/Demo/Stripe Sandbox public endpoints returned HTTP 200.
+
+### Runbook Corrections
+
+- A newly provisioned restore target may report `ACTIVE_HEALTHY` briefly before entering `RESTORING`. Do not run the recovery validator on that transient state. Observe `RESTORING`, then require post-restore `ACTIVE_HEALTHY` to remain stable before validation.
+- Public Supabase Storage URLs persisted as absolute values must be resolved against the configured recovery project at application consumption time. Do not rewrite restored historical rows merely to make a drill pass.
+- Storage backup/health/observation/restore operator scripts run through the pinned development-only `tsx` runner. This preserves the Vercel runtime's emitted-`.js` import convention while making the documented local TypeScript commands executable.
 
 ## 2026-08-13 Drill Evidence
 

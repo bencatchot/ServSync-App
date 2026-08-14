@@ -6,7 +6,7 @@ This runbook is part of FB-020: Security, Records Reliability, Backup/Restore, S
 
 This document is not approval to change production, apply SQL, modify RLS/storage policies, create users, or run production smoke tests. Those remain separate approval gates.
 
-FB-020 met the controlled private beta baseline. Active restore, Storage-byte, backup/PITR, retention, recovery, and public-launch readiness work is consolidated under FB-016. The authoritative current procedure and 2026-08-13 drill evidence are in [FB-016 Recovery Runbook](FB-016_RECOVERY_RUNBOOK.md). Database/Auth restore, independent R2 Storage recovery, and local application smoke are proven. Supabase ticket `SU-445711` resolved the August 9-11 condition as a restore-point visibility incident with the affected data safe and recoverable. Natural scheduler evidence and a timed full recovery drill remain pending.
+FB-020 met the controlled private beta baseline. Active restore, Storage-byte, backup/PITR, retention, recovery, and public-launch readiness work is consolidated under FB-016. The authoritative current procedure and 2026-08-13/14 drill evidence are in [FB-016 Recovery Runbook](FB-016_RECOVERY_RUNBOOK.md). Database/Auth restore, independent R2 Storage recovery, natural scheduler execution, and a 27m03.393s timed isolated application recovery are proven. Supabase ticket `SU-445711` resolved the August 9-11 condition as a restore-point visibility incident with the affected data safe and recoverable. Formal provider RPO wording, hidden-point monitoring, recurring evidence, and external-configuration automation remain active.
 
 Controlled-operations packet policy is documented in [Controlled Operations Policy And Runbook](CONTROLLED_OPERATIONS_RUNBOOK.md). That runbook covers the local/provider-neutral evidence foundation through Slice 2D-A and the Slice 3 documentation closeout. It does not approve live provider adapters, credentials, SQL, deployment, Supabase, Vercel, Production, Sandbox, Preview, Demo, or customer-data access.
 
@@ -147,7 +147,7 @@ FB-020 Slice 1F adds blank/sanitized templates for restore drill results, applie
 
 Historical 2026-07-02 evidence: a controlled database-only drill restored the Sandbox public schema into isolated throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`, verified 66 public tables, 179 public functions, and 66 public RLS-enabled tables, then stopped before Auth/data restore under that drill's authorization boundary. The target and local artifacts were deleted. The later FB-016 drill supersedes this as the current recovery evidence; see `docs/FB-016_RECOVERY_RUNBOOK.md`.
 
-Current follow-up decisions are governed by FB-016: create and test independent Storage-byte backup/restore, resolve and monitor the backup inventory gap, maintain secure external-configuration inventories, and repeat a timed full recovery drill.
+Current follow-up decisions are governed by FB-016: retain and monitor independent Storage-byte backup/restore, seek formal provider RPO/hidden-point monitoring guidance, maintain secure external-configuration inventories, and repeat timed full recovery drills.
 
 ## Applied-SQL Ledger And Deployed-State Tracking
 
