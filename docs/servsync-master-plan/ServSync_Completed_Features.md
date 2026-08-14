@@ -1,8 +1,8 @@
 # ServSync Completed Features
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
-Last reconciled against `origin/main` at `07996fdfb85e0859f43ad03ea38dd9073e322f85`.
+Last reconciled against `origin/main` at `6dd8b4683230e8f6fb8c860756ac23b61ea376e1`.
 
 ## Purpose
 
@@ -50,6 +50,6 @@ For detailed implementation sequence, changed files, validation, SQL rollout gat
 - FB-013 and FB-028: provider-neutral integration foundations exist; accounting export and QuickBooks readiness remains active.
 - FB-014 and FB-023: payment schedules and invoice generation foundations exist; actual payment collection remains active.
 - FB-016 and FB-020: controlled-beta operational baseline is complete; public-launch operational readiness remains active.
-- FB-016 Storage milestone: private, versioned R2 backup and isolated SHA-verified restore of the complete current Production Storage inventory are proven; database backup continuity, scheduler observation, configuration recovery, and timed full recovery remain active.
+- FB-016 recovery closeout milestone: private versioned R2 backup, one natural scheduled Production backup, isolated database/Auth/R2 restore, authenticated ServSync/PDF/media smoke, and a 27m03.393s full drill are proven. Formal provider RPO/hidden-point monitoring, recurring drills/observations, external-configuration automation, role fixture health, retention/deletion policy, and broader public-launch operations remain active under FB-016.
 - FB-035 is archived as Draft-first Work v1. Feature-gated legacy Job/composer presentation remains an emergency rollback path; historical Draft import protects unmatched older Drafts; whole-Job Invoice creation remains only for historical Jobs without durable work items; accepted Estimate-to-Job and completed Job-to-Invoice are legitimate contextual handoffs. The exact `PGRST202` Estimate-send fallback remains temporarily intact and should be retired only after all supported catalogs expose `public.servsync_send_estimate`, current source is deployed, supported Preview targets are confirmed migrated, and rollback no longer requires a forward client against an older database.
 - FB-029 and FB-032: Service Plans foundation v1 is complete; recurring service automation remains future.

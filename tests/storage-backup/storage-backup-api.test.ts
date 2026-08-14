@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStorageBackupHandler, createStorageBackupHealthHandler } from '../../server/storageBackupHttp.ts';
-import { parseStorageBackupRetention } from '../../server/storageBackupConfigContract.ts';
+import { parseStorageBackupRetention, requiredStorageBackupConfig } from '../../server/storageBackupConfigContract.ts';
 
 test('backup endpoint requires the Cron bearer secret and returns only aggregate evidence', async () => {
   const original = process.env.CRON_SECRET;
@@ -58,4 +58,12 @@ test('backup configuration rejects invalid retention before constructing an oper
   assert.throws(() => parseStorageBackupRetention('NaN'), /whole number from 1 through 365/);
   assert.throws(() => parseStorageBackupRetention('90.5'), /whole number from 1 through 365/);
   assert.equal(parseStorageBackupRetention('90'), 90);
+});
+
+test('backup configuration fails closed when an R2 credential is missing', () => {
+  assert.throws(
+    () => requiredStorageBackupConfig('SERVSYNC_STORAGE_BACKUP_R2_ACCESS_KEY_ID', {}),
+    /R2_ACCESS_KEY_ID is unavailable/,
+  );
+  assert.equal(requiredStorageBackupConfig('KEY', { KEY: ' value ' }), 'value');
 });

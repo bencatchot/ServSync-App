@@ -54,7 +54,8 @@ import {
   X,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { supabase, supabaseConfigured } from './supabaseClient';
+import { configuredSupabaseUrl, supabase, supabaseConfigured } from './supabaseClient';
+import { configuredSupabasePublicStorageUrl } from './storageUrls';
 import { createPropertyAssetAdapter, type PropertyAssetDataClient } from './propertyAssetAdapter';
 import { isExactMissingEstimateSendRpcError } from './features/estimates/estimateSendCompatibility';
 import {
@@ -498,6 +499,11 @@ import type {
 
 type RouteName = AppRouteName;
 const SERVSYNC_DEMO_PRESENTATION_MODE = isServSyncDemoPresentationMode();
+const contractorLogoUrl = (value: string | null | undefined) => configuredSupabasePublicStorageUrl(
+  value,
+  configuredSupabaseUrl,
+  'contractor-assets',
+);
 type HomeownerRequestView = 'open_pending' | 'closed' | 'invoiced';
 type HomeownerRequestComposerStep = 'property' | 'issue' | 'contractor' | 'review';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
@@ -8889,7 +8895,7 @@ function ContractorReferralInvitePage({
           contact_name: contractor?.contact_name || '',
           email: contractor?.email || '',
           phone: contractor?.phone || '',
-          logo_url: contractor?.logo_url || '',
+          logo_url: contractorLogoUrl(contractor?.logo_url),
           city: contractor?.city || '',
           state: contractor?.state || '',
           status: data.status as ConnectionStatus,
@@ -12289,7 +12295,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     business_name: contractor.business_name,
     city: contractor.city,
     state: contractor.state,
-    logo_url: contractor.logo_url,
+    logo_url: contractorLogoUrl(contractor.logo_url),
     service_categories: contractor.service_categories,
   });
 
@@ -12298,7 +12304,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     business_name: connection.business_name,
     city: connection.city,
     state: connection.state,
-    logo_url: connection.logo_url,
+    logo_url: contractorLogoUrl(connection.logo_url),
   });
 
   const submitContextualConnectionRequest = async (draft: ContextualConnectionSubmitDraft) => {
@@ -13001,14 +13007,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setError('');
     setFilingEstimateId(estimate.id);
     try {
-      const contractorLogoUrl = connections.find(connection => connection.contractor_id === estimate.contractor_id)?.logo_url
+      const resolvedContractorLogoUrl = connections.find(connection => connection.contractor_id === estimate.contractor_id)?.logo_url
         || directoryContractors.find(contractor => contractor.id === estimate.contractor_id)?.logo_url
         || null;
       const { blob, fileName } = await createEstimatePdf(estimate, {
         contractorName,
         customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
         customerAddress: home?.address_line1 || '',
-        contractorLogoUrl,
+        contractorLogoUrl: contractorLogoUrl(resolvedContractorLogoUrl),
       });
       const document = await createHomeDocumentFromBlob(
         blob,
@@ -14405,7 +14411,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             type="button"
             onClick={() => void downloadInvoicePdf(invoice, {
               contractorName,
-              contractorLogoUrl: invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url || null,
+              contractorLogoUrl: contractorLogoUrl(invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url),
               contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
               contractorPhone: formatPhoneNumber(invoiceConnection?.phone || invoiceDirectoryContractor?.phone || ''),
               contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
@@ -14586,7 +14592,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 contractorName,
                 customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
                 customerAddress: home?.address_line1 || '',
-                contractorLogoUrl: estimateConnection?.logo_url || estimateDirectoryContractor?.logo_url || null,
+                contractorLogoUrl: contractorLogoUrl(estimateConnection?.logo_url || estimateDirectoryContractor?.logo_url),
               }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
               className={buttonClass('secondary')}
             >
@@ -30804,7 +30810,7 @@ function ContractorDashboard({
         ? [localHome.address_line1, localHome.city, localHome.state].filter(Boolean).join(', ')
         : [homeownerConn?.city, homeownerConn?.state].filter(Boolean).join(', '));
 
-      const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url, {
+      const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractorLogoUrl(contractor.logo_url), {
         includeSummary: includeReportSummary,
         includeValueAdd: includeReportValueAdd,
         valueAddText: cleanHumanWrittenText(reportValueAddText),
@@ -32658,7 +32664,7 @@ function ContractorDashboard({
         }}
       />}
       profile={profile}
-      profileLogoUrl={contractorDraft.logo_url}
+      profileLogoUrl={contractorLogoUrl(contractorDraft.logo_url)}
       profileLogoFit="contain"
       accountName={contractorAccountName}
       accountSubtitle={contractorAccountSubtitle}
@@ -33363,7 +33369,7 @@ function ContractorDashboard({
             <div className="flex items-center gap-4">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white">
                 {contractorDraft.logo_url ? (
-                  <img src={contractorDraft.logo_url} alt={`${contractorDraft.business_name || 'Contractor'} logo`} className="h-full w-full object-contain p-2" />
+                  <img src={contractorLogoUrl(contractorDraft.logo_url)} alt={`${contractorDraft.business_name || 'Contractor'} logo`} className="h-full w-full object-contain p-2" />
                 ) : (
                   <Building2 size={28} className="text-[#223D67]/45" />
                 )}
@@ -38135,7 +38141,7 @@ function ContractorDashboard({
                                                     contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                                     customerName: headerName,
                                                     customerAddress: headerAddress || headerCity,
-                                                    contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                                    contractorLogoUrl: contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url),
                                                   }).catch(err => setError(readableError(err, 'Unable to preview estimate PDF.')))}
                                                   className={buttonClass('secondary')}
                                                 >
@@ -38148,7 +38154,7 @@ function ContractorDashboard({
                                                     contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                                     customerName: headerName,
                                                     customerAddress: headerAddress || headerCity,
-                                                    contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                                    contractorLogoUrl: contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url),
                                                   }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
                                                   className={buttonClass('secondary')}
                                                 >
@@ -40046,7 +40052,7 @@ function ContractorDashboard({
                                         type="button"
                                         onClick={() => void previewInvoicePdf(invoice, {
                                           contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
-                                          contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                          contractorLogoUrl: contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url),
                                           contractorEmail: contractor?.email || contractorDraft.email || '',
                                           contractorPhone: formatPhoneNumber(contractor?.phone || contractorDraft.phone || ''),
                                           contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
@@ -40063,7 +40069,7 @@ function ContractorDashboard({
                                         type="button"
                                         onClick={() => void downloadInvoicePdf(invoice, {
                                           contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
-                                          contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                          contractorLogoUrl: contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url),
                                           contractorEmail: contractor?.email || contractorDraft.email || '',
                                           contractorPhone: formatPhoneNumber(contractor?.phone || contractorDraft.phone || ''),
                                           contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
@@ -40267,7 +40273,7 @@ function ContractorDashboard({
                                         contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                         customerName,
                                         customerAddress,
-                                        contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                        contractorLogoUrl: contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url),
                                       }).catch(err => setError(readableError(err, 'Unable to preview estimate PDF.')))}
                                       className={mobileButtonClass('secondary')}
                                     >
@@ -40280,7 +40286,7 @@ function ContractorDashboard({
                                         contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                         customerName,
                                         customerAddress,
-                                        contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                        contractorLogoUrl: contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url),
                                       }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
                                       className={buttonClass('secondary')}
                                     >
@@ -44512,7 +44518,7 @@ function ContractorDashboard({
                             const previewInsp: Inspection = activeInspection.status === 'finalized'
                               ? activeInspection
                               : { ...activeInspection, rooms_with_findings: reportRooms, summary: finalSummaryText };
-                            await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress, contractor?.logo_url || contractorDraft.logo_url || null, {
+                            await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress, contractorLogoUrl(contractor?.logo_url || contractorDraft.logo_url), {
                               includeSummary: includeReportSummary,
                               includeValueAdd: includeReportValueAdd,
                               valueAddText: effectiveValueAddText,
@@ -48860,7 +48866,7 @@ function ContractorPublicProfilePage({
     business_name: data.business_name,
     city: data.city,
     state: data.state,
-    logo_url: data.logo_url,
+    logo_url: contractorLogoUrl(data.logo_url),
     service_categories: data.categories,
   } satisfies ContextualConnectionContractorTarget : null;
 
@@ -48942,7 +48948,7 @@ function ContractorPublicProfilePage({
           <div className="flex min-w-0 flex-1 gap-4">
             {data.logo_url && (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white shadow-sm">
-                <img src={data.logo_url} alt={`${data.business_name} logo`} className="h-full w-full object-contain p-2" />
+                <img src={contractorLogoUrl(data.logo_url)} alt={`${data.business_name} logo`} className="h-full w-full object-contain p-2" />
               </div>
             )}
             <div className="min-w-0">

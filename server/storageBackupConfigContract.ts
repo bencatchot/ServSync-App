@@ -5,3 +5,12 @@ export function parseStorageBackupRetention(value: string) {
   }
   return retentionRuns;
 }
+
+export function requiredStorageBackupConfig(
+  name: string,
+  environment: Record<string, string | undefined> = process.env,
+) {
+  const value = environment[name]?.trim();
+  if (!value) throw new Error(`Required Storage backup configuration ${name} is unavailable.`);
+  return value;
+}
