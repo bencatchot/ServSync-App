@@ -146,6 +146,7 @@ import { reviewModerationStatusPresentation } from './features/reviews/statusPre
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { InternalMarketingWorkspace } from './features/marketing/MarketingWorkspace';
 import { buildInternalMarketingOverview } from './features/marketing/marketingDomain';
+import { marketingFacebookReturnStatus } from './features/marketing/marketingFacebookConnection';
 import { FilterSummary } from './features/search/FilterSummary';
 import {
   canCreateContractorLocalCustomersUi,
@@ -44913,7 +44914,15 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing'>(() => (
+    marketingFacebookReturnStatus(window.location.search) ? 'marketing' : 'overview'
+  ));
+  useEffect(() => {
+    if (!marketingFacebookReturnStatus(window.location.search)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('marketing_facebook');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
   const [reviewModerationFilter, setReviewModerationFilter] = useState<AdminReviewModerationFilter>('pending');
   const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');

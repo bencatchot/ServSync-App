@@ -31,6 +31,11 @@ import {
 import { MarketingContentWorkspace } from './MarketingContentWorkspace';
 import { MarketingPublicationComposer, MarketingPublishingWorkspace } from './MarketingPublishingWorkspace';
 import {
+  createMarketingFacebookConnectionAdapter,
+  marketingFacebookReturnStatus,
+  type MarketingFacebookAuthClient,
+} from './marketingFacebookConnection';
+import {
   createMarketingPublishingAdapter,
   type MarketingPublication,
   type MarketingPublishingRpcClient,
@@ -284,7 +289,9 @@ export function MarketingWorkspace({
   planning: Parameters<typeof MarketingPlanningWorkspace>[0];
   publishing: Parameters<typeof MarketingPublishingWorkspace>[0] & { composer: { content: MarketingContentItem | null; onClose: () => void; onCreate: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] } };
 }) {
-  const [section, setSection] = useState<MarketingWorkspaceSection>('overview');
+  const [section, setSection] = useState<MarketingWorkspaceSection>(() => (
+    marketingFacebookReturnStatus(window.location.search) ? 'campaigns' : 'overview'
+  ));
   const [contentFocus, setContentFocus] = useState<{
     id: string | null;
     status: MarketingContentStatus | 'all';
@@ -364,12 +371,13 @@ function AuthorizedInternalMarketingWorkspace({
   client,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient;
 }) {
   const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
   const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
   const directionsAdapter = useMemo(() => createMarketingDirectionsAdapter(client), [client]);
   const publishingAdapter = useMemo(() => createMarketingPublishingAdapter(client), [client]);
+  const facebookAdapter = useMemo(() => createMarketingFacebookConnectionAdapter(client), [client]);
   const [items, setItems] = useState<MarketingContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -560,6 +568,36 @@ function AuthorizedInternalMarketingWorkspace({
         setPublishingSaving(false);
       }
     },
+    onConnectFacebook: async () => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await facebookAdapter.start(); }
+      catch (saveError) {
+        setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not start Facebook authorization.');
+        setPublishingSaving(false);
+      }
+    },
+    onSelectFacebookPage: async (sessionId: string, pageId: string) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await facebookAdapter.selectPage(sessionId, pageId); await loadPublishing(); }
+      catch (saveError) { setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not connect the Facebook Page.'); }
+      finally { setPublishingSaving(false); }
+    },
+    onRecheckFacebook: async () => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await facebookAdapter.recheck(); await loadPublishing(); }
+      catch (saveError) { setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not recheck Facebook.'); }
+      finally { setPublishingSaving(false); }
+    },
+    onDisconnectFacebook: async () => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await facebookAdapter.disconnect(); await loadPublishing(); }
+      catch (saveError) { setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not disconnect Facebook.'); }
+      finally { setPublishingSaving(false); }
+    },
     composer: {
       content: publishContent,
       onClose: () => setPublishContent(null),
@@ -588,7 +626,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;

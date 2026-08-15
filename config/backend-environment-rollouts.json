@@ -578,6 +578,24 @@
           "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Sandbox and Demo passed. Production has three setup-required providers, zero publications/events, forced RLS, zero direct table grants, and the exact four authenticated plus four service-role RPC grants. The existing 16 Marketing content records, three preparation packages, and 34 content status events remained unchanged; no provider connection or public post was created."
         }
       }
+    },
+    {
+      "id": "facebook-marketing-connection-v1",
+      "artifact": "servsync-facebook-marketing-connection.sql (SHA-256 e003558a720fd5dc2a3cd2ef0179a6227af834258307599cf28f5070179af908)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-15. Forced RLS, zero direct table grants, state/replay/owner boundaries, and real Supabase Vault behavior passed. A rollback-only OAuth/Page-selection lifecycle reached ready_except_live_post_verification with publishing disabled and returned to zero sessions, token references, publications, and events."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-15 after Sandbox passed. Demo retained zero content, packages, status events, publications, OAuth sessions, and token references; Facebook remains setup_required with publishing disabled and no Meta credentials."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Sandbox and Demo passed. Production retained exactly 16 content records, three packages, 34 content status events, and zero publications/events. OAuth sessions and token references remain zero; Facebook remains setup_required with publishing disabled and no selected Page or public post."
+        }
+      }
     }
   ]
 }

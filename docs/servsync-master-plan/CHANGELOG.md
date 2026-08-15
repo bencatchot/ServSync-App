@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037A ServSync Facebook Connection v1
+
+- Branch: `codex/fb037a-facebook-connection-v1`.
+- Starting main SHA: `0ebbcd5b22c31ca1049d72788f563ccedde0232d`.
+- Files changed: additive Facebook connection/Vault-reference migration; server-only Meta OAuth, callback, Page discovery/selection, readiness, disconnect, and adapter code; internal Marketing provider UI; focused SQL/server/browser tests; provider runbook; rollout ledger; FB-037 backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Adds the secure internal path from platform-admin **Connect Facebook** through one-time Meta consent state, server-side code exchange, explicit eligible-Page selection, Vault-backed Page token storage, and non-posting capability validation. The strongest resulting state is `ready_except_live_post_verification`. Public posting remains disabled by both connection capability and a server environment kill switch.
+- Security: OAuth state and authorization codes are stored only as SHA-256 digests; unfinished state expires and cannot be replayed or taken over by a different admin. Provider tokens never enter browser responses or normal Marketing/publication rows. Supabase Vault holds secret values, while forced-RLS/policy-free public tables retain only Vault UUID references and expose zero direct browser/generic service-role grants. Bounded service RPCs own token operations. Recheck failure and disconnect delete local Vault material without deleting publication history.
+- Rollout: Exact migration `servsync-facebook-marketing-connection.sql` (SHA-256 `e003558a720fd5dc2a3cd2ef0179a6227af834258307599cf28f5070179af908`) was applied Sandbox -> Demo -> Production on 2026-08-15. Sandbox completed a real Vault-backed rollback-only connect lifecycle and returned to zero residue. Demo retained zero Marketing content/packages/events/publications. Production retained exactly 16 content records, three packages, 34 content events, and zero publications/events. All environments have zero OAuth sessions/token references and Facebook remains `setup_required` with `publishing_enabled=false`.
+- Tests/checks run: Facebook migration/RLS/grant/Vault/lifecycle tests; state expiry/replay/code-reuse/cross-owner denial; callback/error/token-containment and Page-selection tests; provider adapter/worker/publication regressions; focused Marketing browser tests; 16 backend-parity unit tests; live Sandbox rollback-only validation; live Demo/Production inert-state validation; strict TypeScript; Production build; sensitive-value/source scans; exact migration checksum; and `git diff --check`. Focused ESLint remains blocked before source evaluation by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` loader incompatibility.
+- Known risks or follow-ups: Public search and repository/environment-name evidence do not verify a ServSync Facebook Page, Meta Developer Business app, App Review/Advanced Access, Business verification, or Production Meta variables. The owner must configure those through Meta/Vercel and complete consent in Production. No automatic token refresh or provider-side permission revocation is claimed; token expiry/recheck and local Vault deletion are explicit. No public post, Instagram/TikTok connection, media upload, or contractor Marketing provider connection is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records Facebook connection infrastructure as complete while retaining owner consent and the first real post as separate active gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Adds the encrypted provider-connection boundary without changing internal-versus-contractor ownership or authorizing publication.
+
 ## 2026-08-15 - FB-037 Provider-Neutral Publishing Foundation v1
 
 - Branch: `codex/fb037-provider-neutral-publishing-v1`.
