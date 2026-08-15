@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037A Facebook abandoned-authorization recovery
+
+- Branch: `codex/fb037a-facebook-oauth-recovery-v1`.
+- Starting main SHA: `a902d97ae91e1afb53b692320e35f5ae8ea178b1`.
+- Files changed: internal Marketing Facebook connection action, focused browser regression, Facebook connection runbook, FB-037 backlog, and this changelog.
+- Summary of change: Replaces the disabled Facebook connection action during `authorization_pending` with an explicit **Restart authorization** action. The action reuses the existing guarded server start contract, which expires unfinished OAuth state and deletes any transient Vault token before issuing a fresh owner-bound state. Read-only page loads do not invalidate an active authorization attempt.
+- Operational recovery: Production had exactly one owner-confirmed abandoned OAuth session, no selected Page, no durable or transient provider token, and zero publications/events. A guarded transaction expired only that session and restored Facebook to `setup_required`; `publishing_enabled` remained false and no Meta request or public post occurred.
+- Tests/checks run: Focused internal Marketing publishing browser coverage; existing Facebook connection and provider-neutral publishing validation; 16 backend-parity tests; strict TypeScript; Production build; focused ESLint attempt; Markdown-link and sensitive-value scans; and `git diff --check`.
+- Known risks or follow-ups: Restart is deliberately owner-triggered so a page refresh cannot destroy a valid in-progress consent flow. Meta consent and explicit Page selection remain owner actions. Public posting remains blocked by both database capability and the absent/false server kill switch; Instagram and TikTok are untouched.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records Production Meta configuration readiness and the recoverable abandoned-authorization boundary while retaining consent, Page selection, and first-public-post gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is presentation and operational-recovery hardening of the existing approved Facebook connection workflow; it does not change product direction or authorization.
+
 ## 2026-08-15 - FB-037A ServSync Facebook Connection v1
 
 - Branch: `codex/fb037a-facebook-connection-v1`.
