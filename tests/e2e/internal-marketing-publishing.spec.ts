@@ -106,6 +106,22 @@ test('Facebook setup requires an explicit eligible Page selection', async ({ pag
   await expect(connection).not.toContainText(/token|secret/i);
 });
 
+test('an abandoned Facebook authorization can be deliberately restarted', async ({ page }) => {
+  await install(page, {
+    ...publishingState,
+    providers: publishingState.providers.map(provider => provider.provider === 'facebook' ? {
+      ...provider,
+      readiness_status: 'authorization_pending',
+      readiness_note: 'Facebook authorization is waiting for owner consent.',
+    } : provider),
+  });
+  await page.getByTestId('marketing-nav-campaigns').click();
+  const connection = page.getByTestId('marketing-facebook-connection');
+  await expect(connection).toContainText('Facebook authorization is waiting for owner consent.');
+  await expect(connection.getByRole('button', { name: 'Restart authorization' })).toBeEnabled();
+  await expect(connection.getByRole('button', { name: 'Connect Facebook' })).toHaveCount(0);
+});
+
 test('safe OAuth callback return opens the Publishing Page-selection destination', async ({ page }) => {
   await install(page, {
     ...publishingState,

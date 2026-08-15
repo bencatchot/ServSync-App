@@ -77,6 +77,7 @@ Demo and Sandbox do not receive real Meta credentials or authorize the real Serv
 - State is bound to the internal workspace, connection, initiating platform admin, exact callback, and Meta App ID.
 - State expires after 10 minutes and is consumed once. State and authorization-code replay are rejected.
 - Starting a replacement authorization expires unfinished sessions and deletes any transient user token from Vault.
+- While authorization is pending, the provider UI offers an explicit **Restart authorization** action instead of trapping the owner behind a disabled control. Restarting uses the same guarded server path: it expires prior unfinished state, removes transient Vault material, and creates a fresh owner-bound state. A read-only page load never expires an active attempt automatically.
 - The callback exchanges the code server-side. App secrets and provider tokens do not enter browser responses.
 - Provider errors are reduced to bounded categories; raw provider payloads and descriptions are not logged.
 - A different platform admin cannot take over another admin's pending Page-selection session.
@@ -134,5 +135,7 @@ No Meta app credential, owner consent, Page selection, public post, or external 
 9. Complete Meta login/consent directly with Meta. Do not share the password or access token.
 10. Return to ServSync and explicitly choose the ServSync-owned Page.
 11. Confirm the UI reports `Ready except live post verification`, the correct Page name, and a recent validation time.
+
+If consent is abandoned before the callback completes, return to Publishing and choose **Restart authorization**. ServSync invalidates the unfinished attempt and any transient Vault token before opening a fresh owner-bound consent flow.
 
 The next task is one separately authorized, exact approved-copy Facebook text publication with owner confirmation and post-result reconciliation. It must not begin until this checklist is complete.
