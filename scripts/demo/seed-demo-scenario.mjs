@@ -2594,6 +2594,7 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       contractor_user_id: contractorUser.id,
       contractor_id: contractorId,
       home_id: created.homeId,
+      connection_id: created.connectionId,
       service_request_id: created.requestId,
       estimate_id: created.estimateId,
       job_id: created.jobId,
@@ -2687,6 +2688,118 @@ async function verifyDemoScenario(env, target, scenarioKey, checkpointKey = null
   return { operation: 'verify', verification };
 }
 
+async function adoptRecorderServiceRequest(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'connected_request_ready') {
+    throw new Error(`Recorder adoption refused: active checkpoint must be connected_request_ready, found ${run.checkpoint}.`);
+  }
+
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const contractorId = run.metadata?.contractor_id;
+  const homeId =
+    run.metadata?.home_id ||
+    run.records.find((record) => record.table_name === 'homes' && record.record_role === 'demo_home')?.record_id;
+  const connectionId =
+    run.metadata?.connection_id ||
+    run.records.find(
+      (record) => record.table_name === 'homeowner_contractor_connections' && record.record_role === 'demo_connection'
+    )?.record_id;
+  if (![homeownerId, contractorId, homeId, connectionId].every(Boolean)) {
+    throw new Error('Recorder adoption refused: active run is missing exact homeowner, contractor, home, or connection identity.');
+  }
+
+  const existingRegisteredRequestIds = new Set(
+    run.records.filter((record) => record.table_name === 'service_requests').map((record) => record.record_id)
+  );
+  if (existingRegisteredRequestIds.size > 0) {
+    throw new Error('Recorder adoption refused: connected_request_ready already owns a service request.');
+  }
+
+  const candidates = await ensureOk(
+    await service
+      .from('service_requests')
+      .select('id,created_at,connection_id,home_id,homeowner_user_id,contractor_id,category,urgency,title,description')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('contractor_id', contractorId)
+      .eq('connection_id', connectionId)
+      .eq('home_id', homeId)
+      .eq('category', requestFixture.category)
+      .eq('urgency', requestFixture.urgency)
+      .eq('title', requestFixture.title)
+      .eq('description', requestFixture.description)
+      .gt('created_at', run.completed_at)
+      .order('created_at', { ascending: false }),
+    'Unable to inspect the recorder-created service request'
+  );
+
+  if (candidates.length !== 1) {
+    throw new Error(`Recorder adoption refused: expected exactly one new matching service request, found ${candidates.length}.`);
+  }
+
+  const request = candidates[0];
+  const linkedEstimates = await ensureOk(
+    await service.from('estimates').select('id').eq('service_request_id', request.id),
+    'Unable to inspect recorder request Estimate lineage'
+  );
+  const linkedJobs = await ensureOk(
+    await service.from('inspections').select('id').eq('service_request_id', request.id),
+    'Unable to inspect recorder request Job lineage'
+  );
+  if (linkedEstimates.length > 0 || linkedJobs.length > 0) {
+    throw new Error('Recorder adoption refused: the new request already has downstream Estimate or Job records.');
+  }
+
+  await registerRecord(service, run.id, 'service_requests', request.id, 'demo_service_request', 'request_ready', {
+    source: 'servsync_demo_recorder',
+  });
+  const messages = await ensureOk(
+    await service.from('service_request_messages').select('id').eq('request_id', request.id),
+    'Unable to inspect recorder request messages'
+  );
+  for (const message of messages) {
+    await registerRecord(service, run.id, 'service_request_messages', message.id, 'demo_request_message', 'request_ready', {
+      source: 'servsync_demo_recorder',
+    });
+  }
+
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'request_ready' }).eq('id', run.id),
+    'Unable to advance the recorder scenario checkpoint'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'request_ready',
+    executed_steps: ['identities', 'profilesAndCompany', 'property', 'connection', 'request'],
+    homeowner_user_id: homeownerId,
+    contractor_id: contractorId,
+    home_id: homeId,
+    connection_id: connectionId,
+    service_request_id: request.id,
+    recorder_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'request_ready');
+  if (!verification.ok) {
+    throw new Error(`Recorder adoption verification failed: ${verification.reason || 'request_ready state is invalid'}`);
+  }
+
+  return {
+    operation: 'adopt-request',
+    runId: run.id,
+    checkpoint: 'request_ready',
+    records: { requestId: request.id, messageCount: messages.length },
+    verification,
+  };
+}
+
 function summarize(result, target, scenarioKey) {
   return {
     targetProjectRef: target.expectedRef,
@@ -2724,9 +2837,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'adopt-request'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -2734,6 +2847,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
+  if (operation === 'adopt-request' && optionArgs.length > 0) {
+    throw new Error('Recorder adoption does not accept checkpoint options.');
+  }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
   const checkpointKey = checkpointSelection.checkpointKey;
   const target = assertSafeDemoTarget(env);
@@ -2745,6 +2861,10 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'reset') {
     return summarize(await resetScenario(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-request') {
+    return summarize(await adoptRecorderServiceRequest(env, target, scenarioKey), target, scenarioKey);
   }
 
   return summarize(

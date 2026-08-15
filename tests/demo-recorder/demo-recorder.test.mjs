@@ -1,0 +1,84 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
+import {
+  assertRecordingDuration,
+  assertSafeRecorderEnvironment,
+  buildArtifactMetadata,
+  parseRecorderArgs,
+  scanVisibleTextForSensitiveData,
+  validateScenarioDefinition,
+} from '../../scripts/demo/recorder/lib.mjs';
+
+test('canonical scenario is bounded, reviewable, and Demo-only', () => {
+  assert.equal(validateScenarioDefinition(homeownerServiceRequestScenario), homeownerServiceRequestScenario);
+  assert.equal(homeownerServiceRequestScenario.initialCheckpoint, 'connected_request_ready');
+  assert.equal(homeownerServiceRequestScenario.finalCheckpoint, 'request_ready');
+  assert.deepEqual(homeownerServiceRequestScenario.scenes.map((scene) => scene.key), ['homeowner-submit', 'contractor-review']);
+  assert.equal(homeownerServiceRequestScenario.viewport.width, 1440);
+  assert.equal(homeownerServiceRequestScenario.viewport.height, 900);
+  assert.equal(homeownerServiceRequestScenario.finalState.contractorTab, 'Service Requests');
+  assert.ok(homeownerServiceRequestScenario.property.addressLine1);
+});
+
+test('recorder target guard rejects Production, Sandbox, and non-durable app origins', () => {
+  const scenario = homeownerServiceRequestScenario;
+  assert.equal(assertSafeRecorderEnvironment({}, scenario).projectRef, 'bdytwgejqnlblhrnqxkp');
+  assert.throws(() => assertSafeRecorderEnvironment({ DEMO_SUPABASE_PROJECT_REF: 'uqgtheclhxqlnjpfmheq' }, scenario), /dedicated ServSync Demo/i);
+  assert.throws(() => assertSafeRecorderEnvironment({ DEMO_SUPABASE_PROJECT_REF: 'zpzdkoaubyjtsomccxya' }, scenario), /dedicated ServSync Demo/i);
+  assert.throws(() => assertSafeRecorderEnvironment({ DEMO_SUPABASE_URL: 'https://bdytwgejqnlblhrnqxkp.example.com' }, scenario), /dedicated ServSync Demo/i);
+  assert.throws(() => assertSafeRecorderEnvironment({ DEMO_RECORDING_APP_URL: 'https://servsync.app' }, scenario), /durable ServSync Demo origin/i);
+});
+
+test('operator arguments stay intentionally small', () => {
+  assert.deepEqual(parseRecorderArgs(['homeowner-service-request']), {
+    scenarioKey: 'homeowner-service-request', pacing: 'marketing', outputDir: null, headed: false,
+  });
+  assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
+  assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
+  assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
+});
+
+test('sensitive visible-text scan catches configured credentials and token-like text', () => {
+  assert.deepEqual(scanVisibleTextForSensitiveData('Fictional Demo Bay Home', { password: 'private-pass' }), []);
+  assert.deepEqual(scanVisibleTextForSensitiveData('private-pass', { password: 'private-pass' }), ['Visible page text contains password.']);
+  assert.match(scanVisibleTextForSensitiveData('service_role', {})[0], /credential marker/i);
+});
+
+test('duration and metadata contracts fail closed', () => {
+  assert.doesNotThrow(() => assertRecordingDuration(18.25, { min: 14, max: 40 }));
+  assert.throws(() => assertRecordingDuration(0, { min: 14, max: 40 }), /no playable duration/i);
+  assert.throws(() => assertRecordingDuration(8, { min: 14, max: 40 }), /outside/i);
+  const metadata = buildArtifactMetadata({
+    scenario: homeownerServiceRequestScenario,
+    sourceCommit: 'a'.repeat(40),
+    pacing: 'marketing',
+    durationSeconds: 18.2539,
+    fileName: 'demo.webm',
+    createdAt: '2026-08-14T12:00:00.000Z',
+  });
+  assert.equal(metadata.duration_seconds, 18.254);
+  assert.equal(metadata.contains_credentials, false);
+  assert.match(metadata.fixture_policy, /registry-owned/i);
+});
+
+test('fixture adoption is exact, lineage-bound, and does not broaden reset authority', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts/demo/seed-demo-scenario.mjs'), 'utf8');
+  const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
+  assert.match(source, /async function adoptRecorderServiceRequest/);
+  assert.match(source, /run\.checkpoint !== 'connected_request_ready'/);
+  assert.match(source, /expected exactly one new matching service request/);
+  assert.match(source, /\.eq\('homeowner_user_id', homeownerId\)/);
+  assert.match(source, /\.eq\('contractor_id', contractorId\)/);
+  assert.match(source, /\.eq\('connection_id', connectionId\)/);
+  assert.match(source, /\.eq\('home_id', homeId\)/);
+  assert.match(source, /linkedEstimates\.length > 0 \|\| linkedJobs\.length > 0/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'request_ready'\)/);
+  assert.match(source, /record_role === 'demo_connection'/);
+  assert.match(source, /connection_id: created\.connectionId/);
+  assert.doesNotMatch(source, /truncate|delete from auth\.users/i);
+  assert.match(recorderSource, /requestSubmissionStarted && !requestAdopted/);
+  assert.match(recorderSource, /runDemoCommand\(\['adopt-request', scenario\.fixtureScenarioKey\], env\)\.catch/);
+});

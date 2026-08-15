@@ -110,6 +110,14 @@ DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop npm run demo:reset
 npm run demo:checkpoints
 ```
 
+The reusable Demo Recorder builds on the same private fixture boundary. See [ServSync Demo Recorder v1](ServSync_Demo_Recorder_v1.md). Its first canonical command is:
+
+```bash
+npm run demo:record -- homeowner-service-request
+```
+
+The recorder owns the `connected_request_ready -> request_ready` transition: the homeowner creates the request through the real product UI, then the private runner adopts only the one exact matching request into the active registry-owned run and verifies the final checkpoint. `adopt-request` is an internal recorder operation, not a general operator mutation command.
+
 By default, `demo:seed` restores the backward-compatible `job_created` checkpoint. Demo checkpoint slices also support explicit checkpoint restoration through argument forwarding:
 
 ```bash
@@ -306,7 +314,7 @@ Recommended recording order:
 
 Slice 2C-A presentation mode may be enabled only in the dedicated demo Vercel environment. In that mode, setup prompts, onboarding checklists, subscription/readiness clutter, notification badges/lists, homeowner dashboard reminder/Home History cards, homeowner accepted-estimate PDF/Home History action buttons, and selected mutating capture-surface controls are visually hidden so screenshots and recordings stay focused. Contractor Jobs capture surfaces keep read-only job details and checkpoint context visible while hiding deletion/completion/continuation wording and other mutation controls. The mode also uses presentation-safe job checkpoint copy such as `Draft job created from accepted estimate`, `Contractor visit scheduled`, `Work in progress`, `Ready for contractor review`, and `Work completed. Billing and home records are the next workflow and are intentionally outside this demo.` The contractor selected-homeowner Profile and Jobs views should show the current demo job title, property context, checkpoint copy, and work-item progress, and the contractor Jobs workspace should surface the same checkpoint story near the top of the capture surface.
 
-Slice 2C-A still does not add browser checkpoint controls, role switching, reset buttons, screenshot automation, public demo controls, invoices, Home History, reports, PDFs, media, reminders, payments, or notification delivery. Checkpoint selection remains a private local/server-side runner operation.
+Slice 2C-A still does not add browser checkpoint controls, role switching, reset buttons, public demo controls, invoices, Home History, reports, PDFs, media, reminders, payments, or notification delivery. Demo Recorder v1 adds private local browser automation for the one bounded homeowner-request scenario; it does not add controls to the application or expose privileged fixture operations to the browser. Checkpoint selection remains a private local/server-side runner operation.
 
 ## Troubleshooting
 
