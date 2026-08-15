@@ -191,7 +191,8 @@ test.describe('accepted Plan Marketing Directions', () => {
     const calls = await page.evaluate(() => (window as unknown as { __marketingDirectionCalls: Array<{ name: string }> }).__marketingDirectionCalls);
     expect(calls.some(call => call.name === 'servsync_update_internal_marketing_direction')).toBe(true);
     expect(calls.some(call => call.name === 'servsync_approve_internal_marketing_direction')).toBe(true);
-    expect(calls.some(call => /content|package|publish|schedule/.test(call.name) && call.name !== 'servsync_list_internal_marketing_content')).toBe(false);
+    expect(calls.some(call => /content|package|publish|schedule/.test(call.name)
+      && !['servsync_list_internal_marketing_content', 'servsync_get_internal_marketing_publishing'].includes(call.name))).toBe(false);
   });
 
   test('empty, error, and unauthorized states fail closed', async ({ page }) => {

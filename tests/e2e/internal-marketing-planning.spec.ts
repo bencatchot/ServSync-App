@@ -572,7 +572,7 @@ test.describe('internal Business Marketing Profile and Plan', () => {
       'servsync_create_internal_marketing_content',
       'servsync_update_internal_marketing_content',
       'servsync_transition_internal_marketing_content',
-    ].includes(call.name) || /publish|schedule/.test(call.name))).toBe(false);
+    ].includes(call.name) || (/publish|schedule/.test(call.name) && call.name !== 'servsync_get_internal_marketing_publishing'))).toBe(false);
   });
 
   test('owner-directed planning is bounded to profile audience and topic choices', async ({ page }) => {

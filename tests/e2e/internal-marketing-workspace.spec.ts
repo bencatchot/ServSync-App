@@ -97,7 +97,7 @@ test.describe('internal Marketing workspace', () => {
 
     await expect(page.getByTestId('marketing-workspace')).toHaveAttribute('data-marketing-audience', 'internal');
     await expect(page.getByTestId('marketing-metric-published')).toContainText('0');
-    await expect(page.getByTestId('marketing-metric-published')).toContainText('No workspace publishing activity.');
+    await expect(page.getByTestId('marketing-metric-published')).toContainText('Published from this workspace.');
     await expect(page.getByTestId('marketing-metric-website_visits')).toContainText('Not connected');
     await expect(page.getByTestId('marketing-metric-signups')).toContainText('Unavailable');
     await expect(page.getByTestId('marketing-metric-contractors')).toContainText('4');
@@ -135,6 +135,7 @@ test.describe('internal Marketing workspace', () => {
       await expect(tab).toHaveAttribute('aria-selected', 'true');
       if (section === 'overview') await expect(page.getByTestId('marketing-overview')).toBeVisible();
       else if (section === 'content') await expect(page.getByTestId('marketing-content-workspace')).toBeVisible();
+      else if (section === 'campaigns') await expect(page.getByTestId('marketing-publishing-workspace')).toBeVisible();
       else if (section === 'settings') await expect(page.getByTestId('marketing-planning-workspace')).toBeVisible();
       else await expect(page.getByTestId(`marketing-section-${section}`)).toBeVisible();
     }
