@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-14 - ServSync Demo Recorder v1
+
+- Branch: `codex/servsync-demo-recorder-v1`.
+- Starting main SHA: `a88646ec013fa81fd9e662343314e61c2b59fcc3`.
+- Files changed: reusable Demo recorder CLI and scenario contract; exact UI-created request adoption in the existing private fixture runner; focused recorder/security tests; ignored generated-output policy; Demo runbooks; FB-034A backlog/master-plan/completed-feature governance; package scripts; and this changelog.
+- Summary of change: Adds one canonical `homeowner-service-request` recording scenario at 1440x900. It resets the dedicated Demo project to `connected_request_ready`, authenticates through normal Demo identities without recording login, creates the fictional request through the real homeowner UI, registers only the exact new request and its messages under the existing private scenario run, verifies `request_ready`, and shows the contractor result after a clean frozen-frame hard cut. Reusable pacing, visible pointer, short caption overlays, WebM decode/duration checks, source metadata, sensitive-visible-text checks, and failed-run staging cleanup are included.
+- Reason for change: The first successful one-off recording proved Playwright capture was useful, but also exposed visible session loading, stale fixture clutter, and a high reconstruction cost. Durable tooling makes the same story rerunnable after UI changes without a second fixture or reconciliation system.
+- Tests/checks run: Recorder contract tests (6/6); existing Demo foundation/checkpoint/job-lifecycle/parity/presentation tests (54/57, with three inherited source-shape failures in the unchanged presentation suite); real dedicated-Demo setup, browser recording, exact fixture adoption, final checkpoint verification, WebM playback/duration validation, and sensitive/error checks; TypeScript; Production build; backend parity; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: WebM is the only v1 output; no heavyweight MP4 dependency was added. Three stale Demo presentation source-shape assertions remain outside this branch and should be repaired separately. This is private operator tooling, not public Demo access or a claim that additional workflows have recording coverage. Future scenarios remain separately reviewed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-034A moves into implementation with one completed canonical recorder scenario while additional Demo coverage and media tooling remain future work.
+
 ## 2026-08-14 - Public Beta UX P1 Closeout v1
 
 - Branch: `codex/public-beta-ux-p1-closeout-v1`.
