@@ -12,6 +12,21 @@ Each run retains sanitized JSON for 30 days with the GitHub run/attempt identity
 
 The schedule becomes active only from the default branch. Because GitHub cannot naturally schedule a newly introduced workflow before that workflow is merged, this slice uses a controlled post-merge natural-run acceptance gate: normal independent validation permits source merge, then the first genuine `schedule` event determines operational acceptance. A manual dispatch, local run, repository dispatch, or rerun cannot satisfy that gate.
 
+### First Natural Scheduled Acceptance
+
+The first qualifying natural run passed on 2026-08-15:
+
+- GitHub Actions run: `31867784065`, attempt `1`.
+- Trigger: exact `schedule` event; no dispatch, rerun, or local invocation was used.
+- Default-branch SHA: `4ce5b579f9fe08825e275754783d9e5fb9454214`, which contains merged workflow commit `23152e77b3f4ad9498b7c3a85892d9908531f609`.
+- Timing: started `2026-08-15T05:46:37Z` and completed `2026-08-15T05:47:50Z`.
+- Sandbox: all 25 API identity, role, fixture, authorization, cross-tenant, and backup-health checks passed; the exact-head desktop/mobile browser smoke also passed.
+- Demo: approved contractor/homeowner read-only navigation passed.
+- Production: public and approved contractor Owner/homeowner authenticated read-only smoke passed. No Production mutation probe ran.
+- Evidence: the three required jobs completed successfully and retained four sanitized JSON files under the run/attempt-bound artifacts. Independent review found no email, credential marker, token, private key, or private record/object identifier in those files.
+
+This closes the first-natural-run acceptance gate for the bounded v1 milestone. One passing scheduled run proves that the scheduler and current contract operated successfully once; it is not a long-term availability guarantee and does not replace recurring observation, mutating workflow drills, recovery exercises, or formal provider RPO monitoring.
+
 ## Environment Scope
 
 | Environment | Recurring scope | Mutation |
@@ -100,4 +115,4 @@ npm run ops:role-smoke:api
 npm run qa:e2e:role-smoke
 ```
 
-Local/API/manual-dispatch success validates the implementation but is not natural schedule acceptance.
+Local/API/manual-dispatch success validates the implementation but is not natural schedule acceptance. Natural-run acceptance is recorded above; future manual runs still do not count as recurring scheduled evidence.

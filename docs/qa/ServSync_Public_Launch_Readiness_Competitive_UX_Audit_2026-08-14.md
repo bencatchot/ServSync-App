@@ -8,7 +8,7 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 
 ## 1. Executive Verdict
 
-**P1 PRODUCT FIXES COMPLETE; LIMITED PUBLIC BETA STILL GATED.** ServSync's core connected and account-free work lifecycles are real, durable, role-aware, tenant-isolated, and usable on mobile. The closeout branch promotes Jobs to first-class Customer Work, compresses empty/light schedule states, and replaces the large native Draft Customer list with a bounded searchable connected/local selector. It is not ready for a broader public launch: online payments remain inactive outside Sandbox, dispatch/reporting/integration depth remains limited, real contractor/homeowner usability evidence is still required, and the first natural recurring role-smoke schedule has not yet been observed.
+**P1 PRODUCT FIXES COMPLETE; LIMITED PUBLIC BETA STILL GATED.** ServSync's core connected and account-free work lifecycles are real, durable, role-aware, tenant-isolated, and usable on mobile. The closeout branch promotes Jobs to first-class Customer Work, compresses empty/light schedule states, and replaces the large native Draft Customer list with a bounded searchable connected/local selector. The first natural recurring role-smoke schedule subsequently passed on 2026-08-15. ServSync is still not ready for a broader public launch: online payments remain inactive outside Sandbox, dispatch/reporting/integration depth remains limited, and real contractor/homeowner usability evidence is still required.
 
 ### 2026-08-14 P1 Closeout Addendum
 
@@ -16,7 +16,8 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 - Empty schedule presentation is one compact, actionable state. Light schedules show only populated days plus an empty-day summary. Populated schedules retain every event, week navigation, and the full-calendar action.
 - Both current Draft composers use one ARIA Customer combobox. It searches only already-authorized visible Customer name, connection label, and property context; displays at most 40 of 322 test options; keeps the selected Customer recoverable; preserves explicit multi-property selection; and has desktop/mobile, keyboard, no-result, clear, and reopen coverage.
 - Authenticated exact-head Sandbox validation used the approved Owner identity to open Jobs, start an unsaved Draft, and select an existing authorized Customer. It created no fixture and persisted no Draft or business record.
-- Public-beta confidence improves, but the first natural PR #447 schedule, real contractor/homeowner trials, and candid capability boundaries remain release gates.
+- Post-audit operational acceptance: natural GitHub Actions run `31867784065` passed on 2026-08-15 at default-branch SHA `4ce5b579f9fe08825e275754783d9e5fb9454214`; all Sandbox, Demo read-only, Production read-only, and aggregate backup-health jobs passed with sanitized evidence.
+- Public-beta confidence improves, but real contractor/homeowner trials and candid capability boundaries remain release gates.
 
 ## 2. Confidence Scores
 
@@ -24,7 +25,7 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 | --- | ---: | --- |
 | Functional correctness | 8.4 | Broad lifecycle proof is strong; exception coverage is less complete than the happy paths. |
 | Security/data integrity | 9.0 | Role, cross-tenant, direct-record, and private-cost boundaries passed; no P0 found. |
-| Reliability/operations | 7.7 | Recovery is proven; only one natural Storage run/drill and no natural role-smoke run yet. |
+| Reliability/operations | 7.7 | Recovery and one natural role-smoke run are proven; recurring evidence is still young. |
 | Contractor UX | 7.5 | Core work is now prominent and Customer selection scales; unfamiliar-user evidence remains simulated/internal. |
 | Contractor visual polish | 7.5 | Consistent, restrained system; hierarchy and internal wording need refinement. |
 | Contractor mobile | 7.8 | Jobs, compact schedule, and Customer search remain usable at 390x844; broader real-device evidence remains limited. |
@@ -34,7 +35,7 @@ Environment discipline: Production read-only; Sandbox used for tagged lifecycle 
 | First-time-user intuitiveness | 7.0 | Navigation and first-viewport hierarchy are materially clearer; real cold-user trials remain required. |
 | Competitive table stakes | 6.0 | Core CRM/work lifecycle is credible; dispatch, live payments, reporting, integrations, and automation lag. |
 | Differentiation strength | 7.2 | Connected plus account-free continuity and homeowner-owned home history are defensible. |
-| Limited-public-beta readiness | 7.7 | Product P1s are closed; natural role smoke, real-user trials, and beta-boundary communication remain. |
+| Limited-public-beta readiness | 7.7 | Product P1s and first natural role smoke are closed; real-user trials and beta-boundary communication remain. |
 | Broad-public-launch readiness | 5.4 | Operational breadth, ecosystem, and market proof are not mature enough. |
 
 ## 3. P0 Launch Blockers
@@ -46,7 +47,7 @@ None reproduced. No cross-tenant access, financial corruption, private-cost leak
 1. **CLOSED - UX/Competitive:** Jobs is first in `Customer Work` and no longer appears under `Add-ons`.
 2. **CLOSED - UX/Mobile:** Empty/light schedule states are compact while populated schedules retain every event and week control.
 3. **CLOSED - UX/Scale:** Both Draft composers use one searchable, keyboard-safe customer/property chooser with a 40-result rendering bound and 322-option evidence.
-4. **Reliability/Test Gap:** Observe and pass the first genuine scheduled recurring role/fixture smoke after PR #447; local/manual evidence cannot substitute.
+4. **CLOSED - Reliability/Test:** The first genuine scheduled recurring role/fixture smoke passed in run `31867784065`; local/manual evidence was not used as a substitute.
 5. **Positioning/Product:** State plainly that Production online payments, advanced dispatch, broad integrations, and deep reporting are not live. Either gate public beta to users who accept that boundary or complete separately approved launch slices.
 
 ## 5. P2/P3 Polish
@@ -172,7 +173,7 @@ Do not market ServSync as better at dispatch, payments, reporting, integrations,
 
 ## 21. Competitive Weaknesses Worth Fixing Before Launch
 
-Fix the contractor first viewport, core-work navigation, searchable customer selection, natural role-smoke acceptance, and launch-boundary communication. Decide whether the initial public cohort can operate without online payments and mature dispatch; do not leave that implicit.
+The contractor first viewport, core-work navigation, searchable customer selection, and first natural role-smoke acceptance are closed. Launch-boundary communication remains: decide whether the initial public cohort can operate without online payments and mature dispatch; do not leave that implicit.
 
 ## 22. Competitive Weaknesses We Should Accept for Now
 
@@ -211,7 +212,7 @@ No runtime source, SQL, RLS, RPC, grants, environment variables, Production data
 
 ## 27. Launch Recommendation
 
-Do not open a broad public launch. The Jobs/dashboard/customer-selection P1s are closed. Prepare a limited public beta only after: (1) observing the first natural recurring role smoke, (2) publishing a candid capability boundary for payments, dispatch, reporting, integrations, and support, and (3) confirming no new P0/P1 through real cold-user trials. Recruit 5-8 owner-operators or two-to-five-person HVAC/plumbing/electrical businesses plus 5-8 homeowners. Give them outcome tasks without naming UI controls: add a customer, quote work, respond, complete it, invoice it, find it later, and repeat on mobile. Observe time to first correct action, backtracks, help requests, abandoned tasks, task completion, confidence, and whether they can explain status. Do not ask "Was this easy?" or explain Draft/Home History before the task.
+Do not open a broad public launch. The Jobs/dashboard/customer-selection P1s and first natural recurring role smoke are closed. Prepare a limited public beta only after: (1) publishing a candid capability boundary for payments, dispatch, reporting, integrations, and support, and (2) confirming no new P0/P1 through real cold-user trials. Recruit 5-8 owner-operators or two-to-five-person HVAC/plumbing/electrical businesses plus 5-8 homeowners. Give them outcome tasks without naming UI controls: add a customer, quote work, respond, complete it, invoice it, find it later, and repeat on mobile. Observe time to first correct action, backtracks, help requests, abandoned tasks, task completion, confidence, and whether they can explain status. Do not ask "Was this easy?" or explain Draft/Home History before the task.
 
 ## Evidence Sources
 

@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-016 first natural recurring role-smoke acceptance
+
+- Branch: `codex/fb016-natural-role-smoke-acceptance`.
+- Starting main SHA: `4ce5b579f9fe08825e275754783d9e5fb9454214`.
+- Files changed: recurring role-smoke runbook and sanitized natural-run evidence; beta/go-live and public-launch audit status; FB-016 backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Records operational acceptance of the first genuine post-merge `schedule` event for `.github/workflows/fb016-recurring-role-smoke.yml`. GitHub Actions run `31867784065`, attempt `1`, ran at default-branch SHA `4ce5b579f9fe08825e275754783d9e5fb9454214` from `2026-08-15T05:46:37Z` through `05:47:50Z`. All three required jobs passed: Sandbox completed 25/25 identity, role, capability, fixture, cross-tenant, and aggregate backup-health checks plus exact-head desktop/mobile browser smoke; Demo approved read-only navigation passed; and Production public plus dedicated Owner/homeowner authenticated read-only navigation passed.
+- Reason for change: The merged workflow required a genuine natural schedule before the bounded recurring milestone could be called operationally accepted; manual, local, and rerun evidence were explicitly insufficient.
+- Evidence/checks: Confirmed `event=schedule`; confirmed the run SHA contains workflow merge commit `23152e77b3f4ad9498b7c3a85892d9908531f609`; reviewed every required job and step; downloaded the three run/attempt-bound artifacts containing four JSON reports; verified cross-tenant denial and Production latest-success backup health passed; and scanned the reports for email, credential, token, private-key, private-ID, and object-path exposure with no findings.
+- Known risks or follow-ups: One natural pass proves the scheduler and current read-only contract operated once, not long-term reliability. Formal Pro backup RPO wording, automatic hidden-point monitoring, repeated scheduled observations/recovery drills, external-configuration automation, retention/deletion policy, real-user testing, and broader public-launch readiness remain active. No workflow, credential, environment, application, SQL, or provider configuration changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Closes the first-natural-run gate while keeping broader FB-016 operational-readiness work active.
+
 ## 2026-08-14 - Demo Recorder contractor Estimate scenario v1
 
 - Branch: `codex/servsync-demo-recorder-estimate-v1`.
