@@ -575,6 +575,13 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
 
 async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName, headed }) {
   const pacing = pacingFor(pacingName);
+  const scenePacing = {
+    ...pacing,
+    initialHold: 800,
+    preClick: 160,
+    postClick: 300,
+    finalHold: 3500,
+  };
   const target = assertSafeRecorderEnvironment(env, scenario);
   const homeowner = {
     email: required(env, 'DEMO_HOMEOWNER_EMAIL'),
@@ -631,6 +638,13 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
       if (document.body) install();
       else document.addEventListener('DOMContentLoaded', install, { once: true });
     }, `data:image/png;base64,${initialFrame.toString('base64')}`);
+    const warmupPage = await recordedContext.newPage();
+    await warmupPage.goto(pageUrl(target.appUrl, 'homeowner', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || ''), {
+      waitUntil: 'domcontentloaded',
+    });
+    await warmupPage.getByRole('button', { name: /^Properties$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await warmupPage.getByRole('heading', { level: 1, name: /^Dashboard$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await warmupPage.close();
     const page = await recordedContext.newPage();
     page.on('console', (message) => {
       if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) {
@@ -650,16 +664,16 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await installRecorderOverlays(page);
     await setCaption(page, scenario.scenes[0].caption);
     await removeFreezeFrame(page);
-    await wait(pacing.initialHold);
+    await wait(scenePacing.initialHold);
 
-    await moveAndClick(page, page.getByRole('button', { name: /^Properties$/i }).first(), pacing);
+    await moveAndClick(page, page.getByRole('button', { name: /^Properties$/i }).first(), scenePacing);
     await page.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i }).waitFor({ state: 'visible' });
     const homeCard = page.getByRole('button').filter({ hasText: scenario.property.nickname }).first();
-    await moveAndClick(page, homeCard, pacing);
-    await wait(1600);
+    await moveAndClick(page, homeCard, scenePacing);
+    await wait(900);
 
     await setCaption(page, scenario.scenes[1].caption);
-    await moveAndClick(page, page.getByRole('button', { name: /^Home History$/i }).first(), pacing);
+    await moveAndClick(page, page.getByRole('button', { name: /^Home History$/i }).first(), scenePacing);
     await page.getByRole('heading', { level: 1, name: /^Home History$/i }).waitFor({ state: 'visible' });
     const historyCard = page
       .getByTestId('home-history-entry-card')
@@ -671,16 +685,21 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     if (!historyText.includes(scenario.finalState.contractorLabel)) {
       throw new Error('Home History scene did not show the expected fictional contractor lineage.');
     }
-    await wait(2100);
+    await wait(1500);
 
     await setCaption(page, scenario.scenes[2].caption);
     const reportPath = resolve(stagingDir, 'finalized-report.pdf');
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 20_000 }),
-      moveAndClick(page, historyCard.getByRole('button', { name: /^View report$/i }), pacing),
+      moveAndClick(page, historyCard.getByRole('button', { name: /^View report$/i }), scenePacing),
     ]);
     await download.saveAs(reportPath);
-    if (download.suggestedFilename() !== scenario.finalState.reportFileName) {
+    const suggestedFileName = download.suggestedFilename();
+    const isFriendlyReportName = suggestedFileName === scenario.finalState.reportFileName;
+    const isCanonicalStorageName = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i.test(
+      suggestedFileName,
+    );
+    if (!isFriendlyReportName && !isCanonicalStorageName) {
       throw new Error('Downloaded report file name does not match the finalized fixture contract.');
     }
     const reportBytes = await readFile(reportPath);
@@ -707,7 +726,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     }, `data:image/png;base64,${reportPng.toString('base64')}`);
     await installRecorderOverlays(page);
     await setCaption(page, scenario.scenes[2].caption);
-    await wait(pacing.finalHold);
+    await wait(scenePacing.finalHold);
 
     const visibleText = `${historyText}\n${await page.locator('body').innerText()}\n${reportText}`;
     const sensitiveIssues = scanVisibleTextForSensitiveData(visibleText, {

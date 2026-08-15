@@ -216,3 +216,11 @@ test('registered Storage cleanup is ordered before exact database reset and neve
   assert.match(source, /cleanup\?\.state === 'deleted'/);
   assert.match(source, /cleanup\?\.state !== 'deleting'/);
 });
+
+test('Home History recording accepts only the friendly report name or canonical Storage UUID basename', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
+  assert.match(source, /suggestedFileName === scenario\.finalState\.reportFileName/);
+  assert.match(source, /isCanonicalStorageName/);
+  assert.match(source, /\[0-9a-f\]\{12\}\\\.pdf/);
+  assert.match(source, /if \(!isFriendlyReportName && !isCanonicalStorageName\)/);
+});
