@@ -10,6 +10,7 @@ import {
   lifecycleStepKeys,
   personas,
   propertyFixture,
+  recorderEstimateFixture,
   requestFixture,
   supportedCheckpointKeys,
   waterHeaterCoreLoopScenario,
@@ -1859,6 +1860,10 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
 
   const checkpointKey = SUPPORTED_CHECKPOINT_KEYS.includes(activeCheckpointKey) ? activeCheckpointKey : DEFAULT_CHECKPOINT_KEY;
   const checkpoint = getCheckpointDefinition(checkpointKey);
+  const recorderEstimateCheckpoint =
+    checkpointKey === 'estimate_draft'
+    && run.metadata?.recorder_source === 'servsync_demo_recorder'
+    && run.metadata?.recorder_scenario === 'contractor-create-estimate';
   const requiresEstimate = checkpointRequires(checkpointKey, 'estimateDraft');
   const requiresSent = checkpointRequires(checkpointKey, 'estimateSent');
   const requiresAccepted = checkpointRequires(checkpointKey, 'estimateAccepted');
@@ -1881,7 +1886,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       return requiresRequest;
     }
     if (['estimates', 'estimate_line_items', 'estimate_payment_schedule_items'].includes(tableName)) {
-      return requiresEstimate;
+      return requiresEstimate && !(recorderEstimateCheckpoint && tableName === 'estimate_payment_schedule_items');
     }
     if (tableName === 'inspections') {
       return requiresJob;
@@ -2227,11 +2232,13 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (estimateId) {
     const lineItems = recordIds(records, 'estimate_line_items', 'demo_estimate_line_item');
     const scheduleItems = recordIds(records, 'estimate_payment_schedule_items', 'demo_estimate_payment_schedule_item');
-    if (lineItems.length !== estimateLines().length) {
-      issues.push(`Expected ${estimateLines().length} registered estimate line items, found ${lineItems.length}.`);
+    const expectedLineCount = recorderEstimateCheckpoint ? 1 : estimateLines().length;
+    const expectedScheduleCount = recorderEstimateCheckpoint ? 0 : 2;
+    if (lineItems.length !== expectedLineCount) {
+      issues.push(`Expected ${expectedLineCount} registered estimate line items, found ${lineItems.length}.`);
     }
-    if (scheduleItems.length !== 2) {
-      issues.push(`Expected 2 registered estimate payment schedule rows, found ${scheduleItems.length}.`);
+    if (scheduleItems.length !== expectedScheduleCount) {
+      issues.push(`Expected ${expectedScheduleCount} registered estimate payment schedule rows, found ${scheduleItems.length}.`);
     }
     if (checkpointKey === 'estimate_draft' && estimate && estimate.status === 'draft' && estimate.updated_at !== estimate.created_at) {
       issues.push('Draft estimate should not have sent evidence in updated_at.');
@@ -2800,6 +2807,130 @@ async function adoptRecorderServiceRequest(env, target, scenarioKey) {
   };
 }
 
+async function adoptRecorderEstimateDraft(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder Estimate adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'request_ready') {
+    throw new Error(`Recorder Estimate adoption refused: active checkpoint must be request_ready, found ${run.checkpoint}.`);
+  }
+
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const contractorId = run.metadata?.contractor_id;
+  const homeId = run.metadata?.home_id;
+  const requestId = run.metadata?.service_request_id;
+  if (![homeownerId, contractorId, homeId, requestId].every(Boolean)) {
+    throw new Error('Recorder Estimate adoption refused: active run is missing exact homeowner, contractor, home, or request identity.');
+  }
+  if (run.records.some((record) => record.table_name === 'estimates')) {
+    throw new Error('Recorder Estimate adoption refused: request_ready already owns an Estimate.');
+  }
+
+  const candidates = await ensureOk(
+    await service
+      .from('estimates')
+      .select('id,created_at,updated_at,contractor_id,homeowner_user_id,home_id,service_request_id,inspection_id,title,scope,status,subtotal_cents,total_cents')
+      .eq('contractor_id', contractorId)
+      .eq('homeowner_user_id', homeownerId)
+      .eq('home_id', homeId)
+      .eq('service_request_id', requestId)
+      .is('inspection_id', null)
+      .eq('title', recorderEstimateFixture.title)
+      .eq('scope', recorderEstimateFixture.scope)
+      .eq('status', 'draft')
+      .eq('subtotal_cents', recorderEstimateFixture.line.unit_price_cents)
+      .eq('total_cents', recorderEstimateFixture.line.unit_price_cents)
+      .gt('created_at', run.completed_at)
+      .order('created_at', { ascending: false }),
+    'Unable to inspect the recorder-created Estimate draft'
+  );
+  if (candidates.length !== 1) {
+    throw new Error(`Recorder Estimate adoption refused: expected exactly one new matching Estimate draft, found ${candidates.length}.`);
+  }
+
+  const estimate = candidates[0];
+  const lineItems = await ensureOk(
+    await service
+      .from('estimate_line_items')
+      .select('id,estimate_id,line_type,line_title,description,quantity,unit,unit_price_cents,sort_order')
+      .eq('estimate_id', estimate.id)
+      .order('sort_order', { ascending: true }),
+    'Unable to inspect recorder Estimate lines'
+  );
+  const line = lineItems[0] || null;
+  if (
+    lineItems.length !== 1
+    || !line
+    || line.line_type !== recorderEstimateFixture.line.line_type
+    || line.line_title !== recorderEstimateFixture.line.line_title
+    || line.description !== recorderEstimateFixture.line.line_title
+    || Number(line.quantity) !== recorderEstimateFixture.line.quantity
+    || line.unit !== recorderEstimateFixture.line.unit
+    || line.unit_price_cents !== recorderEstimateFixture.line.unit_price_cents
+  ) {
+    throw new Error('Recorder Estimate adoption refused: saved line items do not match the exact scenario contract.');
+  }
+
+  const scheduleItems = await ensureOk(
+    await service.from('estimate_payment_schedule_items').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect recorder Estimate payment schedule'
+  );
+  const linkedJobs = await ensureOk(
+    await service.from('inspections').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect recorder Estimate Job lineage'
+  );
+  const linkedInvoices = await ensureOk(
+    await service.from('invoices').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect recorder Estimate Invoice lineage'
+  );
+  if (scheduleItems.length > 0 || linkedJobs.length > 0 || linkedInvoices.length > 0) {
+    throw new Error('Recorder Estimate adoption refused: the new draft has payment-schedule, Job, or Invoice records.');
+  }
+
+  await registerRecord(service, run.id, 'estimates', estimate.id, 'demo_estimate', 'estimate_draft', {
+    source: 'servsync_demo_recorder',
+  });
+  await registerRecord(service, run.id, 'estimate_line_items', line.id, 'demo_estimate_line_item', 'estimate_draft', {
+    source: 'servsync_demo_recorder',
+  });
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'estimate_draft' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to estimate_draft'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'estimate_draft',
+    executed_steps: ['identities', 'profilesAndCompany', 'property', 'connection', 'request', 'estimateDraft'],
+    homeowner_user_id: homeownerId,
+    contractor_id: contractorId,
+    home_id: homeId,
+    connection_id: run.metadata?.connection_id,
+    service_request_id: requestId,
+    estimate_id: estimate.id,
+    recorder_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'contractor-create-estimate',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'estimate_draft');
+  if (!verification.ok) {
+    throw new Error(`Recorder Estimate adoption verification failed: ${verification.reason || 'estimate_draft state is invalid'}`);
+  }
+
+  return {
+    operation: 'adopt-estimate',
+    runId: run.id,
+    checkpoint: 'estimate_draft',
+    records: { estimateId: estimate.id, lineItemCount: lineItems.length, paymentScheduleCount: scheduleItems.length },
+    verification,
+  };
+}
+
 function summarize(result, target, scenarioKey) {
   return {
     targetProjectRef: target.expectedRef,
@@ -2837,9 +2968,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'adopt-request'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'adopt-request', 'adopt-estimate'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request|adopt-estimate> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -2847,7 +2978,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (operation === 'adopt-request' && optionArgs.length > 0) {
+  if (['adopt-request', 'adopt-estimate'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -2865,6 +2996,10 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'adopt-request') {
     return summarize(await adoptRecorderServiceRequest(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-estimate') {
+    return summarize(await adoptRecorderEstimateDraft(env, target, scenarioKey), target, scenarioKey);
   }
 
   return summarize(

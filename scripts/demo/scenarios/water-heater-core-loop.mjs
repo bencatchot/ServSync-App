@@ -392,6 +392,18 @@ export const requestFixture = {
     'The existing 40-gallon water heater is leaking near the base. We would like inspection and replacement options. Access is through the garage utility area, and an appointment within the next few days would be helpful.',
 };
 
+export const recorderEstimateFixture = {
+  title: 'Water heater replacement estimate',
+  scope: 'Remove the leaking 40-gallon water heater and install a replacement in the garage utility area.',
+  line: {
+    line_type: 'labor',
+    line_title: 'Replace leaking 40-gallon water heater',
+    quantity: 1,
+    unit: 'each',
+    unit_price_cents: 189500,
+  },
+};
+
 export const estimateFixture = {
   title: 'Water heater replacement estimate',
   scope:

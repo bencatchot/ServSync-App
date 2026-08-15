@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-14 - Demo Recorder contractor Estimate scenario v1
+
+- Branch: `codex/servsync-demo-recorder-estimate-v1`.
+- Starting main SHA: `5ecc8bc50a90e7ab7d339901a8d95bb845585ecc`.
+- Files changed: one contractor Estimate recorder scenario and deterministic fixture contract; exact private Estimate adoption/verification; shared recorder dispatch/metadata support; focused contract/security tests; Demo recorder/runbook documentation; FB-034A backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Adds `contractor-create-estimate`. It restores the dedicated Demo fixture to `request_ready`, authenticates the contractor outside recorded footage, opens the exact request, creates one priced draft Estimate through the real composer, registers only the exact new Estimate and line, verifies `estimate_draft`, and stops on the saved result. It does not send, approve, create a Job/Invoice/payment schedule, or publish the recording.
+- Reason for change: The second canonical clip demonstrates one high-value contractor action while reusing the recorder's existing Demo-only environment guard, registry ownership, visual pacing, cursor/caption, WebM, validation, and cleanup contracts.
+- Tests/checks run: Recorder contracts; Demo fixture/checkpoint regressions; real dedicated-Demo setup, contractor UI recording, exact Estimate adoption, final checkpoint verification, WebM playback/duration validation, and sensitive/error checks; existing homeowner recorder regression; TypeScript; Production build; backend parity; focused ESLint; sensitive-value scan; and `git diff --check`.
+- Known risks or follow-ups: WebM remains the only output. The scenario intentionally records one simple fictional priced line and no payment schedule. Approval, Job, Invoice, payment, publishing, audio, subtitles, and MP4 remain outside this slice.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-034A remains active with a second completed canonical scenario; broader recording coverage and media tooling remain future bounded work.
+
 ## 2026-08-14 - ServSync Demo Recorder v1
 
 - Branch: `codex/servsync-demo-recorder-v1`.

@@ -4,11 +4,15 @@
 
 The Demo Recorder creates reproducible browser recordings for ServSync Marketing, support tutorials, and product demonstrations. It is intentionally a small scenario runner, not a video editor or publishing system.
 
-Recorder v1 includes one canonical scenario:
+Recorder v1 includes two canonical scenarios:
 
 `homeowner-service-request`
 
 The clip shows the fictional Demo homeowner creating one service request for Demo Bay Home, then uses a clean hard cut to the fictional contractor's matching Service Requests view.
+
+`contractor-create-estimate`
+
+The clip starts from the registered Demo request, uses the normal contractor UI to create one priced draft Estimate, and stops on the saved draft. It does not send the Estimate or continue into approval, Job, Invoice, or payment activity.
 
 ## Safety Boundary
 
@@ -20,9 +24,11 @@ Do not record Production or real customer information. Do not paste recorder cre
 
 ## Scenario Contract
 
-The reviewable scenario definition lives at:
+The reviewable scenario definitions live at:
 
 `scripts/demo/recorder/scenarios/homeowner-service-request.mjs`
+
+`scripts/demo/recorder/scenarios/contractor-create-estimate.mjs`
 
 It defines:
 
@@ -53,9 +59,11 @@ The homeowner then creates the request through the normal `servsync_create_servi
 
 The operation registers the request and its exact messages, advances the run to `request_ready`, and runs the ordinary checkpoint verifier. It does not broaden the reset table allowlist or delete by title, user, or timestamp.
 
-One verified `request_ready` fixture remains after a successful recording. The next run removes only registry-owned disposable records before rebuilding the known baseline. Unrelated Demo records are never reset.
+One verified final fixture remains after a successful recording: `request_ready` for the homeowner scenario or `estimate_draft` for the contractor scenario. The next run removes only registry-owned disposable records before rebuilding the known baseline. Unrelated Demo records are never reset.
 
 If the browser fails after submission begins but before ordinary adoption completes, failed-run cleanup attempts the same exact adoption contract. It does not broaden ownership or perform a title-, user-, or timestamp-based delete; a request that cannot satisfy the exact contract remains fail-closed for operator investigation.
+
+For `contractor-create-estimate`, setup restores the registered `request_ready` checkpoint. The contractor creates the draft through the real Estimate composer. The private adoption step accepts exactly one new draft only when its contractor, homeowner, home, request, title, scope, total, and single line match the scenario contract and it has no payment schedule, Job, or Invoice. The adopted Estimate and line become ordinary registry-owned records at `estimate_draft`, so the next scenario run can reset them without touching unrelated Demo data.
 
 ## Authentication and Cuts
 
@@ -71,6 +79,7 @@ Load the existing approved Demo variables, including the private runner values d
 
 ```bash
 npm run demo:record -- homeowner-service-request
+npm run demo:record -- contractor-create-estimate
 ```
 
 Optional bounded controls:
@@ -98,10 +107,12 @@ A run is successful only after:
 - the WebM exists and is non-empty;
 - Chromium decodes it and reports a duration inside the scenario bounds.
 
+The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
+
 Failed runs remove their staging video. A failed run must not be described as a successful artifact.
 
 ## Deliberate Limits
 
-Recorder v1 does not provide video publishing, MP4 conversion, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond `homeowner-service-request`.
+Recorder v1 does not provide video publishing, MP4 conversion, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond the two listed above.
 
-Likely future scenarios include contractor Estimate creation, customer Estimate review, Estimate-to-Job, manual payment, Home History, and contractor discovery. Each requires its own reviewed fixture and final-state contract.
+Likely future scenarios include customer Estimate review, Estimate-to-Job, manual payment, Home History, and contractor discovery. Each requires its own reviewed fixture and final-state contract.

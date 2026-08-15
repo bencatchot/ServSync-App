@@ -64,6 +64,9 @@ export function validateScenarioDefinition(scenario) {
     if (!scene.caption || scene.caption.length > 80) issues.push(`Scene ${scene.key || '(unknown)'} must have a caption of 1-80 characters.`);
   }
   if (!scenario?.request?.title || !scenario?.request?.description || !scenario?.request?.category) issues.push('Scenario request requires title, description, and category.');
+  if (scenario?.estimate && (!scenario.estimate.title || !scenario.estimate.scope || !scenario.estimate.line?.line_title)) {
+    issues.push('Scenario estimate requires title, scope, and a line title.');
+  }
   if (issues.length > 0) throw new Error(`Invalid Demo recording scenario:\n- ${issues.join('\n- ')}`);
   return scenario;
 }
@@ -96,7 +99,7 @@ export function parseRecorderArgs(args) {
     else if (option.startsWith('--output-dir=')) parsed.outputDir = option.slice('--output-dir='.length);
     else throw new Error(`Unsupported Demo recorder option: ${option}`);
   }
-  if (!scenarioKey) throw new Error('Usage: npm run demo:record -- homeowner-service-request [--pacing=marketing|tutorial] [--headed]');
+  if (!scenarioKey) throw new Error('Usage: npm run demo:record -- <scenario> [--pacing=marketing|tutorial] [--headed]');
   if (!PACING[parsed.pacing]) throw new Error(`Unsupported pacing preset: ${parsed.pacing}`);
   return parsed;
 }
@@ -140,7 +143,7 @@ export function buildArtifactMetadata({ scenario, sourceCommit, pacing, duration
     source_commit: sourceCommit,
     artifact: fileName,
     format: 'webm',
-    fixture_policy: 'Leave one canonical request_ready Demo fixture; the next run resets only registry-owned scenario records.',
+    fixture_policy: scenario.fixturePolicy || 'Leave one canonical request_ready Demo fixture; the next run resets only registry-owned scenario records.',
     contains_credentials: false,
   };
 }
