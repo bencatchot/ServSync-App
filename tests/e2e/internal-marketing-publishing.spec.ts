@@ -2,8 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMarketingPublishingAdapter } from '../../src/features/marketing/marketingPublishing';
+import type { MarketingContentItem } from '../../src/features/marketing/marketingContent';
+import {
+  eligibleFacebookPreviewContent,
+  marketingProviderPreview,
+  marketingPublicationSnapshotForContent,
+} from '../../src/features/marketing/marketingPublicationPreview';
 
-const approved = {
+const approved: MarketingContentItem = {
   id: '62000000-0000-4000-8000-000000000001', workspaceKey: 'servsync_internal', workspaceKind: 'internal',
   title: 'Approved social post', contentType: 'social_post', body: 'One exact approved message.', channelCategory: 'social',
   status: 'approved', revisionNumber: 8, createdAt: '2026-08-15T10:00:00.000Z', updatedAt: '2026-08-15T11:00:00.000Z',
@@ -22,6 +28,57 @@ const publishingState = {
   ], publications: [],
 };
 
+const connectedState = {
+  ...publishingState,
+  providers: publishingState.providers.map(provider => provider.provider === 'facebook' ? {
+    ...provider,
+    connection_status: 'connected',
+    destination_label: 'ServSync',
+    readiness_status: 'ready_except_live_post_verification',
+    readiness_note: 'Facebook Page connection is ready for owner preview.',
+    capabilities: { text: true, media: false, publishing_enabled: false },
+    connected_at: '2026-08-15T20:00:00.000Z',
+    last_validated_at: '2026-08-15T21:00:00.000Z',
+    token_expires_at: null,
+  } : provider),
+};
+
+const candidateTitles = [
+  'Months later, the service report is still with the home',
+  'Give homeowners useful context before they connect',
+  'When a customer asks what the job included',
+  'An invoice should still tell the service story',
+  'Make the deposit request a deliberate step',
+  'Let the estimate move forward before account setup',
+  'What should stay connected after a customer calls?',
+];
+
+const approvedCandidates = candidateTitles.map<MarketingContentItem>((title, index) => ({
+  ...approved,
+  id: `62000000-0000-4000-8000-00000000000${index + 1}`,
+  title,
+  body: index === 0 ? 'One exact public Facebook message.' : `Exact public message ${index + 1}.`,
+  revisionNumber: index + 2,
+  ...(index === 0 ? {
+    preparationSource: 'codex_assisted',
+    preparationRequestId: '62000000-0000-4000-8000-000000000090',
+    preparationRecipeKey: 'approved_direction_plan_v1',
+    truthPackVersion: 'servsync-marketing-truth-v3',
+    preparedAt: '2026-08-15T09:00:00.000Z',
+    preparationSequence: 1,
+    intendedAudience: 'homeowners',
+    contentRole: 'homeowner_benefit',
+    strategicSource: 'approved_direction',
+    sourcePlanId: '62000000-0000-4000-8000-000000000091',
+    sourcePlanRevision: 2,
+    sourcePlanItemIndex: 4,
+    sourceDirectionId: '62000000-0000-4000-8000-000000000092',
+    sourceDirectionRevision: 3,
+    sourceDirectionTopic: 'Home History',
+    sourceDirectionStatus: 'approved',
+  } : {}),
+}));
+
 test('publishing adapter preserves capability differences and rejects malformed browser payloads', async () => {
   const adapter = createMarketingPublishingAdapter({ rpc: async () => ({ data: publishingState, error: null }) });
   const state = await adapter.get();
@@ -34,16 +91,30 @@ test('publishing adapter preserves capability differences and rejects malformed 
   await expect(malformed.get()).rejects.toMatchObject({ kind: 'malformed' });
 });
 
-async function install(page: Page, stateOverride: Record<string, unknown> = publishingState, path = '/') {
+test('Facebook preview and provider publication use the same approved snapshot message', () => {
+  const draft: MarketingContentItem = { ...approved, id: '62000000-0000-4000-8000-000000000099', status: 'draft' };
+  expect(eligibleFacebookPreviewContent([...approvedCandidates, draft])).toHaveLength(7);
+  const snapshot = marketingPublicationSnapshotForContent(approvedCandidates[0]);
+  const preview = marketingProviderPreview('facebook', snapshot);
+  expect(preview.publicMessage).toBe(approvedCandidates[0].body);
+  expect(preview.publicMessage).not.toContain(approvedCandidates[0].title);
+  expect(snapshot.content_revision).toBe(2);
+  expect(marketingPublicationSnapshotForContent(approved)).not.toHaveProperty('source_plan_id');
+});
+
+async function install(page: Page, stateOverride: Record<string, unknown> = publishingState, path = '/', contentItems: MarketingContentItem[] = [approved]) {
   await page.goto(path);
-  await page.evaluate(async ({ approved, publishingState }) => {
+  await page.evaluate(async ({ contentItems, publishingState }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as { createElement: (...args: unknown[]) => unknown };
     const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as { createRoot: (element: HTMLElement) => { render: (node: unknown) => void } }).createRoot;
     const Workspace = (await dynamicImport('/src/features/marketing/MarketingWorkspace.tsx')).InternalMarketingWorkspace as (...args: unknown[]) => unknown;
     const overview = (await dynamicImport('/src/features/marketing/marketingDomain.ts')).buildInternalMarketingOverview as (value: unknown) => unknown;
+    const calls: string[] = [];
+    (window as unknown as { __marketingRpcCalls: string[] }).__marketingRpcCalls = calls;
     const client = { rpc: async (name: string) => {
-      if (name === 'servsync_list_internal_marketing_content') return { data: [{ ...approved, content_id: approved.id, workspace_key: approved.workspaceKey, workspace_kind: approved.workspaceKind, content_type: approved.contentType, channel_category: approved.channelCategory, revision_number: approved.revisionNumber, created_at: approved.createdAt, updated_at: approved.updatedAt, created_by: approved.createdBy, created_by_name: approved.createdByName, submitted_at: approved.submittedAt, submitted_by: approved.submittedBy, submitted_by_name: approved.submittedByName, reviewed_at: approved.reviewedAt, reviewed_by: approved.reviewedBy, reviewed_by_name: approved.reviewedByName, review_note: approved.reviewNote, preparation_source: approved.preparationSource, preparation_request_id: null, preparation_recipe_key: null, truth_pack_version: null, prepared_at: null, preparation_sequence: null, intended_audience: null, content_role: null, strategic_source: null, source_plan_id: null, source_plan_revision: null, source_plan_item_index: null, source_direction_id: null, source_direction_revision: null, source_direction_topic: null, source_direction_status: null }], error: null };
+      calls.push(name);
+      if (name === 'servsync_list_internal_marketing_content') return { data: contentItems.map(item => ({ ...item, content_id: item.id, workspace_key: item.workspaceKey, workspace_kind: item.workspaceKind, content_type: item.contentType, channel_category: item.channelCategory, revision_number: item.revisionNumber, created_at: item.createdAt, updated_at: item.updatedAt, created_by: item.createdBy, created_by_name: item.createdByName, submitted_at: item.submittedAt, submitted_by: item.submittedBy, submitted_by_name: item.submittedByName, reviewed_at: item.reviewedAt, reviewed_by: item.reviewedBy, reviewed_by_name: item.reviewedByName, review_note: item.reviewNote, preparation_source: item.preparationSource, preparation_request_id: item.preparationRequestId, preparation_recipe_key: item.preparationRecipeKey, truth_pack_version: item.truthPackVersion, prepared_at: item.preparedAt, preparation_sequence: item.preparationSequence, intended_audience: item.intendedAudience, content_role: item.contentRole, strategic_source: item.strategicSource, source_plan_id: item.sourcePlanId, source_plan_revision: item.sourcePlanRevision, source_plan_item_index: item.sourcePlanItemIndex, source_direction_id: item.sourceDirectionId, source_direction_revision: item.sourceDirectionRevision, source_direction_topic: item.sourceDirectionTopic, source_direction_status: item.sourceDirectionStatus })), error: null };
       if (name === 'servsync_get_internal_marketing_publishing') return { data: publishingState, error: null };
       if (name === 'servsync_get_internal_marketing_planning') return { data: { profile: null, plan: null, recent_content: { window_limit: 20, item_count: 0, items: [] } }, error: null };
       if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
@@ -51,7 +122,7 @@ async function install(page: Page, stateOverride: Record<string, unknown> = publ
     } };
     document.body.innerHTML = '<main class="p-4"><div id="root"></div></main>';
     createRoot(document.getElementById('root')!).render(React.createElement(Workspace, { role: 'platform_admin', overview: overview({ contractors: 1, homeowners: 1, activeInvites: 0 }), client }));
-  }, { approved, publishingState: stateOverride });
+  }, { contentItems, publishingState: stateOverride });
 }
 
 test('approved content has a separate fail-closed publication decision and Publishing history view', async ({ page }) => {
@@ -59,14 +130,65 @@ test('approved content has a separate fail-closed publication decision and Publi
   await page.getByTestId('marketing-nav-content').click();
   await page.getByRole('tab', { name: 'Approved' }).click();
   await page.getByRole('button', { name: /Approved social post/ }).click();
-  await page.getByRole('button', { name: 'Publish / Schedule' }).click();
+  await page.getByRole('button', { name: 'Preview for Facebook' }).click();
   await expect(page.getByTestId('marketing-publication-composer')).toContainText('Approved revision 8');
   await expect(page.getByTestId('marketing-publication-composer')).toContainText('One exact approved message.');
-  await expect(page.getByRole('button', { name: 'Confirm publication' })).toBeDisabled();
-  await expect(page.getByTestId('marketing-publication-composer')).toContainText('Media required');
-  await page.getByTestId('marketing-nav-campaigns').click();
+  await expect(page.getByRole('button', { name: 'Review publication' })).toBeDisabled();
   await expect(page.getByTestId('marketing-publishing-workspace')).toContainText('No publication history yet');
   await expect(page.getByTestId('marketing-publishing-workspace')).toContainText('Setup required');
+});
+
+test('owner can review every eligible Facebook candidate without creating a publication', async ({ page }) => {
+  const draft: MarketingContentItem = { ...approved, id: '62000000-0000-4000-8000-000000000099', title: 'Unapproved draft', status: 'draft' };
+  await install(page, connectedState, '/', [...approvedCandidates, draft]);
+  await page.getByTestId('marketing-nav-campaigns').click();
+
+  const composer = page.getByTestId('marketing-publication-composer');
+  const publicPreview = page.getByTestId('facebook-public-preview');
+  await expect(composer).toContainText('1 of 7');
+  await expect(composer.getByText('Unapproved draft')).toHaveCount(0);
+  await expect(publicPreview).toContainText('One exact public Facebook message.');
+  await expect(publicPreview).not.toContainText('Months later, the service report is still with the home');
+  await expect(composer.getByTestId('marketing-preview-internal-metadata')).toContainText('Home History');
+  await expect(composer.getByTestId('marketing-preview-internal-metadata')).toContainText('First-class approved Direction lineage');
+  await expect(publicPreview).not.toContainText(/reactions|comments|shares|views|reach/i);
+
+  await composer.getByRole('button', { name: 'Next approved post' }).click();
+  await expect(composer).toContainText('2 of 7');
+  await expect(publicPreview).toContainText('Exact public message 2.');
+  await expect(composer.getByTestId('marketing-preview-internal-metadata')).toContainText('Historical approved content');
+
+  await composer.getByLabel('Timing').selectOption('scheduled');
+  await composer.getByLabel('Scheduled time').fill('2026-08-20T10:30');
+  const timezone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  await expect(composer).toContainText(timezone);
+  await composer.getByRole('button', { name: 'Review publication' }).click();
+  const confirmation = page.getByTestId('marketing-publication-confirmation');
+  await expect(confirmation).toContainText('Schedule Facebook Post');
+  await expect(confirmation).toContainText('Exact public message 2.');
+  await expect(confirmation).toContainText('Text only');
+  await expect(confirmation.getByRole('button', { name: 'Schedule Facebook Post' })).toBeDisabled();
+
+  const rpcCalls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: string[] }).__marketingRpcCalls);
+  expect(rpcCalls).not.toContain('servsync_create_internal_marketing_publication');
+});
+
+test('return for revision exits preview through the normal Content workspace without editing approval', async ({ page }) => {
+  await install(page, connectedState, '/', approvedCandidates);
+  await page.getByTestId('marketing-nav-campaigns').click();
+  await page.getByRole('button', { name: 'Return for revision' }).click();
+  await expect(page.getByTestId('marketing-content-workspace')).toBeVisible();
+  await expect(page.getByTestId('marketing-content-detail')).toContainText('Months later, the service report is still with the home');
+  await expect(page.getByTestId('marketing-content-detail')).toContainText('Approved');
+  await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0);
+});
+
+test('Facebook owner preview remains readable without horizontal overflow on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await install(page, connectedState, '/', approvedCandidates);
+  await page.getByTestId('marketing-nav-campaigns').click();
+  await expect(page.getByTestId('facebook-public-preview')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
 test('publishing remains server-side and no browser provider token or local media path exists', () => {

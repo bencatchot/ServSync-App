@@ -287,7 +287,7 @@ export function MarketingWorkspace({
     onPublish: Parameters<typeof MarketingContentWorkspace>[0]['onPublish'];
   };
   planning: Parameters<typeof MarketingPlanningWorkspace>[0];
-  publishing: Parameters<typeof MarketingPublishingWorkspace>[0] & { composer: { content: MarketingContentItem | null; onClose: () => void; onCreate: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] } };
+  publishing: Omit<Parameters<typeof MarketingPublishingWorkspace>[0], 'contentItems' | 'selectedContentId' | 'onSelectContent' | 'onReturnForRevision' | 'onCreate'> & { composer: { selectedContentId: string | null; onSelectContent: (content: MarketingContentItem) => void; onCreate: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] } };
 }) {
   const [section, setSection] = useState<MarketingWorkspaceSection>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'campaigns' : 'overview'
@@ -354,11 +354,21 @@ export function MarketingWorkspace({
               onCreate={content.onCreate}
               onUpdate={content.onUpdate}
               onTransition={content.onTransition}
-              onPublish={content.onPublish}
+              onPublish={item => { publishing.composer.onSelectContent(item); setSection('campaigns'); }}
             />
           )
           : section === 'campaigns'
-            ? <MarketingPublishingWorkspace {...publishing} />
+            ? <MarketingPublishingWorkspace
+                {...publishing}
+                contentItems={content.items}
+                selectedContentId={publishing.composer.selectedContentId}
+                onSelectContent={publishing.composer.onSelectContent}
+                onReturnForRevision={item => {
+                  setContentFocus({ id: item.id, status: 'approved', token: Date.now() });
+                  setSection('content');
+                }}
+                onCreate={publishing.composer.onCreate}
+              />
           : section === 'settings'
             ? <MarketingPlanningWorkspace {...planning} />
             : <MarketingFoundationState section={section} />}
@@ -393,7 +403,7 @@ function AuthorizedInternalMarketingWorkspace({
   const [publishingLoading, setPublishingLoading] = useState(true);
   const [publishingSaving, setPublishingSaving] = useState(false);
   const [publishingError, setPublishingError] = useState<string | null>(null);
-  const [publishContent, setPublishContent] = useState<MarketingContentItem | null>(null);
+  const [previewContentId, setPreviewContentId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -514,7 +524,7 @@ function AuthorizedInternalMarketingWorkspace({
       });
       await load();
     },
-    onPublish: (item: MarketingContentItem) => setPublishContent(item),
+    onPublish: (item: MarketingContentItem) => setPreviewContentId(item.id),
   };
 
   const planning = {
@@ -599,14 +609,14 @@ function AuthorizedInternalMarketingWorkspace({
       finally { setPublishingSaving(false); }
     },
     composer: {
-      content: publishContent,
-      onClose: () => setPublishContent(null),
+      selectedContentId: previewContentId,
+      onSelectContent: (item: MarketingContentItem) => setPreviewContentId(item.id),
       onCreate: async ({ connection, mode, scheduledAt }: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] extends (input: infer T) => Promise<void> ? T : never) => {
-        if (!publishContent) return;
+        const previewContent = items.find(item => item.id === previewContentId);
+        if (!previewContent) return;
         setPublishingSaving(true);
         try {
-          await publishingAdapter.create({ requestId: crypto.randomUUID(), contentId: publishContent.id, contentRevision: publishContent.revisionNumber, provider: connection.provider, connectionId: connection.id, mode, scheduledAt });
-          setPublishContent(null);
+          await publishingAdapter.create({ requestId: crypto.randomUUID(), contentId: previewContent.id, contentRevision: previewContent.revisionNumber, provider: connection.provider, connectionId: connection.id, mode, scheduledAt });
           await loadPublishing();
         } finally { setPublishingSaving(false); }
       },
@@ -615,7 +625,6 @@ function AuthorizedInternalMarketingWorkspace({
 
   return <>
     <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} planning={planning} publishing={publishing} />
-    {publishContent && publishingState && <div className="mt-4"><MarketingPublicationComposer content={publishContent} providers={publishingState.providers} busy={publishingSaving} onClose={publishing.composer.onClose} onCreate={publishing.composer.onCreate} /></div>}
   </>;
 }
 

@@ -516,7 +516,7 @@ export function MarketingContentWorkspace(props: Props) {
                 )}
                 {selected.status === 'approved' && selected.contentType === 'social_post' && selected.channelCategory === 'social' && (
                   <button type="button" disabled={busy} onClick={() => props.onPublish(selected)} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-                    <Megaphone size={17} aria-hidden="true" /> Publish / Schedule
+                    <Megaphone size={17} aria-hidden="true" /> Preview for Facebook
                   </button>
                 )}
               </div>
