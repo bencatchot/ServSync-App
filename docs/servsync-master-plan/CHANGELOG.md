@@ -4,6 +4,19 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-14 - Demo Recorder homeowner Estimate response scenario v1
+
+- Branch: `codex/servsync-demo-recorder-homeowner-estimate-v1`.
+- Starting main SHA: `4ce5b579f9fe08825e275754783d9e5fb9454214`.
+- Files changed: one homeowner Estimate recorder scenario; exact private response-event adoption/verification; shared recorder dispatch; focused contract/security tests; Demo recorder/runbook documentation; FB-034A backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Adds `homeowner-review-estimate`. It independently restores the dedicated Demo fixture to `estimate_sent`, authenticates the homeowner outside recorded footage, opens the exact sent Estimate, accepts it through the normal connected-homeowner RPC, adopts only the exact new approval activity event, verifies `estimate_accepted`, and stops on the accepted confirmation. The five lines and two payment-schedule rows remain intact, and no Job, Invoice, deposit, payment, Home History, provider action, or publishing step is created.
+- Reason for change: Provide one truthful, concise homeowner-decision recording that follows the contractor Estimate clip without turning the recorder into a full lifecycle or media-production system.
+- Tests/checks run: Recorder contracts; all three live Demo scenarios; exact fixture reset/adoption and accepted-state verification; WebM playback/duration/frame review; sensitive visible-text and browser-error checks; TypeScript; Production build; backend parity; focused ESLint; dependency/scope/sensitive-value review; `git diff --check`; exact-head Preview checks; and independent detached review.
+- Known risks or follow-ups: Acceptance enables later contractor Job actions but this recorder does not invoke them. The existing three stale Demo-presentation source-shape assertions remain inherited and unrelated. MP4, publishing, audio/subtitle infrastructure, Job/Invoice/payment scenarios, and general workflow scripting remain deferred.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-034A records the third bounded canonical scenario while remaining active for separately reviewed Demo coverage.
+
 ## 2026-08-14 - Demo Recorder contractor Estimate scenario v1
 
 - Branch: `codex/servsync-demo-recorder-estimate-v1`.
