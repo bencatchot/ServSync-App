@@ -19,7 +19,7 @@ The provider-neutral publication lifecycle remains authoritative. Approval does 
 
 ## Current Meta Contract
 
-The implementation was reviewed against current official Meta documentation on 2026-08-15 and pins Graph API `v26.0`.
+The implementation was reviewed against current official Meta documentation on 2026-08-15 and pins Graph API `v26.0`. Facebook Login for Business is configuration-driven: ServSync invokes one reviewed User access token configuration by `config_id`, while Meta owns the configuration's Page asset selection and permission request.
 
 Requested permissions:
 
@@ -27,7 +27,7 @@ Requested permissions:
 - `pages_read_engagement`
 - `pages_manage_posts`
 
-An eligible Page must also report the `CREATE_CONTENT` Page task. ServSync uses `/me`, `/me/permissions`, and `/me/accounts` for identity, granted-permission, and Page discovery checks. Page readiness is revalidated against the selected Page identity and task set.
+An eligible Page must also report the `CREATE_CONTENT` Page task. ServSync uses `/me`, `/me/permissions`, and `/me/accounts` for identity, granted-permission, and Page discovery checks. The configuration must use a User access token because `/me/accounts` returns the Page access tokens used by this reviewed contract. Page readiness is revalidated against the selected Page identity and task set.
 
 Meta App Review, Advanced Access, and Business verification requirements depend on the final app/business configuration and who will authorize the app. Their current ServSync status is unverified. They must be resolved in Meta before the real owner connection can be treated as available outside any permitted app-role testing boundary.
 
@@ -36,6 +36,8 @@ Official references:
 - [Meta Pages API: Getting Started](https://developers.facebook.com/docs/pages-api/getting-started/)
 - [Meta Pages API: Posts](https://developers.facebook.com/docs/pages-api/posts/)
 - [Meta manual Facebook Login flow](https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow/)
+- [Meta Facebook Login for Business](https://developers.facebook.com/documentation/facebook-login/facebook-login-for-business)
+- [Meta Debug Token reference](https://developers.facebook.com/docs/graph-api/reference/debug_token/)
 - [Meta permissions reference](https://developers.facebook.com/docs/permissions#pages_manage_posts)
 - [Meta Graph API versions](https://developers.facebook.com/docs/graph-api/changelog/versions/)
 
@@ -52,6 +54,7 @@ Required Production-only server variables:
 ```text
 SERVSYNC_META_APP_ID
 SERVSYNC_META_APP_SECRET
+SERVSYNC_META_LOGIN_CONFIGURATION_ID
 SERVSYNC_META_GRAPH_API_VERSION=v26.0
 SERVSYNC_META_OAUTH_REDIRECT_URI=https://servsync.app/api/marketing-facebook-oauth-callback
 ```
@@ -64,7 +67,7 @@ SUPABASE_URL=https://uqgtheclhxqlnjpfmheq.supabase.co
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
-`SERVSYNC_META_APP_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` are server-only. They must not use a browser-visible prefix or appear in source, database rows, logs, documentation values, or chat.
+`SERVSYNC_META_APP_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` are server-only. They must not use a browser-visible prefix or appear in source, database rows, logs, documentation values, or chat. The login Configuration ID is not a secret, but ServSync still keeps it in server configuration and does not expose unrelated Meta setup data to the browser.
 
 `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` must remain absent or false for this slice. Even if it were enabled later, the database connection capability remains a second independent posting gate until a separately authorized live-post task changes it.
 
@@ -73,6 +76,7 @@ Demo and Sandbox do not receive real Meta credentials or authorize the real Serv
 ## OAuth Security
 
 - Only an authenticated platform admin can begin the internal connection.
+- The authorization URL requires the reviewed Facebook Login for Business Configuration ID and omits `scope`; Meta's saved User access token configuration is the permission and Page-asset request authority.
 - The server generates 32 random bytes and returns only the opaque state to Meta. The database stores only its SHA-256 digest.
 - State is bound to the internal workspace, connection, initiating platform admin, exact callback, and Meta App ID.
 - State expires after 10 minutes and is consumed once. State and authorization-code replay are rejected.
@@ -122,19 +126,26 @@ Migration `servsync-facebook-marketing-connection.sql`, SHA-256 `e003558a720fd5d
 
 No Meta app credential, owner consent, Page selection, public post, or external provider traffic occurred during rollout.
 
+## First Production Consent Finding
+
+The first real Production consent on 2026-08-15 selected only Page `1199023349954773` (`ServSync`). Meta completed the Business Integration, `/me` returned a valid provider identity, and `/me/permissions` granted `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`. The resulting no-expiry token and active Business Integration reflected a system-user-style authorization, while ServSync's reviewed discovery contract expects a User access token and `/me/accounts`; that endpoint returned zero Pages before any ServSync eligibility filtering.
+
+The unfinished session and its transient Vault token were deleted after sanitized diagnosis. Production returned to `setup_required` with no selected Page, durable token, publication, or publication event. The corrected flow must use an explicit User access token configuration ID. It must not reuse the scope-only request or a System-user access token configuration.
+
 ## Owner Connection Checklist
 
 1. Confirm or create the ServSync-owned Facebook Page and the Meta Business relationship that administers it.
 2. Create or confirm a Meta Developer Business app owned by the appropriate ServSync/owner business account.
-3. Add Facebook Login and configure the exact callback URL above. Do not add wildcard or Preview callbacks.
-4. Confirm current access for `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`, including any required App Review, Advanced Access, and Business verification.
-5. Install the four `SERVSYNC_META_*` values in the Production Vercel project through secure environment management. Never paste the App Secret into chat.
-6. Leave `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` absent/false.
-7. Deploy the exact merged main build.
-8. Sign in to Production as platform admin, open Internal Marketing Publishing/provider readiness, and choose **Connect Facebook**.
-9. Complete Meta login/consent directly with Meta. Do not share the password or access token.
-10. Return to ServSync and explicitly choose the ServSync-owned Page.
-11. Confirm the UI reports `Ready except live post verification`, the correct Page name, and a recent validation time.
+3. Add Facebook Login for Business and configure the exact callback URL above. Do not add wildcard or Preview callbacks.
+4. Create one **General** configuration using **User access token**, the **Page** asset type, and exactly `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`. Do not choose a System-user access token configuration for this v1 contract.
+5. Confirm any required App Review, Advanced Access, and Business verification.
+6. Install the five `SERVSYNC_META_*` values in the Production Vercel project through secure environment management. Never paste the App Secret or Configuration ID into chat.
+7. Leave `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` absent/false.
+8. Deploy the exact merged main build.
+9. Sign in to Production as platform admin, open Internal Marketing Publishing/provider readiness, and choose **Connect Facebook**.
+10. Complete Meta login/consent directly with Meta and select only the ServSync Page. Do not share the password or access token.
+11. Return to ServSync and explicitly choose the ServSync-owned Page.
+12. Confirm the UI reports `Ready except live post verification`, the correct Page name, and a recent validation time.
 
 If consent is abandoned before the callback completes, return to Publishing and choose **Restart authorization**. ServSync invalidates the unfinished attempt and any transient Vault token before opening a fresh owner-bound consent flow.
 
