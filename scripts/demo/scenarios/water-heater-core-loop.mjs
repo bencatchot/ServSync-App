@@ -13,6 +13,7 @@ export const supportedCheckpointKeys = [
   'job_in_progress',
   'job_review_ready',
   'job_completed',
+  'home_history_updated',
 ];
 
 export const defaultCheckpointKey = 'job_created';
@@ -22,7 +23,6 @@ export const deferredCheckpointKeys = [
   'invoice_draft',
   'invoice_sent',
   'invoice_paid',
-  'home_history_updated',
 ];
 
 export const lifecycleStepKeys = [
@@ -41,6 +41,7 @@ export const lifecycleStepKeys = [
   'jobInProgress',
   'jobReviewReady',
   'jobCompleted',
+  'homeHistoryUpdated',
 ];
 
 export const checkpointDefinitions = [
@@ -345,6 +346,50 @@ export const checkpointDefinitions = [
       homeHistoryCount: 0,
     },
   },
+  {
+    key: 'home_history_updated',
+    displayName: 'Home History Report Ready',
+    primaryRole: 'homeowner',
+    narrativePurpose:
+      'Show one eligible finalized work report filed into Demo Bay Home history through the supported authenticated upload and finalization workflow.',
+    requiredSteps: [
+      'identities',
+      'profilesAndCompany',
+      'property',
+      'connection',
+      'request',
+      'contractorReview',
+      'estimateDraft',
+      'estimateSent',
+      'estimateAccepted',
+      'jobCreated',
+      'jobScheduled',
+      'jobInProgress',
+      'jobReviewReady',
+      'jobCompleted',
+      'homeHistoryUpdated',
+    ],
+    expected: {
+      requestCount: 1,
+      estimateStatus: 'accepted',
+      estimateCount: 1,
+      approvalEventCount: 1,
+      jobCount: 1,
+      jobCreatedEventCount: 1,
+      jobStatus: 'completed',
+      jobCompletedAt: true,
+      jobClosedAt: false,
+      visitEventCount: 1,
+      visitEventStatus: 'completed',
+      visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5,
+      openWorkItemCount: 0,
+      invoiceCount: 0,
+      homeHistoryCount: 1,
+      reportDocumentCount: 1,
+      reportNotificationCount: 1,
+    },
+  },
 ];
 
 export const checkpointByKey = Object.fromEntries(checkpointDefinitions.map((checkpoint) => [checkpoint.key, checkpoint]));
@@ -526,13 +571,14 @@ export const presentationNotes = [
   'Use job_in_progress for partial work-item completion without invoices.',
   'Use job_review_ready for all work items complete before final job completion.',
   'Use job_completed for lightweight completion without invoice or Home History filing.',
+  'Use home_history_updated for the homeowner Home History clip with one finalized, registry-owned PDF report.',
 ];
 
 export const waterHeaterCoreLoopScenario = {
   scenarioKey,
   displayName: 'Water Heater Core Loop Demo',
   description:
-    'Dedicated demo scenario for homeowner request, contractor estimate, homeowner approval, job creation, and lightweight job lifecycle checkpoints.',
+    'Dedicated demo scenario for homeowner request, contractor estimate, homeowner approval, job creation, Job lifecycle, and one finalized Home History report checkpoint.',
   personas,
   property: propertyFixture,
   request: requestFixture,

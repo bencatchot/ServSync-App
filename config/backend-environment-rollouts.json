@@ -526,6 +526,24 @@
       }
     },
     {
+      "id": "demo-recorder-home-history-fixture-registry-v1",
+      "artifact": "servsync-demo-recorder-home-history-fixture-registry.sql (SHA-256 46ef3ce079c1e02d08f4fe7fab233863801708bef57999c0162b6b6aadca41c8)",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder infrastructure only; no Sandbox SQL was authorized or applied."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder infrastructure only; no Production SQL was authorized or applied."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 46ef3ce079c1e02d08f4fe7fab233863801708bef57999c0162b6b6aadca41c8 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-15. It adds only exact-row reset ownership for home_maintenance_log and home_documents at dependency-safe priorities 119 and 118; browser roles remain denied, service_role remains the sole helper executor, and preflight had zero report/history rows and zero home-documents Storage objects."
+        }
+      }
+    },
+    {
       "id": "finalized-report-home-lineage-v1",
       "artifact": "servsync-finalized-report-home-lineage.sql (SHA-256 ad32a0dbcee42f6eda3e71992601742c823e812fb88b51858242664ac0899de7)",
       "environments": {
