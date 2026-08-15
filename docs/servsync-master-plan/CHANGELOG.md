@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - Demo Recorder Recording Output Library v1
+
+- Branch: `codex/demo-recorder-output-library-v1`.
+- Starting main SHA: `1a673ad66e95e1a37ddd7e2701739920e6674d09`.
+- Files changed: shared recorder output-library/finalization tooling; focused promotion/conversion tests; Demo recorder and operator documentation; FB-034A backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Extends all three existing canonical Demo recorder scenarios with one fail-closed output pipeline. A validated native Playwright WebM remains the source/master; the locally installed Homebrew `ffmpeg` creates an H.264/yuv420p MP4, `ffprobe` verifies codec, dimensions, and duration, and the recorder promotes WebM, MP4, and allowlisted provenance metadata together into `~/Documents/Codex/ServSync Demo Recordings/<scenario>/`. Timestamped versions never overwrite prior recordings, and no package is promoted when scenario validation, media probing, conversion, or sensitive-data validation fails.
+- Reason for change: Validated recordings should survive temporary-worktree cleanup and be immediately usable by the owner without searching scratch directories or manually converting media.
+- Tests/checks run: Demo recorder/output-library contracts passed 21/21; backend parity passed 16/16; TypeScript, Production build, focused ESLint, sensitive-value scan, and `git diff --check` passed. A real dedicated-Demo `homeowner-home-history` run reached exact `home_history_updated`, produced a 14.32-second 1440x900 WebM, converted it to matching H.264/yuv420p MP4, promoted the three-file package, and passed sampled-frame review. Two earlier canonical WebMs with intact matching metadata (`homeowner-service-request` and `contractor-create-estimate`) were independently probed, converted, and copied into their new scenario directories; ambiguous/unpaired historical artifacts were not promoted.
+- Known risks or follow-ups: The library is local to this Mac and is not a cloud media archive. Homebrew `ffmpeg` is an operator prerequisite rather than a project dependency. Publishing, audio, subtitles, editing, social integrations, Production capture, and a fourth scenario remain excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records durable owner-facing outputs as complete while keeping FB-034A active for separately reviewed additional scenarios and excluding publishing/editing scope.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Updates the Demo Recorder operating model from temporary WebM-only output to durable validated WebM/MP4/metadata packages without changing product or provider behavior.
+
 ## 2026-08-15 - Demo Recorder homeowner Home History scenario v1
 
 - Branch: `codex/demo-recorder-home-history-v1`.

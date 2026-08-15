@@ -19,6 +19,7 @@ import {
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from './recorder/lib.mjs';
+import { promoteValidatedRecording } from './recorder/output-library.mjs';
 
 const scenarios = new Map([
   [homeownerServiceRequestScenario.key, homeownerServiceRequestScenario],
@@ -371,6 +372,11 @@ async function recordHomeownerServiceRequest({ scenario, env, outputDir, pacingN
     const metadataPath = finalPath.replace(/\.webm$/i, '.json');
     await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
     completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
 
     return {
       success: true,
@@ -379,6 +385,11 @@ async function recordHomeownerServiceRequest({ scenario, env, outputDir, pacingN
       projectRef: scenario.environment.projectRef,
       artifact: finalPath,
       metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
       durationSeconds: metadata.duration_seconds,
       viewport: scenario.viewport,
       finalCheckpoint: scenario.finalCheckpoint,
@@ -548,6 +559,11 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
     const metadataPath = finalPath.replace(/\.webm$/i, '.json');
     await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
     completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
 
     return {
       success: true,
@@ -556,6 +572,11 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
       projectRef: scenario.environment.projectRef,
       artifact: finalPath,
       metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
       durationSeconds: metadata.duration_seconds,
       viewport: scenario.viewport,
       finalCheckpoint: scenario.finalCheckpoint,
@@ -770,6 +791,11 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     const metadataPath = finalPath.replace(/\.webm$/i, '.json');
     await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
     completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
 
     return {
       success: true,
@@ -778,6 +804,11 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
       projectRef: scenario.environment.projectRef,
       artifact: finalPath,
       metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
       durationSeconds: metadata.duration_seconds,
       viewport: scenario.viewport,
       finalCheckpoint: scenario.finalCheckpoint,
