@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
+  createFacebookPublishingAdapter,
   marketingPublishingProviders,
   sanitizeProviderFailure,
   type PublicationClaim,
@@ -40,9 +41,17 @@ export async function runMarketingPublishingWorker(client: WorkerClient) {
   const claimed = await workerRpc(client, 'servsync_claim_due_marketing_publications', { p_limit: 5 });
   const claims = Array.isArray(claimed) ? claimed as PublicationClaim[] : [];
   const result = { claimed: claims.length, published: 0, failed: 0 };
+  const providers = {
+    ...marketingPublishingProviders,
+    facebook: createFacebookPublishingAdapter({
+      getPageToken: async connectionId => workerRpc(client, 'servsync_private_get_marketing_facebook_page_token', {
+        p_connection_id: connectionId,
+      }) as Promise<string>,
+    }),
+  };
 
   for (const claim of claims) {
-    const adapter = marketingPublishingProviders[claim.provider];
+    const adapter = providers[claim.provider];
     const validationFailure = adapter?.validatePublication(claim) ?? {
       category: 'unsupported' as const,
       message: 'The publication provider is unsupported.',

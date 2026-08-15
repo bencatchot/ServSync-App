@@ -54,7 +54,7 @@ The Production Vercel project has the exact Production reference as a Production
 
 ### Facebook
 
-Read-only repository, environment-name, GitHub-secret-name, and public-web checks found no verified ServSync Facebook Page, Meta Developer app, OAuth redirect, Page authorization, or token infrastructure. Facebook is therefore `setup_required`.
+Facebook Connection v1 now supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. The schema is installed across Sandbox, Demo, and Production, but no verified ServSync Meta Developer app credential, owner consent, selected Page, or provider review evidence is configured. Facebook therefore remains `setup_required` and public posting remains disabled. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
 
 The current Meta Pages API documentation describes Page publishing through `POST /{page-id}/feed` with a Page access token. The setup slice must verify the Page/business relationship and current app review/access for `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`, plus a Page task that permits content creation. The Graph API version must be selected and pinned when the real Meta app is connected, not guessed in this unconnected foundation.
 
@@ -63,7 +63,7 @@ Primary references:
 - [Meta Pages API: Posts](https://developers.facebook.com/docs/pages-api/posts/)
 - [Meta Pages API: Getting Started](https://developers.facebook.com/docs/pages-api/getting-started/)
 
-The next Facebook slice must use an owner OAuth/authorization flow and an approved encrypted server-side token store. Raw passwords or pasted long-lived tokens are not an acceptable durable design.
+The next Facebook gate is owner Meta app/Page setup and consent, followed only later by one exact separately authorized public text post. Raw passwords or pasted long-lived tokens are not an acceptable setup method.
 
 ### Instagram
 
@@ -103,7 +103,6 @@ Primary references:
 
 ## Deferred Boundaries
 
-- Meta OAuth callback and encrypted token lifecycle
 - first owner-authorized Facebook post
 - media asset upload/storage
 - Instagram adapter

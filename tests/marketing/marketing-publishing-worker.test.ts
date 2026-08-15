@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createMarketingPublishingHandler } from '../../server/marketingPublishingHttp.ts';
 import { marketingPublishingProviders, sanitizeProviderFailure } from '../../server/marketingPublishingProviders.ts';
 import { resolveMarketingPublishingConfig, runMarketingPublishingWorker } from '../../server/marketingPublishingWorker.ts';
+import { FacebookProviderError } from '../../server/facebookMarketingConnection.ts';
 
 test('provider capabilities remain distinct and every provider is truthfully unconnected', () => {
   assert.deepEqual(marketingPublishingProviders.facebook.capabilities, { text: true, media: false });
@@ -40,6 +41,7 @@ test('unconnected provider claim fails safely without beginning an external requ
         publication_id: '61000000-0000-4000-8000-000000000001',
         attempt_number: 1,
         provider: 'facebook',
+        provider_connection_id: '61000000-0000-4000-8000-000000000002',
         destination_key: 'page',
         content_snapshot: { title: 'Approved', body: 'Approved copy.', content_type: 'social_post' },
       }], error: null };
@@ -60,6 +62,17 @@ test('uncertain network result disables automatic retry to prevent duplicate pub
   assert.deepEqual(sanitizeProviderFailure(new Error('network timeout')), {
     category: 'provider_uncertain',
     message: 'The provider result could not be confirmed. Automatic retry is disabled to prevent a duplicate post.',
+    retryEligible: false,
+    requestStarted: true,
+  });
+});
+
+test('sanitized Facebook failures preserve bounded provider classification', () => {
+  assert.deepEqual(sanitizeProviderFailure(new FacebookProviderError(
+    'provider_permission', 'Facebook rejected the publication request.', false, true,
+  )), {
+    category: 'provider_permission',
+    message: 'Facebook rejected the publication request.',
     retryEligible: false,
     requestStarted: true,
   });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarClock, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react';
+import { CalendarClock, Link2, Loader2, RefreshCw, RotateCcw, ShieldCheck, Unplug, XCircle } from 'lucide-react';
 import type { MarketingContentItem } from './marketingContent';
 import type {
   MarketingProvider,
@@ -12,6 +12,15 @@ import type {
 const PROVIDER_LABELS: Record<MarketingProvider, string> = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok' };
 const STATUS_LABELS: Record<MarketingPublication['status'], string> = {
   scheduled: 'Scheduled', publishing: 'Publishing', published: 'Published', failed: 'Failed', cancelled: 'Cancelled',
+};
+const READINESS_LABELS: Record<MarketingProviderConnection['readinessStatus'], string> = {
+  setup_required: 'Not connected',
+  authorization_pending: 'Authorization pending',
+  page_selection_required: 'Choose Page',
+  ready_except_live_post_verification: 'Ready except live post verification',
+  reconnect_required: 'Reconnect required',
+  disconnected: 'Disconnected',
+  error: 'Setup error',
 };
 
 const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat(undefined, {
@@ -37,7 +46,7 @@ export function MarketingPublicationComposer({
   const [confirmed, setConfirmed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const selected = providers.find(provider => provider.id === providerId) ?? null;
-  const enabled = selected?.status === 'connected' && selected.capabilities.text;
+  const enabled = selected?.status === 'connected' && selected.capabilities.text && selected.capabilities.publishingEnabled;
   const submit = async () => {
     if (!selected) return;
     setSubmitError(null);
@@ -65,7 +74,7 @@ export function MarketingPublicationComposer({
             <input type="radio" name="marketing-provider" checked={providerId === provider.id} onChange={() => setProviderId(provider.id)} className="mt-1" />
             <span className="min-w-0"><span className="block text-sm font-bold text-slate-900">{PROVIDER_LABELS[provider.provider]}</span>
               <span className="block text-xs leading-5 text-slate-500">{provider.status === 'connected' ? provider.destinationLabel : provider.readinessNote}</span>
-              <span className="block text-xs font-semibold text-slate-600">{provider.capabilities.text ? 'Text publishing' : 'Media required'} · {provider.status === 'connected' ? 'Connected' : 'Setup required'}</span>
+              <span className="block text-xs font-semibold text-slate-600">{provider.capabilities.text ? 'Text publishing' : 'Media required'} · {provider.capabilities.publishingEnabled ? 'Enabled' : 'Owner-gated'}</span>
             </span>
           </label>
         ))}
@@ -83,15 +92,28 @@ export function MarketingPublicationComposer({
   );
 }
 
-export function MarketingPublishingWorkspace({ state, loading, error, saving, onReload, onCancel, onRetry }: {
+export function MarketingPublishingWorkspace({ state, loading, error, saving, onReload, onCancel, onRetry, onConnectFacebook, onSelectFacebookPage, onRecheckFacebook, onDisconnectFacebook }: {
   state: MarketingPublishingState | null; loading: boolean; error: string | null; saving: boolean;
   onReload: () => Promise<void>; onCancel: (publication: MarketingPublication) => Promise<void>; onRetry: (publication: MarketingPublication) => Promise<void>;
+  onConnectFacebook: () => Promise<void>;
+  onSelectFacebookPage: (sessionId: string, pageId: string) => Promise<void>;
+  onRecheckFacebook: () => Promise<void>;
+  onDisconnectFacebook: () => Promise<void>;
 }) {
   const publications = useMemo(() => state?.publications ?? [], [state]);
+  const facebook = state?.providers.find(provider => provider.provider === 'facebook') ?? null;
   return <section data-testid="marketing-publishing-workspace" className="space-y-4">
     <div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-950">Publishing</h2><p className="mt-1 text-sm text-slate-500">Provider readiness, scheduled work, and publication history.</p></div><button type="button" aria-label="Reload publishing" onClick={() => void onReload()} disabled={loading || saving} className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white"><RefreshCw size={17} /></button></div>
     {error && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-    <div className="grid gap-3 sm:grid-cols-3">{state?.providers.map(provider => <article key={provider.id} className="rounded-md border border-slate-200 bg-white p-3"><p className="text-sm font-bold text-slate-950">{PROVIDER_LABELS[provider.provider]}</p><p className="mt-1 text-xs font-bold uppercase text-slate-500">{provider.status === 'connected' ? 'Connected' : 'Setup required'}</p><p className="mt-2 text-sm leading-5 text-slate-600">{provider.readinessNote}</p></article>)}</div>
+    <div className="grid gap-3 sm:grid-cols-3">{state?.providers.map(provider => <article key={provider.id} className="rounded-md border border-slate-200 bg-white p-3"><p className="text-sm font-bold text-slate-950">{PROVIDER_LABELS[provider.provider]}</p><p className="mt-1 text-xs font-bold uppercase text-slate-500">{READINESS_LABELS[provider.readinessStatus]}</p><p className="mt-2 text-sm leading-5 text-slate-600">{provider.readinessNote}</p>{provider.lastValidatedAt && <p className="mt-2 text-xs text-slate-500">Last checked: {formatDate(provider.lastValidatedAt)}</p>}</article>)}</div>
+    {facebook && <section data-testid="marketing-facebook-connection" className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><ShieldCheck size={18} className="text-blue-700" /><h3 className="text-sm font-bold text-slate-950">Facebook Page connection</h3></div><p className="mt-1 text-sm text-slate-600">{facebook.destinationLabel ? `Page: ${facebook.destinationLabel}` : facebook.readinessNote}</p></div>
+        {facebook.status === 'connected' ? <div className="flex gap-2"><button type="button" disabled={saving} onClick={() => void onRecheckFacebook()} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><RefreshCw size={16} />Recheck</button><button type="button" disabled={saving} onClick={() => void onDisconnectFacebook()} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700"><Unplug size={16} />Disconnect</button></div>
+          : <button type="button" disabled={saving || facebook.readinessStatus === 'authorization_pending'} onClick={() => void onConnectFacebook()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50"><Link2 size={16} />Connect Facebook</button>}
+      </div>
+      {facebook.status === 'connected' && <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Connection readiness is validated without posting. Public posting remains disabled until a separate owner-authorized live-post task.</p>}
+      {state?.facebookSetup && <fieldset className="mt-4 space-y-2"><legend className="text-sm font-bold text-slate-900">Choose the ServSync Page</legend>{state.facebookSetup.candidatePages.length === 0 ? <p className="text-sm text-slate-600">Facebook returned no Pages available for this connection.</p> : state.facebookSetup.candidatePages.map(page => <div key={page.pageId} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 p-3"><div><p className="text-sm font-bold text-slate-900">{page.pageName}</p><p className="text-xs text-slate-500">{page.eligible ? 'Eligible for Page publishing readiness' : 'Required Page authority is missing'}</p></div><button type="button" disabled={saving || !page.eligible} onClick={() => void onSelectFacebookPage(state.facebookSetup!.sessionId, page.pageId)} className="min-h-11 rounded-md border border-blue-300 px-3 text-sm font-bold text-blue-700 disabled:opacity-50">Connect this Page</button></div>)}</fieldset>}
+    </section>}
     {loading ? <p className="py-10 text-center text-sm text-slate-500">Loading publication history...</p> : publications.length === 0 ? <div className="border-y border-dashed border-slate-200 py-10 text-center"><CalendarClock className="mx-auto text-slate-400" size={22} /><p className="mt-2 text-sm font-bold text-slate-700">No publication history yet</p><p className="mt-1 text-sm text-slate-500">Approval alone never creates or schedules a publication.</p></div> : <div className="divide-y divide-slate-200 border-y border-slate-200">{publications.map(publication => <article key={publication.id} className="py-4"><div className="flex flex-wrap justify-between gap-3"><div className="min-w-0"><p className="text-sm font-bold text-slate-900">{publication.snapshot.title}</p><p className="mt-1 text-xs text-slate-500">{PROVIDER_LABELS[publication.provider]} · {publication.destinationLabel} · Revision {publication.contentRevision}</p><p className="mt-1 text-xs text-slate-500">{publication.status === 'published' ? formatDate(publication.publishedAt) : formatDate(publication.scheduledAt)}</p>{publication.failureMessage && <p className="mt-2 text-sm text-rose-700">{publication.failureMessage}</p>}</div><div className="flex items-start gap-2"><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700">{STATUS_LABELS[publication.status]}</span>{publication.status === 'scheduled' && <button type="button" title="Cancel publication" aria-label={`Cancel ${publication.snapshot.title}`} disabled={saving} onClick={() => void onCancel(publication)} className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300"><XCircle size={16} /></button>}{publication.status === 'failed' && publication.retryEligible && <button type="button" title="Retry publication" aria-label={`Retry ${publication.snapshot.title}`} disabled={saving} onClick={() => void onRetry(publication)} className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300"><RotateCcw size={16} /></button>}</div></div></article>)}</div>}
   </section>;
 }

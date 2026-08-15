@@ -26,14 +26,16 @@ test('publishing adapter preserves capability differences and rejects malformed 
   const adapter = createMarketingPublishingAdapter({ rpc: async () => ({ data: publishingState, error: null }) });
   const state = await adapter.get();
   expect(state.providers.map(provider => [provider.provider, provider.capabilities])).toEqual([
-    ['facebook', { text: true, media: false }], ['instagram', { text: false, media: true }], ['tiktok', { text: false, media: true }],
+    ['facebook', { text: true, media: false, publishingEnabled: false }],
+    ['instagram', { text: false, media: true, publishingEnabled: false }],
+    ['tiktok', { text: false, media: true, publishingEnabled: false }],
   ]);
   const malformed = createMarketingPublishingAdapter({ rpc: async () => ({ data: { ...publishingState, providers: [{ ...publishingState.providers[0], destination_label: '/Users/owner/video.mp4' }] }, error: null }) });
   await expect(malformed.get()).rejects.toMatchObject({ kind: 'malformed' });
 });
 
-async function install(page: Page) {
-  await page.goto('/');
+async function install(page: Page, stateOverride: Record<string, unknown> = publishingState, path = '/') {
+  await page.goto(path);
   await page.evaluate(async ({ approved, publishingState }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as { createElement: (...args: unknown[]) => unknown };
@@ -49,7 +51,7 @@ async function install(page: Page) {
     } };
     document.body.innerHTML = '<main class="p-4"><div id="root"></div></main>';
     createRoot(document.getElementById('root')!).render(React.createElement(Workspace, { role: 'platform_admin', overview: overview({ contractors: 1, homeowners: 1, activeInvites: 0 }), client }));
-  }, { approved, publishingState });
+  }, { approved, publishingState: stateOverride });
 }
 
 test('approved content has a separate fail-closed publication decision and Publishing history view', async ({ page }) => {
@@ -74,4 +76,51 @@ test('publishing remains server-side and no browser provider token or local medi
   ].map(file => readFileSync(resolve(process.cwd(), file), 'utf8')).join('\n');
   expect(files).not.toMatch(/access[_-]?token|client[_-]?secret|\/Users\/|file:\/\//i);
   expect(files).not.toContain('fetch(');
+});
+
+test('Facebook setup requires an explicit eligible Page selection', async ({ page }) => {
+  await install(page, {
+    ...publishingState,
+    providers: publishingState.providers.map(provider => provider.provider === 'facebook' ? {
+      ...provider,
+      readiness_status: 'page_selection_required',
+      readiness_note: 'Authorization complete. Choose the ServSync Facebook Page.',
+    } : provider),
+    facebook_setup: {
+      session_id: '71000000-0000-4000-8000-000000000001',
+      status: 'page_selection_required',
+      expires_at: '2026-08-15T22:00:00.000Z',
+      candidate_pages: [
+        { page_id: '1122334455667788', page_name: 'ServSync Page', tasks: ['CREATE_CONTENT'], eligible: true },
+        { page_id: '8877665544332211', page_name: 'Read Only Page', tasks: ['MODERATE'], eligible: false },
+      ],
+    },
+  });
+  await page.getByTestId('marketing-nav-campaigns').click();
+  const connection = page.getByTestId('marketing-facebook-connection');
+  await expect(connection).toContainText('Choose the ServSync Page');
+  await expect(connection.getByText('ServSync Page', { exact: true })).toBeVisible();
+  await expect(connection.getByText('Read Only Page')).toBeVisible();
+  await expect(connection.getByRole('button', { name: 'Connect this Page' }).first()).toBeEnabled();
+  await expect(connection.getByRole('button', { name: 'Connect this Page' }).last()).toBeDisabled();
+  await expect(connection).not.toContainText(/token|secret/i);
+});
+
+test('safe OAuth callback return opens the Publishing Page-selection destination', async ({ page }) => {
+  await install(page, {
+    ...publishingState,
+    providers: publishingState.providers.map(provider => provider.provider === 'facebook' ? {
+      ...provider,
+      readiness_status: 'page_selection_required',
+      readiness_note: 'Authorization complete. Choose the ServSync Facebook Page.',
+    } : provider),
+    facebook_setup: {
+      session_id: '71000000-0000-4000-8000-000000000001',
+      status: 'page_selection_required',
+      expires_at: '2026-08-15T22:00:00.000Z',
+      candidate_pages: [{ page_id: '1122334455667788', page_name: 'ServSync Page', tasks: ['CREATE_CONTENT'], eligible: true }],
+    },
+  }, '/?marketing_facebook=page_selection_required');
+  await expect(page.getByTestId('marketing-publishing-workspace')).toBeVisible();
+  await expect(page.getByTestId('marketing-facebook-connection')).toContainText('ServSync Page');
 });

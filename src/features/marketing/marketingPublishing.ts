@@ -11,9 +11,19 @@ export type MarketingProviderConnection = {
   priority: number;
   status: 'setup_required' | 'connected' | 'disabled' | 'error';
   destinationLabel: string | null;
-  capabilities: { text: boolean; media: boolean };
+  readinessStatus: 'setup_required' | 'authorization_pending' | 'page_selection_required' | 'ready_except_live_post_verification' | 'reconnect_required' | 'disconnected' | 'error';
+  capabilities: { text: boolean; media: boolean; publishingEnabled: boolean };
   readinessNote: string;
   connectedAt: string | null;
+  lastValidatedAt: string | null;
+  tokenExpiresAt: string | null;
+};
+
+export type MarketingFacebookSetup = {
+  sessionId: string;
+  status: 'page_selection_required';
+  expiresAt: string;
+  candidatePages: Array<{ pageId: string; pageName: string; tasks: string[]; eligible: boolean }>;
 };
 
 export type MarketingPublication = {
@@ -40,6 +50,7 @@ export type MarketingPublication = {
 
 export type MarketingPublishingState = {
   providers: MarketingProviderConnection[];
+  facebookSetup: MarketingFacebookSetup | null;
   publications: MarketingPublication[];
 };
 
@@ -75,18 +86,49 @@ function parseState(value: unknown): MarketingPublishingState {
       || !['setup_required', 'connected', 'disabled', 'error'].includes(String(provider.connection_status))
       || !nullableString(provider.destination_label) || (typeof provider.destination_label === 'string' && localPath(provider.destination_label)) || !record(provider.capabilities)
       || typeof provider.capabilities.text !== 'boolean' || typeof provider.capabilities.media !== 'boolean'
-      || typeof provider.readiness_note !== 'string' || !nullableTimestamp(provider.connected_at)) malformed();
+      || typeof provider.readiness_note !== 'string' || !nullableTimestamp(provider.connected_at)
+      || (provider.last_validated_at !== undefined && !nullableTimestamp(provider.last_validated_at))
+      || (provider.token_expires_at !== undefined && !nullableTimestamp(provider.token_expires_at))) malformed();
+    const readinessStatus = provider.readiness_status === undefined
+      ? provider.connection_status === 'connected' ? 'ready_except_live_post_verification' : 'setup_required'
+      : String(provider.readiness_status);
+    if (!['setup_required','authorization_pending','page_selection_required','ready_except_live_post_verification','reconnect_required','disconnected','error'].includes(readinessStatus)) malformed();
     return {
       id: provider.connection_id,
       provider: provider.provider as MarketingProvider,
       priority: provider.priority,
       status: provider.connection_status as MarketingProviderConnection['status'],
+      readinessStatus: readinessStatus as MarketingProviderConnection['readinessStatus'],
       destinationLabel: provider.destination_label,
-      capabilities: { text: provider.capabilities.text, media: provider.capabilities.media },
+      capabilities: {
+        text: provider.capabilities.text,
+        media: provider.capabilities.media,
+        publishingEnabled: provider.capabilities.publishing_enabled === true,
+      },
       readinessNote: provider.readiness_note,
       connectedAt: provider.connected_at,
+      lastValidatedAt: provider.last_validated_at ?? null,
+      tokenExpiresAt: provider.token_expires_at ?? null,
     };
   });
+  let facebookSetup: MarketingFacebookSetup | null = null;
+  if (value.facebook_setup !== undefined && value.facebook_setup !== null) {
+    if (!record(value.facebook_setup) || typeof value.facebook_setup.session_id !== 'string' || !UUID.test(value.facebook_setup.session_id)
+      || value.facebook_setup.status !== 'page_selection_required' || !timestamp(value.facebook_setup.expires_at)
+      || !Array.isArray(value.facebook_setup.candidate_pages)) malformed();
+    const candidatePages = value.facebook_setup.candidate_pages.map(page => {
+      if (!record(page) || typeof page.page_id !== 'string' || !/^\d{3,80}$/.test(page.page_id)
+        || typeof page.page_name !== 'string' || !Array.isArray(page.tasks)
+        || !page.tasks.every(task => typeof task === 'string') || typeof page.eligible !== 'boolean') malformed();
+      return { pageId: page.page_id, pageName: page.page_name, tasks: page.tasks as string[], eligible: page.eligible };
+    });
+    facebookSetup = {
+      sessionId: value.facebook_setup.session_id,
+      status: value.facebook_setup.status,
+      expiresAt: value.facebook_setup.expires_at,
+      candidatePages,
+    };
+  }
   const publications = value.publications.map(publication => {
     if (!record(publication) || typeof publication.publication_id !== 'string' || !UUID.test(publication.publication_id)
       || typeof publication.content_id !== 'string' || !UUID.test(publication.content_id)
@@ -126,7 +168,7 @@ function parseState(value: unknown): MarketingPublishingState {
       cancelledAt: publication.cancelled_at,
     };
   });
-  return { providers, publications };
+  return { providers, facebookSetup, publications };
 }
 
 function errorFor(value: unknown, mutation: boolean) {
