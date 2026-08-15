@@ -122,9 +122,17 @@ The second bounded scenario uses the same guarded runner and creates one draft E
 npm run demo:record -- contractor-create-estimate
 ```
 
+The third bounded scenario finalizes one registry-owned Demo Job through the supported authenticated upload/RPC path, then records the homeowner reopening that report from the selected home's Home History:
+
+```bash
+npm run demo:record -- homeowner-home-history
+```
+
 The recorder owns the `connected_request_ready -> request_ready` transition: the homeowner creates the request through the real product UI, then the private runner adopts only the one exact matching request into the active registry-owned run and verifies the final checkpoint. `adopt-request` is an internal recorder operation, not a general operator mutation command.
 
 For `contractor-create-estimate`, the recorder restores `request_ready`, saves one exact priced draft through the contractor Estimate composer, and privately adopts only that exact Estimate and line before verifying `estimate_draft`. It creates no approval, Job, Invoice, payment schedule, or external side effect. `adopt-estimate` is likewise an internal recorder operation.
+
+For `homeowner-home-history`, the private runner restores `home_history_updated`, owns exactly one `home_documents` row, one `home_maintenance_log` row, one notification, and one SHA-verified object in the private `home-documents` bucket. The ordinary finalization RPC supplies the canonical home lineage. The recorder authenticates offscreen, opens the selected home, reopens the real PDF, and remains read-only. The next exact reset removes only the registered object and rows.
 
 By default, `demo:seed` restores the backward-compatible `job_created` checkpoint. Demo checkpoint slices also support explicit checkpoint restoration through argument forwarding:
 

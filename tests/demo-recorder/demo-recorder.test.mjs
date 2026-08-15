@@ -184,6 +184,12 @@ test('finalized report ownership requires one exact document, history row, and n
   );
 });
 
+test('Home History checkpoint verifies exact home lineage on both generated rows', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts/demo/seed-demo-scenario.mjs'), 'utf8');
+  assert.match(source, /home_maintenance_log'[\s\S]*?home_id[\s\S]*?history\?\.home_id !== homeId/);
+  assert.match(source, /home_documents'[\s\S]*?home_id[\s\S]*?document\?\.home_id !== homeId/);
+});
+
 test('finalized report Storage identity accepts only one canonical private PDF path', () => {
   const homeownerId = '00000000-0000-4000-8000-000000000001';
   const jobId = '00000000-0000-4000-8000-000000000002';

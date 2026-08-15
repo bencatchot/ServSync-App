@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - Demo Recorder homeowner Home History scenario v1
+
+- Branch: `codex/demo-recorder-home-history-v1`.
+- Starting main SHA: `2f8d0f5aed1c41987e5db74a4adafc46e21c6e7b`; incorporated Product Fix merge `564beec2f85ac93fff897a2012565c90452ec473` before final recording.
+- Files changed: Demo-only fixture registry SQL/allowlist, recorder scenario/runner/fixture code, focused recorder tests, Demo parity/rollout records, recorder/runbook documentation, FB-034A backlog/master-plan/completed-feature records, and this changelog.
+- Summary of change: Adds canonical `homeowner-home-history`. The private runner creates one fictional finalized report through the normal authenticated Storage upload and `servsync_finalize_field_work`, registers exactly one document, Home History row, notification, and private object, then records the homeowner opening Demo Bay Home, viewing its scoped history, and reopening the rendered PDF. Authentication and setup remain offscreen; the accepted WebM is 14.6 seconds at 1440x900 with visible cursor, three short captions, and no detected sensitive data.
+- Demo boundary: Exact registry patch `servsync-demo-recorder-home-history-fixture-registry.sql` (SHA-256 `46ef3ce079c1e02d08f4fe7fab233863801708bef57999c0162b6b6aadca41c8`) was applied only to Demo `bdytwgejqnlblhrnqxkp`. It adds dependency-safe exact-row reset ownership for `home_maintenance_log` and `home_documents`; browser roles remain denied and the existing private helper remains service-role only. No Sandbox or Production recorder SQL/data/configuration changed.
+- Validation: Recorder contracts passed 13/13. Real Demo finalization verified exact home lineage, one private PDF with registry SHA, one Home History row, one notification, five completed work items, and zero Invoices. Desktop/mobile Home History visibility and private report download passed during the prerequisite product correction. The final recording passed WebM decode/duration, browser console/page/HTTP checks, sensitive-visible-text scanning, and sampled visual review. Existing homeowner-request and contractor-Estimate scenario contracts remain green.
+- Cleanup: Each new run deletes only the prior registered report object before exact dependency-safe row reset. Two failed duration/filename-gate attempts retained no accepted artifact; one current registry-owned `home_history_updated` fixture and its exact private PDF remain intentionally for canonical review and will be removed by the next registered run.
+- Known risks or follow-ups: Chromium may suggest the canonical UUID object basename for a signed cross-origin Storage download even though ServSync retains the friendly document filename; the recorder accepts only that strict UUID `.pdf` shape or the exact friendly name. Generated WebM/metadata remain local and ignored. MP4, publishing, audio, subtitles, editing, and further scenarios remain excluded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-034A now records three canonical scenarios and remains active for bounded future coverage.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the truthful Demo-only finalized-report/Home History capture boundary without changing Production capability claims.
+
 ## 2026-08-15 - Finalized Report Home Lineage v1
 
 - Branch: `codex/home-history-report-lineage-v1`.

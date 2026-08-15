@@ -2547,7 +2547,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       ? await ensureOk(
           await service
             .from('home_maintenance_log')
-            .select('id, homeowner_user_id, inspection_id, service_request_id, report_document_id')
+            .select('id, homeowner_user_id, home_id, inspection_id, service_request_id, report_document_id')
             .or(homeHistoryClauses.join(',')),
           'Unable to inspect deferred demo Home History rows'
         )
@@ -2556,7 +2556,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     ? await ensureOk(
         await service
           .from('home_documents')
-          .select('id, homeowner_user_id, storage_path, file_name, file_size_bytes, content_type, document_type')
+          .select('id, homeowner_user_id, home_id, storage_path, file_name, file_size_bytes, content_type, document_type')
           .eq('id', reportDocumentId),
         'Unable to inspect the Demo finalized-report document'
       )
@@ -2787,6 +2787,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     if (
       homeHistoryRows.length !== 1 ||
       history?.id !== homeHistoryId ||
+      history?.home_id !== homeId ||
       history?.inspection_id !== jobId ||
       history?.service_request_id !== requestId
     ) {
@@ -2796,6 +2797,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       reportDocuments.length !== 1 ||
       document?.id !== reportDocumentId ||
       document?.homeowner_user_id !== homeownerUser?.id ||
+      document?.home_id !== homeId ||
       document?.storage_path !== job?.report_storage_path ||
       document?.content_type !== 'application/pdf' ||
       document?.document_type !== 'inspection'

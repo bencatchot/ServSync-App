@@ -4,7 +4,7 @@
 
 The Demo Recorder creates reproducible browser recordings for ServSync Marketing, support tutorials, and product demonstrations. It is intentionally a small scenario runner, not a video editor or publishing system.
 
-Recorder v1 includes two canonical scenarios:
+Recorder v1 includes three canonical scenarios:
 
 `homeowner-service-request`
 
@@ -13,6 +13,10 @@ The clip shows the fictional Demo homeowner creating one service request for Dem
 `contractor-create-estimate`
 
 The clip starts from the registered Demo request, uses the normal contractor UI to create one priced draft Estimate, and stops on the saved draft. It does not send the Estimate or continue into approval, Job, Invoice, or payment activity.
+
+`homeowner-home-history`
+
+The clip starts from one registry-owned completed Job, opens Demo Bay Home, shows its property-scoped Home History entry, and reopens the real private finalized-report PDF. It stops on the report and does not continue into Invoice or payment activity.
 
 ## Safety Boundary
 
@@ -29,6 +33,8 @@ The reviewable scenario definitions live at:
 `scripts/demo/recorder/scenarios/homeowner-service-request.mjs`
 
 `scripts/demo/recorder/scenarios/contractor-create-estimate.mjs`
+
+`scripts/demo/recorder/scenarios/homeowner-home-history.mjs`
 
 It defines:
 
@@ -59,11 +65,13 @@ The homeowner then creates the request through the normal `servsync_create_servi
 
 The operation registers the request and its exact messages, advances the run to `request_ready`, and runs the ordinary checkpoint verifier. It does not broaden the reset table allowlist or delete by title, user, or timestamp.
 
-One verified final fixture remains after a successful recording: `request_ready` for the homeowner scenario or `estimate_draft` for the contractor scenario. The next run removes only registry-owned disposable records before rebuilding the known baseline. Unrelated Demo records are never reset.
+One verified final fixture remains after a successful recording: `request_ready` for the homeowner request scenario, `estimate_draft` for the contractor scenario, or `home_history_updated` for the Home History scenario. The next run removes only registry-owned disposable records and the exact registered private report object before rebuilding the known baseline. Unrelated Demo records and Storage objects are never reset.
 
 If the browser fails after submission begins but before ordinary adoption completes, failed-run cleanup attempts the same exact adoption contract. It does not broaden ownership or perform a title-, user-, or timestamp-based delete; a request that cannot satisfy the exact contract remains fail-closed for operator investigation.
 
 For `contractor-create-estimate`, setup restores the registered `request_ready` checkpoint. The contractor creates the draft through the real Estimate composer. The private adoption step accepts exactly one new draft only when its contractor, homeowner, home, request, title, scope, total, and single line match the scenario contract and it has no payment schedule, Job, or Invoice. The adopted Estimate and line become ordinary registry-owned records at `estimate_draft`, so the next scenario run can reset them without touching unrelated Demo data.
+
+For `homeowner-home-history`, setup restores `home_history_updated` by uploading one generated fictional PDF through the authenticated contractor Storage path and calling the supported finalization RPC. The verifier requires one exact report document, Home History row, notification, and SHA-bound private Storage object with the canonical Demo home lineage. Browser recording is homeowner-only and read-only. Reset deletes that exact registered object before dependency-safe row cleanup; it never sweeps the bucket.
 
 ## Authentication and Cuts
 
@@ -80,6 +88,7 @@ Load the existing approved Demo variables, including the private runner values d
 ```bash
 npm run demo:record -- homeowner-service-request
 npm run demo:record -- contractor-create-estimate
+npm run demo:record -- homeowner-home-history
 ```
 
 Optional bounded controls:
@@ -109,10 +118,12 @@ A run is successful only after:
 
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
 
+The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, property-scoped homeowner visibility, a real download, and a 12-18 second final WebM.
+
 Failed runs remove their staging video. A failed run must not be described as a successful artifact.
 
 ## Deliberate Limits
 
-Recorder v1 does not provide video publishing, MP4 conversion, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond the two listed above.
+Recorder v1 does not provide video publishing, MP4 conversion, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond the three listed above.
 
-Likely future scenarios include customer Estimate review, Estimate-to-Job, manual payment, Home History, and contractor discovery. Each requires its own reviewed fixture and final-state contract.
+Likely future scenarios include Estimate-to-Job, manual payment, and contractor discovery. Each requires its own reviewed fixture and final-state contract.
