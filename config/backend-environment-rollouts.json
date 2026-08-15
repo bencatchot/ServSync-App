@@ -596,6 +596,24 @@
           "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Sandbox and Demo passed. Production retained exactly 16 content records, three packages, 34 content status events, and zero publications/events. OAuth sessions and token references remain zero; Facebook remains setup_required with publishing disabled and no selected Page or public post."
         }
       }
+    },
+    {
+      "id": "facebook-granular-page-discovery-v1",
+      "artifact": "servsync-facebook-granular-page-discovery.sql (SHA-256 6942190b49fdbdcc744838fd1d8ae067d5812f035a50a166d51c99337efc6747)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact compatibility patch was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-15. The two purpose-bound service RPCs accept a bounded direct-candidate task contract while preserving exact stored-candidate matching, postgres ownership, fixed search_path, SECURITY DEFINER, and service-role-only execution. Facebook remained setup_required with publishing disabled and zero sessions, token references, publications, and events."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact patch was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-15 after Sandbox passed. Demo remained setup_required with publishing disabled and zero selected Page, sessions, token references, Marketing content, packages, content events, publications, and publication events."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact patch was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Demo passed. Postflight proved the corrected definitions and service-only grants. Production remained setup_required with publishing disabled, no selected Page, zero unfinished sessions, transient or durable tokens, publications, or publication events, while exactly 16 content records, three packages, and 34 content status events were preserved."
+        }
+      }
     }
   ]
 }

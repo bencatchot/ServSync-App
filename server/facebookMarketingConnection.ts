@@ -6,7 +6,11 @@ export const FACEBOOK_REQUIRED_PERMISSIONS = [
   'pages_read_engagement',
   'pages_manage_posts',
 ] as const;
-export const FACEBOOK_REQUIRED_PAGE_TASK = 'CREATE_CONTENT';
+export const FACEBOOK_CONTENT_PUBLISHING_TASKS = [
+  'CREATE_CONTENT',
+  'PROFILE_PLUS_CREATE_CONTENT',
+  'PROFILE_PLUS_FULL_CONTROL',
+] as const;
 export const FACEBOOK_OAUTH_STATE_TTL_SECONDS = 600;
 export const FACEBOOK_PRODUCTION_PROJECT_REF = 'uqgtheclhxqlnjpfmheq';
 export const FACEBOOK_CALLBACK_URL = 'https://servsync.app/api/marketing-facebook-oauth-callback';
@@ -49,6 +53,16 @@ export type FacebookPageCandidate = {
 };
 
 type MetaError = { error?: { code?: unknown; error_subcode?: unknown; type?: unknown; is_transient?: unknown } };
+export type FacebookTokenDebug = {
+  isValid: boolean;
+  type: string;
+  appIdMatches: boolean;
+  profileId: string | null;
+  scopes: string[];
+  granularScopes: Array<{ scope: string; targetIds: string[] }>;
+  expiresAt: number | null;
+  dataAccessExpiresAt: number | null;
+};
 
 function projectRef(value: string) {
   try { return new URL(value).hostname.split('.')[0] ?? ''; } catch { return ''; }
@@ -104,6 +118,30 @@ function appSecretProof(token: string, appSecret: string) {
   return createHmac('sha256', appSecret).update(token, 'utf8').digest('hex');
 }
 
+function strings(value: unknown, limit = 100) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').slice(0, limit)
+    : [];
+}
+
+function pageIds(value: unknown) {
+  if (!Array.isArray(value) || value.length > 100) {
+    if (Array.isArray(value) && value.length > 100) {
+      throw new FacebookProviderError('provider_permission', 'Facebook returned too many authorized Page targets.');
+    }
+    return [];
+  }
+  const ids = value.filter((item): item is string => typeof item === 'string' && /^\d{3,80}$/.test(item));
+  if (ids.length !== value.length) {
+    throw new FacebookProviderError('provider_permission', 'Facebook returned invalid Page authorization metadata.');
+  }
+  return [...new Set(ids)];
+}
+
+function contentPublishingTask(tasks: string[]) {
+  return FACEBOOK_CONTENT_PUBLISHING_TASKS.some(task => tasks.includes(task));
+}
+
 function classifyMetaError(status: number, body: MetaError): FacebookProviderError {
   const code = typeof body.error?.code === 'number' ? body.error.code : null;
   const transient = body.error?.is_transient === true;
@@ -124,6 +162,60 @@ async function metaJson<T>(fetcher: typeof fetch, url: URL, init?: RequestInit):
   try { body = await response.json(); } catch { /* sanitized below */ }
   if (!response.ok || !body || typeof body !== 'object') throw classifyMetaError(response.status, (body ?? {}) as MetaError);
   return body as T;
+}
+
+export async function debugFacebookAccessToken(
+  config: FacebookMarketingConfig,
+  token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<FacebookTokenDebug> {
+  const url = new URL(`https://graph.facebook.com/${config.graphApiVersion}/debug_token`);
+  url.searchParams.set('input_token', token);
+  const body = await metaJson<{ data?: unknown }>(fetcher, url, {
+    headers: { Authorization: `Bearer ${config.appId}|${config.appSecret}` },
+  });
+  if (!body.data || typeof body.data !== 'object') {
+    throw new FacebookProviderError('provider_auth', 'Facebook token metadata could not be validated.');
+  }
+  const data = body.data as Record<string, unknown>;
+  const granularScopes = Array.isArray(data.granular_scopes)
+    ? data.granular_scopes.flatMap(item => {
+      if (!item || typeof item !== 'object') return [];
+      const scope = (item as Record<string, unknown>).scope;
+      if (typeof scope !== 'string') return [];
+      return [{ scope, targetIds: pageIds((item as Record<string, unknown>).target_ids) }];
+    })
+    : [];
+  return {
+    isValid: data.is_valid === true,
+    type: typeof data.type === 'string' ? data.type : '',
+    appIdMatches: data.app_id === config.appId,
+    profileId: typeof data.profile_id === 'string' && /^\d{3,80}$/.test(data.profile_id) ? data.profile_id : null,
+    scopes: strings(data.scopes).sort(),
+    granularScopes,
+    expiresAt: typeof data.expires_at === 'number' && Number.isFinite(data.expires_at) ? data.expires_at : null,
+    dataAccessExpiresAt: typeof data.data_access_expires_at === 'number' && Number.isFinite(data.data_access_expires_at)
+      ? data.data_access_expires_at
+      : null,
+  };
+}
+
+export function authorizedFacebookPageTargets(debug: FacebookTokenDebug) {
+  if (!debug.isValid || debug.type !== 'USER' || !debug.appIdMatches) return [];
+  const targetsByPermission = new Map<string, Set<string>>();
+  for (const permission of FACEBOOK_REQUIRED_PERMISSIONS) {
+    const targets = new Set(debug.granularScopes
+      .filter(scope => scope.scope === permission)
+      .flatMap(scope => scope.targetIds));
+    if (!debug.scopes.includes(permission) || targets.size === 0) return [];
+    targetsByPermission.set(permission, targets);
+  }
+  const [first, ...rest] = FACEBOOK_REQUIRED_PERMISSIONS.map(permission => targetsByPermission.get(permission)!);
+  const intersection = [...first].filter(target => rest.every(targets => targets.has(target))).sort();
+  if (intersection.length > 100) {
+    throw new FacebookProviderError('provider_permission', 'Facebook returned too many authorized Page targets.');
+  }
+  return intersection;
 }
 
 async function tokenExchange(fetcher: typeof fetch, config: FacebookMarketingConfig, params: Record<string, string>) {
@@ -192,25 +284,50 @@ export async function discoverFacebookPages(
     : [];
   const requiredGranted = FACEBOOK_REQUIRED_PERMISSIONS.every(permission => granted.includes(permission));
 
+  const debug = await debugFacebookAccessToken(config, userAccessToken, fetcher);
+  if (!debug.isValid || debug.type !== 'USER' || !debug.appIdMatches) {
+    throw new FacebookProviderError('provider_auth', 'Facebook returned an invalid User access token.');
+  }
+  const authorizedTargets = new Set(authorizedFacebookPageTargets(debug));
+
   const pagesUrl = new URL(`https://graph.facebook.com/${config.graphApiVersion}/me/accounts`);
   pagesUrl.searchParams.set('fields', 'id,name,access_token,tasks');
   pagesUrl.searchParams.set('limit', '100');
   pagesUrl.searchParams.set('appsecret_proof', proof);
   const pagesBody = await metaJson<{ data?: unknown; paging?: unknown }>(fetcher, pagesUrl, auth);
   const rawPages = Array.isArray(pagesBody.data) ? pagesBody.data : [];
-  const pages = rawPages.flatMap(item => {
-    if (!item || typeof item !== 'object') return [];
+  const pages = new Map<string, { safe: FacebookPageCandidate; accessToken: string }>();
+  for (const item of rawPages) {
+    if (!item || typeof item !== 'object') continue;
     const page = item as Record<string, unknown>;
     if (typeof page.id !== 'string' || !/^\d{3,80}$/.test(page.id)
       || typeof page.name !== 'string' || page.name.trim().length === 0 || page.name.length > 200
-      || typeof page.access_token !== 'string' || page.access_token.length < 20) return [];
-    const tasks = Array.isArray(page.tasks) ? page.tasks.filter((task): task is string => typeof task === 'string').slice(0, 30) : [];
-    return [{
-      safe: { page_id: page.id, page_name: page.name.trim(), tasks, eligible: requiredGranted && tasks.includes(FACEBOOK_REQUIRED_PAGE_TASK) } satisfies FacebookPageCandidate,
+      || typeof page.access_token !== 'string' || page.access_token.length < 20
+      || !authorizedTargets.has(page.id)) continue;
+    const tasks = strings(page.tasks, 30);
+    if (tasks.length === 0) continue;
+    pages.set(page.id, {
+      safe: { page_id: page.id, page_name: page.name.trim(), tasks, eligible: requiredGranted && contentPublishingTask(tasks) },
       accessToken: page.access_token,
-    }];
-  });
-  return { providerUserId: me.id, grantedPermissions: granted.sort(), pages };
+    });
+  }
+
+  for (const pageId of authorizedTargets) {
+    if (pages.has(pageId)) continue;
+    const pageUrl = new URL(`https://graph.facebook.com/${config.graphApiVersion}/${pageId}`);
+    pageUrl.searchParams.set('fields', 'id,name,access_token');
+    pageUrl.searchParams.set('appsecret_proof', proof);
+    const page = await metaJson<{ id?: unknown; name?: unknown; access_token?: unknown }>(fetcher, pageUrl, auth);
+    if (page.id !== pageId || typeof page.name !== 'string' || page.name.trim().length === 0 || page.name.length > 200
+      || typeof page.access_token !== 'string' || page.access_token.length < 20) {
+      throw new FacebookProviderError('provider_permission', 'Facebook could not resolve an authorized Page target.');
+    }
+    pages.set(pageId, {
+      safe: { page_id: pageId, page_name: page.name.trim(), tasks: [], eligible: requiredGranted },
+      accessToken: page.access_token,
+    });
+  }
+  return { providerUserId: me.id, grantedPermissions: granted.sort(), pages: [...pages.values()] };
 }
 
 export async function validateFacebookPage(
@@ -219,20 +336,24 @@ export async function validateFacebookPage(
   pageAccessToken: string,
   fetcher: typeof fetch = fetch,
 ) {
+  const debug = await debugFacebookAccessToken(config, pageAccessToken, fetcher);
+  if (!debug.isValid || debug.type !== 'PAGE' || !debug.appIdMatches || debug.profileId !== pageId) {
+    throw new FacebookProviderError('provider_auth', 'Facebook Page token identity could not be validated.');
+  }
+  if (!FACEBOOK_REQUIRED_PERMISSIONS.every(permission => debug.scopes.includes(permission)
+    && debug.granularScopes.some(scope => scope.scope === permission && scope.targetIds.includes(pageId)))) {
+    throw new FacebookProviderError('provider_permission', 'The selected Facebook Page does not grant content publishing authority.');
+  }
   const url = new URL(`https://graph.facebook.com/${config.graphApiVersion}/${pageId}`);
-  url.searchParams.set('fields', 'id,name,tasks');
+  url.searchParams.set('fields', 'id,name');
   url.searchParams.set('appsecret_proof', appSecretProof(pageAccessToken, config.appSecret));
-  const body = await metaJson<{ id?: unknown; name?: unknown; tasks?: unknown }>(fetcher, url, {
+  const body = await metaJson<{ id?: unknown; name?: unknown }>(fetcher, url, {
     headers: { Authorization: `Bearer ${pageAccessToken}` },
   });
   if (body.id !== pageId || typeof body.name !== 'string' || body.name.trim().length === 0) {
     throw new FacebookProviderError('provider_auth', 'Facebook Page identity could not be validated.');
   }
-  const tasks = Array.isArray(body.tasks) ? body.tasks.filter((task): task is string => typeof task === 'string') : [];
-  if (!tasks.includes(FACEBOOK_REQUIRED_PAGE_TASK)) {
-    throw new FacebookProviderError('provider_permission', 'The selected Facebook Page does not grant content publishing authority.');
-  }
-  return { pageId, pageName: body.name.trim(), tasks };
+  return { pageId, pageName: body.name.trim(), tasks: [] as string[] };
 }
 
 export function validateFacebookText(body: string) {

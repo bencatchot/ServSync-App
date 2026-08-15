@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037A granular Facebook Page discovery correction
+
+- Branch: `codex/fb037a-granular-page-discovery-v1`.
+- Starting main SHA: `7af08a18ddd361ec7b85475ec0265f0bdc47ac35`.
+- Files changed: server-side Meta token diagnostics and Page discovery/selection validation; a narrow completion/recheck compatibility patch; focused server/SQL tests and validator coverage; Facebook connection runbook; rollout ledger; FB-037 backlog/master-plan governance; and this changelog.
+- Summary of change: Uses the intersection of the three required `/debug_token` granular Page target sets as the authoritative candidate allowlist. `/me/accounts` remains supported, including exact modern publishing task values, but an omitted target can be resolved only by its provider-proved ID through the direct `id,name,access_token` Page contract. The resulting Page token must independently match the ServSync App, `PAGE` type, exact Page profile, all required scopes, and all granular targets before explicit owner selection can complete.
+- Production finding and cleanup: A second real owner consent using the reviewed User-token configuration produced a valid User token with all three required scopes and granular targets containing only ServSync Page `1199023349954773`. `/me/accounts` returned zero rows; direct exact-Page resolution and Page-token validation succeeded. The failed session and its transient Vault token were removed. Production returned to `setup_required` with no selected Page, durable token, publication, event, provider post, or public request.
+- Rollout: Exact patch `servsync-facebook-granular-page-discovery.sql` (SHA-256 `6942190b49fdbdcc744838fd1d8ae067d5812f035a50a166d51c99337efc6747`) was applied Sandbox -> Demo -> Production. All environments retained service-only helper execution, `setup_required`, publishing disabled, and zero Facebook token/session/publication residue. Production preserved 16 content records, three packages, and 34 status events.
+- Tests/checks run: 21 Facebook connection tests; six provider-publishing tests; 16 backend-parity tests; disposable PostgreSQL Vault/lifecycle validation; TypeScript; Production build; focused lint attempt; Markdown-link, sensitive-value, rollout-ledger, and diff checks; plus exact live postflight in all three environments.
+- Known risks or follow-ups: Meta may continue omitting a valid Business Login asset from `/me/accounts`; the correction deliberately trusts only the exact granular intersection and separately validated direct Page token. One corrected owner consent and explicit Page selection remain required. Public posting stays disabled by both the database capability and absent/false environment gate; no post is authorized by this change.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the provider compatibility correction and keeps corrected owner consent/Page selection plus first separately authorized post as active gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Corrects the live provider-discovery contract without changing provider ownership, owner approval, or public-post authority.
+
 ## 2026-08-15 - FB-037A Facebook Login for Business configuration correction
 
 - Branch: `codex/fb037a-facebook-business-login-config-v1`.
