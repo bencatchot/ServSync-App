@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runDemoCommand } from './seed-demo-scenario.mjs';
 import { contractorCreateEstimateScenario } from './recorder/scenarios/contractor-create-estimate.mjs';
+import { homeownerHomeHistoryScenario } from './recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from './recorder/scenarios/homeowner-service-request.mjs';
 import {
   assertRecordingDuration,
@@ -22,6 +23,7 @@ import {
 const scenarios = new Map([
   [homeownerServiceRequestScenario.key, homeownerServiceRequestScenario],
   [contractorCreateEstimateScenario.key, contractorCreateEstimateScenario],
+  [homeownerHomeHistoryScenario.key, homeownerHomeHistoryScenario],
 ]);
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -181,6 +183,16 @@ async function probeVideoDuration(browser, videoPath) {
   } finally {
     await new Promise((done) => server.close(done));
   }
+}
+
+async function renderFirstPdfPage(pdfPath, outputBasePath) {
+  const result = spawnSync('pdftoppm', ['-png', '-f', '1', '-singlefile', '-r', '110', pdfPath, outputBasePath], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    throw new Error(`Unable to render the downloaded finalized report: ${result.stderr.trim() || 'pdftoppm failed'}`);
+  }
+  return `${outputBasePath}.png`;
 }
 
 function sourceCommit() {
@@ -561,6 +573,206 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
   }
 }
 
+async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName, headed }) {
+  const pacing = pacingFor(pacingName);
+  const target = assertSafeRecorderEnvironment(env, scenario);
+  const homeowner = {
+    email: required(env, 'DEMO_HOMEOWNER_EMAIL'),
+    password: required(env, 'DEMO_HOMEOWNER_PASSWORD'),
+  };
+  required(env, 'DEMO_SUPABASE_ANON_KEY');
+  required(env, 'DEMO_SUPABASE_SERVICE_ROLE_KEY');
+  env.DEMO_MODE_ENABLED = 'true';
+  env.DEMO_SUPABASE_PROJECT_REF = target.projectRef;
+  env.DEMO_SUPABASE_URL = target.supabaseUrl;
+
+  const seed = await runDemoCommand(
+    ['seed', scenario.fixtureScenarioKey, `--checkpoint=${scenario.initialCheckpoint}`],
+    env,
+  );
+  if (seed.verification?.ok !== true) {
+    throw new Error('Demo recorder setup did not reach its verified Home History checkpoint.');
+  }
+
+  const browser = await chromium.launch({ headless: !headed });
+  const errors = [];
+  let recordedContext;
+  let finalPath = null;
+  let completed = false;
+  const stagingDir = resolve(outputDir, '.staging', crypto.randomUUID());
+  try {
+    const authContext = await browser.newContext({ viewport: scenario.viewport });
+    const authPage = await authContext.newPage();
+    await login(authPage, target.appUrl, 'homeowner', homeowner, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '');
+    await authPage.getByRole('heading', { level: 1, name: /^Dashboard$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await wait(500);
+    const initialFrame = await authPage.screenshot({ type: 'png' });
+    const storageState = await authContext.storageState();
+    await authContext.close();
+
+    await mkdir(outputDir, { recursive: true });
+    await mkdir(stagingDir, { recursive: true });
+    recordedContext = await browser.newContext({
+      viewport: scenario.viewport,
+      storageState,
+      acceptDownloads: true,
+      recordVideo: { dir: stagingDir, size: scenario.viewport },
+    });
+    await recordedContext.addInitScript((src) => {
+      const install = () => {
+        document.getElementById('servsync-recorder-freeze')?.remove();
+        const freeze = document.createElement('img');
+        freeze.id = 'servsync-recorder-freeze';
+        freeze.alt = '';
+        freeze.src = src;
+        freeze.style.cssText = 'position:fixed;inset:0;z-index:2147483645;width:100vw;height:100vh;object-fit:cover;pointer-events:none';
+        document.body.append(freeze);
+      };
+      if (document.body) install();
+      else document.addEventListener('DOMContentLoaded', install, { once: true });
+    }, `data:image/png;base64,${initialFrame.toString('base64')}`);
+    const page = await recordedContext.newPage();
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) {
+        errors.push(`console.error: ${message.text()}`);
+      }
+    });
+    page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+    page.on('response', (response) => {
+      if (response.status() >= 500) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
+    });
+
+    await page.goto(pageUrl(target.appUrl, 'homeowner', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || ''), {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.getByRole('button', { name: /^Properties$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await page.getByRole('heading', { level: 1, name: /^Dashboard$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await installRecorderOverlays(page);
+    await setCaption(page, scenario.scenes[0].caption);
+    await removeFreezeFrame(page);
+    await wait(pacing.initialHold);
+
+    await moveAndClick(page, page.getByRole('button', { name: /^Properties$/i }).first(), pacing);
+    await page.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i }).waitFor({ state: 'visible' });
+    const homeCard = page.getByRole('button').filter({ hasText: scenario.property.nickname }).first();
+    await moveAndClick(page, homeCard, pacing);
+    await wait(1600);
+
+    await setCaption(page, scenario.scenes[1].caption);
+    await moveAndClick(page, page.getByRole('button', { name: /^Home History$/i }).first(), pacing);
+    await page.getByRole('heading', { level: 1, name: /^Home History$/i }).waitFor({ state: 'visible' });
+    const historyCard = page
+      .getByTestId('home-history-entry-card')
+      .filter({ hasText: scenario.finalState.homeHistoryTitle })
+      .first();
+    await historyCard.waitFor({ state: 'visible', timeout: 30_000 });
+    await historyCard.scrollIntoViewIfNeeded();
+    const historyText = await historyCard.innerText();
+    if (!historyText.includes(scenario.finalState.contractorLabel)) {
+      throw new Error('Home History scene did not show the expected fictional contractor lineage.');
+    }
+    await wait(2100);
+
+    await setCaption(page, scenario.scenes[2].caption);
+    const reportPath = resolve(stagingDir, 'finalized-report.pdf');
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20_000 }),
+      moveAndClick(page, historyCard.getByRole('button', { name: /^View report$/i }), pacing),
+    ]);
+    await download.saveAs(reportPath);
+    if (download.suggestedFilename() !== scenario.finalState.reportFileName) {
+      throw new Error('Downloaded report file name does not match the finalized fixture contract.');
+    }
+    const reportBytes = await readFile(reportPath);
+    if (reportBytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
+      throw new Error('Downloaded finalized report is not a readable PDF artifact.');
+    }
+    const reportText = reportBytes.toString('latin1');
+    if (!reportText.includes('Completed Water Heater Work Report') || !reportText.includes('Fictional demo record')) {
+      throw new Error('Downloaded finalized report does not match the expected fictional Demo content.');
+    }
+    const reportPngPath = await renderFirstPdfPage(reportPath, resolve(stagingDir, 'finalized-report'));
+    const reportPng = await readFile(reportPngPath);
+    await page.evaluate((src) => {
+      const viewer = document.createElement('main');
+      viewer.setAttribute('aria-label', 'Finalized work report preview');
+      viewer.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#e2e8f0;padding:24px 24px 86px;overflow:hidden';
+      const pageImage = document.createElement('img');
+      pageImage.alt = 'Completed Water Heater Work Report';
+      pageImage.src = src;
+      pageImage.style.cssText = 'display:block;max-width:100%;max-height:100%;object-fit:contain;background:white;box-shadow:0 16px 44px rgba(15,23,42,.22)';
+      viewer.append(pageImage);
+      document.body.replaceChildren(viewer);
+      document.body.style.margin = '0';
+    }, `data:image/png;base64,${reportPng.toString('base64')}`);
+    await installRecorderOverlays(page);
+    await setCaption(page, scenario.scenes[2].caption);
+    await wait(pacing.finalHold);
+
+    const visibleText = `${historyText}\n${await page.locator('body').innerText()}\n${reportText}`;
+    const sensitiveIssues = scanVisibleTextForSensitiveData(visibleText, {
+      'homeowner email': homeowner.email,
+      'homeowner password': homeowner.password,
+      'contractor email': env.DEMO_CONTRACTOR_EMAIL,
+      'contractor password': env.DEMO_CONTRACTOR_PASSWORD,
+    });
+    if (sensitiveIssues.length > 0) throw new Error(sensitiveIssues.join(' '));
+    if (errors.length > 0) throw new Error(`Recording encountered browser errors:\n${errors.join('\n')}`);
+
+    const verification = await runDemoCommand(
+      ['verify', scenario.fixtureScenarioKey, `--checkpoint=${scenario.finalCheckpoint}`],
+      env,
+    );
+    if (verification.verification?.ok !== true) {
+      throw new Error('Home History fixture changed during the read-only recording.');
+    }
+
+    const video = page.video();
+    if (!video) throw new Error('Playwright did not initialize WebM recording.');
+    await recordedContext.close();
+    recordedContext = null;
+    const sourcePath = await video.path();
+    const createdAt = new Date().toISOString();
+    const timestamp = createdAt.replace(/[:.]/g, '-');
+    finalPath = resolve(outputDir, `${scenario.outputBaseName}-${timestamp}.webm`);
+    await rename(sourcePath, finalPath);
+    const fileStat = await stat(finalPath);
+    if (fileStat.size <= 0) throw new Error('Recorded WebM artifact is empty.');
+    const durationSeconds = await probeVideoDuration(browser, finalPath);
+    assertRecordingDuration(durationSeconds, scenario.expectedDurationSeconds);
+    const metadata = buildArtifactMetadata({
+      scenario,
+      sourceCommit: sourceCommit(),
+      pacing: pacingName,
+      durationSeconds,
+      fileName: basename(finalPath),
+      createdAt,
+    });
+    const metadataPath = finalPath.replace(/\.webm$/i, '.json');
+    await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+    completed = true;
+
+    return {
+      success: true,
+      scenario: scenario.key,
+      environment: scenario.environment.name,
+      projectRef: scenario.environment.projectRef,
+      artifact: finalPath,
+      metadata: metadataPath,
+      durationSeconds: metadata.duration_seconds,
+      viewport: scenario.viewport,
+      finalCheckpoint: scenario.finalCheckpoint,
+      fixturePolicy: metadata.fixture_policy,
+      sensitiveData: 'none detected',
+    };
+  } finally {
+    if (recordedContext) await recordedContext.close().catch(() => {});
+    await browser.close();
+    await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    if (!completed && finalPath) await unlink(finalPath).catch(() => {});
+  }
+}
+
 export async function runRecorder(argv = process.argv.slice(2), processEnv = process.env) {
   const env = loadKnownLocalEnv({ ...processEnv });
   const args = parseRecorderArgs(argv);
@@ -570,6 +782,9 @@ export async function runRecorder(argv = process.argv.slice(2), processEnv = pro
   const outputDir = resolve(args.outputDir || env.DEMO_RECORDING_OUTPUT_DIR || 'demo-recordings');
   if (scenario.key === homeownerServiceRequestScenario.key) {
     return recordHomeownerServiceRequest({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
+  }
+  if (scenario.key === homeownerHomeHistoryScenario.key) {
+    return recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
   }
   return recordContractorCreateEstimate({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
 }

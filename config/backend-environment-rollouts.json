@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-13",
+  "updatedOn": "2026-08-15",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -522,6 +522,24 @@
         "demo": {
           "status": "Applied",
           "reason": "Exact reviewed migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-13 from 13:49:54Z through 13:49:56Z. The first authenticated post-migration attempt stopped on a stale local contractor alias/credential. On 2026-08-13 the exact demo-owned contractor and homeowner fixture identities were reverified against scenario metadata and ownership, their approved local credentials were rotated through the established Supabase Admin Auth operation, and normal password grants passed without exposing secrets. Rollback-only validation then passed Owner/Admin/Office allow; Field Technician/Viewer/inactive/cross-tenant/homeowner mutation denial; connected send; customer-scoped read; actor attribution; and pre-acceptance Invoice denial. Probe auth and business residue returned to zero. Catalog fingerprint eb502cbc03aa7c58987d3b6fb31e3511, zero Estimate/line/schedule/launch/link/activity/audit counts, and business fingerprint 43844d59220756db572e31cdafd41ac8 remained exact."
+        }
+      }
+    },
+    {
+      "id": "demo-recorder-home-history-fixture-registry-v1",
+      "artifact": "servsync-demo-recorder-home-history-fixture-registry.sql (SHA-256 46ef3ce079c1e02d08f4fe7fab233863801708bef57999c0162b6b6aadca41c8)",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder infrastructure only; no Sandbox SQL was authorized or applied."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder infrastructure only; no Production SQL was authorized or applied."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 46ef3ce079c1e02d08f4fe7fab233863801708bef57999c0162b6b6aadca41c8 was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-15. It adds only exact-row reset ownership for home_maintenance_log and home_documents at dependency-safe priorities 119 and 118; browser roles remain denied, service_role remains the sole helper executor, and preflight had zero report/history rows and zero home-documents Storage objects."
         }
       }
     }

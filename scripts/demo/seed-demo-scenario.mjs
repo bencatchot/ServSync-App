@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { jsPDF } from 'jspdf';
 import {
   checkpointByKey,
   dateOffsets,
@@ -67,6 +69,8 @@ const DEMO_AUTH_METADATA = {
 };
 const RESETTABLE_PRIMARY_KEYS = {
   workflow_activity_events: 'id',
+  home_maintenance_log: 'id',
+  home_documents: 'id',
   notifications: 'id',
   contractor_visit_events: 'id',
   job_work_items: 'id',
@@ -83,6 +87,12 @@ const RESETTABLE_PRIMARY_KEYS = {
   home_rooms: 'id',
   homes: 'id',
 };
+const FINALIZED_REPORT_BUCKET = 'home-documents';
+const FINALIZED_REPORT_RECORD_ROLES = Object.freeze({
+  document: 'demo_finalized_report_document',
+  history: 'demo_home_history_entry',
+  notification: 'demo_finalized_report_notification',
+});
 const REQUIRED_SCENARIO_TABLES = [
   'homes',
   'home_rooms',
@@ -487,7 +497,7 @@ async function getRegisteredRecordsForRun(service, runId) {
   return ensureOk(
     await service
       .from('demo_scenario_records')
-      .select('id, run_id, schema_name, table_name, primary_key_column, record_id, record_role, checkpoint, reset_order')
+      .select('id, run_id, schema_name, table_name, primary_key_column, record_id, record_role, checkpoint, reset_order, metadata')
       .eq('run_id', runId)
       .order('reset_order', { ascending: false }),
     'Unable to inspect registered demo records'
@@ -670,13 +680,198 @@ async function inspectNonResetRuns(service, scenarioKey) {
   return inspected;
 }
 
+export function validateFinalizedReportStoragePath(storagePath, homeownerId, jobId) {
+  const path = String(storagePath || '');
+  const expectedPrefix = `${homeownerId}/field-work/${jobId}/`;
+  const fileName = path.startsWith(expectedPrefix) ? path.slice(expectedPrefix.length) : '';
+  if (
+    !homeownerId ||
+    !jobId ||
+    path.includes('..') ||
+    !path.startsWith(expectedPrefix) ||
+    fileName.includes('/') ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i.test(fileName)
+  ) {
+    throw new Error('Finalized-report Storage cleanup refused: registered path is outside the canonical homeowner field-work contract.');
+  }
+  return { bucket: FINALIZED_REPORT_BUCKET, path, folder: expectedPrefix.slice(0, -1), fileName };
+}
+
+function exactlyOneRegisteredReportRecord(run, tableName, role) {
+  const matches = run.records.filter((record) => record.table_name === tableName && record.record_role === role);
+  if (matches.length !== 1) {
+    throw new Error(`Finalized-report reset refused: expected exactly one registered ${tableName}/${role}, found ${matches.length}.`);
+  }
+  return matches[0];
+}
+
+export function resolveFinalizedReportRegistryRecords(run) {
+  return {
+    documentRecord: exactlyOneRegisteredReportRecord(
+      run,
+      'home_documents',
+      FINALIZED_REPORT_RECORD_ROLES.document
+    ),
+    historyRecord: exactlyOneRegisteredReportRecord(
+      run,
+      'home_maintenance_log',
+      FINALIZED_REPORT_RECORD_ROLES.history
+    ),
+    notificationRecord: exactlyOneRegisteredReportRecord(
+      run,
+      'notifications',
+      FINALIZED_REPORT_RECORD_ROLES.notification
+    ),
+  };
+}
+
+async function exactStorageObject(service, storage) {
+  const objects = await ensureOk(
+    await service.storage.from(storage.bucket).list(storage.folder, { limit: 100, search: storage.fileName }),
+    'Unable to inspect the registered finalized-report Storage object'
+  );
+  return (objects || []).filter((object) => object.name === storage.fileName);
+}
+
+async function persistStorageCleanupState(service, run, state, storage, extra = {}) {
+  const metadata = {
+    ...(run.metadata || {}),
+    report_storage_cleanup: {
+      state,
+      bucket: storage.bucket,
+      path: storage.path,
+      ...extra,
+    },
+  };
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ metadata }).eq('id', run.id),
+    'Unable to persist finalized-report Storage cleanup state'
+  );
+  run.metadata = metadata;
+}
+
+async function cleanupRegisteredFinalizedReportStorage(service, run) {
+  const checkpoint = run.checkpoint || run.metadata?.selected_checkpoint;
+  const reportRecords = run.records.filter((record) =>
+    ['home_documents', 'home_maintenance_log'].includes(record.table_name) ||
+    record.record_role === FINALIZED_REPORT_RECORD_ROLES.notification
+  );
+  if (reportRecords.length === 0) {
+    if (run.metadata?.report_storage_path || run.metadata?.report_storage_cleanup) {
+      throw new Error('Finalized-report reset refused: run metadata claims Storage ownership without registered report artifacts.');
+    }
+    return null;
+  }
+  if (checkpoint !== 'home_history_updated') {
+    throw new Error('Finalized-report reset refused: registered report artifacts belong to a non-report checkpoint.');
+  }
+
+  const { documentRecord, historyRecord, notificationRecord } = resolveFinalizedReportRegistryRecords(run);
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const jobId = run.metadata?.job_id;
+  const requestId = run.metadata?.service_request_id;
+  const registeredPath = documentRecord.metadata?.storage_path;
+  const registeredBucket = documentRecord.metadata?.storage_bucket;
+  if (registeredBucket !== FINALIZED_REPORT_BUCKET) {
+    throw new Error('Finalized-report Storage cleanup refused: registered bucket is missing or foreign.');
+  }
+  const storage = validateFinalizedReportStoragePath(registeredPath, homeownerId, jobId);
+
+  const [documents, historyRows, notifications] = await Promise.all([
+    ensureOk(
+      await service
+        .from('home_documents')
+        .select('id, homeowner_user_id, storage_path, content_type, document_type, file_size_bytes')
+        .eq('homeowner_user_id', homeownerId)
+        .eq('storage_path', storage.path),
+      'Unable to inspect the registered finalized-report document'
+    ),
+    ensureOk(
+      await service
+        .from('home_maintenance_log')
+        .select('id, homeowner_user_id, inspection_id, service_request_id, report_document_id')
+        .eq('inspection_id', jobId),
+      'Unable to inspect the registered Home History row'
+    ),
+    ensureOk(
+      await service
+        .from('notifications')
+        .select('id, user_id, type, request_id')
+        .eq('user_id', homeownerId)
+        .eq('type', 'inspection_report_filed')
+        .eq('request_id', requestId),
+      'Unable to inspect the registered finalized-report notification'
+    ),
+  ]);
+  if (documents.length !== 1 || documents[0].id !== documentRecord.record_id) {
+    throw new Error(`Finalized-report reset refused: expected one exact report document, found ${documents.length}.`);
+  }
+  if (
+    documents[0].content_type !== 'application/pdf' ||
+    documents[0].document_type !== 'inspection' ||
+    historyRows.length !== 1 ||
+    historyRows[0].id !== historyRecord.record_id ||
+    historyRows[0].report_document_id !== documentRecord.record_id ||
+    historyRows[0].homeowner_user_id !== homeownerId ||
+    historyRows[0].service_request_id !== requestId
+  ) {
+    throw new Error('Finalized-report reset refused: document and Home History ownership lineage is missing or ambiguous.');
+  }
+  if (notifications.length !== 1 || notifications[0].id !== notificationRecord.record_id) {
+    throw new Error(`Finalized-report reset refused: expected one exact notification, found ${notifications.length}.`);
+  }
+
+  const cleanup = run.metadata?.report_storage_cleanup;
+  if (cleanup && (cleanup.bucket !== storage.bucket || cleanup.path !== storage.path)) {
+    throw new Error('Finalized-report Storage cleanup refused: persisted cleanup identity does not match the registered object.');
+  }
+  let matches = await exactStorageObject(service, storage);
+  if (cleanup?.state === 'deleted') {
+    if (matches.length !== 0) {
+      throw new Error('Finalized-report Storage cleanup refused: an object reappeared after verified deletion.');
+    }
+    return { ...storage, status: 'already-deleted' };
+  }
+  if (matches.length === 0 && cleanup?.state !== 'deleting') {
+    throw new Error('Finalized-report Storage cleanup refused: the exact registered object is unexpectedly missing.');
+  }
+  if (matches.length > 1) {
+    throw new Error('Finalized-report Storage cleanup refused: Storage ownership is ambiguous.');
+  }
+  if (matches.length === 1) {
+    const downloaded = await ensureOk(
+      await service.storage.from(storage.bucket).download(storage.path),
+      'Unable to read the exact registered finalized-report object before cleanup'
+    );
+    const sha256 = createHash('sha256').update(Buffer.from(await downloaded.arrayBuffer())).digest('hex');
+    if (documentRecord.metadata?.storage_sha256 !== sha256) {
+      throw new Error('Finalized-report Storage cleanup refused: object SHA-256 does not match registered ownership evidence.');
+    }
+    await persistStorageCleanupState(service, run, 'deleting', storage, { storage_sha256: sha256 });
+    await ensureOk(
+      await service.storage.from(storage.bucket).remove([storage.path]),
+      'Unable to remove the exact registered finalized-report Storage object'
+    );
+  }
+  matches = await exactStorageObject(service, storage);
+  if (matches.length !== 0) {
+    throw new Error('Finalized-report Storage cleanup refused: the exact registered object remains after deletion.');
+  }
+  await persistStorageCleanupState(service, run, 'deleted', storage, {
+    storage_sha256: documentRecord.metadata?.storage_sha256,
+    verified_at: new Date().toISOString(),
+  });
+  return { ...storage, status: 'deleted' };
+}
+
 async function resetRun(service, run) {
+  const finalizedReportStorage = await cleanupRegisteredFinalizedReportStorage(service, run);
   const retainedPropertyGraph = await retainRevisionBackedPropertyGraph(service, run);
   const data = await ensureOk(
     await service.rpc('servsync_demo_reset_registered_run', { p_run_id: run.id }),
     'Unable to reset registered demo records'
   );
-  return { removed: data || [], retainedPropertyGraph };
+  return { removed: data || [], retainedPropertyGraph, finalizedReportStorage };
 }
 
 async function resetNonResetRuns(service, scenarioKey, reason) {
@@ -697,6 +892,7 @@ async function resetNonResetRuns(service, scenarioKey, reason) {
         reconciledRecordingConnections,
         removed: resetResult.removed,
         retainedPropertyGraph: resetResult.retainedPropertyGraph,
+        finalizedReportStorage: resetResult.finalizedReportStorage,
         action: 'reset',
         reason,
       });
@@ -1229,15 +1425,16 @@ async function createEstimateDraft(contractorClient, service, runId, contractorI
   return { estimateId: estimate.id, totalCents };
 }
 
-async function sendEstimate(contractorClient, estimateId, dates) {
+async function sendEstimate(contractorClient, service, estimateId, dates) {
   await ensureOk(
-    await contractorClient
-      .from('estimates')
-      .update({ status: 'sent', updated_at: dates.estimateSentAt })
-      .eq('id', estimateId),
-    'Unable to send demo estimate'
+    await contractorClient.rpc('servsync_send_estimate', { p_estimate_id: estimateId }),
+    'Unable to send demo estimate through servsync_send_estimate'
   );
-  return { estimateId };
+  await ensureOk(
+    await service.from('estimates').update({ updated_at: dates.estimateSentAt }).eq('id', estimateId),
+    'Unable to normalize the Demo Estimate sent timestamp'
+  );
+  return { estimateId, sentAt: dates.estimateSentAt };
 }
 
 async function acceptEstimate(homeownerClient, service, runId, estimateId, dates) {
@@ -1536,6 +1733,217 @@ async function completeDemoJob(contractorClient, service, jobId, contractorUserI
     'Unable to set deterministic demo visit completion date'
   );
   return progress;
+}
+
+function buildDemoFinalizedReportPdf() {
+  const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(20);
+  pdf.text('Completed Water Heater Work Report', 54, 72);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(11);
+  const lines = [
+    'Fictional demo record',
+    'Home: Demo Bay Home',
+    'Contractor: Gulf Coast Home Services',
+    '',
+    'Completed work',
+    'The approved water-heater replacement work was completed and documented.',
+    'The finalized report is available from this home\'s Home History in ServSync.',
+  ];
+  pdf.text(lines, 54, 108, { lineHeightFactor: 1.5 });
+  return Buffer.from(pdf.output('arraybuffer'));
+}
+
+async function finalizeDemoHomeHistoryReport(contractorClient, service, runId, fixture, dates) {
+  const { homeownerId, requestId, jobId } = fixture;
+  const job = await fetchOneByPrimaryKey(
+    service,
+    'inspections',
+    'id',
+    jobId,
+    'id, rooms_with_findings, summary, status, job_status, completed_at, closed_at'
+  );
+  if (!job || job.job_status !== 'completed' || job.status !== 'draft') {
+    throw new Error('Finalized-report fixture refused: the recorder-owned Job is not in the expected completed pre-report state.');
+  }
+  const existingArtifacts = await Promise.all([
+    ensureOk(
+      await service.from('home_maintenance_log').select('id').eq('inspection_id', jobId),
+      'Unable to inspect pre-existing Home History rows'
+    ),
+    ensureOk(
+      await service
+        .from('notifications')
+        .select('id')
+        .eq('user_id', homeownerId)
+        .eq('type', 'inspection_report_filed')
+        .eq('request_id', requestId),
+      'Unable to inspect pre-existing report notifications'
+    ),
+  ]);
+  if (existingArtifacts.some((rows) => rows.length !== 0)) {
+    throw new Error('Finalized-report fixture refused: report history or notification state already exists for the recorder-owned Job.');
+  }
+
+  const reportBytes = buildDemoFinalizedReportPdf();
+  const storagePath = `${homeownerId}/field-work/${jobId}/${randomUUID()}.pdf`;
+  const fileName = 'Demo Bay Home - completed water heater work report.pdf';
+  const storage = validateFinalizedReportStoragePath(storagePath, homeownerId, jobId);
+  const storageSha256 = createHash('sha256').update(reportBytes).digest('hex');
+  const createdIds = [];
+  let uploadSucceeded = false;
+  try {
+    await ensureOk(
+      await contractorClient.storage
+        .from(storage.bucket)
+        .upload(storage.path, reportBytes, { contentType: 'application/pdf', upsert: false }),
+      'Unable to upload the authenticated Demo finalized report'
+    );
+    uploadSucceeded = true;
+
+    await ensureOk(
+      await contractorClient.rpc('servsync_finalize_field_work', {
+        p_inspection_id: jobId,
+        p_rooms_with_findings: job.rooms_with_findings || [],
+        p_summary: 'Water-heater replacement work completed and documented for the homeowner.',
+        p_storage_path: storage.path,
+        p_file_name: fileName,
+        p_file_size_bytes: reportBytes.byteLength,
+      }),
+      'Unable to finalize the Demo report through servsync_finalize_field_work'
+    );
+
+    const [documents, historyRows, notifications] = await Promise.all([
+      ensureOk(
+        await service
+          .from('home_documents')
+          .select('id, homeowner_user_id, storage_path, content_type, document_type, file_size_bytes')
+          .eq('homeowner_user_id', homeownerId)
+          .eq('storage_path', storage.path),
+        'Unable to inspect the finalized Demo report document'
+      ),
+      ensureOk(
+        await service
+          .from('home_maintenance_log')
+          .select('id, homeowner_user_id, inspection_id, service_request_id, report_document_id')
+          .eq('inspection_id', jobId),
+        'Unable to inspect the finalized Demo Home History row'
+      ),
+      ensureOk(
+        await service
+          .from('notifications')
+          .select('id, user_id, type, request_id')
+          .eq('user_id', homeownerId)
+          .eq('type', 'inspection_report_filed')
+          .eq('request_id', requestId),
+        'Unable to inspect the finalized Demo report notification'
+      ),
+    ]);
+    if (documents.length !== 1 || historyRows.length !== 1 || notifications.length !== 1) {
+      throw new Error(
+        `Finalized-report fixture refused: expected one document/history/notification, found ${documents.length}/${historyRows.length}/${notifications.length}.`
+      );
+    }
+    const document = documents[0];
+    const history = historyRows[0];
+    const notification = notifications[0];
+    createdIds.push(
+      ['home_maintenance_log', history.id],
+      ['home_documents', document.id],
+      ['notifications', notification.id]
+    );
+    if (
+      document.homeowner_user_id !== homeownerId ||
+      document.storage_path !== storage.path ||
+      document.content_type !== 'application/pdf' ||
+      document.document_type !== 'inspection' ||
+      history.homeowner_user_id !== homeownerId ||
+      history.inspection_id !== jobId ||
+      history.service_request_id !== requestId ||
+      history.report_document_id !== document.id ||
+      notification.user_id !== homeownerId ||
+      notification.type !== 'inspection_report_filed' ||
+      notification.request_id !== requestId
+    ) {
+      throw new Error('Finalized-report fixture refused: RPC artifacts do not have the exact expected lineage.');
+    }
+
+    await registerRecord(
+      service,
+      runId,
+      'home_maintenance_log',
+      history.id,
+      FINALIZED_REPORT_RECORD_ROLES.history,
+      'home_history_updated',
+      { source_rpc: 'servsync_finalize_field_work', inspection_id: jobId, report_document_id: document.id }
+    );
+    await registerRecord(
+      service,
+      runId,
+      'home_documents',
+      document.id,
+      FINALIZED_REPORT_RECORD_ROLES.document,
+      'home_history_updated',
+      {
+        source_rpc: 'servsync_finalize_field_work',
+        storage_bucket: storage.bucket,
+        storage_path: storage.path,
+        storage_sha256: storageSha256,
+      }
+    );
+    await registerRecord(
+      service,
+      runId,
+      'notifications',
+      notification.id,
+      FINALIZED_REPORT_RECORD_ROLES.notification,
+      'home_history_updated',
+      { source_rpc: 'servsync_finalize_field_work', inspection_id: jobId, request_id: requestId }
+    );
+
+    return {
+      reportDocumentId: document.id,
+      homeHistoryId: history.id,
+      notificationId: notification.id,
+      reportStorageBucket: storage.bucket,
+      reportStoragePath: storage.path,
+      reportStorageSha256: storageSha256,
+      reportFileName: fileName,
+      reportFileSizeBytes: reportBytes.byteLength,
+      reportFinalizedAt: dates.jobCompletedAt,
+    };
+  } catch (error) {
+    for (const [tableName, recordId] of createdIds) {
+      await service.from(tableName).delete().eq('id', recordId).catch(() => {});
+    }
+    if (createdIds.length > 0) {
+      await service
+        .from('demo_scenario_records')
+        .delete()
+        .eq('run_id', runId)
+        .in('record_id', createdIds.map(([, recordId]) => recordId))
+        .catch(() => {});
+    }
+    if (uploadSucceeded) {
+      await service.storage.from(storage.bucket).remove([storage.path]).catch(() => {});
+    }
+    await service
+      .from('inspections')
+      .update({
+        status: 'draft',
+        job_status: 'completed',
+        completed_at: job.completed_at,
+        closed_at: job.closed_at,
+        report_storage_path: null,
+        report_file_name: null,
+        summary: job.summary,
+        updated_at: dates.jobCompletedAt,
+      })
+      .eq('id', jobId)
+      .catch(() => {});
+    throw error;
+  }
 }
 
 function notificationHandlingDecision() {
@@ -1874,6 +2282,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const requiresJobInProgress = checkpointRequires(checkpointKey, 'jobInProgress');
   const requiresJobReviewReady = checkpointRequires(checkpointKey, 'jobReviewReady');
   const requiresJobCompleted = checkpointRequires(checkpointKey, 'jobCompleted');
+  const requiresHomeHistory = checkpointRequires(checkpointKey, 'homeHistoryUpdated');
 
   const records = run.records;
   const counts = countBy(records, 'table_name');
@@ -1904,6 +2313,13 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   }
   if (requiresJobScheduled && !counts.contractor_visit_events) {
     issues.push('Job-scheduled checkpoint requires a registered contractor visit event.');
+  }
+  if (requiresHomeHistory) {
+    for (const tableName of ['home_maintenance_log', 'home_documents', 'notifications']) {
+      if (counts[tableName] !== 1) {
+        issues.push(`Home History checkpoint requires exactly one registered ${tableName} record, found ${counts[tableName] || 0}.`);
+      }
+    }
   }
   for (const tableName of requiredTables) {
     if (!counts[tableName]) {
@@ -2017,6 +2433,15 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const jobIds = recordIds(records, 'inspections', 'demo_job');
   const visitEventIds = recordIds(records, 'contractor_visit_events', 'demo_contractor_visit_event');
   const jobWorkItemIds = recordIds(records, 'job_work_items', 'demo_job_work_item');
+  const reportDocumentId = requiresHomeHistory
+    ? requireExactlyOneId(issues, records, 'home_documents', FINALIZED_REPORT_RECORD_ROLES.document, 'finalized report document')
+    : null;
+  const homeHistoryId = requiresHomeHistory
+    ? requireExactlyOneId(issues, records, 'home_maintenance_log', FINALIZED_REPORT_RECORD_ROLES.history, 'Home History entry')
+    : null;
+  const reportNotificationId = requiresHomeHistory
+    ? requireExactlyOneId(issues, records, 'notifications', FINALIZED_REPORT_RECORD_ROLES.notification, 'finalized report notification')
+    : null;
   let estimateId = null;
   let jobId = null;
   if (requiresEstimate) {
@@ -2120,10 +2545,28 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const homeHistoryRows =
     homeHistoryClauses.length > 0
       ? await ensureOk(
-          await service.from('home_maintenance_log').select('id, inspection_id, service_request_id').or(homeHistoryClauses.join(',')),
+          await service
+            .from('home_maintenance_log')
+            .select('id, homeowner_user_id, inspection_id, service_request_id, report_document_id')
+            .or(homeHistoryClauses.join(',')),
           'Unable to inspect deferred demo Home History rows'
         )
       : [];
+  const reportDocuments = reportDocumentId
+    ? await ensureOk(
+        await service
+          .from('home_documents')
+          .select('id, homeowner_user_id, storage_path, file_name, file_size_bytes, content_type, document_type')
+          .eq('id', reportDocumentId),
+        'Unable to inspect the Demo finalized-report document'
+      )
+    : [];
+  const reportNotifications = reportNotificationId
+    ? await ensureOk(
+        await service.from('notifications').select('id, user_id, type, request_id').eq('id', reportNotificationId),
+        'Unable to inspect the Demo finalized-report notification'
+      )
+    : [];
   const scenarioConnections = homeownerUser && contractor
     ? await ensureOk(
         await service
@@ -2295,8 +2738,11 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     if (job.closed_at) {
       issues.push('Demo job lifecycle checkpoints must not close the job.');
     }
-    if (job.report_storage_path || job.report_file_name) {
+    if (!requiresHomeHistory && (job.report_storage_path || job.report_file_name)) {
       issues.push('Demo job lifecycle checkpoints must not create or attach finalized report files.');
+    }
+    if (requiresHomeHistory && (!job.report_storage_path || !job.report_file_name || job.status !== 'finalized')) {
+      issues.push('Home History checkpoint requires one finalized Job report path and file name.');
     }
   } else if (jobWorkItems.length > 0 || visitEvents.length > 0) {
     issues.push(`Checkpoint ${checkpointKey} should not have job work items or visit events.`);
@@ -2331,8 +2777,73 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (scenarioInvoices.length !== 0) {
     issues.push(`Demo Slice 2B must not create invoices, found ${scenarioInvoices.length}.`);
   }
-  if (homeHistoryRows.length !== 0) {
+  if (!requiresHomeHistory && homeHistoryRows.length !== 0) {
     issues.push(`Demo Slice 2B must not file Home History rows, found ${homeHistoryRows.length}.`);
+  }
+  if (requiresHomeHistory) {
+    const history = homeHistoryRows[0] || null;
+    const document = reportDocuments[0] || null;
+    const notification = reportNotifications[0] || null;
+    if (
+      homeHistoryRows.length !== 1 ||
+      history?.id !== homeHistoryId ||
+      history?.inspection_id !== jobId ||
+      history?.service_request_id !== requestId
+    ) {
+      issues.push(`Home History checkpoint expected one exact maintenance row, found ${homeHistoryRows.length}.`);
+    }
+    if (
+      reportDocuments.length !== 1 ||
+      document?.id !== reportDocumentId ||
+      document?.homeowner_user_id !== homeownerUser?.id ||
+      document?.storage_path !== job?.report_storage_path ||
+      document?.content_type !== 'application/pdf' ||
+      document?.document_type !== 'inspection'
+    ) {
+      issues.push(`Home History checkpoint expected one exact finalized-report document, found ${reportDocuments.length}.`);
+    }
+    if (
+      reportNotifications.length !== 1 ||
+      notification?.id !== reportNotificationId ||
+      notification?.user_id !== homeownerUser?.id ||
+      notification?.type !== 'inspection_report_filed' ||
+      notification?.request_id !== requestId
+    ) {
+      issues.push(`Home History checkpoint expected one exact finalized-report notification, found ${reportNotifications.length}.`);
+    }
+    if (history?.report_document_id !== reportDocumentId) {
+      issues.push('Home History row does not link to the exact registered finalized-report document.');
+    }
+    const documentRecord = records.find(
+      (record) => record.table_name === 'home_documents' && record.record_role === FINALIZED_REPORT_RECORD_ROLES.document
+    );
+    try {
+      if (document && documentRecord) {
+        const storage = validateFinalizedReportStoragePath(document.storage_path, homeownerUser?.id, jobId);
+        if (
+          documentRecord.metadata?.storage_bucket !== storage.bucket ||
+          documentRecord.metadata?.storage_path !== storage.path
+        ) {
+          issues.push('Finalized-report registry metadata does not match the canonical Storage object identity.');
+        } else {
+          const objects = await exactStorageObject(service, storage);
+          if (objects.length !== 1) {
+            issues.push(`Home History checkpoint expected one exact private Storage object, found ${objects.length}.`);
+          } else {
+            const downloaded = await ensureOk(
+              await service.storage.from(storage.bucket).download(storage.path),
+              'Unable to read the Demo finalized-report Storage object'
+            );
+            const sha256 = createHash('sha256').update(Buffer.from(await downloaded.arrayBuffer())).digest('hex');
+            if (sha256 !== documentRecord.metadata?.storage_sha256) {
+              issues.push('Finalized-report Storage SHA-256 does not match registered ownership evidence.');
+            }
+          }
+        }
+      }
+    } catch (error) {
+      issues.push(error.message);
+    }
   }
 
   const requestEstimates = requestId
@@ -2436,6 +2947,8 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         openWorkItems: jobWorkItems.filter((item) => item.completion_status === 'open').length,
         invoices: scenarioInvoices.length,
         homeHistoryRows: homeHistoryRows.length,
+        reportDocuments: reportDocuments.length,
+        reportNotifications: reportNotifications.length,
       },
       propertyAssetBridge: verifiedPropertyGraph
         ? {
@@ -2450,7 +2963,9 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         tables: counts,
         recordsChecked: records.length,
       },
-      notifications: notificationHandlingDecision(),
+      notifications: requiresHomeHistory
+        ? 'Exactly one recorder-owned inspection_report_filed notification is registered and reset with the finalized report.'
+        : notificationHandlingDecision(),
     },
   };
 }
@@ -2501,6 +3016,14 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       completedWorkItemCount: 0,
       openWorkItemCount: 0,
       approvalEventCount: 0,
+      reportDocumentId: null,
+      homeHistoryId: null,
+      notificationId: null,
+      reportStorageBucket: null,
+      reportStoragePath: null,
+      reportStorageSha256: null,
+      reportFileName: null,
+      reportFileSizeBytes: null,
     };
     const executedSteps = ['identities', 'profilesAndCompany'];
 
@@ -2547,7 +3070,7 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
     }
 
     if (checkpointRequires(checkpointKey, 'estimateSent')) {
-      await sendEstimate(contractorClient, created.estimateId, dates);
+      await sendEstimate(contractorClient, service, created.estimateId, dates);
       executedSteps.push('estimateSent');
     }
 
@@ -2592,6 +3115,22 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       executedSteps.push('jobCompleted');
     }
 
+    if (checkpointRequires(checkpointKey, 'homeHistoryUpdated')) {
+      const report = await finalizeDemoHomeHistoryReport(
+        contractorClient,
+        service,
+        runId,
+        {
+          homeownerId: homeownerUser.id,
+          requestId: created.requestId,
+          jobId: created.jobId,
+        },
+        dates
+      );
+      Object.assign(created, report);
+      executedSteps.push('homeHistoryUpdated');
+    }
+
     await finishRun(service, runId, 'succeeded', {
       selected_checkpoint: checkpointKey,
       checkpoint_display_name: checkpoint.displayName,
@@ -2611,6 +3150,14 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       job_work_items_created: created.jobWorkItemCount,
       job_work_items_completed: created.completedWorkItemCount,
       job_work_items_open: created.openWorkItemCount,
+      report_document_id: created.reportDocumentId,
+      home_history_id: created.homeHistoryId,
+      report_notification_id: created.notificationId,
+      report_storage_bucket: created.reportStorageBucket,
+      report_storage_path: created.reportStoragePath,
+      report_storage_sha256: created.reportStorageSha256,
+      report_file_name: created.reportFileName,
+      report_file_size_bytes: created.reportFileSizeBytes,
     });
 
     const verification = await verifyScenario(service, scenarioKey, env, checkpointKey);
@@ -2643,7 +3190,9 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       },
       checkpoint: checkpointKey,
       verification,
-      externalEffects: `No email, SMS, push, Stripe, webhook, accounting, AI, geocoding, storage, or deployment calls were made by this runner. ${notificationHandlingDecision()}`,
+      externalEffects: checkpointRequires(checkpointKey, 'homeHistoryUpdated')
+        ? 'One authenticated private Demo PDF upload and one in-app notification were created by servsync_finalize_field_work. No email, SMS, push, Stripe, webhook, accounting, AI, geocoding, or deployment call was made.'
+        : `No email, SMS, push, Stripe, webhook, accounting, AI, geocoding, storage, or deployment calls were made by this runner. ${notificationHandlingDecision()}`,
       anonKeyUsed: Boolean(anonKey),
     };
   } catch (error) {
