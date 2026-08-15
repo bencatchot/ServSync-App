@@ -560,6 +560,24 @@
           "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Demo passed. The finalizer changed from MD5 e53389b0222568af71d7bbf1d012629d to the reviewed 1d8cc9b3f44e519e96354e27fb5afbb0 definition while postgres ownership, fixed search_path, SECURITY DEFINER, and grants remained exact. Nine Jobs, zero report documents/objects, four Home History rows, and 69 notifications were preserved; public smoke passed 7/7 and approved authenticated read-only homeowner/Owner smoke passed 2/2 without Production fixtures."
         }
       }
+    },
+    {
+      "id": "provider-neutral-marketing-publishing-v1",
+      "artifact": "servsync-provider-neutral-marketing-publishing.sql (SHA-256 0ae63afd8f9eebb6ec09b421adcf33cf40f3fa8281fa5e5e7cb50b1028844595)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-15. Catalog/security validation passed with three setup-required provider records, forced RLS, zero direct table grants, four platform-admin RPCs, and four purpose-bound worker RPCs. Rollback-only authenticated validation created, claimed, and fully removed one non-public publication fixture; Sandbox returned to zero Marketing content, packages, publication rows, and publication events."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-15 after Sandbox passed. Demo has three setup-required providers, zero publications/events, forced RLS, zero direct table grants, and the exact four authenticated plus four service-role RPC grants. Existing Marketing content, package, and status-event counts remained zero; no provider connection or public post was created."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Sandbox and Demo passed. Production has three setup-required providers, zero publications/events, forced RLS, zero direct table grants, and the exact four authenticated plus four service-role RPC grants. The existing 16 Marketing content records, three preparation packages, and 34 content status events remained unchanged; no provider connection or public post was created."
+        }
+      }
     }
   ]
 }

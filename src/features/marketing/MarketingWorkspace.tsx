@@ -29,6 +29,13 @@ import {
   type MarketingContentStatus,
 } from './marketingContent';
 import { MarketingContentWorkspace } from './MarketingContentWorkspace';
+import { MarketingPublicationComposer, MarketingPublishingWorkspace } from './MarketingPublishingWorkspace';
+import {
+  createMarketingPublishingAdapter,
+  type MarketingPublication,
+  type MarketingPublishingRpcClient,
+  type MarketingPublishingState,
+} from './marketingPublishing';
 import {
   createMarketingPlanningAdapter,
   type MarketingBusinessProfile,
@@ -72,8 +79,7 @@ const METRIC_ACCENTS: Record<MarketingMetric['id'], string> = {
   invites: 'bg-slate-100 text-slate-700',
 };
 
-const EMPTY_SECTION_COPY: Record<Exclude<MarketingWorkspaceSection, 'overview' | 'content' | 'settings'>, { title: string; body: string }> = {
-  campaigns: { title: 'No campaigns yet', body: 'Campaign planning is not connected in this foundation.' },
+const EMPTY_SECTION_COPY: Record<Exclude<MarketingWorkspaceSection, 'overview' | 'content' | 'campaigns' | 'settings'>, { title: string; body: string }> = {
   prospects: { title: 'No prospects yet', body: 'Prospecting and outreach are not enabled.' },
   growth: { title: 'Acquisition analytics are not connected', body: 'Growth reporting will remain unavailable until a real data source is approved.' },
 };
@@ -195,17 +201,25 @@ function MarketingOverview({
   contentLoading,
   contentError,
   onOpenApproval,
+  publications,
 }: {
   data: MarketingOverviewData;
   approvalItems: MarketingContentItem[];
   contentLoading: boolean;
   contentError: string | null;
   onOpenApproval: (id: string | null) => void;
+  publications: MarketingPublication[];
 }) {
+  const publishedCount = publications.filter(item => item.status === 'published').length;
   return (
     <div data-testid="marketing-overview" className="space-y-5">
       <section aria-label="Marketing performance summary" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        {data.metrics.map(metric => <MarketingMetricCard key={metric.id} metric={metric} />)}
+        {data.metrics.map(metric => <MarketingMetricCard key={metric.id} metric={metric.id === 'published' ? {
+          ...metric,
+          value: publishedCount,
+          state: 'available',
+          helper: 'Published from this workspace.',
+        } : metric} />)}
       </section>
 
       <div className="grid gap-3 lg:grid-cols-3">
@@ -215,13 +229,10 @@ function MarketingOverview({
           error={contentError}
           onOpen={onOpenApproval}
         />
-        <OperatingPanel
-          title="Upcoming"
-          icon={<CalendarDays size={17} />}
-          emptyTitle="Nothing scheduled"
-          emptyBody="Scheduled marketing work will appear here when publishing is enabled."
-          testId="marketing-upcoming"
-        />
+        <section data-testid="marketing-upcoming" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><CalendarDays size={17} /></span><h2 className="text-sm font-bold text-slate-950">Upcoming</h2></div>
+          {publications.filter(item => item.status === 'scheduled').length === 0 ? <div className="mt-4 min-h-[8rem] rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5"><p className="text-sm font-semibold text-slate-700">Nothing scheduled</p><p className="mt-1 text-sm text-slate-500">Approved content still requires a separate publication decision.</p></div> : <div className="mt-4 divide-y divide-slate-200 border-y border-slate-200">{publications.filter(item => item.status === 'scheduled').slice(0, 3).map(item => <div key={item.id} className="py-3"><p className="text-sm font-bold text-slate-800">{item.snapshot.title}</p><p className="mt-1 text-xs text-slate-500">{new Date(item.scheduledAt).toLocaleString()}</p></div>)}</div>}
+        </section>
         <OperatingPanel
           title="Recommended Next Action"
           icon={<Lightbulb size={17} />}
@@ -234,7 +245,7 @@ function MarketingOverview({
   );
 }
 
-function MarketingFoundationState({ section }: { section: Exclude<MarketingWorkspaceSection, 'overview' | 'content' | 'settings'> }) {
+function MarketingFoundationState({ section }: { section: Exclude<MarketingWorkspaceSection, 'overview' | 'content' | 'campaigns' | 'settings'> }) {
   const copy = EMPTY_SECTION_COPY[section];
   const Icon = SECTION_PRESENTATION[section].icon;
   return (
@@ -256,6 +267,7 @@ export function MarketingWorkspace({
   overview,
   content,
   planning,
+  publishing,
 }: {
   audience: MarketingWorkspaceAudience;
   overview: MarketingOverviewData;
@@ -267,8 +279,10 @@ export function MarketingWorkspace({
     onCreate: Parameters<typeof MarketingContentWorkspace>[0]['onCreate'];
     onUpdate: Parameters<typeof MarketingContentWorkspace>[0]['onUpdate'];
     onTransition: Parameters<typeof MarketingContentWorkspace>[0]['onTransition'];
+    onPublish: Parameters<typeof MarketingContentWorkspace>[0]['onPublish'];
   };
   planning: Parameters<typeof MarketingPlanningWorkspace>[0];
+  publishing: Parameters<typeof MarketingPublishingWorkspace>[0] & { composer: { content: MarketingContentItem | null; onClose: () => void; onCreate: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] } };
 }) {
   const [section, setSection] = useState<MarketingWorkspaceSection>('overview');
   const [contentFocus, setContentFocus] = useState<{
@@ -319,6 +333,7 @@ export function MarketingWorkspace({
             contentLoading={content.loading}
             contentError={content.error}
             onOpenApproval={openApproval}
+            publications={publishing.state?.publications ?? []}
           />
         )
         : section === 'content'
@@ -332,8 +347,11 @@ export function MarketingWorkspace({
               onCreate={content.onCreate}
               onUpdate={content.onUpdate}
               onTransition={content.onTransition}
+              onPublish={content.onPublish}
             />
           )
+          : section === 'campaigns'
+            ? <MarketingPublishingWorkspace {...publishing} />
           : section === 'settings'
             ? <MarketingPlanningWorkspace {...planning} />
             : <MarketingFoundationState section={section} />}
@@ -346,11 +364,12 @@ function AuthorizedInternalMarketingWorkspace({
   client,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient;
 }) {
   const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
   const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
   const directionsAdapter = useMemo(() => createMarketingDirectionsAdapter(client), [client]);
+  const publishingAdapter = useMemo(() => createMarketingPublishingAdapter(client), [client]);
   const [items, setItems] = useState<MarketingContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -362,6 +381,11 @@ function AuthorizedInternalMarketingWorkspace({
   const [directionsLoading, setDirectionsLoading] = useState(true);
   const [directionsSaving, setDirectionsSaving] = useState(false);
   const [directionsError, setDirectionsError] = useState<string | null>(null);
+  const [publishingState, setPublishingState] = useState<MarketingPublishingState | null>(null);
+  const [publishingLoading, setPublishingLoading] = useState(true);
+  const [publishingSaving, setPublishingSaving] = useState(false);
+  const [publishingError, setPublishingError] = useState<string | null>(null);
+  const [publishContent, setPublishContent] = useState<MarketingContentItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -407,6 +431,16 @@ function AuthorizedInternalMarketingWorkspace({
   }, [directionsAdapter]);
 
   useEffect(() => { void loadDirections(); }, [loadDirections]);
+
+  const loadPublishing = useCallback(async () => {
+    setPublishingLoading(true);
+    setPublishingError(null);
+    try { setPublishingState(await publishingAdapter.get()); }
+    catch (loadError) { setPublishingState(null); setPublishingError(loadError instanceof Error ? loadError.message : 'ServSync could not load publishing.'); }
+    finally { setPublishingLoading(false); }
+  }, [publishingAdapter]);
+
+  useEffect(() => { void loadPublishing(); }, [loadPublishing]);
 
   const withPlanningSave = async (operation: () => Promise<unknown>) => {
     setPlanningSaving(true);
@@ -472,6 +506,7 @@ function AuthorizedInternalMarketingWorkspace({
       });
       await load();
     },
+    onPublish: (item: MarketingContentItem) => setPublishContent(item),
   };
 
   const planning = {
@@ -495,7 +530,55 @@ function AuthorizedInternalMarketingWorkspace({
     },
   };
 
-  return <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} planning={planning} />;
+  const publishing = {
+    state: publishingState,
+    loading: publishingLoading,
+    error: publishingError,
+    saving: publishingSaving,
+    onReload: loadPublishing,
+    onCancel: async (publication: MarketingPublication) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await publishingAdapter.cancel(publication.id);
+        await loadPublishing();
+      } catch (saveError) {
+        setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not cancel the publication.');
+      } finally {
+        setPublishingSaving(false);
+      }
+    },
+    onRetry: async (publication: MarketingPublication) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await publishingAdapter.retry(publication.id);
+        await loadPublishing();
+      } catch (saveError) {
+        setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not retry the publication.');
+      } finally {
+        setPublishingSaving(false);
+      }
+    },
+    composer: {
+      content: publishContent,
+      onClose: () => setPublishContent(null),
+      onCreate: async ({ connection, mode, scheduledAt }: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] extends (input: infer T) => Promise<void> ? T : never) => {
+        if (!publishContent) return;
+        setPublishingSaving(true);
+        try {
+          await publishingAdapter.create({ requestId: crypto.randomUUID(), contentId: publishContent.id, contentRevision: publishContent.revisionNumber, provider: connection.provider, connectionId: connection.id, mode, scheduledAt });
+          setPublishContent(null);
+          await loadPublishing();
+        } finally { setPublishingSaving(false); }
+      },
+    },
+  };
+
+  return <>
+    <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} planning={planning} publishing={publishing} />
+    {publishContent && publishingState && <div className="mt-4"><MarketingPublicationComposer content={publishContent} providers={publishingState.providers} busy={publishingSaving} onClose={publishing.composer.onClose} onCreate={publishing.composer.onCreate} /></div>}
+  </>;
 }
 
 export function InternalMarketingWorkspace({
@@ -505,7 +588,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;

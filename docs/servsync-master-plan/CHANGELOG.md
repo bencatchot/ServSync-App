@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037 Provider-Neutral Publishing Foundation v1
+
+- Branch: `codex/fb037-provider-neutral-publishing-v1`.
+- Starting main SHA: `28dfd3dc7089876788a6be3e08e009d142309f50`.
+- Files changed: additive provider-readiness/publication/history migration; purpose-bound scheduling worker and provider adapter contract; internal Marketing Content/Publishing UI; focused SQL/server/browser tests; Vercel Cron configuration; provider architecture/runbook; FB-037 backlog/master-plan governance; and this changelog.
+- Summary of change: Adds a second explicit owner decision after content approval. An exact approved social-content revision can be snapshotted immutably for a workspace-scoped connected provider destination, scheduled durably, claimed idempotently, and recorded through scheduled/publishing/published/failed/cancelled history with bounded retry and uncertainty protection. Facebook, Instagram, and TikTok are seeded as truthful `setup_required` connections in priority order; no real provider adapter, OAuth token store, or public social request is introduced because readiness evidence is absent.
+- Security: Publishing remains platform-admin-only through server-derived workspace RPCs. Private tables are forced-RLS with no browser/direct service-role table access; worker mutations use purpose-bound service-role RPCs behind Cron auth and exact Supabase project identity. Provider secrets never enter publication rows, browser payloads, history, logs, fixtures, or Git. Local media paths are rejected.
+- Rollout: Exact migration `servsync-provider-neutral-marketing-publishing.sql` (SHA-256 `0ae63afd8f9eebb6ec09b421adcf33cf40f3fa8281fa5e5e7cb50b1028844595`) was applied Sandbox -> Demo -> Production on 2026-08-15. Each environment has three truthful `setup_required` provider rows, forced RLS, zero direct table grants, four platform-admin RPCs, and four purpose-bound worker RPCs. Sandbox rollback-only publication validation left zero residue. Demo retained zero historical Marketing rows. Production retained exactly 16 content records, three packages, and 34 content status events with zero publications/events. The Production-only Vercel project-ref guard was added for normal merge deployment; Demo/Sandbox retain no dedicated Marketing worker server credentials and remain fail-closed. No provider connection or public post was created.
+- Tests/checks run: provider-neutral migration/security/lifecycle validation; five worker/provider/configuration tests; 42 focused Marketing approval/planning/Direction/publishing desktop/mobile browser tests; existing Codex draft, Profile/Plan, planner-v2, planner-v3, and Direction suites; 16 backend-parity tests; strict TypeScript; Production build; sensitive-value, Markdown-link, diff, rollout-ledger, and exact-head checks. Live parity passed Production-to-Demo with approved additions and retained the 21 inherited Production-to-Sandbox drifts. Focused ESLint was attempted but stopped before source evaluation on the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` loader incompatibility.
+- Known risks or follow-ups: The owner must confirm/create the real ServSync Facebook Page and Meta Developer app, complete OAuth/Page authorization, and approve an encrypted token-lifecycle design before a Facebook adapter or first public post. Instagram requires a professional account plus an explicit supported login model and managed media. TikTok requires a developer app, Content Posting access/scopes, audit for public visibility, and managed media. The Production Vercel project is on a plan that supports the 15-minute Cron cadence. The inherited lint startup failure and 21 unrelated Sandbox parity drifts remain separately tracked. No public posting is authorized by this foundation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the durable publication boundary and provider priority while keeping every real connection and public execution gate explicit.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Adds the owner-controlled publication lifecycle and preserves internal-versus-contractor provider isolation.
+
 ## 2026-08-15 - Demo Recorder Recording Output Library v1
 
 - Branch: `codex/demo-recorder-output-library-v1`.
