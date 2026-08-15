@@ -116,7 +116,15 @@ The reusable Demo Recorder builds on the same private fixture boundary. See [Ser
 npm run demo:record -- homeowner-service-request
 ```
 
+The second bounded scenario uses the same guarded runner and creates one draft Estimate from the registered request through the normal contractor UI:
+
+```bash
+npm run demo:record -- contractor-create-estimate
+```
+
 The recorder owns the `connected_request_ready -> request_ready` transition: the homeowner creates the request through the real product UI, then the private runner adopts only the one exact matching request into the active registry-owned run and verifies the final checkpoint. `adopt-request` is an internal recorder operation, not a general operator mutation command.
+
+For `contractor-create-estimate`, the recorder restores `request_ready`, saves one exact priced draft through the contractor Estimate composer, and privately adopts only that exact Estimate and line before verifying `estimate_draft`. It creates no approval, Job, Invoice, payment schedule, or external side effect. `adopt-estimate` is likewise an internal recorder operation.
 
 By default, `demo:seed` restores the backward-compatible `job_created` checkpoint. Demo checkpoint slices also support explicit checkpoint restoration through argument forwarding:
 

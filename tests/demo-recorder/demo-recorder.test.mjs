@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/scenarios/contractor-create-estimate.mjs';
 import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
 import {
   assertRecordingDuration,
@@ -23,6 +24,20 @@ test('canonical scenario is bounded, reviewable, and Demo-only', () => {
   assert.ok(homeownerServiceRequestScenario.property.addressLine1);
 });
 
+test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {
+  assert.equal(validateScenarioDefinition(contractorCreateEstimateScenario), contractorCreateEstimateScenario);
+  assert.equal(contractorCreateEstimateScenario.initialCheckpoint, 'request_ready');
+  assert.equal(contractorCreateEstimateScenario.finalCheckpoint, 'estimate_draft');
+  assert.deepEqual(
+    contractorCreateEstimateScenario.scenes.map((scene) => scene.key),
+    ['request-context', 'estimate-draft', 'estimate-saved'],
+  );
+  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 15, max: 25 });
+  assert.equal(contractorCreateEstimateScenario.estimate.line.unit_price_cents, 189500);
+  assert.equal(contractorCreateEstimateScenario.estimate.unitPrice, '1895.00');
+  assert.doesNotMatch(JSON.stringify(contractorCreateEstimateScenario), /password|service_role|@example/i);
+});
+
 test('recorder target guard rejects Production, Sandbox, and non-durable app origins', () => {
   const scenario = homeownerServiceRequestScenario;
   assert.equal(assertSafeRecorderEnvironment({}, scenario).projectRef, 'bdytwgejqnlblhrnqxkp');
@@ -37,6 +52,7 @@ test('operator arguments stay intentionally small', () => {
     scenarioKey: 'homeowner-service-request', pacing: 'marketing', outputDir: null, headed: false,
   });
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
+  assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
 });
@@ -62,6 +78,15 @@ test('duration and metadata contracts fail closed', () => {
   assert.equal(metadata.duration_seconds, 18.254);
   assert.equal(metadata.contains_credentials, false);
   assert.match(metadata.fixture_policy, /registry-owned/i);
+  const estimateMetadata = buildArtifactMetadata({
+    scenario: contractorCreateEstimateScenario,
+    sourceCommit: 'b'.repeat(40),
+    pacing: 'marketing',
+    durationSeconds: 19.5,
+    fileName: 'estimate.webm',
+    createdAt: '2026-08-14T12:00:00.000Z',
+  });
+  assert.match(estimateMetadata.fixture_policy, /estimate_draft/i);
 });
 
 test('fixture adoption is exact, lineage-bound, and does not broaden reset authority', () => {
@@ -81,4 +106,12 @@ test('fixture adoption is exact, lineage-bound, and does not broaden reset autho
   assert.doesNotMatch(source, /truncate|delete from auth\.users/i);
   assert.match(recorderSource, /requestSubmissionStarted && !requestAdopted/);
   assert.match(recorderSource, /runDemoCommand\(\['adopt-request', scenario\.fixtureScenarioKey\], env\)\.catch/);
+  assert.match(source, /async function adoptRecorderEstimateDraft/);
+  assert.match(source, /run\.checkpoint !== 'request_ready'/);
+  assert.match(source, /expected exactly one new matching Estimate draft/);
+  assert.match(source, /recorder_scenario: 'contractor-create-estimate'/);
+  assert.match(source, /scheduleItems\.length > 0 \|\| linkedJobs\.length > 0 \|\| linkedInvoices\.length > 0/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'estimate_draft'\)/);
+  assert.match(recorderSource, /estimateSubmissionStarted && !estimateAdopted/);
+  assert.match(recorderSource, /runDemoCommand\(\['adopt-estimate', scenario\.fixtureScenarioKey\], env\)\.catch/);
 });
