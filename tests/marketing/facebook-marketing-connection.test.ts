@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  authorizedFacebookPageTargets,
   createFacebookOauthState,
+  debugFacebookAccessToken,
   discoverFacebookPages,
   exchangeFacebookAuthorizationCode,
   FACEBOOK_CALLBACK_URL,
+  FACEBOOK_CONTENT_PUBLISHING_TASKS,
   FACEBOOK_GRAPH_API_VERSION,
   FACEBOOK_REQUIRED_PERMISSIONS,
   facebookAuthorizationUrl,
@@ -51,6 +54,21 @@ function queueFetcher(responses: Response[], calls: Array<{ url: URL; init?: Req
 
 function rpcClient(handler: (name: string, args: Record<string, unknown>) => unknown) {
   return { rpc: async (name: string, args: Record<string, unknown>) => ({ data: handler(name, args), error: null }) };
+}
+
+function tokenDebug(type: 'USER' | 'PAGE', targetIds: string[], profileId?: string) {
+  return {
+    data: {
+      app_id: config.appId,
+      type,
+      is_valid: true,
+      profile_id: profileId,
+      scopes: [...FACEBOOK_REQUIRED_PERMISSIONS, 'public_profile'],
+      granular_scopes: FACEBOOK_REQUIRED_PERMISSIONS.map(scope => ({ scope, target_ids: targetIds })),
+      expires_at: 0,
+      data_access_expires_at: 1_800_000_000,
+    },
+  };
 }
 
 test('configuration is pinned to Production, the current Graph version, and the exact callback', () => {
@@ -126,59 +144,98 @@ test('token exchange keeps the app secret and provider tokens out of request URL
   assert.equal(firstBody.get('redirect_uri'), FACEBOOK_CALLBACK_URL);
 });
 
-test('Page discovery strips tokens and requires permissions plus CREATE_CONTENT', async () => {
+test('token debugging parses only sanitized scope and granular Page authorization metadata', async () => {
+  const calls: Array<{ url: URL; init?: RequestInit }> = [];
+  const debug = await debugFacebookAccessToken(config, userToken, queueFetcher([
+    json(tokenDebug('USER', ['1199023349954773'])),
+  ], calls));
+  assert.equal(debug.type, 'USER');
+  assert.equal(debug.isValid, true);
+  assert.equal(debug.appIdMatches, true);
+  assert.deepEqual(authorizedFacebookPageTargets(debug), ['1199023349954773']);
+  assert.equal(JSON.stringify(debug).includes(userToken), false);
+  assert.equal(calls[0].url.searchParams.get('input_token'), userToken);
+  assert.equal(calls[0].url.toString().includes(config.appSecret), false);
+  assert.equal(new Headers(calls[0].init?.headers).get('authorization'), `Bearer ${config.appId}|${config.appSecret}`);
+  assert.throws(() => authorizedFacebookPageTargets({
+    ...debug,
+    granularScopes: FACEBOOK_REQUIRED_PERMISSIONS.map(scope => ({
+      scope,
+      targetIds: Array.from({ length: 101 }, (_, index) => String(1_000_000 + index)),
+    })),
+  }), { category: 'provider_permission' });
+});
+
+test('Page discovery accepts current content tasks and excludes Pages outside granular targets', async () => {
   const calls: Array<{ url: URL; init?: RequestInit }> = [];
   const fetcher = queueFetcher([
     json({ id: '9988776655443322' }),
     json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
+    json(tokenDebug('USER', ['1122334455667788', '8877665544332211'])),
     json({ data: [
-      { id: '1122334455667788', name: ' ServSync Page ', access_token: pageToken, tasks: ['CREATE_CONTENT', 'MODERATE'] },
+      { id: '1122334455667788', name: ' ServSync Page ', access_token: pageToken, tasks: ['PROFILE_PLUS_CREATE_CONTENT'] },
       { id: '8877665544332211', name: 'Read Only Page', access_token: 'read-only-token-abcdefghijklmnopqrstuvwxyz', tasks: ['MODERATE'] },
+      { id: '7766554433221100', name: 'Prevention Pros', access_token: 'foreign-page-token-abcdefghijklmnopqrstuvwxyz', tasks: ['PROFILE_PLUS_FULL_CONTROL'] },
     ] }),
   ], calls);
   const discovered = await discoverFacebookPages(config, userToken, fetcher);
   assert.equal(discovered.providerUserId, '9988776655443322');
   assert.deepEqual(discovered.pages.map(page => page.safe), [
-    { page_id: '1122334455667788', page_name: 'ServSync Page', tasks: ['CREATE_CONTENT', 'MODERATE'], eligible: true },
+    { page_id: '1122334455667788', page_name: 'ServSync Page', tasks: ['PROFILE_PLUS_CREATE_CONTENT'], eligible: true },
     { page_id: '8877665544332211', page_name: 'Read Only Page', tasks: ['MODERATE'], eligible: false },
   ]);
+  assert.deepEqual(FACEBOOK_CONTENT_PUBLISHING_TASKS, ['CREATE_CONTENT', 'PROFILE_PLUS_CREATE_CONTENT', 'PROFILE_PLUS_FULL_CONTROL']);
   assert.equal(JSON.stringify(discovered.pages.map(page => page.safe)).includes('token'), false);
+  assert.equal(JSON.stringify(discovered).includes('Prevention Pros'), false);
   for (const call of calls) {
     assert.equal(call.url.searchParams.has('access_token'), false);
-    assert.equal(new Headers(call.init?.headers).get('authorization'), `Bearer ${userToken}`);
   }
 });
 
-test('configured asset selection exposes only the Meta-returned Page and zero-page discovery stays fail-closed', async () => {
+test('zero-row accounts discovery resolves only the direct Page proved by every granular permission', async () => {
+  const calls: Array<{ url: URL; init?: RequestInit }> = [];
   const selectedOnly = await discoverFacebookPages(config, userToken, queueFetcher([
     json({ id: '9988776655443322' }),
     json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
-    json({ data: [{ id: '1199023349954773', name: 'ServSync', access_token: pageToken, tasks: ['CREATE_CONTENT'] }] }),
-  ], []));
+    json(tokenDebug('USER', ['1199023349954773'])),
+    json({ data: [] }),
+    json({ id: '1199023349954773', name: 'ServSync', access_token: pageToken }),
+  ], calls));
   assert.deepEqual(selectedOnly.pages.map(page => page.safe), [
-    { page_id: '1199023349954773', page_name: 'ServSync', tasks: ['CREATE_CONTENT'], eligible: true },
+    { page_id: '1199023349954773', page_name: 'ServSync', tasks: [], eligible: true },
   ]);
-  assert.equal(JSON.stringify(selectedOnly).includes('Prevention Pros'), false);
+  assert.equal(calls.at(-1)?.url.pathname, '/v26.0/1199023349954773');
+  assert.equal(calls.at(-1)?.url.searchParams.get('fields'), 'id,name,access_token');
+  assert.equal(calls.at(-1)?.url.searchParams.has('tasks'), false);
+});
 
+test('missing granular target authority stays fail-closed even when account rows contain a Page', async () => {
   const zeroPages = await discoverFacebookPages(config, userToken, queueFetcher([
     json({ id: '9988776655443322' }),
     json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
-    json({ data: [] }),
+    json({ data: { ...tokenDebug('USER', ['1199023349954773']).data, granular_scopes: [
+      { scope: 'pages_show_list', target_ids: ['1199023349954773'] },
+      { scope: 'pages_read_engagement', target_ids: ['1199023349954773'] },
+      { scope: 'pages_manage_posts', target_ids: [] },
+    ] } }),
+    json({ data: [{ id: '1199023349954773', name: 'ServSync', access_token: pageToken, tasks: ['PROFILE_PLUS_FULL_CONTROL'] }] }),
   ], []));
   assert.deepEqual(zeroPages.pages, []);
   assert.deepEqual(zeroPages.grantedPermissions, [...FACEBOOK_REQUIRED_PERMISSIONS].sort());
 });
 
-test('Page validation enforces stable identity and content authority', async () => {
+test('Page token validation enforces app, type, exact profile, scopes, and granular target authority', async () => {
   const calls: Array<{ url: URL; init?: RequestInit }> = [];
   const valid = await validateFacebookPage(config, '1122334455667788', pageToken, queueFetcher([
-    json({ id: '1122334455667788', name: 'ServSync Page', tasks: ['CREATE_CONTENT'] }),
+    json(tokenDebug('PAGE', ['1122334455667788'], '1122334455667788')),
+    json({ id: '1122334455667788', name: 'ServSync Page' }),
   ], calls));
-  assert.deepEqual(valid, { pageId: '1122334455667788', pageName: 'ServSync Page', tasks: ['CREATE_CONTENT'] });
-  assert.equal(calls[0].url.searchParams.has('access_token'), false);
-  assert.equal(new Headers(calls[0].init?.headers).get('authorization'), `Bearer ${pageToken}`);
+  assert.deepEqual(valid, { pageId: '1122334455667788', pageName: 'ServSync Page', tasks: [] });
+  assert.equal(calls[1].url.searchParams.get('fields'), 'id,name');
+  assert.equal(calls[1].url.searchParams.has('tasks'), false);
+  assert.equal(new Headers(calls[1].init?.headers).get('authorization'), `Bearer ${pageToken}`);
   await assert.rejects(() => validateFacebookPage(config, '1122334455667788', pageToken, queueFetcher([
-    json({ id: '1122334455667788', name: 'ServSync Page', tasks: ['MODERATE'] }),
+    json({ data: { ...tokenDebug('PAGE', ['8877665544332211'], '1122334455667788').data } }),
   ], [])), { category: 'provider_permission' });
 });
 
@@ -187,7 +244,7 @@ test('start endpoint is same-origin, owner-authorized through RPC, and browser-t
   const dependencies = {
     config: () => config,
     clients: () => ({
-      user: (_accessToken: string) => rpcClient((name, args) => { calls.push({ scope: 'user', name, args }); return { session_id: sessionId }; }),
+      user: () => rpcClient((name, args) => { calls.push({ scope: 'user', name, args }); return { session_id: sessionId }; }),
       service: rpcClient((name, args) => { calls.push({ scope: 'service', name, args }); return null; }),
     }),
     fetcher: fetch,
@@ -226,7 +283,8 @@ test('callback consumes state once and returns only a safe same-site selection r
       json({ access_token: userToken, expires_in: 5_184_000 }),
       json({ id: '9988776655443322' }),
       json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
-      json({ data: [{ id: '1122334455667788', name: 'ServSync Page', access_token: pageToken, tasks: ['CREATE_CONTENT'] }] }),
+      json(tokenDebug('USER', ['1122334455667788'])),
+      json({ data: [{ id: '1122334455667788', name: 'ServSync Page', access_token: pageToken, tasks: ['PROFILE_PLUS_CREATE_CONTENT'] }] }),
     ], providerCalls),
     createState: createFacebookOauthState,
   };
@@ -292,8 +350,10 @@ test('explicit Page selection re-discovers authority and stores only the selecte
     fetcher: queueFetcher([
       json({ id: '9988776655443322' }),
       json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
-      json({ data: [{ id: '1122334455667788', name: 'ServSync Page', access_token: pageToken, tasks: ['CREATE_CONTENT'] }] }),
-      json({ id: '1122334455667788', name: 'ServSync Page', tasks: ['CREATE_CONTENT'] }),
+      json(tokenDebug('USER', ['1122334455667788'])),
+      json({ data: [{ id: '1122334455667788', name: 'ServSync Page', access_token: pageToken, tasks: ['PROFILE_PLUS_CREATE_CONTENT'] }] }),
+      json(tokenDebug('PAGE', ['1122334455667788'], '1122334455667788')),
+      json({ id: '1122334455667788', name: 'ServSync Page' }),
     ], providerCalls),
     createState: createFacebookOauthState,
   };
@@ -315,6 +375,7 @@ test('explicit Page selection re-discovers authority and stores only the selecte
   const completed = rpcCalls.at(-1)?.args ?? {};
   assert.equal(completed.p_page_id, '1122334455667788');
   assert.equal(completed.p_page_access_token, pageToken);
+  assert.deepEqual(completed.p_page_tasks, ['PROFILE_PLUS_CREATE_CONTENT']);
 });
 
 test('readiness-only connection cannot post, while the future kill-switch path builds a token-safe request', async () => {

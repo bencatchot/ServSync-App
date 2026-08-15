@@ -110,7 +110,7 @@ select public.servsync_private_store_marketing_facebook_oauth_result(
   'test-user-access-token-abcdefghijklmnopqrstuvwxyz',
   '9988776655443322',
   '["pages_manage_posts","pages_read_engagement","pages_show_list"]'::jsonb,
-  '[{"page_id":"1122334455667788","page_name":"ServSync Test Page","tasks":["CREATE_CONTENT"],"eligible":true},{"page_id":"8877665544332211","page_name":"Read Only Page","tasks":["MODERATE"],"eligible":false}]'::jsonb,
+  '[{"page_id":"1122334455667788","page_name":"ServSync Test Page","tasks":[],"eligible":true},{"page_id":"8877665544332211","page_name":"Read Only Page","tasks":["MODERATE"],"eligible":false}]'::jsonb,
   now()+interval '60 days'
 );
 reset role;
@@ -174,7 +174,7 @@ begin
   v_token := public.servsync_private_get_marketing_facebook_session_token(current_setting('servsync.test_first_session_id')::uuid);
   if v_token <> 'test-user-access-token-abcdefghijklmnopqrstuvwxyz' then raise exception 'Transient Facebook Vault token mismatch.'; end if;
   perform public.servsync_private_complete_marketing_facebook_page(
-    current_setting('servsync.test_first_session_id')::uuid,'1122334455667788','ServSync Test Page','["CREATE_CONTENT"]'::jsonb,
+    current_setting('servsync.test_first_session_id')::uuid,'1122334455667788','ServSync Test Page','[]'::jsonb,
     'test-page-access-token-abcdefghijklmnopqrstuvwxyz',now()+interval '60 days'
   );
 end $$;
@@ -226,7 +226,7 @@ begin
   v_token := public.servsync_private_get_marketing_facebook_page_token(v_connection_id);
   if v_token <> 'test-page-access-token-abcdefghijklmnopqrstuvwxyz' then raise exception 'Facebook Page Vault token mismatch.'; end if;
   perform public.servsync_private_record_marketing_facebook_recheck(
-    v_connection_id,'1122334455667788','ServSync Test Page','["CREATE_CONTENT"]'::jsonb
+    v_connection_id,'1122334455667788','ServSync Test Page','[]'::jsonb
   );
 end $$;
 reset role;

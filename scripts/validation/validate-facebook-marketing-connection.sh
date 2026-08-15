@@ -79,10 +79,15 @@ done
 
 psql_run --file "$ROOT_DIR/tests/sql/provider-neutral-marketing-publishing-validation.sql" >/dev/null
 psql_run --file "$ROOT_DIR/servsync-facebook-marketing-connection.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-facebook-granular-page-discovery.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/facebook-marketing-connection-validation.sql" >/dev/null
 
 if psql_run --file "$ROOT_DIR/servsync-facebook-marketing-connection.sql" >/dev/null 2>&1; then
   echo "Repeated Facebook Marketing connection migration unexpectedly succeeded." >&2
+  exit 1
+fi
+if psql_run --file "$ROOT_DIR/servsync-facebook-granular-page-discovery.sql" >/dev/null 2>&1; then
+  echo "Repeated Facebook granular Page discovery migration unexpectedly succeeded." >&2
   exit 1
 fi
 

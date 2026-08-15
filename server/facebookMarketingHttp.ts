@@ -204,7 +204,7 @@ export function createFacebookConnectionHandler(dependencies: FacebookHttpDepend
           p_session_id: authorized.session_id,
           p_page_id: page.pageId,
           p_page_name: page.pageName,
-          p_page_tasks: page.tasks,
+          p_page_tasks: selected.safe.tasks,
           p_page_access_token: selected.accessToken,
           p_token_expires_at: null,
         });
