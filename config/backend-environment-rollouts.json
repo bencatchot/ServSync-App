@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-13",
+  "updatedOn": "2026-08-15",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -522,6 +522,24 @@
         "demo": {
           "status": "Applied",
           "reason": "Exact reviewed migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-13 from 13:49:54Z through 13:49:56Z. The first authenticated post-migration attempt stopped on a stale local contractor alias/credential. On 2026-08-13 the exact demo-owned contractor and homeowner fixture identities were reverified against scenario metadata and ownership, their approved local credentials were rotated through the established Supabase Admin Auth operation, and normal password grants passed without exposing secrets. Rollback-only validation then passed Owner/Admin/Office allow; Field Technician/Viewer/inactive/cross-tenant/homeowner mutation denial; connected send; customer-scoped read; actor attribution; and pre-acceptance Invoice denial. Probe auth and business residue returned to zero. Catalog fingerprint eb502cbc03aa7c58987d3b6fb31e3511, zero Estimate/line/schedule/launch/link/activity/audit counts, and business fingerprint 43844d59220756db572e31cdafd41ac8 remained exact."
+        }
+      }
+    },
+    {
+      "id": "finalized-report-home-lineage-v1",
+      "artifact": "servsync-finalized-report-home-lineage.sql (SHA-256 ad32a0dbcee42f6eda3e71992601742c823e812fb88b51858242664ac0899de7)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-15. The already-home-aware function remained at definition MD5 1d8cc9b3f44e519e96354e27fb5afbb0 with postgres ownership, fixed search_path, SECURITY DEFINER, and unchanged authenticated/service-role grants. A disposable authenticated report finalization proved exact source-home lineage, source-home visibility, other-home and cross-tenant denial, private PDF download, one notification, and zero fixture residue."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-15 after Sandbox passed. Authenticated API validation and the registered Demo Home History checkpoint produced one document, one history row, and one notification with exact home lineage; desktop and mobile homeowner UI reopened the private PDF. Exact registry reset removed all 24 disposable rows and the report object while preserving the canonical home/room/asset graph."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Demo passed. The finalizer changed from MD5 e53389b0222568af71d7bbf1d012629d to the reviewed 1d8cc9b3f44e519e96354e27fb5afbb0 definition while postgres ownership, fixed search_path, SECURITY DEFINER, and grants remained exact. Nine Jobs, zero report documents/objects, four Home History rows, and 69 notifications were preserved; public smoke passed 7/7 and approved authenticated read-only homeowner/Owner smoke passed 2/2 without Production fixtures."
         }
       }
     }
