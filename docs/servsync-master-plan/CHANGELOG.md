@@ -4,6 +4,24 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - Finalized Report Home Lineage v1
+
+- Branch: `codex/home-history-report-lineage-v1`.
+- Starting main SHA: `2f8d0f5aed1c41987e5db74a4adafc46e21c6e7b`.
+- Files changed: additive finalizer migration; disposable PostgreSQL foundation/behavior validation; rollout ledger; FB-007 backlog and Home History master-plan truth; and this changelog.
+- Summary of change: Corrects `servsync_finalize_field_work` so a connected-customer Job's canonical `home_id` is written to both the generated private `home_documents` report row and the generated `home_maintenance_log` row. All newer report generation, authorization, lifecycle, notification, delivery, and private Storage behavior remains unchanged. No historical row is backfilled.
+- Root cause: `servsync-report-documents-home-id.sql` originally added the correct lineage, but the later current Job-lifecycle finalizer body deployed in Demo and Production omitted both `home_id` insert columns. Sandbox retained the home-aware body; Demo and Production shared the regressed definition until this rollout.
+- Rollout: Exact migration `servsync-finalized-report-home-lineage.sql` (SHA-256 `ad32a0dbcee42f6eda3e71992601742c823e812fb88b51858242664ac0899de7`) was applied Sandbox -> Demo -> Production on 2026-08-15. All three now share function-definition MD5 `1d8cc9b3f44e519e96354e27fb5afbb0`, postgres ownership, `SECURITY DEFINER`, fixed `search_path=public`, and unchanged authenticated/service-role execution grants.
+- Validation: The disposable PostgreSQL harness passed exact source-home propagation, source/other-home scoping, null-home preservation, Owner allow, read-only/cross-tenant denial, lifecycle, notification, report metadata, and reapplication. Authenticated Sandbox and Demo validation each created one private PDF, one document, one Home History row, and one notification, proved homeowner download and cross-homeowner denial, then returned to exact zero-residue baselines. The registered Demo scenario also passed desktop 1440x900 and mobile 390x844 Home History visibility/download with clean console/layout state and exact registry reset. Production remained read-only: nine Jobs, zero report documents/objects, four Home History rows, and 69 notifications were preserved; public smoke passed 7/7 and approved authenticated homeowner/Owner smoke passed 2/2.
+- Historical impact: Read-only aggregate audit found zero prior finalized Production report chains requiring repair. Sandbox also had zero mismatches; Demo's disposable pre-fix recorder row had already been removed. No historical data mutation was authorized or performed.
+- Known risks or follow-ups: The supported UI prevents re-finalizing an already finalized report; this correction does not redesign direct-RPC replay semantics. Live backend parity now agrees on the finalizer. Sandbox retains its separately tracked 21 unrelated drifts, and Demo's private recorder-registry catalog fingerprint is represented by the uncommitted, isolated recorder branch rather than mixed into this product fix. FB-007 remains active for broader trade/checklist maturity.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the completed cross-environment lineage correction without changing FB-007's active broader scope.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Corrects the live Home History capability description and explicitly preserves the no-silent-backfill boundary.
+
 ## 2026-08-15 - FB-016 first natural recurring role-smoke acceptance
 
 - Branch: `codex/fb016-natural-role-smoke-acceptance`.
