@@ -98,9 +98,27 @@ npm run demo:record -- homeowner-service-request --pacing=tutorial --headed
 npm run demo:record -- homeowner-service-request --output-dir="/absolute/review/path"
 ```
 
-The default output directory is `demo-recordings/`, which is ignored by Git. WebM is the native artifact. A small adjacent JSON file records the scenario, version, environment, viewport, measured duration, pacing preset, source commit, and fixture policy. It contains no credentials or record identifiers.
+The default working output directory is `demo-recordings/`, which is ignored by Git. WebM remains the native source/master. After the WebM passes scenario, playback, duration, final-state, browser-error, and sensitive-data validation, the recorder uses the locally installed Homebrew `ffmpeg`/`ffprobe` tools to create and verify an H.264/yuv420p MP4 with the same dimensions and duration.
 
-MP4 conversion is not part of v1. Do not add a heavyweight media dependency only for conversion.
+The approved package is then promoted to the durable owner library:
+
+`~/Documents/Codex/ServSync Demo Recordings/<scenario>/`
+
+Each timestamped package contains:
+
+- `.webm`: canonical Playwright source/master;
+- `.mp4`: broadly compatible distribution copy for marketing, tutorials, Canva, social platforms, and web upload;
+- `.json`: allowlisted provenance with scenario, recording version, timestamp, source Git commit, Demo environment, viewport, duration, filenames, validation status, and sensitive-data result.
+
+Promotion fails closed. Conversion and media validation happen in a staging directory, and no durable package is copied into the scenario directory until every artifact passes. If MP4 conversion fails, the validated working WebM/metadata remain available for diagnosis, but the run does not report a complete durable package. Timestamped filenames are never overwritten.
+
+Open the owner library in Finder with:
+
+```bash
+open "$HOME/Documents/Codex/ServSync Demo Recordings"
+```
+
+Use MP4 for distribution and WebM as the original source.
 
 ## Validation
 
@@ -115,6 +133,10 @@ A run is successful only after:
 - no page error, console error, or HTTP 5xx is observed;
 - the WebM exists and is non-empty;
 - Chromium decodes it and reports a duration inside the scenario bounds.
+- `ffprobe` confirms the source dimensions and duration;
+- `ffmpeg` creates an H.264/yuv420p MP4 without resizing;
+- `ffprobe` confirms the MP4 dimensions and duration still match the source;
+- WebM, MP4, and allowlisted metadata promote together into the scenario's durable owner-library directory.
 
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
 
@@ -124,6 +146,6 @@ Failed runs remove their staging video. A failed run must not be described as a 
 
 ## Deliberate Limits
 
-Recorder v1 does not provide video publishing, MP4 conversion, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond the three listed above.
+Recorder v1 does not provide video publishing, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond the three listed above.
 
 Likely future scenarios include Estimate-to-Job, manual payment, and contractor discovery. Each requires its own reviewed fixture and final-state contract.

@@ -128,6 +128,18 @@ The third bounded scenario finalizes one registry-owned Demo Job through the sup
 npm run demo:record -- homeowner-home-history
 ```
 
+Every successful canonical run keeps its validated WebM source in the ignored working output and promotes a versioned WebM, H.264 MP4, and sanitized JSON metadata package to:
+
+`~/Documents/Codex/ServSync Demo Recordings/<scenario>/`
+
+The terminal summary reports the working source paths, durable WebM/MP4/metadata paths, duration, scenario, and promotion status. Use MP4 for normal distribution and retain WebM as the source/master. Open the library in Finder with:
+
+```bash
+open "$HOME/Documents/Codex/ServSync Demo Recordings"
+```
+
+A failed scenario, playback check, duration check, sensitive-data check, conversion, or MP4 verification never promotes a durable package. The recorder uses the existing local Homebrew `ffmpeg`/`ffprobe` installation and adds no project video-processing dependency.
+
 The recorder owns the `connected_request_ready -> request_ready` transition: the homeowner creates the request through the real product UI, then the private runner adopts only the one exact matching request into the active registry-owned run and verifies the final checkpoint. `adopt-request` is an internal recorder operation, not a general operator mutation command.
 
 For `contractor-create-estimate`, the recorder restores `request_ready`, saves one exact priced draft through the contractor Estimate composer, and privately adopts only that exact Estimate and line before verifying `estimate_draft`. It creates no approval, Job, Invoice, payment schedule, or external side effect. `adopt-estimate` is likewise an internal recorder operation.
