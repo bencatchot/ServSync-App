@@ -1229,15 +1229,15 @@ async function createEstimateDraft(contractorClient, service, runId, contractorI
   return { estimateId: estimate.id, totalCents };
 }
 
-async function sendEstimate(contractorClient, estimateId, dates) {
-  await ensureOk(
-    await contractorClient
-      .from('estimates')
-      .update({ status: 'sent', updated_at: dates.estimateSentAt })
-      .eq('id', estimateId),
-    'Unable to send demo estimate'
+async function sendEstimate(contractorClient, estimateId) {
+  const result = await ensureOk(
+    await contractorClient.rpc('servsync_send_estimate', { p_estimate_id: estimateId }),
+    'Unable to send demo estimate through the server-authoritative RPC'
   );
-  return { estimateId };
+  if (result?.estimate_id !== estimateId || result?.status !== 'sent') {
+    throw new Error('Demo Estimate send returned an unexpected identity or status.');
+  }
+  return { estimateId, status: result.status };
 }
 
 async function acceptEstimate(homeownerClient, service, runId, estimateId, dates) {
@@ -2547,7 +2547,7 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
     }
 
     if (checkpointRequires(checkpointKey, 'estimateSent')) {
-      await sendEstimate(contractorClient, created.estimateId, dates);
+      await sendEstimate(contractorClient, created.estimateId);
       executedSteps.push('estimateSent');
     }
 
@@ -2931,6 +2931,149 @@ async function adoptRecorderEstimateDraft(env, target, scenarioKey) {
   };
 }
 
+async function adoptRecorderEstimateResponse(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder Estimate response adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'estimate_sent') {
+    throw new Error(`Recorder Estimate response adoption refused: active checkpoint must be estimate_sent, found ${run.checkpoint}.`);
+  }
+
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const contractorId = run.metadata?.contractor_id;
+  const homeId = run.metadata?.home_id;
+  const requestId = run.metadata?.service_request_id;
+  const estimateId = run.metadata?.estimate_id;
+  if (![homeownerId, contractorId, homeId, requestId, estimateId].every(Boolean)) {
+    throw new Error('Recorder Estimate response adoption refused: active run is missing exact homeowner, contractor, home, request, or Estimate identity.');
+  }
+
+  const estimate = await ensureOk(
+    await service
+      .from('estimates')
+      .select('id,contractor_id,homeowner_user_id,home_id,service_request_id,inspection_id,title,scope,status,subtotal_cents,total_cents,created_at,updated_at')
+      .eq('id', estimateId)
+      .eq('contractor_id', contractorId)
+      .eq('homeowner_user_id', homeownerId)
+      .eq('home_id', homeId)
+      .eq('service_request_id', requestId)
+      .is('inspection_id', null)
+      .eq('title', estimateFixture.title)
+      .eq('scope', estimateFixture.scope)
+      .eq('status', 'accepted')
+      .eq('subtotal_cents', estimateFixture.subtotalCents)
+      .eq('total_cents', estimateFixture.subtotalCents + estimateFixture.taxCents)
+      .single(),
+    'Unable to inspect the homeowner-accepted Demo Estimate'
+  );
+
+  const lineItems = await ensureOk(
+    await service.from('estimate_line_items').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect accepted Demo Estimate lines'
+  );
+  const scheduleItems = await ensureOk(
+    await service.from('estimate_payment_schedule_items').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect accepted Demo Estimate payment schedule'
+  );
+  if (lineItems.length !== estimateLines().length || scheduleItems.length !== estimatePaymentScheduleRows().length) {
+    throw new Error('Recorder Estimate response adoption refused: line or payment-schedule count changed during homeowner response.');
+  }
+
+  const approvalEvents = await ensureOk(
+    await service
+      .from('workflow_activity_events')
+      .select('id,event_type,estimate_id,inspection_id,created_at,metadata')
+      .eq('estimate_id', estimate.id)
+      .eq('event_type', WORKFLOW_EVENT_TYPES.estimateApproved)
+      .is('inspection_id', null)
+      .gt('created_at', run.completed_at),
+    'Unable to inspect the homeowner Estimate approval event'
+  );
+  if (
+    approvalEvents.length !== 1
+    || approvalEvents[0]?.metadata?.source_rpc !== WORKFLOW_EVENT_SOURCES.estimateResponse
+  ) {
+    throw new Error(`Recorder Estimate response adoption refused: expected one exact approval event, found ${approvalEvents.length}.`);
+  }
+
+  const linkedJobs = await ensureOk(
+    await service.from('inspections').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect accepted Demo Estimate Job lineage'
+  );
+  const linkedInvoices = await ensureOk(
+    await service.from('invoices').select('id').eq('estimate_id', estimate.id),
+    'Unable to inspect accepted Demo Estimate Invoice lineage'
+  );
+  if (linkedJobs.length > 0 || linkedInvoices.length > 0) {
+    throw new Error('Recorder Estimate response adoption refused: accepting the Estimate created a Job or Invoice.');
+  }
+
+  await registerRecord(
+    service,
+    run.id,
+    'workflow_activity_events',
+    approvalEvents[0].id,
+    'demo_estimate_approved_event',
+    'estimate_accepted',
+    { source: 'servsync_demo_recorder' }
+  );
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'estimate_accepted' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to estimate_accepted'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'estimate_accepted',
+    executed_steps: [
+      'identities',
+      'profilesAndCompany',
+      'property',
+      'connection',
+      'request',
+      'contractorReview',
+      'estimateDraft',
+      'estimateSent',
+      'estimateAccepted',
+    ],
+    homeowner_user_id: homeownerId,
+    contractor_id: contractorId,
+    home_id: homeId,
+    connection_id: run.metadata?.connection_id,
+    service_request_id: requestId,
+    estimate_id: estimate.id,
+    recorder_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'homeowner-review-estimate',
+    recorder_response_action: 'accept',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'estimate_accepted');
+  if (!verification.ok) {
+    throw new Error(`Recorder Estimate response verification failed: ${verification.reason || 'estimate_accepted state is invalid'}`);
+  }
+
+  return {
+    operation: 'adopt-estimate-response',
+    runId: run.id,
+    checkpoint: 'estimate_accepted',
+    records: {
+      estimateId: estimate.id,
+      estimateStatus: estimate.status,
+      approvalEventCount: approvalEvents.length,
+      lineItemCount: lineItems.length,
+      paymentScheduleCount: scheduleItems.length,
+      jobCount: linkedJobs.length,
+      invoiceCount: linkedInvoices.length,
+    },
+    verification,
+  };
+}
+
 function summarize(result, target, scenarioKey) {
   return {
     targetProjectRef: target.expectedRef,
@@ -2968,9 +3111,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'adopt-request', 'adopt-estimate'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'adopt-request', 'adopt-estimate', 'adopt-estimate-response'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request|adopt-estimate> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request|adopt-estimate|adopt-estimate-response> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -2978,7 +3121,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (['adopt-request', 'adopt-estimate'].includes(operation) && optionArgs.length > 0) {
+  if (['adopt-request', 'adopt-estimate', 'adopt-estimate-response'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -3000,6 +3143,10 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'adopt-estimate') {
     return summarize(await adoptRecorderEstimateDraft(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-estimate-response') {
+    return summarize(await adoptRecorderEstimateResponse(env, target, scenarioKey), target, scenarioKey);
   }
 
   return summarize(

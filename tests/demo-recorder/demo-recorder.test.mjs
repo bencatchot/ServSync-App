@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/scenarios/contractor-create-estimate.mjs';
+import { homeownerReviewEstimateScenario } from '../../scripts/demo/recorder/scenarios/homeowner-review-estimate.mjs';
 import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
 import {
   assertRecordingDuration,
@@ -38,6 +39,21 @@ test('contractor Estimate scenario is a bounded request-to-draft workflow', () =
   assert.doesNotMatch(JSON.stringify(contractorCreateEstimateScenario), /password|service_role|@example/i);
 });
 
+test('homeowner Estimate scenario is a bounded sent-to-accepted response', () => {
+  assert.equal(validateScenarioDefinition(homeownerReviewEstimateScenario), homeownerReviewEstimateScenario);
+  assert.equal(homeownerReviewEstimateScenario.initialCheckpoint, 'estimate_sent');
+  assert.equal(homeownerReviewEstimateScenario.finalCheckpoint, 'estimate_accepted');
+  assert.deepEqual(
+    homeownerReviewEstimateScenario.scenes.map((scene) => scene.key),
+    ['estimate-available', 'estimate-details', 'estimate-accepted'],
+  );
+  assert.deepEqual(homeownerReviewEstimateScenario.expectedDurationSeconds, { min: 15, max: 22 });
+  assert.deepEqual(homeownerReviewEstimateScenario.response, { action: 'accept', resultingStatus: 'accepted' });
+  assert.equal(homeownerReviewEstimateScenario.estimate.lineCount, 5);
+  assert.equal(homeownerReviewEstimateScenario.estimate.paymentScheduleCount, 2);
+  assert.doesNotMatch(JSON.stringify(homeownerReviewEstimateScenario), /password|service_role|@example/i);
+});
+
 test('recorder target guard rejects Production, Sandbox, and non-durable app origins', () => {
   const scenario = homeownerServiceRequestScenario;
   assert.equal(assertSafeRecorderEnvironment({}, scenario).projectRef, 'bdytwgejqnlblhrnqxkp');
@@ -53,6 +69,7 @@ test('operator arguments stay intentionally small', () => {
   });
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
+  assert.equal(parseRecorderArgs(['homeowner-review-estimate']).scenarioKey, 'homeowner-review-estimate');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
 });
@@ -87,6 +104,15 @@ test('duration and metadata contracts fail closed', () => {
     createdAt: '2026-08-14T12:00:00.000Z',
   });
   assert.match(estimateMetadata.fixture_policy, /estimate_draft/i);
+  const homeownerEstimateMetadata = buildArtifactMetadata({
+    scenario: homeownerReviewEstimateScenario,
+    sourceCommit: 'c'.repeat(40),
+    pacing: 'marketing',
+    durationSeconds: 18.5,
+    fileName: 'homeowner-estimate.webm',
+    createdAt: '2026-08-14T12:00:00.000Z',
+  });
+  assert.match(homeownerEstimateMetadata.fixture_policy, /estimate_accepted/i);
 });
 
 test('fixture adoption is exact, lineage-bound, and does not broaden reset authority', () => {
@@ -114,4 +140,14 @@ test('fixture adoption is exact, lineage-bound, and does not broaden reset autho
   assert.match(source, /verifyScenario\(service, scenarioKey, env, 'estimate_draft'\)/);
   assert.match(recorderSource, /estimateSubmissionStarted && !estimateAdopted/);
   assert.match(recorderSource, /runDemoCommand\(\['adopt-estimate', scenario\.fixtureScenarioKey\], env\)\.catch/);
+  assert.match(source, /async function adoptRecorderEstimateResponse/);
+  assert.match(source, /contractorClient\.rpc\('servsync_send_estimate'/);
+  assert.doesNotMatch(source, /\.update\(\{ status: 'sent', updated_at: dates\.estimateSentAt \}\)/);
+  assert.match(source, /run\.checkpoint !== 'estimate_sent'/);
+  assert.match(source, /expected one exact approval event/);
+  assert.match(source, /recorder_scenario: 'homeowner-review-estimate'/);
+  assert.match(source, /accepting the Estimate created a Job or Invoice/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'estimate_accepted'\)/);
+  assert.match(recorderSource, /responseSubmissionStarted && !responseAdopted/);
+  assert.match(recorderSource, /runDemoCommand\(\['adopt-estimate-response', scenario\.fixtureScenarioKey\], env\)\.catch/);
 });

@@ -120,11 +120,14 @@ The second bounded scenario uses the same guarded runner and creates one draft E
 
 ```bash
 npm run demo:record -- contractor-create-estimate
+npm run demo:record -- homeowner-review-estimate
 ```
 
 The recorder owns the `connected_request_ready -> request_ready` transition: the homeowner creates the request through the real product UI, then the private runner adopts only the one exact matching request into the active registry-owned run and verifies the final checkpoint. `adopt-request` is an internal recorder operation, not a general operator mutation command.
 
 For `contractor-create-estimate`, the recorder restores `request_ready`, saves one exact priced draft through the contractor Estimate composer, and privately adopts only that exact Estimate and line before verifying `estimate_draft`. It creates no approval, Job, Invoice, payment schedule, or external side effect. `adopt-estimate` is likewise an internal recorder operation.
+
+For `homeowner-review-estimate`, the recorder restores `estimate_sent`, authenticates the homeowner outside the footage, accepts through the normal connected-homeowner Estimate UI, and privately adopts the one exact approval event before verifying `estimate_accepted`. The five Estimate lines and two payment-schedule rows remain unchanged, and the run fails if a Job or Invoice appears. `adopt-estimate-response` is an internal recorder operation, not a general fixture mutation command.
 
 By default, `demo:seed` restores the backward-compatible `job_created` checkpoint. Demo checkpoint slices also support explicit checkpoint restoration through argument forwarding:
 
