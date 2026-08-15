@@ -35,6 +35,7 @@ export class FacebookProviderError extends Error {
 export type FacebookMarketingConfig = {
   appId: string;
   appSecret: string;
+  loginConfigurationId: string;
   graphApiVersion: string;
   callbackUrl: string;
   publicPostsEnabled: boolean;
@@ -56,16 +57,18 @@ function projectRef(value: string) {
 export function resolveFacebookMarketingConfig(environment: NodeJS.ProcessEnv = process.env): FacebookMarketingConfig | null {
   const appId = environment.SERVSYNC_META_APP_ID?.trim() ?? '';
   const appSecret = environment.SERVSYNC_META_APP_SECRET?.trim() ?? '';
+  const loginConfigurationId = environment.SERVSYNC_META_LOGIN_CONFIGURATION_ID?.trim() ?? '';
   const graphApiVersion = environment.SERVSYNC_META_GRAPH_API_VERSION?.trim() ?? '';
   const callbackUrl = environment.SERVSYNC_META_OAUTH_REDIRECT_URI?.trim() ?? '';
   const expectedRef = environment.SERVSYNC_MARKETING_PUBLISHING_PROJECT_REF?.trim() ?? '';
   const supabaseUrl = environment.SUPABASE_URL?.trim() ?? '';
-  if (!/^\d{3,40}$/.test(appId) || appSecret.length < 20) return null;
+  if (!/^\d{3,40}$/.test(appId) || appSecret.length < 20 || !/^\d{3,80}$/.test(loginConfigurationId)) return null;
   if (graphApiVersion !== FACEBOOK_GRAPH_API_VERSION || callbackUrl !== FACEBOOK_CALLBACK_URL) return null;
   if (expectedRef !== FACEBOOK_PRODUCTION_PROJECT_REF || projectRef(supabaseUrl) !== FACEBOOK_PRODUCTION_PROJECT_REF) return null;
   return {
     appId,
     appSecret,
+    loginConfigurationId,
     graphApiVersion,
     callbackUrl,
     publicPostsEnabled: environment.SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED === 'true',
@@ -93,7 +96,7 @@ export function facebookAuthorizationUrl(config: FacebookMarketingConfig, state:
   url.searchParams.set('redirect_uri', config.callbackUrl);
   url.searchParams.set('state', state);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', FACEBOOK_REQUIRED_PERMISSIONS.join(','));
+  url.searchParams.set('config_id', config.loginConfigurationId);
   return url.toString();
 }
 

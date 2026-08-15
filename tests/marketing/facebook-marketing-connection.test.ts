@@ -25,6 +25,7 @@ import { marketingFacebookReturnStatus } from '../../src/features/marketing/mark
 const config: FacebookMarketingConfig = {
   appId: '123456789012345',
   appSecret: 'test-app-secret-abcdefghijklmnopqrstuvwxyz',
+  loginConfigurationId: '987654321098765',
   graphApiVersion: FACEBOOK_GRAPH_API_VERSION,
   callbackUrl: FACEBOOK_CALLBACK_URL,
   publicPostsEnabled: false,
@@ -57,12 +58,15 @@ test('configuration is pinned to Production, the current Graph version, and the 
   const environment = {
     SERVSYNC_META_APP_ID: config.appId,
     SERVSYNC_META_APP_SECRET: config.appSecret,
+    SERVSYNC_META_LOGIN_CONFIGURATION_ID: config.loginConfigurationId,
     SERVSYNC_META_GRAPH_API_VERSION: FACEBOOK_GRAPH_API_VERSION,
     SERVSYNC_META_OAUTH_REDIRECT_URI: FACEBOOK_CALLBACK_URL,
     SERVSYNC_MARKETING_PUBLISHING_PROJECT_REF: 'uqgtheclhxqlnjpfmheq',
     SUPABASE_URL: 'https://uqgtheclhxqlnjpfmheq.supabase.co',
   } as NodeJS.ProcessEnv;
   assert.deepEqual(resolveFacebookMarketingConfig(environment), config);
+  assert.equal(resolveFacebookMarketingConfig({ ...environment, SERVSYNC_META_LOGIN_CONFIGURATION_ID: '' }), null);
+  assert.equal(resolveFacebookMarketingConfig({ ...environment, SERVSYNC_META_LOGIN_CONFIGURATION_ID: 'not-a-configuration' }), null);
   assert.equal(resolveFacebookMarketingConfig({ ...environment, SERVSYNC_MARKETING_PUBLISHING_PROJECT_REF: 'bdytwgejqnlblhrnqxkp' }), null);
   assert.equal(resolveFacebookMarketingConfig({ ...environment, SERVSYNC_META_GRAPH_API_VERSION: 'v25.0' }), null);
   assert.equal(resolveFacebookMarketingConfig({ ...environment, SERVSYNC_META_OAUTH_REDIRECT_URI: 'https://example.com/callback' }), null);
@@ -88,14 +92,16 @@ test('OAuth state is strong and only its SHA-256 digest is prepared for persiste
   assert.equal(first.stateHash.includes(first.state), false);
 });
 
-test('authorization URL requests only the reviewed Page permissions', () => {
+test('authorization URL invokes the reviewed Facebook Login for Business configuration', () => {
   const url = new URL(facebookAuthorizationUrl(config, 'safe-state-value'));
   assert.equal(url.origin, 'https://www.facebook.com');
   assert.equal(url.pathname, `/${FACEBOOK_GRAPH_API_VERSION}/dialog/oauth`);
   assert.equal(url.searchParams.get('client_id'), config.appId);
   assert.equal(url.searchParams.get('redirect_uri'), FACEBOOK_CALLBACK_URL);
   assert.equal(url.searchParams.get('state'), 'safe-state-value');
-  assert.deepEqual(url.searchParams.get('scope')?.split(','), [...FACEBOOK_REQUIRED_PERMISSIONS]);
+  assert.equal(url.searchParams.get('response_type'), 'code');
+  assert.equal(url.searchParams.get('config_id'), config.loginConfigurationId);
+  assert.equal(url.searchParams.has('scope'), false);
   assert.equal(url.toString().includes(config.appSecret), false);
 });
 
@@ -141,6 +147,26 @@ test('Page discovery strips tokens and requires permissions plus CREATE_CONTENT'
     assert.equal(call.url.searchParams.has('access_token'), false);
     assert.equal(new Headers(call.init?.headers).get('authorization'), `Bearer ${userToken}`);
   }
+});
+
+test('configured asset selection exposes only the Meta-returned Page and zero-page discovery stays fail-closed', async () => {
+  const selectedOnly = await discoverFacebookPages(config, userToken, queueFetcher([
+    json({ id: '9988776655443322' }),
+    json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
+    json({ data: [{ id: '1199023349954773', name: 'ServSync', access_token: pageToken, tasks: ['CREATE_CONTENT'] }] }),
+  ], []));
+  assert.deepEqual(selectedOnly.pages.map(page => page.safe), [
+    { page_id: '1199023349954773', page_name: 'ServSync', tasks: ['CREATE_CONTENT'], eligible: true },
+  ]);
+  assert.equal(JSON.stringify(selectedOnly).includes('Prevention Pros'), false);
+
+  const zeroPages = await discoverFacebookPages(config, userToken, queueFetcher([
+    json({ id: '9988776655443322' }),
+    json({ data: FACEBOOK_REQUIRED_PERMISSIONS.map(permission => ({ permission, status: 'granted' })) }),
+    json({ data: [] }),
+  ], []));
+  assert.deepEqual(zeroPages.pages, []);
+  assert.deepEqual(zeroPages.grantedPermissions, [...FACEBOOK_REQUIRED_PERMISSIONS].sort());
 });
 
 test('Page validation enforces stable identity and content authority', async () => {

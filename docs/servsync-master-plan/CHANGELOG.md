@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037A Facebook Login for Business configuration correction
+
+- Branch: `codex/fb037a-facebook-business-login-config-v1`.
+- Starting main SHA: `1022b8ede2caa6365ece213453652ad4213205ba`.
+- Files changed: server-side Facebook configuration and OAuth URL construction; focused provider regressions; Facebook connection runbook; FB-037 backlog/master-plan governance; and this changelog.
+- Summary of change: Requires `SERVSYNC_META_LOGIN_CONFIGURATION_ID` and invokes the Meta authorization-code dialog using `config_id` without a scope query. This aligns ServSync with current Facebook Login for Business configuration semantics while retaining post-callback permission checks, explicit candidate Page selection, and the existing Page-token/Vault boundary.
+- Production finding: The first real consent selected only the ServSync Page and granted all three required permissions, but the scope-only flow returned a no-expiry Business Integration token whose `/me/accounts` result was empty. The unfinished session and one transient Vault token were removed; Production returned to `setup_required` with no selected Page, durable token, publication, event, or post.
+- Tests/checks run: Focused Facebook configuration, authorization URL, selected-asset, permission, zero-Page, callback, selection, token-containment, publishing, backend-parity, TypeScript, Production build, sensitive-value, Markdown-link, and diff checks.
+- Known risks or follow-ups: The owner must create or confirm a General Facebook Login for Business **User access token** configuration for Page assets, install its ID through the approved local Production Vercel flow, and then perform one new consent attempt selecting only ServSync. This branch does not install configuration, call Meta, select a Page, or enable publishing.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the real provider mismatch and the exact configuration gate without advancing publication readiness.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the corrected configuration-driven provider authorization workflow while preserving existing product authority and publication gates.
+
 ## 2026-08-15 - FB-037A Facebook abandoned-authorization recovery
 
 - Branch: `codex/fb037a-facebook-oauth-recovery-v1`.
