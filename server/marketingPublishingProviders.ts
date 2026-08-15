@@ -5,6 +5,7 @@ import {
   validateFacebookText,
   type FacebookMarketingConfig,
 } from './facebookMarketingConnection.js';
+import { publicMessageForProvider } from '../src/features/marketing/marketingPublicationPreview.js';
 
 export type MarketingProvider = 'facebook' | 'instagram' | 'tiktok';
 export type ProviderFailureCategory =
@@ -91,7 +92,7 @@ export function createFacebookPublishingAdapter({
       if (!/^\d{3,80}$/.test(claim.destination_key)) return {
         category: 'provider_auth', message: 'The Facebook Page destination is invalid.', retryEligible: false, requestStarted: false,
       };
-      const validation = validateFacebookText(claim.content_snapshot.body ?? '');
+      const validation = validateFacebookText(publicMessageForProvider('facebook', claim.content_snapshot));
       return validation ? {
         category: validation.category,
         message: validation.message,
@@ -102,7 +103,12 @@ export function createFacebookPublishingAdapter({
     async publishText(claim) {
       if (!config?.publicPostsEnabled) throw new FacebookProviderError('unsupported', 'Facebook public posting is not enabled.');
       const pageToken = await getPageToken(claim.provider_connection_id);
-      const request = facebookTextPublicationRequest(config, claim.destination_key, pageToken, claim.content_snapshot.body ?? '');
+      const request = facebookTextPublicationRequest(
+        config,
+        claim.destination_key,
+        pageToken,
+        publicMessageForProvider('facebook', claim.content_snapshot),
+      );
       let response: Response;
       try { response = await fetcher(request.url, { ...request.init, cache: 'no-store' }); }
       catch { throw new FacebookProviderError('provider_uncertain', 'The Facebook post result could not be confirmed.', false, true); }

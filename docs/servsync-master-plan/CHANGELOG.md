@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037B Owner Visual Publication Preview v1
+
+- Branch: `codex/fb037b-owner-visual-publication-preview-v1`.
+- Starting main SHA: `d31e5224e717a748196ce499335b139a3dd3118c`.
+- Files changed: shared Marketing publication-preview contract; internal Marketing Content/Publishing UI; Facebook provider adapter parity wiring; focused browser/provider regressions; provider publishing and Facebook connection specifications; FB-037 backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Adds a responsive owner decision surface for every approved Facebook-eligible text item. Internal title, audience, approved Direction lineage, revision, and grounding stay outside a Facebook-style card that renders only the exact snapshot `body` consumed by the provider adapter. Candidate switching, return-to-Content, publish-now/scheduled timing, timezone display, and an explicit final `Publish to Facebook` or `Schedule Facebook Post` confirmation are present without bypassing content approval.
+- Safety: The browser never reads a provider token or calls Meta. Database `publishing_enabled` remains false and `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` remains absent/false, so the final public action is disabled and no publication, publication event, schedule, or Facebook feed POST can be created by this slice. Instagram and TikTok remain unconnected.
+- Tests/checks run: focused approved-candidate/public-copy/Direction/schedule/final-action/mobile browser coverage; Facebook provider/publication parity; backend parity; strict TypeScript; Production build; focused ESLint; Markdown-link and sensitive-value scans; and `git diff --check`.
+- Known risks or follow-ups: The preview intentionally does not claim pixel-perfect Facebook rendering and does not show provider-generated timestamps or engagement. Returning for revision navigates back to the immutable approved Content record; wording changes must proceed through a separately created/edited draft and normal reapproval. The first public post remains a separate exact owner authorization.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records visual owner review as complete while keeping the first public Facebook post and future provider/media work gated.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Adds destination-specific preview and explicit final-confirmation steps to the approved Marketing publication workflow without changing publication authority.
+
 ## 2026-08-15 - FB-037A granular Facebook Page discovery correction
 
 - Branch: `codex/fb037a-granular-page-discovery-v1`.

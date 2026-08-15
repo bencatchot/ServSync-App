@@ -6,7 +6,9 @@ This foundation adds a durable publication decision after Marketing Content appr
 
 ```text
 Approved Marketing Content revision
+-> destination-specific owner visual preview
 -> explicit owner provider/timing decision
+-> explicit final public-action confirmation
 -> immutable publication snapshot
 -> durable scheduled/publishing/published/failed/cancelled lifecycle
 -> purpose-bound server worker
@@ -30,6 +32,8 @@ This ordering is ServSync internal strategy. It is not a default for future cont
 - Provider connection, publication, and event tables are forced-RLS and expose no direct browser or generic service-role table access.
 - Worker RPCs are purpose-bound and executable only by the server-side service role.
 - Creation requires an exact approved social-content revision and a connected destination with text capability.
+- Preview eligibility uses the same approved social-content boundary as creation. The Facebook card renders only the snapshot `body`; the internal title and lineage remain outside public content.
+- Provider previews are advisory rather than pixel-perfect. They do not invent timestamps, engagement, reach, or other provider-generated state.
 - The snapshot retains only public copy and bounded audit lineage. It is immutable after authorization.
 - Published and cancelled rows are terminal. Publication events are append-only.
 - A replay-safe request UUID protects owner retries. Row claims use `FOR UPDATE SKIP LOCKED`.
@@ -54,7 +58,9 @@ The Production Vercel project has the exact Production reference as a Production
 
 ### Facebook
 
-Facebook Connection v1 now supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. The schema is installed across Sandbox, Demo, and Production, but no verified ServSync Meta Developer app credential, owner consent, selected Page, or provider review evidence is configured. Facebook therefore remains `setup_required` and public posting remains disabled. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
+Facebook Connection v1 supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. Production now has a provider-validated ServSync Page connection with required granular Page authority and readiness `ready_except_live_post_verification`. Public posting remains disabled by the database capability and absent/false environment kill switch. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
+
+Owner Visual Publication Preview v1 lists every currently approved Facebook-eligible text item, separates internal metadata from public content, and renders the exact adapter message in a responsive Facebook-style decision card. The owner can compare candidates, review Direction lineage and grounding notes, choose publish-now or one-time scheduled timing, and inspect the explicit final public action. With public posting disabled, that final action cannot create or schedule a publication.
 
 The current Meta Pages API documentation describes Page publishing through `POST /{page-id}/feed` with a Page access token. The setup slice must verify the Page/business relationship and current app review/access for `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`, plus a Page task that permits content creation. The Graph API version must be selected and pinned when the real Meta app is connected, not guessed in this unconnected foundation.
 
@@ -63,7 +69,7 @@ Primary references:
 - [Meta Pages API: Posts](https://developers.facebook.com/docs/pages-api/posts/)
 - [Meta Pages API: Getting Started](https://developers.facebook.com/docs/pages-api/getting-started/)
 
-The next Facebook gate is owner Meta app/Page setup and consent, followed only later by one exact separately authorized public text post. Raw passwords or pasted long-lived tokens are not an acceptable setup method.
+The next Facebook gate is one exact separately authorized public text post after owner visual review. Raw passwords or pasted long-lived tokens remain outside the workflow.
 
 ### Instagram
 
