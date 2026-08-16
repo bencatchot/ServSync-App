@@ -22234,6 +22234,8 @@ function ContractorDashboard({
   const canManageFinancialActions = financialActionVisibility.canManageBilling;
   const jobActionVisibility = contractorJobActionVisibility(durableDraftCapabilities);
   const canManageJobOperations = jobActionVisibility.canManageJobOperations;
+  const canFinalizeCompletedJobReport = canManageJobOperations
+    || (SERVSYNC_DEMO_PRESENTATION_MODE && contractor?.owner_user_id === profile.id);
   const authorizedInvoiceComposerOpen = canManageFinancialActions && invoiceComposerOpen;
   useEffect(() => {
     if (durableDraftCapabilityLoading || canManageFinancialActions) return;
@@ -42818,7 +42820,7 @@ function ContractorDashboard({
                                     : 'Finalize the completed work into a ServSync customer report stored with this Job.'}
                               </p>
                             </div>
-                            {canManageJobOperations && activeInspection.status === 'draft' && (
+                            {canFinalizeCompletedJobReport && activeInspection.status === 'draft' && (
                               <button
                                 type="button"
                                 disabled={finalizingInspection}

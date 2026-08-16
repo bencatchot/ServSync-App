@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037C Demo owner report-finalizer visibility bridge
+
+- Branch: `codex/fb037c-demo-owner-report-finalizer-v1`.
+- Starting main SHA: `6f3266a2b60c89b27c6025cad82d277785c26363`.
+- Files changed: completed simple-Job report action visibility, focused recorder regression, and this changelog.
+- Summary of change: Keeps the normal completed simple-Job **Finalize Report** action available to the exact contractor owner in the dedicated Demo presentation environment. The action still calls the canonical `finalizeInspection` handler, `generateInspectionPdf`, authenticated private upload, and server-authorized `servsync_finalize_field_work` RPC.
+- Reason for change: Live post-merge validation proved the Demo Job and registry lineage were correct, but presentation mode intentionally suppresses the durable Job-launch capability used by shared mutation rendering. That made the normal finalizer invisible even to the fixture contractor owner before any click occurred.
+- Tests/checks run: Focused Demo recorder/output contracts, strict TypeScript, Production build, JavaScript lint, sensitive-value scan, and `git diff --check`.
+- Known risks or follow-ups: The bridge is limited to the dedicated Demo presentation ref, exact contractor owner, completed simple-Job report action, and unchanged server authority. Other Demo mutation controls remain hidden. The real recording and owner-review pairing remain required.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This unblocks the already-recorded canonical-output recording gate without changing scope or priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is a narrow presentation-mode compatibility correction for the approved recorder workflow.
+
 ## 2026-08-16 - FB-037C Home History recorder runtime-lineage correction
 
 - Branch: `codex/fb037c-home-history-runtime-lineage-v1`.
