@@ -25,6 +25,16 @@ export type PublicationClaim = {
   provider_connection_id: string;
   destination_key: string;
   content_snapshot: { title?: string; body?: string; content_type?: string };
+  media_pairing_id?: string | null;
+  media_snapshot?: {
+    pairing_id?: string;
+    asset_id?: string;
+    storage_bucket?: string;
+    storage_path?: string;
+    mime_type?: string;
+    sha256?: string;
+    media_variant?: string;
+  } | null;
 };
 
 export type ProviderPublishResult = {
@@ -91,6 +101,12 @@ export function createFacebookPublishingAdapter({
       };
       if (!/^\d{3,80}$/.test(claim.destination_key)) return {
         category: 'provider_auth', message: 'The Facebook Page destination is invalid.', retryEligible: false, requestStarted: false,
+      };
+      if (claim.media_snapshot) return {
+        category: 'unsupported',
+        message: 'Facebook managed-video publishing is not enabled in this release.',
+        retryEligible: false,
+        requestStarted: false,
       };
       const validation = validateFacebookText(publicMessageForProvider('facebook', claim.content_snapshot));
       return validation ? {

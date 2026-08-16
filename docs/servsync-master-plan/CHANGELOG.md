@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037D flagship narrated Marketing asset and exact publication preview
+
+- Branch: `codex/fb037d-flagship-narrated-asset-v1`.
+- Starting main SHA: `d9da62fb3383c12057b950d44ca5241228f0aee8`.
+- Files changed: narrated Marketing media/publication migration and installer validation; media, publication-preview, worker, and owner Publishing UI contracts; focused SQL/browser/worker tests; backend rollout ledger/parity, provider-publishing architecture, Marketing runbook, FB-037 backlog/master-plan governance; and this changelog.
+- Summary of change: Distinguishes silent product-demo masters from narrated Marketing derivatives; stores bounded OpenAI/Cedar/model/script/audio-timing/disclosure provenance; lets an owner-approved exact asset pair with separately unapproved caption copy; carries that exact approved pairing only across a later status-only Content approval revision; and binds the same immutable media snapshot to the owner preview and future worker input. The first real Production flagship uses approved asset `2097be01-0be4-4f8e-bef2-2e81adb9c95d`, approved pairing `86e4a795-6c67-4586-bac8-794d6eee7364`, and Content `67790a72-b9c4-4796-9fcf-e0d5b9d6149a` revision 2 in `needs_approval` with approved Direction lineage.
+- Rollout: Exact migration `servsync-narrated-marketing-media-publication.sql` (SHA-256 `e165fb94f6214bdfdee68204694eee5af6658d639ce0ef88c4c3526c2d261167`) was applied Sandbox -> Demo -> Production on 2026-08-16 UTC. Rollback-only narrated registration, pairing, separate approval, revision carry-forward, immutable publication snapshot, role denial, and zero-residue validation passed. Sandbox and Demo remained empty. Production preserved all prior Marketing assets/pairings/content/status history before the separately authorized flagship Plan, Direction, draft, managed upload, and media approval were added.
+- Safety: The exact caption remains awaiting owner approval. Database `publishing_enabled` remains false, `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` remains absent/false, and publication/publication-event counts remain zero. The current Facebook adapter still declares no media capability and rejects a media claim before token lookup or network access. No Facebook/Instagram/TikTok media upload or feed POST occurred.
+- Tests/checks run: narrated-media SQL/security/lifecycle validation; Marketing media, provider publishing, Facebook connection, and backend-parity regressions; owner preview desktop/mobile browser coverage; strict TypeScript; Production build; focused lint where available; rollout-ledger, Markdown-link, sensitive-value, and `git diff --check` validation.
+- Known risks or follow-ups: The owner must approve or revise the exact caption. Facebook video upload/post support remains a separate reviewed adapter slice; first public publication still requires both public-post gates and explicit owner authorization. One successful flagship asset does not authorize runtime AI generation or contractor-tenant Marketing media.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records managed narrated-media provenance and exact preview parity while preserving text approval, provider video support, and public posting as separate gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Adds the narrated-derivative and independent text/media approval contract to the provider-neutral Marketing architecture.
+
 ## 2026-08-16 - ServSync flagship introduction video v2 recorder foundation
 
 - Branch: `codex/flagship-intro-video-v2`.

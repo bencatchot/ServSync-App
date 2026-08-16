@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMarketingPublishingHandler } from '../../server/marketingPublishingHttp.ts';
-import { marketingPublishingProviders, sanitizeProviderFailure } from '../../server/marketingPublishingProviders.ts';
+import {
+  createFacebookPublishingAdapter,
+  marketingPublishingProviders,
+  sanitizeProviderFailure,
+} from '../../server/marketingPublishingProviders.ts';
 import { resolveMarketingPublishingConfig, runMarketingPublishingWorker } from '../../server/marketingPublishingWorker.ts';
 import { FacebookProviderError } from '../../server/facebookMarketingConnection.ts';
 
@@ -56,6 +60,38 @@ test('unconnected provider claim fails safely without beginning an external requ
   ]);
   assert.equal(calls[1].args.p_retry_eligible, false);
   assert.equal(JSON.stringify(calls).includes('token'), false);
+});
+
+test('Facebook managed video fails closed before token access or provider request', () => {
+  let tokenReads = 0;
+  let providerRequests = 0;
+  const adapter = createFacebookPublishingAdapter({
+    config: {
+      appId: '1234567890', appSecret: 'test-secret', graphApiVersion: 'v26.0',
+      oauthRedirectUri: 'https://servsync.app/api/marketing-facebook-oauth-callback',
+      loginConfigurationId: '9876543210', expectedProjectRef: 'uqgtheclhxqlnjpfmheq', publicPostsEnabled: true,
+    },
+    getPageToken: async () => { tokenReads += 1; return 'test-page-token'; },
+    fetcher: async () => { providerRequests += 1; return new Response('{}'); },
+  });
+  const failure = adapter.validatePublication({
+    publication_id: '61000000-0000-4000-8000-000000000010', attempt_number: 1, provider: 'facebook',
+    provider_connection_id: '61000000-0000-4000-8000-000000000011', destination_key: '1122334455667788',
+    content_snapshot: { title: 'Flagship', body: 'Exact approved public copy.', content_type: 'social_post' },
+    media_pairing_id: '61000000-0000-4000-8000-000000000012',
+    media_snapshot: {
+      pairing_id: '61000000-0000-4000-8000-000000000012',
+      asset_id: '61000000-0000-4000-8000-000000000013', storage_bucket: 'marketing-assets',
+      storage_path: 'workspace/asset/flagship.mp4', mime_type: 'video/mp4', sha256: 'a'.repeat(64),
+      media_variant: 'narrated_marketing_derivative',
+    },
+  });
+  assert.deepEqual(failure, {
+    category: 'unsupported', message: 'Facebook managed-video publishing is not enabled in this release.',
+    retryEligible: false, requestStarted: false,
+  });
+  assert.equal(tokenReads, 0);
+  assert.equal(providerRequests, 0);
 });
 
 test('uncertain network result disables automatic retry to prevent duplicate public posts', () => {

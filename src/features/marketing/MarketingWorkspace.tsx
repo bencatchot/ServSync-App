@@ -43,7 +43,7 @@ import {
 } from './marketingPublishing';
 import {
   createMarketingMediaAdapter,
-  type DurableDemoRecordingMetadata,
+  type MarketingMediaUploadMetadata,
   type MarketingMediaClient,
   type MarketingMediaState,
 } from './marketingMedia';
@@ -573,7 +573,7 @@ function AuthorizedInternalMarketingWorkspace({
     saving: publishingSaving,
     onReload: async () => { await Promise.all([loadPublishing(), loadMedia()]); },
     mediaState,
-    onUploadMedia: async ({ content: selectedContent, mp4, metadata, claimDemonstrated }: { content: MarketingContentItem; mp4: File; metadata: DurableDemoRecordingMetadata; claimDemonstrated: string }) => {
+    onUploadMedia: async ({ content: selectedContent, mp4, metadata, claimDemonstrated }: { content: MarketingContentItem; mp4: File; metadata: MarketingMediaUploadMetadata; claimDemonstrated: string }) => {
       if (!mediaState) throw new Error('Marketing media is still loading.');
       setPublishingSaving(true);
       setPublishingError(null);

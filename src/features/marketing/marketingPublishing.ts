@@ -31,6 +31,8 @@ export type MarketingPublication = {
   contentId: string;
   contentRevision: number;
   snapshot: { title: string; body: string; content_type: string; content_revision: number };
+  mediaPairingId: string | null;
+  mediaSnapshot: Record<string, unknown> | null;
   provider: MarketingProvider;
   destinationLabel: string;
   mode: MarketingPublicationMode;
@@ -136,6 +138,9 @@ function parseState(value: unknown): MarketingPublishingState {
       || !record(publication.content_snapshot) || typeof publication.content_snapshot.title !== 'string'
       || typeof publication.content_snapshot.body !== 'string' || typeof publication.content_snapshot.content_type !== 'string'
       || typeof publication.content_snapshot.content_revision !== 'number'
+      || !(publication.media_pairing_id === undefined || publication.media_pairing_id === null
+        || (typeof publication.media_pairing_id === 'string' && UUID.test(publication.media_pairing_id)))
+      || !(publication.media_snapshot === undefined || publication.media_snapshot === null || record(publication.media_snapshot))
       || !MARKETING_PROVIDERS.includes(publication.provider as MarketingProvider)
       || typeof publication.destination_label !== 'string'
       || !['publish_now', 'scheduled'].includes(String(publication.publication_mode))
@@ -151,6 +156,8 @@ function parseState(value: unknown): MarketingPublishingState {
       contentId: publication.content_id,
       contentRevision: publication.content_revision,
       snapshot: publication.content_snapshot as MarketingPublication['snapshot'],
+      mediaPairingId: typeof publication.media_pairing_id === 'string' ? publication.media_pairing_id : null,
+      mediaSnapshot: record(publication.media_snapshot) ? publication.media_snapshot : null,
       provider: publication.provider as MarketingProvider,
       destinationLabel: publication.destination_label,
       mode: publication.publication_mode as MarketingPublicationMode,

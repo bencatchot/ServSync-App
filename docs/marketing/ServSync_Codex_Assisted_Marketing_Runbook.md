@@ -4,6 +4,8 @@
 
 Use this runbook only to prepare draft content for ServSync's internal Marketing workspace. It does not authorize approval, publishing, scheduling, outreach, provider configuration, or contractor/homeowner Marketing access.
 
+Narrated Marketing media remains a separate owner-review boundary. A narrated upload must use the private `marketing-assets` bucket, preserve the silent master provenance, match one exact Content revision, include the reviewed public AI-voice disclosure in that Content body, and record media approval separately from text approval. A status-only Content approval may carry the already-approved exact pairing to the new revision; any copy edit requires a fresh pairing decision. Neither a managed asset nor an approved pairing authorizes publication, and the current Facebook adapter rejects media claims until a separately reviewed video adapter exists.
+
 The repository-current contracts are:
 
 - Truth Pack: `config/marketing/servsync-marketing-truth-pack.v3.json`
