@@ -65,6 +65,7 @@
     "test:marketing-directions": "bash scripts/validation/validate-accepted-plan-marketing-directions.sh && node --test tests/marketing/marketing-direction-preparation-contract.test.mjs",
     "test:marketing-publishing": "bash scripts/validation/validate-provider-neutral-marketing-publishing.sh && node --import tsx --test tests/marketing/marketing-publishing-worker.test.ts",
     "test:marketing-media-assets": "bash scripts/validation/validate-marketing-media-assets.sh",
+    "test:narrated-marketing-media": "bash scripts/validation/validate-narrated-marketing-media-publication.sh",
     "test:facebook-marketing-connection": "bash scripts/validation/validate-facebook-marketing-connection.sh && node --import tsx --test tests/marketing/facebook-marketing-connection.test.ts tests/marketing/marketing-publishing-worker.test.ts",
     "test:approved-direction-content": "bash scripts/validation/validate-approved-direction-content-preparation.sh && node --test tests/marketing/approved-direction-package-contract.test.mjs",
     "test:price-book-import-rollback": "bash scripts/validation/validate-price-book-import-rollback.sh",

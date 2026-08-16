@@ -3,8 +3,8 @@ import { CalendarClock, Check, ChevronLeft, ChevronRight, Globe2, Link2, Loader2
 import type { MarketingContentItem } from './marketingContent';
 import {
   pairingForContent,
-  parseDurableDemoRecordingMetadata,
-  type DurableDemoRecordingMetadata,
+  parseMarketingMediaUploadMetadata,
+  type MarketingMediaUploadMetadata,
   type MarketingMediaState,
 } from './marketingMedia';
 import {
@@ -66,7 +66,7 @@ export function MarketingPublicationComposer({
   onReturnForRevision: (content: MarketingContentItem) => void;
   onCreate: (input: { connection: MarketingProviderConnection; mode: MarketingPublicationMode; scheduledAt: string | null }) => Promise<void>;
   mediaState: MarketingMediaState | null;
-  onUploadMedia: (input: { content: MarketingContentItem; mp4: File; metadata: DurableDemoRecordingMetadata; claimDemonstrated: string }) => Promise<void>;
+  onUploadMedia: (input: { content: MarketingContentItem; mp4: File; metadata: MarketingMediaUploadMetadata; claimDemonstrated: string }) => Promise<void>;
   onReviewMedia: (pairingId: string, decision: 'approved' | 'rejected') => Promise<void>;
 }) {
   const candidates = useMemo(() => eligibleFacebookPreviewContent(contentItems), [contentItems]);
@@ -80,10 +80,10 @@ export function MarketingPublicationComposer({
   const [metadataFile, setMetadataFile] = useState<File | null>(null);
   const [claimDemonstrated, setClaimDemonstrated] = useState('');
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const snapshot = selected ? marketingPublicationSnapshotForContent(selected) : null;
-  const preview = snapshot ? marketingProviderPreview('facebook', snapshot) : null;
   const mediaPairing = pairingForContent(mediaState, selected);
   const mediaAsset = mediaPairing ? mediaState?.assets.find(asset => asset.id === mediaPairing.assetId) ?? null : null;
+  const snapshot = selected ? marketingPublicationSnapshotForContent(selected, mediaPairing, mediaAsset) : null;
+  const preview = snapshot ? marketingProviderPreview('facebook', snapshot) : null;
   const connectionReady = facebook?.status === 'connected'
     && facebook.readinessStatus === 'ready_except_live_post_verification'
     && facebook.capabilities.text;
@@ -109,7 +109,7 @@ export function MarketingPublicationComposer({
     if (!selected || !mp4File || !metadataFile) return;
     setMediaError(null);
     try {
-      const metadata = parseDurableDemoRecordingMetadata(JSON.parse(await metadataFile.text()));
+      const metadata = parseMarketingMediaUploadMetadata(JSON.parse(await metadataFile.text()));
       await onUploadMedia({ content: selected, mp4: mp4File, metadata, claimDemonstrated });
       setMp4File(null);
       setMetadataFile(null);
@@ -134,7 +134,7 @@ export function MarketingPublicationComposer({
   };
 
   if (!selected || !preview) {
-    return <section data-testid="marketing-publication-composer" className="border-y border-dashed border-slate-200 py-8 text-center"><p className="text-sm font-bold text-slate-700">No approved Facebook text posts</p><p className="mt-1 text-sm text-slate-500">Approved social posts will appear here for visual review.</p></section>;
+    return <section data-testid="marketing-publication-composer" className="border-y border-dashed border-slate-200 py-8 text-center"><p className="text-sm font-bold text-slate-700">No Facebook posts ready for review</p><p className="mt-1 text-sm text-slate-500">Submitted and approved social posts will appear here for owner review.</p></section>;
   }
 
   const move = (offset: number) => {
@@ -144,17 +144,17 @@ export function MarketingPublicationComposer({
 
   return (
     <section data-testid="marketing-publication-composer" className="space-y-5 border-y border-slate-200 py-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase text-blue-700">Owner publication preview</p><h3 className="mt-1 text-base font-bold text-slate-950">Approved Facebook posts</h3><p className="mt-1 text-sm text-slate-500">Review the exact public message before any publication is created.</p></div><div className="flex items-center gap-2"><button type="button" aria-label="Previous approved post" onClick={() => move(-1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white"><ChevronLeft size={17} /></button><span className="min-w-16 text-center text-sm font-bold text-slate-700">{selectedIndex + 1} of {candidates.length}</span><button type="button" aria-label="Next approved post" onClick={() => move(1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white"><ChevronRight size={17} /></button></div></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase text-blue-700">Owner publication preview</p><h3 className="mt-1 text-base font-bold text-slate-950">Facebook post review</h3><p className="mt-1 text-sm text-slate-500">Review the exact public message and managed media before any publication is created.</p></div><div className="flex items-center gap-2"><button type="button" aria-label="Previous reviewable post" onClick={() => move(-1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white"><ChevronLeft size={17} /></button><span className="min-w-16 text-center text-sm font-bold text-slate-700">{selectedIndex + 1} of {candidates.length}</span><button type="button" aria-label="Next reviewable post" onClick={() => move(1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white"><ChevronRight size={17} /></button></div></div>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(13rem,0.65fr)_minmax(0,1.35fr)]">
         <div className="min-w-0 space-y-4">
-          <div aria-label="Approved Facebook candidates" className="max-h-72 divide-y divide-slate-200 overflow-y-auto border-y border-slate-200">{candidates.map((content, index) => <button key={content.id} type="button" onClick={() => onSelectContent(content)} className={`w-full px-2 py-3 text-left ${content.id === selected.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}><span className="block text-xs font-bold text-slate-500">{index + 1}</span><span className="mt-0.5 block text-sm font-bold text-slate-900">{content.title}</span></button>)}</div>
+          <div aria-label="Facebook posts ready for review" className="max-h-72 divide-y divide-slate-200 overflow-y-auto border-y border-slate-200">{candidates.map((content, index) => <button key={content.id} type="button" onClick={() => onSelectContent(content)} className={`w-full px-2 py-3 text-left ${content.id === selected.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}><span className="block text-xs font-bold text-slate-500">{index + 1} · {content.status === 'approved' ? 'Approved' : 'Awaiting text approval'}</span><span className="mt-0.5 block text-sm font-bold text-slate-900">{content.title}</span></button>)}</div>
           <div data-testid="marketing-preview-internal-metadata" className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-bold uppercase text-slate-500">Internal ServSync metadata</p>
-            <div><p className="text-sm font-bold text-slate-950">{selected.title}</p><p className="mt-1 text-xs text-slate-600">Approved revision {selected.revisionNumber} · Social post</p></div>
+            <div><p className="text-sm font-bold text-slate-950">{selected.title}</p><p className="mt-1 text-xs text-slate-600">{selected.status === 'approved' ? 'Approved' : 'Awaiting text approval'} · revision {selected.revisionNumber} · Social post</p></div>
             <dl className="grid gap-2 text-xs"><div><dt className="font-bold text-slate-500">Audience</dt><dd className="mt-0.5 text-slate-800">{selected.intendedAudience ? AUDIENCE_LABELS[selected.intendedAudience] : 'Not specified'}</dd></div><div><dt className="font-bold text-slate-500">Marketing Direction</dt><dd className="mt-0.5 text-slate-800">{selected.sourceDirectionTopic ?? 'Historical approved content'}</dd></div><div><dt className="font-bold text-slate-500">Grounding</dt><dd className="mt-0.5 text-slate-800">{selected.strategicSource === 'approved_direction' ? `First-class approved Direction lineage · Direction revision ${selected.sourceDirectionRevision}` : 'Historical approved item · confirm current product truth before publishing'}</dd></div></dl>
             <button type="button" onClick={() => onReturnForRevision(selected)} className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-blue-700"><PencilLine size={15} />Return for revision</button>
-            <p className="text-xs leading-5 text-slate-500">The approved copy stays unchanged. Revised wording must return through Content and be approved again.</p>
+            <p className="text-xs leading-5 text-slate-500">Copy changes stay in the normal Content review lifecycle. Media approval does not approve the text.</p>
           </div>
         </div>
 
@@ -169,11 +169,11 @@ export function MarketingPublicationComposer({
 
           {mediaPairing && mediaAsset ? <section data-testid="marketing-media-review" className="space-y-3 border-y border-slate-200 py-4">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-bold text-slate-950">Product-demo pairing</p><p className="mt-1 text-sm text-slate-600">{mediaPairing.claimDemonstrated}</p></div><span className={`rounded-full px-2 py-1 text-xs font-bold ${mediaPairing.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{mediaPairing.status === 'approved' ? 'Media approved' : 'Awaiting media approval'}</span></div>
-            <dl className="grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-bold text-slate-500">Recorder scenario</dt><dd className="mt-0.5 text-slate-800">{mediaAsset.recorderScenario}</dd></div><div><dt className="font-bold text-slate-500">Recording</dt><dd className="mt-0.5 text-slate-800">{mediaAsset.durationSeconds.toFixed(1)} seconds · {mediaAsset.width}×{mediaAsset.height}</dd></div><div><dt className="font-bold text-slate-500">Pacing review</dt><dd className="mt-0.5 text-emerald-700">Passed at normal speed</dd></div><div><dt className="font-bold text-slate-500">Sensitive-data check</dt><dd className="mt-0.5 text-emerald-700">Passed</dd></div></dl>
+            <dl className="grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-bold text-slate-500">Recorder scenario</dt><dd className="mt-0.5 text-slate-800">{mediaAsset.recorderScenario}</dd></div><div><dt className="font-bold text-slate-500">Recording</dt><dd className="mt-0.5 text-slate-800">{mediaAsset.durationSeconds.toFixed(1)} seconds · {mediaAsset.width}×{mediaAsset.height}</dd></div><div><dt className="font-bold text-slate-500">Media kind</dt><dd className="mt-0.5 text-slate-800">{mediaAsset.mediaVariant === 'narrated_marketing_derivative' ? 'Narrated marketing derivative' : 'Silent product demo master'}</dd></div><div><dt className="font-bold text-slate-500">Voice</dt><dd className="mt-0.5 text-slate-800">{mediaAsset.narrationVoice ? `${mediaAsset.narrationVoice} · ${mediaAsset.narrationModel}` : 'No narration'}</dd></div><div><dt className="font-bold text-slate-500">Pacing review</dt><dd className="mt-0.5 text-emerald-700">Passed at normal speed</dd></div><div><dt className="font-bold text-slate-500">Sensitive-data check</dt><dd className="mt-0.5 text-emerald-700">Passed</dd></div><div><dt className="font-bold text-slate-500">Text approval</dt><dd className="mt-0.5 text-slate-800">{selected.status === 'approved' ? 'Approved' : 'Pending owner decision'}</dd></div><div><dt className="font-bold text-slate-500">Checksum</dt><dd className="mt-0.5 break-all font-mono text-slate-800">{mediaAsset.sha256}</dd></div></dl>
             {mediaPairing.status === 'candidate' && <div className="flex flex-wrap justify-end gap-2"><button type="button" disabled={busy} onClick={() => void onReviewMedia(mediaPairing.id, 'rejected')} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700"><X size={16} />Reject video</button><button type="button" disabled={busy} onClick={() => void onReviewMedia(mediaPairing.id, 'approved')} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white"><Check size={16} />Approve video pairing</button></div>}
             {mediaPairing.status === 'approved' && <button type="button" disabled={busy} onClick={() => void onReviewMedia(mediaPairing.id, 'rejected')} className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-rose-700"><X size={16} />Retire this video pairing</button>}
           </section> : <section data-testid="marketing-media-upload" className="space-y-3 border-y border-dashed border-slate-200 py-4">
-            <div className="flex items-center gap-2"><Video size={17} className="text-blue-700" /><div><p className="text-sm font-bold text-slate-950">Pair a validated Demo recording</p><p className="text-xs text-slate-500">Requires the reviewed MP4 and its matching pacing-approved metadata.</p></div></div>
+            <div className="flex items-center gap-2"><Video size={17} className="text-blue-700" /><div><p className="text-sm font-bold text-slate-950">Pair a validated Demo recording</p><p className="text-xs text-slate-500">Requires the reviewed MP4 and its matching silent or narrated metadata manifest.</p></div></div>
             <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold text-slate-800">Demo MP4<input type="file" accept="video/mp4,.mp4" onChange={event => setMp4File(event.target.files?.[0] ?? null)} className="mt-1.5 block w-full text-xs font-normal" /></label><label className="text-sm font-bold text-slate-800">Recorder metadata<input type="file" accept="application/json,.json" onChange={event => setMetadataFile(event.target.files?.[0] ?? null)} className="mt-1.5 block w-full text-xs font-normal" /></label></div>
             <label className="block text-sm font-bold text-slate-800">Claim demonstrated<textarea value={claimDemonstrated} onChange={event => setClaimDemonstrated(event.target.value)} maxLength={500} rows={2} placeholder="Describe exactly what the recording proves." className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
             {mediaError && <p role="alert" className="text-sm text-rose-700">{mediaError}</p>}
@@ -182,7 +182,8 @@ export function MarketingPublicationComposer({
 
           {!connectionReady && <p role="status" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">A valid connected Facebook Page is required before this preview can advance.</p>}
           <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold text-slate-800">Timing<select value={mode} onChange={event => setMode(event.target.value as MarketingPublicationMode)} className="mt-1.5 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="publish_now">Publish now</option><option value="scheduled">Schedule for later</option></select></label>{mode === 'scheduled' && <label className="text-sm font-bold text-slate-800">Scheduled time<input type="datetime-local" value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} className="mt-1.5 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm" /><span className="mt-1 block text-xs font-normal text-slate-500">{timezone}{scheduledIso ? ` · ${scheduledIso}` : ''}</span></label>}</div>
-          <div className="flex justify-end"><button type="button" disabled={!connectionReady || (mode === 'scheduled' && !scheduledIso)} onClick={() => setShowConfirmation(true)} className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">Review publication</button></div>
+          {selected.status !== 'approved' && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">This exact post is ready for owner text review. Approving the media does not approve or publish the copy.</p>}
+          <div className="flex justify-end"><button type="button" disabled={selected.status !== 'approved' || !connectionReady || (mode === 'scheduled' && !scheduledIso)} onClick={() => setShowConfirmation(true)} className="min-h-11 rounded-md bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">Review publication</button></div>
         </div>
       </div>
 

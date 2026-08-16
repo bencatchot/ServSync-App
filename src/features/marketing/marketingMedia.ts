@@ -19,6 +19,19 @@ export type MarketingMediaAsset = {
   sensitiveDataCheck: 'passed';
   pacingReview: 'passed';
   pacingReviewedAt: string;
+  mediaVariant: 'silent_product_demo_master' | 'narrated_marketing_derivative';
+  sourceSilentFilename: string | null;
+  sourceSilentSha256: string | null;
+  narrationProvider: 'OpenAI' | null;
+  narrationModel: string | null;
+  narrationVoice: string | null;
+  narrationScript: string | null;
+  narrationScriptVersion: number | null;
+  narrationAudioDurationSeconds: number | null;
+  narrationStartSeconds: number | null;
+  narrationEndSeconds: number | null;
+  aiNarrationDisclosureRequired: boolean;
+  aiNarrationDisclosureText: string | null;
   createdAt: string;
 };
 
@@ -67,6 +80,59 @@ export type DurableDemoRecordingMetadata = {
   marketing_candidate_status: 'passed';
   pacing_review_criteria: Record<string, true>;
 };
+
+export const AI_NARRATION_DISCLOSURE = "AI-generated voiceover using OpenAI's Cedar voice.";
+
+export type NarratedDemoRecordingMetadata = {
+  schema_version: 1;
+  scenario: string;
+  recording_version: number;
+  generated_at: string;
+  source_git_commit: string;
+  environment: 'Demo';
+  source_silent_video: {
+    filename: string;
+    duration_seconds: number;
+    width: number;
+    height: number;
+    codec: 'h264';
+    pixel_format: 'yuv420p';
+    sha256: string;
+  };
+  narration: {
+    filename: string;
+    model: string;
+    voice: 'cedar';
+    request_count: 1;
+    duration_seconds: number;
+    size_bytes: number;
+    sha256: string;
+    instructions: string;
+    script_filename: string;
+  };
+  preview: {
+    filename: string;
+    duration_seconds: number;
+    size_bytes: number;
+    video_codec: 'h264';
+    audio_codec: 'aac';
+    narration_start_seconds: number;
+    narration_end_seconds: number;
+    final_quiet_seconds: number;
+    sha256: string;
+    validation_status: 'passed_full_1x_review';
+    reviewed_at: string;
+    pacing_review: 'passed';
+  };
+  marketing: { production_asset_id: null; production_pairing_id: null; approval_status: string; uploaded: false; published: false };
+  security: { credential_persisted: false; sensitive_data_check: 'passed'; fictional_demo_data_only: true; ai_voice_disclosure_required_before_public_use: true };
+  narration_script: string;
+  narration_provider: 'OpenAI';
+  narration_script_version: number;
+  ai_narration_disclosure_text: string;
+};
+
+export type MarketingMediaUploadMetadata = DurableDemoRecordingMetadata | NarratedDemoRecordingMetadata;
 
 type RpcResult = { data: unknown; error: unknown };
 type StorageResult<T> = PromiseLike<{ data: T; error: unknown }>;
@@ -159,6 +225,60 @@ export function parseDurableDemoRecordingMetadata(value: unknown): DurableDemoRe
   return value as unknown as DurableDemoRecordingMetadata;
 }
 
+export function parseNarratedDemoRecordingMetadata(value: unknown): NarratedDemoRecordingMetadata {
+  if (!isRecord(value) || value.schema_version !== 1 || value.environment !== 'Demo'
+    || typeof value.scenario !== 'string' || !SCENARIO.test(value.scenario)
+    || !Number.isInteger(value.recording_version) || Number(value.recording_version) < 1
+    || !isTimestamp(value.generated_at) || typeof value.source_git_commit !== 'string' || !COMMIT.test(value.source_git_commit)
+    || !isRecord(value.source_silent_video) || typeof value.source_silent_video.filename !== 'string'
+    || !SAFE_MP4.test(value.source_silent_video.filename)
+    || !requireNumber(value.source_silent_video.duration_seconds, 0.1, 300)
+    || !requireNumber(value.source_silent_video.width, 320, 4096) || !requireNumber(value.source_silent_video.height, 240, 2160)
+    || value.source_silent_video.codec !== 'h264' || value.source_silent_video.pixel_format !== 'yuv420p'
+    || typeof value.source_silent_video.sha256 !== 'string' || !SHA256.test(value.source_silent_video.sha256)
+    || !isRecord(value.narration) || typeof value.narration.filename !== 'string' || !value.narration.filename.endsWith('.mp3')
+    || typeof value.narration.model !== 'string' || value.narration.model.length < 3 || value.narration.voice !== 'cedar'
+    || value.narration.request_count !== 1 || !requireNumber(value.narration.duration_seconds, 0.1, 300)
+    || !Number.isInteger(value.narration.size_bytes) || Number(value.narration.size_bytes) < 1
+    || typeof value.narration.sha256 !== 'string' || !SHA256.test(value.narration.sha256)
+    || typeof value.narration.instructions !== 'string' || value.narration.instructions.trim().length < 10
+    || typeof value.narration.script_filename !== 'string' || !value.narration.script_filename.endsWith('.txt')
+    || !isRecord(value.preview) || typeof value.preview.filename !== 'string' || !value.preview.filename.endsWith('.mp4')
+    || !requireNumber(value.preview.duration_seconds, 0.1, 300) || !Number.isInteger(value.preview.size_bytes)
+    || Number(value.preview.size_bytes) < 1 || Number(value.preview.size_bytes) > 104857600
+    || value.preview.video_codec !== 'h264' || value.preview.audio_codec !== 'aac'
+    || !requireNumber(value.preview.narration_start_seconds, 0, 300)
+    || !requireNumber(value.preview.narration_end_seconds, 0.1, 300)
+    || Number(value.preview.narration_end_seconds) <= Number(value.preview.narration_start_seconds)
+    || !requireNumber(value.preview.final_quiet_seconds, 0, 300)
+    || typeof value.preview.sha256 !== 'string' || !SHA256.test(value.preview.sha256)
+    || value.preview.validation_status !== 'passed_full_1x_review' || !isTimestamp(value.preview.reviewed_at)
+    || value.preview.pacing_review !== 'passed' || !isRecord(value.marketing) || value.marketing.uploaded !== false
+    || value.marketing.published !== false || !isRecord(value.security) || value.security.credential_persisted !== false
+    || value.security.sensitive_data_check !== 'passed' || value.security.fictional_demo_data_only !== true
+    || value.security.ai_voice_disclosure_required_before_public_use !== true
+    || value.narration_provider !== 'OpenAI' || !Number.isInteger(value.narration_script_version)
+    || Number(value.narration_script_version) < 1 || typeof value.narration_script !== 'string'
+    || value.narration_script.trim().length < 10 || value.narration_script.length > 5000
+    || value.ai_narration_disclosure_text !== AI_NARRATION_DISCLOSURE) {
+    throw new MarketingMediaError('validation', 'Choose an owner-reviewed narrated Demo package with complete Cedar provenance.');
+  }
+  if (Number(value.preview.duration_seconds) !== Number(value.source_silent_video.duration_seconds)
+    || Number(value.preview.narration_end_seconds) > Number(value.preview.duration_seconds)
+    || Math.abs(Number(value.preview.final_quiet_seconds)
+      - (Number(value.preview.duration_seconds) - Number(value.preview.narration_end_seconds))) > 0.05) {
+    throw new MarketingMediaError('validation', 'Narrated recording timing does not match its preserved silent source.');
+  }
+  return value as unknown as NarratedDemoRecordingMetadata;
+}
+
+export function parseMarketingMediaUploadMetadata(value: unknown): MarketingMediaUploadMetadata {
+  if (isRecord(value) && isRecord(value.preview) && isRecord(value.narration)) {
+    return parseNarratedDemoRecordingMetadata(value);
+  }
+  return parseDurableDemoRecordingMetadata(value);
+}
+
 export async function sha256ForFile(file: File) {
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -194,16 +314,43 @@ function parseAsset(value: unknown, signedUrl: string): MarketingMediaAsset {
     || !requireNumber(Number(value.duration_seconds), 0.1, 300)
     || typeof value.sha256 !== 'string' || !SHA256.test(value.sha256)
     || value.validation_status !== 'passed' || value.sensitive_data_check !== 'passed' || value.pacing_review !== 'passed'
+    || !['silent_product_demo_master', 'narrated_marketing_derivative'].includes(String(value.media_variant ?? 'silent_product_demo_master'))
     || !isTimestamp(value.pacing_reviewed_at) || !isTimestamp(value.created_at) || !signedUrl.startsWith('http')) {
     throw new MarketingMediaError('malformed', 'ServSync received an invalid Marketing media response.');
   }
+  const mediaVariant = (value.media_variant ?? 'silent_product_demo_master') as MarketingMediaAsset['mediaVariant'];
+  const narrationRequired = value.ai_narration_disclosure_required === true;
+  if (mediaVariant === 'narrated_marketing_derivative' && (
+    typeof value.source_silent_filename !== 'string' || !SAFE_MP4.test(value.source_silent_filename)
+    || typeof value.source_silent_sha256 !== 'string' || !SHA256.test(value.source_silent_sha256)
+    || value.narration_provider !== 'OpenAI' || typeof value.narration_model !== 'string'
+    || value.narration_voice !== 'cedar' || typeof value.narration_script !== 'string'
+    || !Number.isInteger(value.narration_script_version)
+    || !requireNumber(Number(value.narration_audio_duration_seconds), 0.1, 300)
+    || !requireNumber(Number(value.narration_start_seconds), 0, 300)
+    || !requireNumber(Number(value.narration_end_seconds), 0.1, 300)
+    || !narrationRequired || typeof value.ai_narration_disclosure_text !== 'string'
+  )) throw new MarketingMediaError('malformed', 'ServSync received incomplete narrated Marketing media provenance.');
   return {
     id: value.asset_id, type: 'video', source: 'demo_recorder', recorderScenario: value.recorder_scenario,
     sourceCommit: value.source_commit, storageBucket: 'marketing-assets', storagePath: value.storage_path,
     signedUrl, mimeType: 'video/mp4', fileSizeBytes: Number(value.file_size_bytes), width: Number(value.width),
     height: Number(value.height), durationSeconds: Number(value.duration_seconds), sha256: value.sha256,
     validationStatus: 'passed', sensitiveDataCheck: 'passed', pacingReview: 'passed',
-    pacingReviewedAt: value.pacing_reviewed_at, createdAt: value.created_at,
+    pacingReviewedAt: value.pacing_reviewed_at, mediaVariant,
+    sourceSilentFilename: typeof value.source_silent_filename === 'string' ? value.source_silent_filename : null,
+    sourceSilentSha256: typeof value.source_silent_sha256 === 'string' ? value.source_silent_sha256 : null,
+    narrationProvider: value.narration_provider === 'OpenAI' ? 'OpenAI' : null,
+    narrationModel: typeof value.narration_model === 'string' ? value.narration_model : null,
+    narrationVoice: typeof value.narration_voice === 'string' ? value.narration_voice : null,
+    narrationScript: typeof value.narration_script === 'string' ? value.narration_script : null,
+    narrationScriptVersion: Number.isInteger(value.narration_script_version) ? Number(value.narration_script_version) : null,
+    narrationAudioDurationSeconds: requireNumber(Number(value.narration_audio_duration_seconds), 0.1, 300) ? Number(value.narration_audio_duration_seconds) : null,
+    narrationStartSeconds: requireNumber(Number(value.narration_start_seconds), 0, 300) ? Number(value.narration_start_seconds) : null,
+    narrationEndSeconds: requireNumber(Number(value.narration_end_seconds), 0.1, 300) ? Number(value.narration_end_seconds) : null,
+    aiNarrationDisclosureRequired: narrationRequired,
+    aiNarrationDisclosureText: typeof value.ai_narration_disclosure_text === 'string' ? value.ai_narration_disclosure_text : null,
+    createdAt: value.created_at,
   };
 }
 
@@ -259,27 +406,43 @@ export function createMarketingMediaAdapter(client: MarketingMediaClient) {
       workspaceId: string;
       content: MarketingContentItem;
       mp4: File;
-      metadata: DurableDemoRecordingMetadata;
+      metadata: MarketingMediaUploadMetadata;
       claimDemonstrated: string;
     }) {
       const { workspaceId, content, mp4, metadata, claimDemonstrated } = input;
-      if (!UUID.test(workspaceId) || content.status !== 'approved' || metadata.mp4_filename !== mp4.name
-        || mp4.type !== 'video/mp4' || mp4.size !== metadata.mp4_size_bytes) {
+      const narrated = 'preview' in metadata;
+      const mp4Filename = narrated ? metadata.preview.filename : metadata.mp4_filename;
+      const mp4Size = narrated ? metadata.preview.size_bytes : metadata.mp4_size_bytes;
+      const mp4Sha256 = narrated ? metadata.preview.sha256 : metadata.mp4_sha256;
+      const width = narrated ? metadata.source_silent_video.width : metadata.width;
+      const height = narrated ? metadata.source_silent_video.height : metadata.height;
+      const duration = narrated ? metadata.preview.duration_seconds : metadata.duration_seconds;
+      const reviewedAt = narrated ? metadata.preview.reviewed_at : metadata.pacing_reviewed_at;
+      if (!UUID.test(workspaceId) || (narrated ? !['needs_approval', 'approved'].includes(content.status) : content.status !== 'approved')
+        || mp4Filename !== mp4.name || mp4.type !== 'video/mp4' || mp4.size !== mp4Size) {
         throw new MarketingMediaError('validation', 'The MP4, metadata, and approved content do not form a valid upload package.');
       }
+      if (narrated && !content.body.includes(metadata.ai_narration_disclosure_text)) {
+        throw new MarketingMediaError('validation', 'The public post must include the exact AI narration disclosure before pairing.');
+      }
       const [sha256, video] = await Promise.all([sha256ForFile(mp4), readVideoFileMetadata(mp4)]);
-      if (sha256 !== metadata.mp4_sha256 || video.width !== metadata.width || video.height !== metadata.height
-        || Math.abs(video.durationSeconds - metadata.duration_seconds) > 0.75) {
+      if (sha256 !== mp4Sha256 || video.width !== width || video.height !== height
+        || Math.abs(video.durationSeconds - duration) > 0.75) {
         throw new MarketingMediaError('validation', 'The MP4 no longer matches its reviewed recorder metadata.');
       }
       const assetId = crypto.randomUUID();
       const pairingId = crypto.randomUUID();
-      const storagePath = `${workspaceId}/${assetId}/${metadata.mp4_filename}`;
+      const storageFilename = narrated
+        ? `servsync-${metadata.scenario}-narrated-v${metadata.recording_version}-${metadata.generated_at.replace(/Z$/, '').replace(/[.:]/g, '-')}Z.mp4`
+        : metadata.mp4_filename;
+      const storagePath = `${workspaceId}/${assetId}/${storageFilename}`;
       const bucket = client.storage.from('marketing-assets');
       const upload = await bucket.upload(storagePath, mp4, { contentType: 'video/mp4', upsert: false });
       if (upload.error) throw new MarketingMediaError('storage', 'ServSync could not upload the private Marketing video.');
       try {
-        await rpc(client, 'servsync_register_and_pair_internal_marketing_media_asset', {
+        await rpc(client, narrated
+          ? 'servsync_register_narrated_marketing_media'
+          : 'servsync_register_and_pair_internal_marketing_media_asset', {
           p_asset_id: assetId,
           p_pairing_id: pairingId,
           p_content_id: content.id,
@@ -288,13 +451,26 @@ export function createMarketingMediaAdapter(client: MarketingMediaClient) {
           p_source_commit: metadata.source_git_commit,
           p_storage_path: storagePath,
           p_mime_type: 'video/mp4',
-          p_file_size_bytes: metadata.mp4_size_bytes,
-          p_width: metadata.width,
-          p_height: metadata.height,
-          p_duration_seconds: metadata.duration_seconds,
-          p_sha256: metadata.mp4_sha256,
-          p_pacing_reviewed_at: metadata.pacing_reviewed_at,
+          p_file_size_bytes: mp4Size,
+          p_width: width,
+          p_height: height,
+          p_duration_seconds: duration,
+          p_sha256: mp4Sha256,
+          p_pacing_reviewed_at: reviewedAt,
           p_claim_demonstrated: claimDemonstrated.trim(),
+          ...(narrated ? {
+            p_source_silent_filename: metadata.source_silent_video.filename,
+            p_source_silent_sha256: metadata.source_silent_video.sha256,
+            p_narration_provider: metadata.narration_provider,
+            p_narration_model: metadata.narration.model,
+            p_narration_voice: metadata.narration.voice,
+            p_narration_script: metadata.narration_script,
+            p_narration_script_version: metadata.narration_script_version,
+            p_narration_audio_duration_seconds: metadata.narration.duration_seconds,
+            p_narration_start_seconds: metadata.preview.narration_start_seconds,
+            p_narration_end_seconds: metadata.preview.narration_end_seconds,
+            p_ai_narration_disclosure_text: metadata.ai_narration_disclosure_text,
+          } : {}),
         }, 'register and pair the Marketing video');
       } catch (error) {
         await bucket.remove([storagePath]);

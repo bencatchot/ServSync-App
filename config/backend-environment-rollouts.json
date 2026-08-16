@@ -634,6 +634,24 @@
       }
     },
     {
+      "id": "narrated-marketing-media-publication-v1",
+      "artifact": "servsync-narrated-marketing-media-publication.sql (SHA-256 e165fb94f6214bdfdee68204694eee5af6658d639ce0ef88c4c3526c2d261167)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 e165fb94f6214bdfdee68204694eee5af6658d639ce0ef88c4c3526c2d261167 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-16 from 23:25:43Z through 23:25:45Z. Catalog/security validation and a rollback-only authenticated narrated asset, exact pairing, separate media approval, status-only Content approval carry-forward, immutable publication snapshot, role denial, and zero-residue lifecycle passed. Sandbox returned to zero Marketing assets, pairings, publications, and events."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-16 from 23:27:09Z through 23:27:13Z after Sandbox passed. Demo retained zero Marketing content, assets, pairings, publications, and events with no provider or recording action."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-16 from 23:27:51Z through 23:27:52Z after Sandbox and Demo passed. The preflight preserved exactly three plans, six Directions, three packages, 16 content records, 34 status events, two assets, two pairings, and zero publications/events. The separately authorized flagship workflow then added one accepted owner-directed Plan, one approved Direction, one needs-approval Content item, one narrated managed asset, and one approved exact-revision pairing while publication counts remained zero and database publishing stayed disabled."
+        }
+      }
+    },
+    {
       "id": "demo-recorder-flagship-fixture-registry-v1",
       "artifact": "servsync-demo-recorder-flagship-fixture-registry.sql (SHA-256 1e852f65090c124cbac4c07894ff1bfd156316f40d2cf45448284f0ed3583e9e)",
       "environments": {
