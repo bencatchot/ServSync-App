@@ -274,6 +274,7 @@ test('Marketing Home History uses the canonical product finalizer and cannot see
   assert.match(appSource, /onClick=\{\(\) => void finalizeInspection\(activeInspection\)\}/);
   assert.match(appSource, /canFinalizeCompletedJobReport = canManageJobOperations[\s\S]*SERVSYNC_DEMO_PRESENTATION_MODE && contractor\?\.owner_user_id === profile\.id/);
   assert.match(appSource, /canFinalizeCompletedJobReport && activeInspection\.status === 'draft'/);
+  assert.match(appSource, /const finalizeInspection[\s\S]*if \(!canFinalizeCompletedJobReport\)/);
   assert.doesNotMatch(appSource, /!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && activeInspection\.status === 'draft'/);
   assert.match(appSource, /generateInspectionPdf\(finalInsp/);
   assert.match(appSource, /supabase\.rpc\('servsync_finalize_field_work'/);

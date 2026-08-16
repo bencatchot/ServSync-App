@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037C Demo owner report-finalizer handler alignment
+
+- Branch: `codex/fb037c-demo-owner-report-handler-v1`.
+- Starting main SHA: `aae946c51b1ac8653e86887769836d2470658f47`.
+- Files changed: canonical report finalization handler guard, focused recorder regression, and this changelog.
+- Summary of change: Applies the same narrow completed-report capability used by the visible Demo owner action inside `finalizeInspection`. The dedicated Demo contractor owner can therefore reach the unchanged canonical generator/upload/RPC path, while non-owner Demo identities and normal Production role/capability behavior remain unchanged.
+- Reason for change: Live reconciliation after the first visible-button run showed the handler still returned the read-only role error before generating or uploading any report because it separately checked the presentation-suppressed Job-launch capability.
+- Tests/checks run: Focused Demo recorder/output contracts, strict TypeScript, Production build, JavaScript lint, sensitive-value scan, and `git diff --check`.
+- Known risks or follow-ups: Server authorization remains authoritative and no report was created by the failed attempt. The real recording, PDF visual review, and fresh owner-review pairing remain required.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: This completes the narrow compatibility bridge for the existing canonical-output recording gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: No product authority or roadmap changes; this aligns one handler with its reviewed presentation decision.
+
 ## 2026-08-16 - FB-037C Demo owner report-finalizer visibility bridge
 
 - Branch: `codex/fb037c-demo-owner-report-finalizer-v1`.

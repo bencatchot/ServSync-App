@@ -30761,7 +30761,7 @@ function ContractorDashboard({
       setError('We could not finalize this report because your contractor session is not ready. Please refresh and try again.');
       return;
     }
-    if (!canManageJobOperations) {
+    if (!canFinalizeCompletedJobReport) {
       setError('This Job is read-only for your role.');
       return;
     }
