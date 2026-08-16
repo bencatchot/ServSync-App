@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { jsPDF } from 'jspdf';
 import {
   checkpointByKey,
   dateOffsets,
@@ -1539,8 +1538,8 @@ async function syncJobRoomsForWorkItems(service, jobId, completedTitles, summary
           return {
             ...finding,
             status: 'Fixed On Site',
-            action: finding?.action || 'Completed as part of the demo water-heater replacement.',
-            notes: finding?.notes || 'Demo checkpoint progress note.',
+            action: finding?.action || 'Completed as part of the approved water-heater replacement.',
+            notes: finding?.notes || 'Completed and documented during the service visit.',
           };
         })
       : [],
@@ -1706,7 +1705,7 @@ async function completeDemoJob(contractorClient, service, jobId, contractorUserI
     service,
     jobId,
     progress.completedTitles,
-    'Demo job completed. Invoice and Home History steps are intentionally deferred to a later Demo Mode slice.',
+    'Replaced the water heater and completed the agreed installation work. Final connections and operating checks were documented before completion.',
     dates.jobCompletedAt
   );
   await ensureOk(
@@ -1735,216 +1734,8 @@ async function completeDemoJob(contractorClient, service, jobId, contractorUserI
   return progress;
 }
 
-function buildDemoFinalizedReportPdf() {
-  const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
-  pdf.text('Completed Water Heater Work Report', 54, 72);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(11);
-  const lines = [
-    'Fictional demo record',
-    'Home: Demo Bay Home',
-    'Contractor: Gulf Coast Home Services',
-    '',
-    'Completed work',
-    'The approved water-heater replacement work was completed and documented.',
-    'The finalized report is available from this home\'s Home History in ServSync.',
-  ];
-  pdf.text(lines, 54, 108, { lineHeightFactor: 1.5 });
-  return Buffer.from(pdf.output('arraybuffer'));
-}
-
-async function finalizeDemoHomeHistoryReport(contractorClient, service, runId, fixture, dates) {
-  const { homeownerId, requestId, jobId } = fixture;
-  const job = await fetchOneByPrimaryKey(
-    service,
-    'inspections',
-    'id',
-    jobId,
-    'id, rooms_with_findings, summary, status, job_status, completed_at, closed_at'
-  );
-  if (!job || job.job_status !== 'completed' || job.status !== 'draft') {
-    throw new Error('Finalized-report fixture refused: the recorder-owned Job is not in the expected completed pre-report state.');
-  }
-  const existingArtifacts = await Promise.all([
-    ensureOk(
-      await service.from('home_maintenance_log').select('id').eq('inspection_id', jobId),
-      'Unable to inspect pre-existing Home History rows'
-    ),
-    ensureOk(
-      await service
-        .from('notifications')
-        .select('id')
-        .eq('user_id', homeownerId)
-        .eq('type', 'inspection_report_filed')
-        .eq('request_id', requestId),
-      'Unable to inspect pre-existing report notifications'
-    ),
-  ]);
-  if (existingArtifacts.some((rows) => rows.length !== 0)) {
-    throw new Error('Finalized-report fixture refused: report history or notification state already exists for the recorder-owned Job.');
-  }
-
-  const reportBytes = buildDemoFinalizedReportPdf();
-  const storagePath = `${homeownerId}/field-work/${jobId}/${randomUUID()}.pdf`;
-  const fileName = 'Demo Bay Home - completed water heater work report.pdf';
-  const storage = validateFinalizedReportStoragePath(storagePath, homeownerId, jobId);
-  const storageSha256 = createHash('sha256').update(reportBytes).digest('hex');
-  const createdIds = [];
-  let uploadSucceeded = false;
-  try {
-    await ensureOk(
-      await contractorClient.storage
-        .from(storage.bucket)
-        .upload(storage.path, reportBytes, { contentType: 'application/pdf', upsert: false }),
-      'Unable to upload the authenticated Demo finalized report'
-    );
-    uploadSucceeded = true;
-
-    await ensureOk(
-      await contractorClient.rpc('servsync_finalize_field_work', {
-        p_inspection_id: jobId,
-        p_rooms_with_findings: job.rooms_with_findings || [],
-        p_summary: 'Water-heater replacement work completed and documented for the homeowner.',
-        p_storage_path: storage.path,
-        p_file_name: fileName,
-        p_file_size_bytes: reportBytes.byteLength,
-      }),
-      'Unable to finalize the Demo report through servsync_finalize_field_work'
-    );
-
-    const [documents, historyRows, notifications] = await Promise.all([
-      ensureOk(
-        await service
-          .from('home_documents')
-          .select('id, homeowner_user_id, storage_path, content_type, document_type, file_size_bytes')
-          .eq('homeowner_user_id', homeownerId)
-          .eq('storage_path', storage.path),
-        'Unable to inspect the finalized Demo report document'
-      ),
-      ensureOk(
-        await service
-          .from('home_maintenance_log')
-          .select('id, homeowner_user_id, inspection_id, service_request_id, report_document_id')
-          .eq('inspection_id', jobId),
-        'Unable to inspect the finalized Demo Home History row'
-      ),
-      ensureOk(
-        await service
-          .from('notifications')
-          .select('id, user_id, type, request_id')
-          .eq('user_id', homeownerId)
-          .eq('type', 'inspection_report_filed')
-          .eq('request_id', requestId),
-        'Unable to inspect the finalized Demo report notification'
-      ),
-    ]);
-    if (documents.length !== 1 || historyRows.length !== 1 || notifications.length !== 1) {
-      throw new Error(
-        `Finalized-report fixture refused: expected one document/history/notification, found ${documents.length}/${historyRows.length}/${notifications.length}.`
-      );
-    }
-    const document = documents[0];
-    const history = historyRows[0];
-    const notification = notifications[0];
-    createdIds.push(
-      ['home_maintenance_log', history.id],
-      ['home_documents', document.id],
-      ['notifications', notification.id]
-    );
-    if (
-      document.homeowner_user_id !== homeownerId ||
-      document.storage_path !== storage.path ||
-      document.content_type !== 'application/pdf' ||
-      document.document_type !== 'inspection' ||
-      history.homeowner_user_id !== homeownerId ||
-      history.inspection_id !== jobId ||
-      history.service_request_id !== requestId ||
-      history.report_document_id !== document.id ||
-      notification.user_id !== homeownerId ||
-      notification.type !== 'inspection_report_filed' ||
-      notification.request_id !== requestId
-    ) {
-      throw new Error('Finalized-report fixture refused: RPC artifacts do not have the exact expected lineage.');
-    }
-
-    await registerRecord(
-      service,
-      runId,
-      'home_maintenance_log',
-      history.id,
-      FINALIZED_REPORT_RECORD_ROLES.history,
-      'home_history_updated',
-      { source_rpc: 'servsync_finalize_field_work', inspection_id: jobId, report_document_id: document.id }
-    );
-    await registerRecord(
-      service,
-      runId,
-      'home_documents',
-      document.id,
-      FINALIZED_REPORT_RECORD_ROLES.document,
-      'home_history_updated',
-      {
-        source_rpc: 'servsync_finalize_field_work',
-        storage_bucket: storage.bucket,
-        storage_path: storage.path,
-        storage_sha256: storageSha256,
-      }
-    );
-    await registerRecord(
-      service,
-      runId,
-      'notifications',
-      notification.id,
-      FINALIZED_REPORT_RECORD_ROLES.notification,
-      'home_history_updated',
-      { source_rpc: 'servsync_finalize_field_work', inspection_id: jobId, request_id: requestId }
-    );
-
-    return {
-      reportDocumentId: document.id,
-      homeHistoryId: history.id,
-      notificationId: notification.id,
-      reportStorageBucket: storage.bucket,
-      reportStoragePath: storage.path,
-      reportStorageSha256: storageSha256,
-      reportFileName: fileName,
-      reportFileSizeBytes: reportBytes.byteLength,
-      reportFinalizedAt: dates.jobCompletedAt,
-    };
-  } catch (error) {
-    for (const [tableName, recordId] of createdIds) {
-      await service.from(tableName).delete().eq('id', recordId).catch(() => {});
-    }
-    if (createdIds.length > 0) {
-      await service
-        .from('demo_scenario_records')
-        .delete()
-        .eq('run_id', runId)
-        .in('record_id', createdIds.map(([, recordId]) => recordId))
-        .catch(() => {});
-    }
-    if (uploadSucceeded) {
-      await service.storage.from(storage.bucket).remove([storage.path]).catch(() => {});
-    }
-    await service
-      .from('inspections')
-      .update({
-        status: 'draft',
-        job_status: 'completed',
-        completed_at: job.completed_at,
-        closed_at: job.closed_at,
-        report_storage_path: null,
-        report_file_name: null,
-        summary: job.summary,
-        updated_at: dates.jobCompletedAt,
-      })
-      .eq('id', jobId)
-      .catch(() => {});
-    throw error;
-  }
-}
+// Marketing-ready Demo recordings must finalize reports through the normal contractor UI.
+// Fixture data may be synthetic; canonical product artifacts may not be.
 
 function notificationHandlingDecision() {
   return 'Slice 1 leaves incidental in-app notifications untouched and does not register them for reset.';
@@ -2973,6 +2764,11 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
 }
 
 async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CHECKPOINT_KEY) {
+  if (checkpointKey === 'home_history_updated') {
+    throw new Error(
+      'Home History seeding refused: canonical report bytes must be generated by the normal contractor UI. Use the homeowner-home-history recorder workflow.'
+    );
+  }
   const checkpoint = getCheckpointDefinition(checkpointKey);
   const dates = buildDatePlan(env.DEMO_ANCHOR_TIMESTAMP || new Date());
   const { service, anonKey, makeUserClient } = createSupabaseClients(env, target);
@@ -3115,22 +2911,6 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       created.completedWorkItemCount = progress.completedCount;
       created.openWorkItemCount = progress.openCount;
       executedSteps.push('jobCompleted');
-    }
-
-    if (checkpointRequires(checkpointKey, 'homeHistoryUpdated')) {
-      const report = await finalizeDemoHomeHistoryReport(
-        contractorClient,
-        service,
-        runId,
-        {
-          homeownerId: homeownerUser.id,
-          requestId: created.requestId,
-          jobId: created.jobId,
-        },
-        dates
-      );
-      Object.assign(created, report);
-      executedSteps.push('homeHistoryUpdated');
     }
 
     await finishRun(service, runId, 'succeeded', {
@@ -3482,6 +3262,225 @@ async function adoptRecorderEstimateDraft(env, target, scenarioKey) {
   };
 }
 
+async function adoptRecorderFinalizedReport(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder report adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'job_completed') {
+    throw new Error(`Recorder report adoption refused: active checkpoint must be job_completed, found ${run.checkpoint}.`);
+  }
+  if (run.records.some((record) => ['home_documents', 'home_maintenance_log', 'notifications'].includes(record.table_name))) {
+    throw new Error('Recorder report adoption refused: job_completed already owns report, Home History, or notification records.');
+  }
+
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const requestId = run.metadata?.service_request_id;
+  const jobId = run.metadata?.job_id;
+  if (![homeownerId, requestId, jobId].every(Boolean)) {
+    throw new Error('Recorder report adoption refused: active run is missing exact homeowner, request, or Job identity.');
+  }
+
+  const job = await fetchOneByPrimaryKey(
+    service,
+    'inspections',
+    'id',
+    jobId,
+    'id, homeowner_user_id, home_id, service_request_id, status, job_status, report_storage_path, report_file_name, completed_at'
+  );
+  if (!job || job.homeowner_user_id !== homeownerId || job.service_request_id !== requestId) {
+    throw new Error('Recorder report adoption refused: the exact registered Demo Job lineage is missing or ambiguous.');
+  }
+  if (
+    job.status !== 'finalized'
+    || job.job_status !== 'completed'
+    || !job.report_storage_path
+    || !job.report_file_name
+  ) {
+    const storageFolder = `${homeownerId}/field-work/${jobId}`;
+    const [documents, historyRows, objects] = await Promise.all([
+      ensureOk(
+        await service
+          .from('home_documents')
+          .select('id, storage_path')
+          .eq('homeowner_user_id', homeownerId)
+          .like('storage_path', `${storageFolder}/%`),
+        'Unable to inspect canonical-report documents before orphan cleanup'
+      ),
+      ensureOk(
+        await service.from('home_maintenance_log').select('id').eq('inspection_id', jobId),
+        'Unable to inspect Home History before orphan cleanup'
+      ),
+      ensureOk(
+        await service.storage.from(FINALIZED_REPORT_BUCKET).list(storageFolder, { limit: 100 }),
+        'Unable to inspect the exact recorder-owned Job folder before orphan cleanup'
+      ),
+    ]);
+    if (job.report_storage_path || job.report_file_name || documents.length > 0 || historyRows.length > 0) {
+      throw new Error('Recorder report adoption refused: partial durable report lineage exists, so orphan cleanup is unsafe.');
+    }
+    const orphanPaths = (objects || [])
+      .filter((object) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i.test(object.name))
+      .map((object) => `${storageFolder}/${object.name}`);
+    if (orphanPaths.length > 0) {
+      await ensureOk(
+        await service.storage.from(FINALIZED_REPORT_BUCKET).remove(orphanPaths),
+        'Unable to remove unregistered canonical-report bytes from the exact recorder-owned Job folder'
+      );
+    }
+    throw new Error('Recorder report adoption refused: the exact Demo Job was not finalized through the supported product workflow.');
+  }
+  if (!/^[a-z0-9-]+-Field-Work-\d{4}-\d{2}-\d{2}\.pdf$/i.test(job.report_file_name)) {
+    throw new Error('Recorder report adoption refused: the report filename does not match the canonical ServSync generator contract.');
+  }
+
+  const storage = validateFinalizedReportStoragePath(job.report_storage_path, homeownerId, jobId);
+  const [documents, historyRows, notifications, reportBlob] = await Promise.all([
+    ensureOk(
+      await service
+        .from('home_documents')
+        .select('id, homeowner_user_id, home_id, storage_path, file_name, content_type, document_type, file_size_bytes')
+        .eq('homeowner_user_id', homeownerId)
+        .eq('storage_path', storage.path),
+      'Unable to inspect the canonical Demo report document'
+    ),
+    ensureOk(
+      await service
+        .from('home_maintenance_log')
+        .select('id, homeowner_user_id, home_id, inspection_id, service_request_id, report_document_id')
+        .eq('inspection_id', jobId),
+      'Unable to inspect the canonical Demo Home History row'
+    ),
+    ensureOk(
+      await service
+        .from('notifications')
+        .select('id, user_id, type, request_id')
+        .eq('user_id', homeownerId)
+        .eq('type', 'inspection_report_filed')
+        .eq('request_id', requestId),
+      'Unable to inspect the canonical Demo report notification'
+    ),
+    ensureOk(
+      await service.storage.from(storage.bucket).download(storage.path),
+      'Unable to download the canonical Demo report for ownership verification'
+    ),
+  ]);
+  if (documents.length !== 1 || historyRows.length !== 1 || notifications.length !== 1 || !reportBlob) {
+    throw new Error(
+      `Recorder report adoption refused: expected one document/history/notification and one PDF, found ${documents.length}/${historyRows.length}/${notifications.length}.`
+    );
+  }
+
+  const document = documents[0];
+  const history = historyRows[0];
+  const notification = notifications[0];
+  const reportBytes = Buffer.from(await reportBlob.arrayBuffer());
+  const reportSha256 = createHash('sha256').update(reportBytes).digest('hex');
+  if (
+    reportBytes.subarray(0, 5).toString('ascii') !== '%PDF-'
+    || reportBytes.byteLength !== document.file_size_bytes
+    || document.homeowner_user_id !== homeownerId
+    || document.home_id !== job.home_id
+    || document.storage_path !== storage.path
+    || document.file_name !== job.report_file_name
+    || document.content_type !== 'application/pdf'
+    || document.document_type !== 'inspection'
+    || history.homeowner_user_id !== homeownerId
+    || history.home_id !== job.home_id
+    || history.inspection_id !== jobId
+    || history.service_request_id !== requestId
+    || history.report_document_id !== document.id
+    || notification.user_id !== homeownerId
+    || notification.type !== 'inspection_report_filed'
+    || notification.request_id !== requestId
+  ) {
+    throw new Error('Recorder report adoption refused: canonical report artifacts do not have the exact expected lineage or PDF identity.');
+  }
+
+  const sourceMetadata = {
+    source_ui: 'canonical_contractor_finalize_report',
+    source_generator: 'generateInspectionPdf',
+    source_rpc: 'servsync_finalize_field_work',
+  };
+  await registerRecord(
+    service,
+    run.id,
+    'home_maintenance_log',
+    history.id,
+    FINALIZED_REPORT_RECORD_ROLES.history,
+    'home_history_updated',
+    { ...sourceMetadata, inspection_id: jobId, report_document_id: document.id }
+  );
+  await registerRecord(
+    service,
+    run.id,
+    'home_documents',
+    document.id,
+    FINALIZED_REPORT_RECORD_ROLES.document,
+    'home_history_updated',
+    {
+      ...sourceMetadata,
+      storage_bucket: storage.bucket,
+      storage_path: storage.path,
+      storage_sha256: reportSha256,
+    }
+  );
+  await registerRecord(
+    service,
+    run.id,
+    'notifications',
+    notification.id,
+    FINALIZED_REPORT_RECORD_ROLES.notification,
+    'home_history_updated',
+    { ...sourceMetadata, inspection_id: jobId, request_id: requestId }
+  );
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'home_history_updated' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to home_history_updated'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'home_history_updated',
+    executed_steps: [...(run.metadata?.executed_steps || []), 'canonicalProductReportFinalization'],
+    report_document_id: document.id,
+    home_history_id: history.id,
+    report_notification_id: notification.id,
+    report_storage_bucket: storage.bucket,
+    report_storage_path: storage.path,
+    report_storage_sha256: reportSha256,
+    report_file_name: document.file_name,
+    report_file_size_bytes: reportBytes.byteLength,
+    recorder_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'homeowner-home-history',
+    report_origin: 'canonical_product_ui',
+    report_generator: 'generateInspectionPdf',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'home_history_updated');
+  if (!verification.ok) {
+    throw new Error(`Recorder report adoption verification failed: ${verification.reason || 'home_history_updated state is invalid'}`);
+  }
+  return {
+    operation: 'adopt-report',
+    runId: run.id,
+    checkpoint: 'home_history_updated',
+    records: {
+      jobId,
+      reportDocumentId: document.id,
+      homeHistoryId: history.id,
+      notificationId: notification.id,
+      reportFileName: document.file_name,
+      reportFileSizeBytes: reportBytes.byteLength,
+      reportSha256,
+    },
+    verification,
+  };
+}
+
 function summarize(result, target, scenarioKey) {
   return {
     targetProjectRef: target.expectedRef,
@@ -3519,9 +3518,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'adopt-request', 'adopt-estimate'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'adopt-request', 'adopt-estimate', 'adopt-report'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request|adopt-estimate> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request|adopt-estimate|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -3529,7 +3528,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (['adopt-request', 'adopt-estimate'].includes(operation) && optionArgs.length > 0) {
+  if (['adopt-request', 'adopt-estimate', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -3551,6 +3550,10 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'adopt-estimate') {
     return summarize(await adoptRecorderEstimateDraft(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-report') {
+    return summarize(await adoptRecorderFinalizedReport(env, target, scenarioKey), target, scenarioKey);
   }
 
   return summarize(

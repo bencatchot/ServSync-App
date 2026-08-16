@@ -30864,6 +30864,24 @@ function ContractorDashboard({
     }
   };
 
+  const downloadFinalizedInspectionReport = async (insp: Inspection) => {
+    if (!supabase || !insp.report_storage_path) {
+      setError('The finalized report file is not available.');
+      return;
+    }
+    const { data, error: signedUrlError } = await supabase.storage
+      .from('home-documents')
+      .createSignedUrl(insp.report_storage_path, 60);
+    if (signedUrlError || !data?.signedUrl) {
+      setError('Unable to generate the finalized report download link.');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = data.signedUrl;
+    link.download = insp.report_file_name || 'ServSync-Job-Report.pdf';
+    link.click();
+  };
+
   const sendInspectionReportToHomeowner = async (insp: Inspection, options?: { skipHomeTemplatePrompt?: boolean }) => {
     if (!supabase) return;
     setNotice('');
@@ -42784,6 +42802,60 @@ function ContractorDashboard({
                           />
                         )}
                       </div>
+
+                      {completed && (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" data-testid="simple-job-report-panel">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <h3 className="text-sm font-bold text-slate-950">Final Job Report</h3>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">
+                                {activeInspection.status === 'finalized'
+                                  ? activeInspection.homeowner_user_id
+                                    ? 'The ServSync report is filed with this Job and available to the connected homeowner in Documents and Home History.'
+                                    : 'The ServSync report is stored with this Job and can use the supported secure customer-delivery path.'
+                                  : activeInspection.homeowner_user_id
+                                    ? 'Finalize the completed work into the same ServSync report used for Documents and Home History.'
+                                    : 'Finalize the completed work into a ServSync customer report stored with this Job.'}
+                              </p>
+                            </div>
+                            {canManageJobOperations && activeInspection.status === 'draft' && (
+                              <button
+                                type="button"
+                                disabled={finalizingInspection}
+                                onClick={() => void finalizeInspection(activeInspection)}
+                                data-testid="simple-job-finalize-report"
+                                className={mobileButtonClass('primary')}
+                              >
+                                <FileText size={15} />
+                                {finalizingInspection ? 'Finalizing...' : 'Finalize Report'}
+                              </button>
+                            )}
+                            {!SERVSYNC_DEMO_PRESENTATION_MODE && activeInspection.status === 'finalized' && activeInspection.report_storage_path && (
+                              <button
+                                type="button"
+                                onClick={() => void downloadFinalizedInspectionReport(activeInspection)}
+                                data-testid="simple-job-download-finalized-report"
+                                className={mobileButtonClass('secondary')}
+                              >
+                                <Download size={15} />
+                                Download Report PDF
+                              </button>
+                            )}
+                          </div>
+                          {activeInspection.status === 'finalized' && (
+                            <VisibilityNotice
+                              title={activeInspection.homeowner_user_id ? 'Filed to Documents' : 'Stored with Customer Job'}
+                              body={activeInspection.homeowner_user_id
+                                ? "This stored PDF is the report available from the connected homeowner's Home History."
+                                : 'This stored PDF remains tied to the customer Job and is not a connected Home History record.'}
+                              tone="success"
+                              variant="compact"
+                              icon={<CheckCircle2 size={14} />}
+                              testId="simple-job-report-filed-notice"
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
 
                   {canManageJobOperations && <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

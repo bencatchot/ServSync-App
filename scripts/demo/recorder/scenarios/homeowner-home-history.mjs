@@ -8,9 +8,9 @@ export const homeownerHomeHistoryScenario = Object.freeze({
   key: 'homeowner-home-history',
   displayName: 'Homeowner reopens a completed work report',
   fixtureScenarioKey: 'water_heater_core_loop',
-  initialCheckpoint: 'home_history_updated',
+  initialCheckpoint: 'job_completed',
   finalCheckpoint: 'home_history_updated',
-  fixturePolicy: 'Leave one canonical home_history_updated Demo fixture; the next run removes its exact private PDF before resetting registry-owned rows.',
+  fixturePolicy: 'Prepare one completed recorder-owned Job, finalize its canonical ServSync report through the normal contractor UI, then register only the exact private PDF and lineage rows for reset.',
   environment: Object.freeze({
     name: 'ServSync Demo',
     projectRef: 'bdytwgejqnlblhrnqxkp',
@@ -51,6 +51,6 @@ export const homeownerHomeHistoryScenario = Object.freeze({
   finalState: Object.freeze({
     homeHistoryTitle: requestFixture.title,
     contractorLabel: personas.contractor.businessName,
-    reportFileName: 'Demo Bay Home - completed water heater work report.pdf',
+    reportFileNamePattern: /^[a-z0-9-]+-Field-Work-\d{4}-\d{2}-\d{2}\.pdf$/i,
   }),
 });

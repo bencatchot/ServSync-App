@@ -71,7 +71,11 @@ If the browser fails after submission begins but before ordinary adoption comple
 
 For `contractor-create-estimate`, setup restores the registered `request_ready` checkpoint. The contractor creates the draft through the real Estimate composer. The private adoption step accepts exactly one new draft only when its contractor, homeowner, home, request, title, scope, total, and single line match the scenario contract and it has no payment schedule, Job, or Invoice. The adopted Estimate and line become ordinary registry-owned records at `estimate_draft`, so the next scenario run can reset them without touching unrelated Demo data.
 
-For `homeowner-home-history`, setup restores `home_history_updated` by uploading one generated fictional PDF through the authenticated contractor Storage path and calling the supported finalization RPC. The verifier requires one exact report document, Home History row, notification, and SHA-bound private Storage object with the canonical Demo home lineage. Browser recording is homeowner-only and read-only. Reset deletes that exact registered object before dependency-safe row cleanup; it never sweeps the bucket.
+For `homeowner-home-history`, setup stops at the registry-owned `job_completed` checkpoint. In an offscreen contractor browser context, the recorder opens that exact Job and uses the normal **Finalize Report** product action. The application calls the canonical `generateInspectionPdf` generator, uploads the resulting customer report through the normal private Storage path, and calls `servsync_finalize_field_work`. The private runner then adopts only the exact resulting document, Home History row, notification, and SHA-bound Storage object before homeowner recording begins. Direct seeding of `home_history_updated` is refused so Marketing cannot substitute a fixture-only PDF for the product artifact.
+
+If finalization is interrupted after upload but before any durable report lineage exists, recovery inspects only the exact registry-owned Demo Job folder and may remove only UUID-named PDF objects from that folder. Any report path, document row, or Home History row makes cleanup fail closed for operator review. Normal reset deletes only the exact registered object before dependency-safe row cleanup; it never sweeps the bucket.
+
+Fixture data may be fictional, but visible product output must be canonical. Marketing-ready scenarios must use the same Estimate, Invoice, report, Home History artifact, and profile UI produced by the normal supported product workflow. Bespoke PDFs, documents, or UI made only for a recording are prohibited.
 
 ## Authentication and Cuts
 
@@ -149,7 +153,7 @@ A run is successful only after:
 
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
 
-The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, property-scoped homeowner visibility, a real download, and an 18-32 second final WebM.
+The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, canonical report text extracted from the downloaded PDF, property-scoped homeowner visibility, a real download, and an 18-32 second final WebM.
 
 Failed runs remove their staging video. A failed run must not be described as a successful artifact.
 

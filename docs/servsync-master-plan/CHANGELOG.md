@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037C canonical Home History report correction
+
+- Branch: `codex/fb037c-home-history-canonical-report-v1`.
+- Starting main SHA: `d692e165dffec10be3f5c40a22e4c07241b916ca`.
+- Files changed: normal completed simple-Job report action; Demo Home History recorder/adoption/reset safety; focused recorder regressions; Demo recorder/runbook and Marketing product inventory; FB-034A/FB-037 backlog/master-plan governance; and this changelog.
+- Summary of change: Retires the Home History recorder's bespoke `buildDemoFinalizedReportPdf()` path. The corrected scenario stops at one registry-owned completed Job, uses the normal contractor **Finalize Report** action and canonical `generateInspectionPdf` generator, adopts only the exact document/Home History/notification/private-Storage lineage produced by `servsync_finalize_field_work`, and then records the homeowner reopening that same product artifact. Completed simple service Jobs now expose the already-supported canonical finalization action and exact stored-report download alongside the existing checklist/report path.
+- Safety: Direct fixture seeding of `home_history_updated` is refused. An interrupted upload can remove only UUID-named PDFs from the exact registry-owned Demo Job folder and only when no durable report path, document, or Home History lineage exists; otherwise cleanup fails closed. No SQL/RLS/RPC/schema, environment, credential, provider, Production-data, publication, or Facebook-post authority changes are included.
+- Marketing correction: The prior Production Home History media pairing was rejected without changing approved Content revision 3 or deleting historical asset/status evidence. A new Marketing candidate requires a fresh canonical recording, exact upload/pairing, and owner media approval.
+- Tests/checks run: Focused Demo recorder/output contracts, backend parity, finalized-report lineage/delivery checks, strict TypeScript, Production build, focused JavaScript lint, sensitive-value and Markdown-link scans, and `git diff --check`. Focused TypeScript lint remains blocked before source evaluation by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` startup incompatibility.
+- Known risks or follow-ups: A real dedicated-Demo recording and full normal-speed visual review remain required after the corrected source reaches Demo. Public Facebook posting remains disabled; no publication is authorized by this correction.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Replaces the rejected fixture-output candidate gate with a canonical-product-output recording and fresh owner media-review gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Establishes the durable Marketing integrity rule that fictional fixtures may never replace a feature's canonical visible product artifact.
+
 ## 2026-08-15 - FB-037C Paired Text + Product Demo Assets v1
 
 - Branch: `codex/fb037c-paired-text-product-demo-assets-v1`.
