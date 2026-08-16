@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037C Home History recorder runtime-lineage correction
+
+- Branch: `codex/fb037c-home-history-runtime-lineage-v1`.
+- Starting main SHA: `001e8a8bd86ff4c079530e031b86d235661b2ec7`.
+- Files changed: Home History recorder runtime selection, scenario contract, focused recorder regression, and this changelog.
+- Summary of change: Binds the offscreen contractor Job selection, homeowner Home History entry, and canonical PDF text verification to the exact registry-returned Job ID and its persisted display title. This removes the incorrect assumption that the Job title equals the earlier service-request title.
+- Reason for change: The first post-merge Demo run safely reached `job_completed` but found the real accepted-estimate Job title `Water heater replacement estimate`, not the request title `Replace leaking water heater`, and therefore stopped before finalization or media promotion.
+- Tests/checks run: Focused Demo recorder/output contracts, strict TypeScript, Production build, JavaScript lint, sensitive-value scan, and `git diff --check`.
+- Known risks or follow-ups: The real dedicated-Demo recording, PDF visual review, and fresh Marketing candidate remain required. No SQL, configuration, provider, Production-data, or publication behavior changes are included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: The canonical-product-output and fresh owner-review gates already recorded under FB-034A/FB-037 remain unchanged.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This corrects deterministic runtime identity binding within the already-approved canonical-report recorder workflow.
+
 ## 2026-08-16 - FB-037C canonical Home History report correction
 
 - Branch: `codex/fb037c-home-history-canonical-report-v1`.

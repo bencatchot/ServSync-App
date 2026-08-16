@@ -672,6 +672,10 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
   if (seed.verification?.ok !== true) {
     throw new Error('Demo recorder setup did not reach its verified completed-Job checkpoint.');
   }
+  const canonicalJobId = seed.records?.jobId;
+  if (!canonicalJobId) {
+    throw new Error('Demo recorder setup did not return the exact registry-owned Job identity.');
+  }
 
   const browser = await chromium.launch({ headless: !headed });
   const errors = [];
@@ -688,11 +692,14 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await openSidebar(contractorPage, /^Jobs$/i);
     await contractorPage.getByRole('heading', { level: 1, name: /^Jobs$/i }).waitFor({ state: 'visible', timeout: 30_000 });
     await contractorPage.getByRole('button', { name: /Completed \/ Closed Jobs/i }).click();
-    const completedJobRow = contractorPage
-      .getByTestId('contractor-job-row')
-      .filter({ hasText: scenario.finalState.homeHistoryTitle })
-      .first();
+    const completedJobRow = contractorPage.locator(
+      `[data-testid="contractor-job-row"][data-record-id="${canonicalJobId}"]`,
+    );
     await completedJobRow.waitFor({ state: 'visible', timeout: 30_000 });
+    const canonicalJobTitle = await completedJobRow.getAttribute('data-record-title');
+    if (!canonicalJobTitle) {
+      throw new Error('The exact registry-owned Demo Job is missing its canonical display title.');
+    }
     await completedJobRow.getByRole('button', { name: /^View Job$/i }).click();
     await contractorPage.getByTestId('simple-job-report-panel').waitFor({ state: 'visible', timeout: 30_000 });
     contractorPage.once('dialog', (dialog) => dialog.accept());
@@ -775,7 +782,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await page.getByRole('heading', { level: 1, name: /^Home History$/i }).waitFor({ state: 'visible' });
     const historyCard = page
       .getByTestId('home-history-entry-card')
-      .filter({ hasText: scenario.finalState.homeHistoryTitle })
+      .filter({ hasText: canonicalJobTitle })
       .first();
     await historyCard.waitFor({ state: 'visible', timeout: 30_000 });
     await historyCard.scrollIntoViewIfNeeded();
@@ -810,7 +817,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
       'Job Report',
       scenario.identities.contractor.label,
       scenario.identities.homeowner.label,
-      scenario.finalState.homeHistoryTitle,
+      canonicalJobTitle,
       scenario.property.addressLine1,
     ];
     if (expectedCanonicalText.some((value) => !reportText.includes(value))) {
