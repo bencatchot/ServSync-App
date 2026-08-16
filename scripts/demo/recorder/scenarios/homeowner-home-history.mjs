@@ -17,7 +17,7 @@ export const homeownerHomeHistoryScenario = Object.freeze({
     appUrl: 'https://servsync-demo.vercel.app',
   }),
   viewport: Object.freeze({ width: 1440, height: 900 }),
-  expectedDurationSeconds: Object.freeze({ min: 12, max: 18 }),
+  expectedDurationSeconds: Object.freeze({ min: 18, max: 32 }),
   outputBaseName: 'servsync-homeowner-home-history-v1',
   identities: Object.freeze({
     homeowner: Object.freeze({ role: 'homeowner', label: personas.homeowner.fullName }),

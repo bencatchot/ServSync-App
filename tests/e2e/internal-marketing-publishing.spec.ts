@@ -8,6 +8,7 @@ import {
   marketingProviderPreview,
   marketingPublicationSnapshotForContent,
 } from '../../src/features/marketing/marketingPublicationPreview';
+import { parseDurableDemoRecordingMetadata } from '../../src/features/marketing/marketingMedia';
 
 const approved: MarketingContentItem = {
   id: '62000000-0000-4000-8000-000000000001', workspaceKey: 'servsync_internal', workspaceKind: 'internal',
@@ -102,9 +103,33 @@ test('Facebook preview and provider publication use the same approved snapshot m
   expect(marketingPublicationSnapshotForContent(approved)).not.toHaveProperty('source_plan_id');
 });
 
-async function install(page: Page, stateOverride: Record<string, unknown> = publishingState, path = '/', contentItems: MarketingContentItem[] = [approved]) {
+const emptyMediaState = { workspace_id: '00000000-0000-4000-8000-000000000037', assets: [], pairings: [] };
+const pairedMediaStateFor = (content: MarketingContentItem) => {
+  const assetId = '64000000-0000-4000-8000-000000000001';
+  return {
+    workspace_id: emptyMediaState.workspace_id,
+    assets: [{
+      asset_id: assetId, asset_type: 'video', source: 'demo_recorder', recorder_scenario: 'homeowner-home-history',
+      source_commit: 'a'.repeat(40), storage_bucket: 'marketing-assets',
+      storage_path: `${emptyMediaState.workspace_id}/${assetId}/servsync-homeowner-home-history-v1-2026-08-15T18-00-00-000Z.mp4`,
+      mime_type: 'video/mp4', file_size_bytes: 4096, width: 1440, height: 900, duration_seconds: 23.4,
+      sha256: 'b'.repeat(64), validation_status: 'passed', sensitive_data_check: 'passed', pacing_review: 'passed',
+      pacing_reviewed_at: '2026-08-15T18:30:00.000Z', created_at: '2026-08-15T18:31:00.000Z',
+    }],
+    pairings: [{
+      pairing_id: '64000000-0000-4000-8000-000000000002', content_id: content.id,
+      content_revision: content.revisionNumber, source_direction_id: content.sourceDirectionId,
+      source_direction_revision: content.sourceDirectionRevision, asset_id: assetId,
+      recorder_scenario: 'homeowner-home-history',
+      claim_demonstrated: 'Open one home, enter Home History, and reopen its finalized report.',
+      status: 'candidate', created_at: '2026-08-15T18:32:00.000Z', reviewed_at: null,
+    }],
+  };
+};
+
+async function install(page: Page, stateOverride: Record<string, unknown> = publishingState, path = '/', contentItems: MarketingContentItem[] = [approved], mediaStateOverride: Record<string, unknown> = emptyMediaState) {
   await page.goto(path);
-  await page.evaluate(async ({ contentItems, publishingState }) => {
+  await page.evaluate(async ({ contentItems, publishingState, mediaState }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as { createElement: (...args: unknown[]) => unknown };
     const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as { createRoot: (element: HTMLElement) => { render: (node: unknown) => void } }).createRoot;
@@ -116,14 +141,39 @@ async function install(page: Page, stateOverride: Record<string, unknown> = publ
       calls.push(name);
       if (name === 'servsync_list_internal_marketing_content') return { data: contentItems.map(item => ({ ...item, content_id: item.id, workspace_key: item.workspaceKey, workspace_kind: item.workspaceKind, content_type: item.contentType, channel_category: item.channelCategory, revision_number: item.revisionNumber, created_at: item.createdAt, updated_at: item.updatedAt, created_by: item.createdBy, created_by_name: item.createdByName, submitted_at: item.submittedAt, submitted_by: item.submittedBy, submitted_by_name: item.submittedByName, reviewed_at: item.reviewedAt, reviewed_by: item.reviewedBy, reviewed_by_name: item.reviewedByName, review_note: item.reviewNote, preparation_source: item.preparationSource, preparation_request_id: item.preparationRequestId, preparation_recipe_key: item.preparationRecipeKey, truth_pack_version: item.truthPackVersion, prepared_at: item.preparedAt, preparation_sequence: item.preparationSequence, intended_audience: item.intendedAudience, content_role: item.contentRole, strategic_source: item.strategicSource, source_plan_id: item.sourcePlanId, source_plan_revision: item.sourcePlanRevision, source_plan_item_index: item.sourcePlanItemIndex, source_direction_id: item.sourceDirectionId, source_direction_revision: item.sourceDirectionRevision, source_direction_topic: item.sourceDirectionTopic, source_direction_status: item.sourceDirectionStatus })), error: null };
       if (name === 'servsync_get_internal_marketing_publishing') return { data: publishingState, error: null };
+      if (name === 'servsync_get_internal_marketing_media') return { data: mediaState, error: null };
       if (name === 'servsync_get_internal_marketing_planning') return { data: { profile: null, plan: null, recent_content: { window_limit: 20, item_count: 0, items: [] } }, error: null };
       if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
       return { data: [], error: null };
-    } };
+    }, storage: { from: () => ({
+      createSignedUrl: async (storagePath: string) => ({ data: { signedUrl: `https://media.example.test/${encodeURIComponent(storagePath)}` }, error: null }),
+      upload: async () => ({ data: {}, error: null }),
+      remove: async () => ({ data: {}, error: null }),
+    }) } };
     document.body.innerHTML = '<main class="p-4"><div id="root"></div></main>';
     createRoot(document.getElementById('root')!).render(React.createElement(Workspace, { role: 'platform_admin', overview: overview({ contractors: 1, homeowners: 1, activeInvites: 0 }), client }));
-  }, { contentItems, publishingState: stateOverride });
+  }, { contentItems, publishingState: stateOverride, mediaState: mediaStateOverride });
 }
+
+test('Marketing upload metadata requires exact Demo provenance and completed pacing review', () => {
+  const valid = {
+    schema_version: 2, scenario: 'homeowner-home-history', recording_version: 1,
+    timestamp: '2026-08-15T18:00:00.000Z', source_git_commit: 'a'.repeat(40), environment: 'Demo',
+    viewport: { width: 1440, height: 900 }, duration_seconds: 23.4, pacing: 'marketing',
+    webm_filename: 'servsync-homeowner-home-history-v1-2026-08-15T18-00-00-000Z.webm',
+    mp4_filename: 'servsync-homeowner-home-history-v1-2026-08-15T18-00-00-000Z.mp4',
+    width: 1440, height: 900, mime_type: 'video/mp4', mp4_size_bytes: 4096,
+    webm_sha256: 'b'.repeat(64), mp4_sha256: 'c'.repeat(64), validation_status: 'passed',
+    sensitive_data_check: 'passed', pacing_review: 'passed', pacing_reviewed_at: '2026-08-15T18:30:00.000Z',
+    marketing_candidate_status: 'passed', pacing_review_criteria: {
+      cursor_followable: true, click_intent_visible: true, ui_changes_readable: true, cursor_speed_acceptable: true,
+      cursor_motion_natural: true, text_readable: true, important_holds_sufficient: true, final_result_obvious: true,
+    },
+  } as const;
+  expect(parseDurableDemoRecordingMetadata(valid).scenario).toBe('homeowner-home-history');
+  expect(() => parseDurableDemoRecordingMetadata({ ...valid, pacing_review: 'pending' })).toThrow(/completed 1x pacing review/i);
+  expect(() => parseDurableDemoRecordingMetadata({ ...valid, environment: 'Production' })).toThrow(/validated Demo recording/i);
+});
 
 test('approved content has a separate fail-closed publication decision and Publishing history view', async ({ page }) => {
   await install(page);
@@ -173,6 +223,32 @@ test('owner can review every eligible Facebook candidate without creating a publ
   expect(rpcCalls).not.toContain('servsync_create_internal_marketing_publication');
 });
 
+test('owner preview binds exact approved text revision to one playable reviewed Demo asset', async ({ page }) => {
+  const homeHistory = approvedCandidates[0];
+  await install(page, connectedState, '/', approvedCandidates, pairedMediaStateFor(homeHistory));
+  await page.getByTestId('marketing-nav-campaigns').click();
+  await expect(page.getByTestId('facebook-public-preview')).toContainText(homeHistory.body);
+  await expect(page.getByTestId('facebook-public-preview-video')).toBeVisible();
+  await expect(page.getByTestId('marketing-media-review')).toContainText('Awaiting media approval');
+  await expect(page.getByTestId('marketing-media-review')).toContainText('Passed at normal speed');
+  await expect(page.getByRole('button', { name: 'Approve video pairing' })).toBeVisible();
+  await page.getByRole('button', { name: 'Review publication' }).click();
+  await expect(page.getByTestId('marketing-publication-confirmation')).toContainText('Candidate product demo video');
+  await expect(page.getByTestId('marketing-publication-confirmation')).toContainText(/Provider media publishing is not enabled/i);
+  await expect(page.getByRole('button', { name: 'Publish to Facebook' })).toBeDisabled();
+});
+
+test('approved pairing identity and review history are immutable in the migration contract', () => {
+  const sql = readFileSync(resolve(process.cwd(), 'servsync-marketing-media-assets.sql'), 'utf8');
+  expect(sql).toContain('marketing_content_media_one_approved_idx');
+  expect(sql).toMatch(/content_id is distinct from old\.content_id/);
+  expect(sql).toMatch(/content_revision is distinct from old\.content_revision/);
+  expect(sql).toMatch(/asset_id is distinct from old\.asset_id/);
+  expect(sql).toMatch(/Marketing media review history is append-only/);
+  expect(sql).toMatch(/old\.status = 'approved' and new\.status <> 'rejected'/);
+  expect(sql).not.toMatch(/facebook\.com\/.+feed|graph\.facebook/i);
+});
+
 test('return for revision exits preview through the normal Content workspace without editing approval', async ({ page }) => {
   await install(page, connectedState, '/', approvedCandidates);
   await page.getByTestId('marketing-nav-campaigns').click();
@@ -185,9 +261,10 @@ test('return for revision exits preview through the normal Content workspace wit
 
 test('Facebook owner preview remains readable without horizontal overflow on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await install(page, connectedState, '/', approvedCandidates);
+  await install(page, connectedState, '/', approvedCandidates, pairedMediaStateFor(approvedCandidates[0]));
   await page.getByTestId('marketing-nav-campaigns').click();
   await expect(page.getByTestId('facebook-public-preview')).toBeVisible();
+  await expect(page.getByTestId('facebook-public-preview-video')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 

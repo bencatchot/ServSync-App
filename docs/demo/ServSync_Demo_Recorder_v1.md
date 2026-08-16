@@ -79,7 +79,7 @@ The recorder authenticates the homeowner in an unrecorded browser context and ca
 
 During the identity change, the recorder freezes the last homeowner frame, signs out, signs in as the contractor through the normal UI behind that frame, and removes the freeze only after the contractor request card is ready. The output therefore has a simple visual hard cut without an external media pipeline or a long portal-loading transition.
 
-The visible pointer is a reusable DOM overlay driven by Playwright mouse movement. Captions are short, deterministic DOM overlays. The two pacing presets are `marketing` and `tutorial`.
+The visible pointer is a reusable DOM overlay driven by Playwright mouse movement. Captions are short, deterministic DOM overlays. The two pacing presets are `marketing` and `tutorial`. Marketing pacing uses cubic ease-in/out pointer travel, 0.7/1.1/1.5-second distance bands, a 550 ms settle before each click, a 900 ms result pause, 75 ms-per-character visible typing, and a 3.2-second neutral-cursor final hold. Scenario-specific reading holds may add time where the result needs it; they must not replace the shared pacing contract.
 
 ## Command
 
@@ -98,7 +98,7 @@ npm run demo:record -- homeowner-service-request --pacing=tutorial --headed
 npm run demo:record -- homeowner-service-request --output-dir="/absolute/review/path"
 ```
 
-The default working output directory is `demo-recordings/`, which is ignored by Git. WebM remains the native source/master. After the WebM passes scenario, playback, duration, final-state, browser-error, and sensitive-data validation, the recorder uses the locally installed Homebrew `ffmpeg`/`ffprobe` tools to create and verify an H.264/yuv420p MP4 with the same dimensions and duration.
+The default working output directory is `demo-recordings/`, which is ignored by Git. WebM remains the native source/master. After the WebM passes scenario, playback, duration, final-state, browser-error, and sensitive-data validation, the recorder uses the locally installed Homebrew `ffmpeg`/`ffprobe` tools to create and verify an H.264/yuv420p MP4 with the same dimensions and duration. The package begins with `pacing_review: pending`; technical validation alone does not make it a Marketing asset.
 
 The approved package is then promoted to the durable owner library:
 
@@ -120,6 +120,14 @@ open "$HOME/Documents/Codex/ServSync Demo Recordings"
 
 Use MP4 for distribution and WebM as the original source.
 
+After watching the complete MP4 at normal speed and confirming all eight pacing criteria, record the explicit local Marketing review:
+
+```bash
+npm run demo:approve-marketing -- "/absolute/path/to/recording.json" --confirm=human-paced-1x-review-passed
+```
+
+The command rechecks package paths, hashes, codec, dimensions, duration, Demo provenance, technical validation, and the sensitive-data result before atomically recording the pacing decision. It never uploads media or approves Marketing Content.
+
 ## Validation
 
 A run is successful only after:
@@ -137,10 +145,11 @@ A run is successful only after:
 - `ffmpeg` creates an H.264/yuv420p MP4 without resizing;
 - `ffprobe` confirms the MP4 dimensions and duration still match the source;
 - WebM, MP4, and allowlisted metadata promote together into the scenario's durable owner-library directory.
+- a separate normal-speed review confirms followable cursor motion, visible click intent, understandable UI changes, natural speed/motion, readable text, sufficient reading holds, and an obvious final result before `marketing_candidate_status` may become `passed`.
 
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
 
-The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, property-scoped homeowner visibility, a real download, and a 12-18 second final WebM.
+The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, property-scoped homeowner visibility, a real download, and an 18-32 second final WebM.
 
 Failed runs remove their staging video. A failed run must not be described as a successful artifact.
 

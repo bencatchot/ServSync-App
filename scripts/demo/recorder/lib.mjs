@@ -20,8 +20,26 @@ export const DEMO_RECORDING_ENV_KEYS = Object.freeze([
 ]);
 
 const PACING = Object.freeze({
-  marketing: Object.freeze({ initialHold: 1100, preClick: 220, postClick: 450, typing: 32, finalHold: 5200 }),
-  tutorial: Object.freeze({ initialHold: 1600, preClick: 350, postClick: 700, typing: 48, finalHold: 4200 }),
+  marketing: Object.freeze({
+    initialHold: 1300,
+    settleBeforeClick: 550,
+    postClick: 900,
+    typing: 75,
+    finalHold: 3200,
+    nearbyTravel: 700,
+    mediumTravel: 1100,
+    largeTravel: 1500,
+  }),
+  tutorial: Object.freeze({
+    initialHold: 1700,
+    settleBeforeClick: 650,
+    postClick: 1200,
+    typing: 90,
+    finalHold: 3800,
+    nearbyTravel: 850,
+    mediumTravel: 1300,
+    largeTravel: 1750,
+  }),
 });
 
 function unquote(value) {

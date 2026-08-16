@@ -614,6 +614,24 @@
           "reason": "The same exact patch was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-15 after Demo passed. Postflight proved the corrected definitions and service-only grants. Production remained setup_required with publishing disabled, no selected Page, zero unfinished sessions, transient or durable tokens, publications, or publication events, while exactly 16 content records, three packages, and 34 content status events were preserved."
         }
       }
+    },
+    {
+      "id": "marketing-media-assets-v1",
+      "artifact": "servsync-marketing-media-assets.sql (SHA-256 4a516ad53ac2d5e75c2ed70103616c3dcce247c6c651604c240601f72b07fbf9)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 4a516ad53ac2d5e75c2ed70103616c3dcce247c6c651604c240601f72b07fbf9 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-16 at 01:53:20Z through 01:53:23Z. The private MP4 bucket, three forced-RLS tables, zero direct grants, and authenticated-only platform-admin RPCs passed with zero media, pairings, publications, or events."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-16 at 01:54:05Z through 01:54:07Z after Sandbox passed. Demo retained zero Marketing content/status/publication rows and has zero media assets or pairings; no provider or recording action occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-16 at 01:54:56Z through 01:54:57Z after Sandbox and Demo passed. Exact 16-content/3-package/34-status-event fingerprints were preserved, media/pairing/publication/event counts remained zero, Facebook stayed connected and ready with database publishing disabled, and no provider request occurred."
+        }
+      }
     }
   ]
 }

@@ -13,6 +13,7 @@ import {
   assertRecordingDuration,
   assertSafeRecorderEnvironment,
   buildArtifactMetadata,
+  pacingFor,
   parseRecorderArgs,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
@@ -51,7 +52,7 @@ test('homeowner Home History scenario is a bounded read-only finalized-report wo
     homeownerHomeHistoryScenario.scenes.map((scene) => scene.key),
     ['open-home', 'home-history', 'finalized-report'],
   );
-  assert.deepEqual(homeownerHomeHistoryScenario.expectedDurationSeconds, { min: 12, max: 18 });
+  assert.deepEqual(homeownerHomeHistoryScenario.expectedDurationSeconds, { min: 18, max: 32 });
   assert.match(homeownerHomeHistoryScenario.fixturePolicy, /exact private PDF/i);
   assert.doesNotMatch(JSON.stringify(homeownerHomeHistoryScenario), /password|service_role|@example/i);
 });
@@ -74,6 +75,22 @@ test('operator arguments stay intentionally small', () => {
   assert.equal(parseRecorderArgs(['homeowner-home-history']).scenarioKey, 'homeowner-home-history');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
+});
+
+test('Marketing pacing uses human-readable cursor, click, typing, and final-hold timing', () => {
+  const marketing = pacingFor('marketing');
+  assert.equal(marketing.settleBeforeClick, 550);
+  assert.equal(marketing.postClick, 900);
+  assert.equal(marketing.typing, 75);
+  assert.equal(marketing.finalHold, 3200);
+  assert.ok(marketing.nearbyTravel >= 600);
+  assert.ok(marketing.mediumTravel >= 1000);
+  assert.ok(marketing.largeTravel >= 1500);
+  const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
+  assert.match(recorderSource, /easeInOutCubic/);
+  assert.match(recorderSource, /await wait\(pacing\.settleBeforeClick\)/);
+  assert.match(recorderSource, /await moveCursorToRest\(page, (?:scenePacing|pacing)\)/);
+  assert.doesNotMatch(recorderSource, /preClick: 160|postClick: 300/);
 });
 
 test('sensitive visible-text scan catches configured credentials and token-like text', () => {
