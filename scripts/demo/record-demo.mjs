@@ -239,6 +239,14 @@ async function renderFirstPdfPage(pdfPath, outputBasePath) {
   return `${outputBasePath}.png`;
 }
 
+function extractPdfText(pdfPath) {
+  const result = spawnSync('pdftotext', ['-layout', pdfPath, '-'], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`Unable to inspect the downloaded finalized report: ${result.stderr.trim() || 'pdftotext failed'}`);
+  }
+  return result.stdout;
+}
+
 function sourceCommit() {
   const result = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error('Unable to resolve recorder source commit.');
@@ -647,6 +655,10 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     email: required(env, 'DEMO_HOMEOWNER_EMAIL'),
     password: required(env, 'DEMO_HOMEOWNER_PASSWORD'),
   };
+  const contractor = {
+    email: required(env, 'DEMO_CONTRACTOR_EMAIL'),
+    password: required(env, 'DEMO_CONTRACTOR_PASSWORD'),
+  };
   required(env, 'DEMO_SUPABASE_ANON_KEY');
   required(env, 'DEMO_SUPABASE_SERVICE_ROLE_KEY');
   env.DEMO_MODE_ENABLED = 'true';
@@ -658,7 +670,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     env,
   );
   if (seed.verification?.ok !== true) {
-    throw new Error('Demo recorder setup did not reach its verified Home History checkpoint.');
+    throw new Error('Demo recorder setup did not reach its verified completed-Job checkpoint.');
   }
 
   const browser = await chromium.launch({ headless: !headed });
@@ -666,8 +678,34 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
   let recordedContext;
   let finalPath = null;
   let completed = false;
+  let reportFinalizationStarted = false;
+  let reportAdopted = false;
   const stagingDir = resolve(outputDir, '.staging', crypto.randomUUID());
   try {
+    const contractorContext = await browser.newContext({ viewport: scenario.viewport, acceptDownloads: true });
+    const contractorPage = await contractorContext.newPage();
+    await login(contractorPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '');
+    await openSidebar(contractorPage, /^Jobs$/i);
+    await contractorPage.getByRole('heading', { level: 1, name: /^Jobs$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await contractorPage.getByRole('button', { name: /Completed \/ Closed Jobs/i }).click();
+    const completedJobRow = contractorPage
+      .getByTestId('contractor-job-row')
+      .filter({ hasText: scenario.finalState.homeHistoryTitle })
+      .first();
+    await completedJobRow.waitFor({ state: 'visible', timeout: 30_000 });
+    await completedJobRow.getByRole('button', { name: /^View Job$/i }).click();
+    await contractorPage.getByTestId('simple-job-report-panel').waitFor({ state: 'visible', timeout: 30_000 });
+    contractorPage.once('dialog', (dialog) => dialog.accept());
+    reportFinalizationStarted = true;
+    await contractorPage.getByTestId('simple-job-finalize-report').click();
+    await contractorPage.getByTestId('contractor-report-finalize-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    const adoption = await runDemoCommand(['adopt-report', scenario.fixtureScenarioKey], env);
+    if (adoption.verification?.ok !== true) {
+      throw new Error('Canonical product report did not reach the verified Home History checkpoint.');
+    }
+    reportAdopted = true;
+    await contractorContext.close();
+
     const authContext = await browser.newContext({ viewport: scenario.viewport });
     const authPage = await authContext.newPage();
     await login(authPage, target.appUrl, 'homeowner', homeowner, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '');
@@ -756,7 +794,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     ]);
     await download.saveAs(reportPath);
     const suggestedFileName = download.suggestedFilename();
-    const isFriendlyReportName = suggestedFileName === scenario.finalState.reportFileName;
+    const isFriendlyReportName = scenario.finalState.reportFileNamePattern.test(suggestedFileName);
     const isCanonicalStorageName = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i.test(
       suggestedFileName,
     );
@@ -767,9 +805,19 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     if (reportBytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
       throw new Error('Downloaded finalized report is not a readable PDF artifact.');
     }
-    const reportText = reportBytes.toString('latin1');
-    if (!reportText.includes('Completed Water Heater Work Report') || !reportText.includes('Fictional demo record')) {
-      throw new Error('Downloaded finalized report does not match the expected fictional Demo content.');
+    const reportText = extractPdfText(reportPath);
+    const expectedCanonicalText = [
+      'Job Report',
+      scenario.identities.contractor.label,
+      scenario.identities.homeowner.label,
+      scenario.finalState.homeHistoryTitle,
+      scenario.property.addressLine1,
+    ];
+    if (expectedCanonicalText.some((value) => !reportText.includes(value))) {
+      throw new Error('Downloaded finalized report does not match the canonical ServSync product-report contract.');
+    }
+    if (/Fictional demo record|Completed Water Heater Work Report/i.test(reportText)) {
+      throw new Error('Downloaded finalized report contains retired fixture-only report content.');
     }
     const reportPngPath = await renderFirstPdfPage(reportPath, resolve(stagingDir, 'finalized-report'));
     const reportPng = await readFile(reportPngPath);
@@ -778,7 +826,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
       viewer.setAttribute('aria-label', 'Finalized work report preview');
       viewer.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#e2e8f0;padding:24px 24px 86px;overflow:hidden';
       const pageImage = document.createElement('img');
-      pageImage.alt = 'Completed Water Heater Work Report';
+      pageImage.alt = 'ServSync Job Report';
       pageImage.src = src;
       pageImage.style.cssText = 'display:block;max-width:100%;max-height:100%;object-fit:contain;background:white;box-shadow:0 16px 44px rgba(15,23,42,.22)';
       viewer.append(pageImage);
@@ -788,7 +836,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await installRecorderOverlays(page);
     await setCaption(page, scenario.scenes[2].caption);
     await moveCursorToRest(page, scenePacing);
-    await wait(scenePacing.finalHold);
+    await wait(Math.max(scenePacing.finalHold, 5500));
 
     const visibleText = `${historyText}\n${await page.locator('body').innerText()}\n${reportText}`;
     const sensitiveIssues = scanVisibleTextForSensitiveData(visibleText, {
@@ -858,6 +906,9 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     };
   } finally {
     if (recordedContext) await recordedContext.close().catch(() => {});
+    if (reportFinalizationStarted && !reportAdopted) {
+      await runDemoCommand(['adopt-report', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
     await browser.close();
     await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
     if (!completed && finalPath) await unlink(finalPath).catch(() => {});

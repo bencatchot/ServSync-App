@@ -122,7 +122,7 @@ The second bounded scenario uses the same guarded runner and creates one draft E
 npm run demo:record -- contractor-create-estimate
 ```
 
-The third bounded scenario finalizes one registry-owned Demo Job through the supported authenticated upload/RPC path, then records the homeowner reopening that report from the selected home's Home History:
+The third bounded scenario finalizes one registry-owned Demo Job through the normal contractor **Finalize Report** UI and canonical product PDF generator, then records the homeowner reopening that exact report from the selected home's Home History:
 
 ```bash
 npm run demo:record -- homeowner-home-history
@@ -144,7 +144,9 @@ The recorder owns the `connected_request_ready -> request_ready` transition: the
 
 For `contractor-create-estimate`, the recorder restores `request_ready`, saves one exact priced draft through the contractor Estimate composer, and privately adopts only that exact Estimate and line before verifying `estimate_draft`. It creates no approval, Job, Invoice, payment schedule, or external side effect. `adopt-estimate` is likewise an internal recorder operation.
 
-For `homeowner-home-history`, the private runner restores `home_history_updated`, owns exactly one `home_documents` row, one `home_maintenance_log` row, one notification, and one SHA-verified object in the private `home-documents` bucket. The ordinary finalization RPC supplies the canonical home lineage. The recorder authenticates offscreen, opens the selected home, reopens the real PDF, and remains read-only. The next exact reset removes only the registered object and rows.
+For `homeowner-home-history`, the private runner restores `job_completed`. The recorder authenticates the contractor offscreen, opens the exact registry-owned Job, and uses the normal application finalizer. The canonical `generateInspectionPdf` output is uploaded and passed to the ordinary finalization RPC, which supplies the home lineage. Only then does `adopt-report` register exactly one `home_documents` row, one `home_maintenance_log` row, one notification, and one SHA-verified object in the private `home-documents` bucket and advance to `home_history_updated`. The homeowner recording remains read-only. The next exact reset removes only the registered object and rows.
+
+Direct `home_history_updated` seeding is deliberately unsupported. Fixture data can be fictional, but Marketing-visible product output must come from the same normal generator and workflow used for real ServSync records. An interrupted pre-lineage upload can be removed only from the exact recorder-owned Job folder and only when no report path, document row, or Home History row exists.
 
 By default, `demo:seed` restores the backward-compatible `job_created` checkpoint. Demo checkpoint slices also support explicit checkpoint restoration through argument forwarding:
 
@@ -198,7 +200,7 @@ Slice 2A adds deterministic checkpoint restoration for the existing `water_heate
 | `job_review_ready` | Contractor | All seeded work items completed before lightweight completion. | Linked job remains `in_progress`; all estimate-derived work items complete; no completed-at timestamp. |
 | `job_completed` | Contractor | Lightweight current-product completion. | Linked job status `completed`, completed timestamp present, visit event completed, no closed timestamp, invoice, Home History row, report file, or fabricated `job_completed` workflow event. |
 
-Deferred checkpoints are not supported in Slice 2B and must not be claimed as available: `estimate_viewed`, `invoice_draft`, `invoice_sent`, `invoice_paid`, and `home_history_updated`.
+The base Slice 2B seeder still does not directly support `estimate_viewed`, `invoice_draft`, `invoice_sent`, `invoice_paid`, or `home_history_updated`. The Home History recorder reaches `home_history_updated` only through normal contractor UI finalization plus exact private adoption; it is not a general seed checkpoint.
 
 ## Checkpoint Reset and Restore Behavior
 
