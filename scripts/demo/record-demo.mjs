@@ -101,13 +101,47 @@ async function setCaption(page, text) {
   }, text);
 }
 
+const pointerPositions = new WeakMap();
+
+function easeInOutCubic(value) {
+  return value < 0.5 ? 4 * value ** 3 : 1 - ((-2 * value + 2) ** 3) / 2;
+}
+
+function pointerTravelDuration(distance, pacing) {
+  if (distance <= 260) return pacing.nearbyTravel;
+  if (distance <= 760) return pacing.mediumTravel;
+  return pacing.largeTravel;
+}
+
+async function moveCursorHuman(page, x, y, pacing) {
+  const viewport = page.viewportSize();
+  const start = pointerPositions.get(page) || {
+    x: (viewport?.width || 1440) * 0.76,
+    y: (viewport?.height || 900) * 0.7,
+  };
+  const distance = Math.hypot(x - start.x, y - start.y);
+  const duration = pointerTravelDuration(distance, pacing);
+  const steps = Math.max(24, Math.ceil(duration / 24));
+  for (let step = 1; step <= steps; step += 1) {
+    const progress = easeInOutCubic(step / steps);
+    await page.mouse.move(
+      start.x + (x - start.x) * progress,
+      start.y + (y - start.y) * progress,
+    );
+    await wait(duration / steps);
+  }
+  pointerPositions.set(page, { x, y });
+}
+
 async function moveAndClick(page, locator, pacing) {
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (!box) throw new Error('Recorder action target has no visible bounding box.');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 18 });
-  await wait(pacing.preClick);
-  await locator.click();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await moveCursorHuman(page, x, y, pacing);
+  await wait(pacing.settleBeforeClick);
+  await page.mouse.click(x, y);
   await wait(pacing.postClick);
 }
 
@@ -115,11 +149,20 @@ async function moveAndType(page, locator, value, pacing) {
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (!box) throw new Error('Recorder text target has no visible bounding box.');
-  await page.mouse.move(box.x + Math.min(box.width * 0.35, 220), box.y + box.height / 2, { steps: 16 });
-  await wait(pacing.preClick);
-  await locator.fill('');
+  const x = box.x + Math.min(box.width * 0.35, 220);
+  const y = box.y + box.height / 2;
+  await moveCursorHuman(page, x, y, pacing);
+  await wait(pacing.settleBeforeClick);
+  await page.mouse.click(x, y);
+  await locator.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await locator.press('Backspace');
   await locator.pressSequentially(value, { delay: pacing.typing });
   await wait(pacing.postClick);
+}
+
+async function moveCursorToRest(page, pacing) {
+  const viewport = page.viewportSize() || { width: 1440, height: 900 };
+  await moveCursorHuman(page, viewport.width * 0.88, viewport.height * 0.86, pacing);
 }
 
 async function addFreezeFrame(page) {
@@ -324,6 +367,7 @@ async function recordHomeownerServiceRequest({ scenario, env, outputDir, pacingN
     await finalCard.first().scrollIntoViewIfNeeded();
     await setCaption(page, scenario.scenes[1].caption);
     await removeFreezeFrame(page);
+    await moveCursorToRest(page, pacing);
     await wait(pacing.finalHold);
 
     const mainText = await page.getByRole('main').innerText();
@@ -514,6 +558,7 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
     estimateAdopted = true;
 
     await setCaption(page, scenario.scenes[2].caption);
+    await moveCursorToRest(page, pacing);
     await wait(pacing.finalHold);
     const mainText = await page.getByRole('main').innerText();
     const sensitiveIssues = scanVisibleTextForSensitiveData(mainText, {
@@ -596,13 +641,7 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
 
 async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName, headed }) {
   const pacing = pacingFor(pacingName);
-  const scenePacing = {
-    ...pacing,
-    initialHold: 800,
-    preClick: 160,
-    postClick: 300,
-    finalHold: 3500,
-  };
+  const scenePacing = pacing;
   const target = assertSafeRecorderEnvironment(env, scenario);
   const homeowner = {
     email: required(env, 'DEMO_HOMEOWNER_EMAIL'),
@@ -691,7 +730,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await page.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i }).waitFor({ state: 'visible' });
     const homeCard = page.getByRole('button').filter({ hasText: scenario.property.nickname }).first();
     await moveAndClick(page, homeCard, scenePacing);
-    await wait(900);
+    await wait(1400);
 
     await setCaption(page, scenario.scenes[1].caption);
     await moveAndClick(page, page.getByRole('button', { name: /^Home History$/i }).first(), scenePacing);
@@ -706,7 +745,8 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     if (!historyText.includes(scenario.finalState.contractorLabel)) {
       throw new Error('Home History scene did not show the expected fictional contractor lineage.');
     }
-    await wait(1500);
+    await moveCursorToRest(page, scenePacing);
+    await wait(1900);
 
     await setCaption(page, scenario.scenes[2].caption);
     const reportPath = resolve(stagingDir, 'finalized-report.pdf');
@@ -747,6 +787,7 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     }, `data:image/png;base64,${reportPng.toString('base64')}`);
     await installRecorderOverlays(page);
     await setCaption(page, scenario.scenes[2].caption);
+    await moveCursorToRest(page, scenePacing);
     await wait(scenePacing.finalHold);
 
     const visibleText = `${historyText}\n${await page.locator('body').innerText()}\n${reportText}`;

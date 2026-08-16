@@ -10,6 +10,7 @@ import {
   recordingLibraryRoot,
   recordingLibraryScenarioDir,
 } from '../../scripts/demo/recorder/output-library.mjs';
+import { approveMarketingRecording } from '../../scripts/demo/approve-marketing-recording.mjs';
 
 const scenarioKey = 'homeowner-service-request';
 const recordingBase = 'servsync-homeowner-service-request-v1-2026-08-15T14-22-11-123Z';
@@ -77,7 +78,11 @@ test('validated WebM, H.264 MP4, and sanitized metadata promote together', async
   assert.equal(await readFile(result.webmPath, 'utf8'), 'validated-webm');
   assert.equal(await readFile(result.mp4Path, 'utf8'), 'converted-mp4');
   const metadata = JSON.parse(await readFile(result.metadataPath, 'utf8'));
-  assert.deepEqual(metadata, {
+  assert.deepEqual({
+    ...metadata,
+    webm_sha256: '<sha>',
+    mp4_sha256: '<sha>',
+  }, {
     schema_version: 2,
     scenario: scenarioKey,
     recording_version: 1,
@@ -89,9 +94,20 @@ test('validated WebM, H.264 MP4, and sanitized metadata promote together', async
     pacing: 'marketing',
     webm_filename: `${recordingBase}.webm`,
     mp4_filename: `${recordingBase}.mp4`,
+    width: 1440,
+    height: 900,
+    mime_type: 'video/mp4',
+    mp4_size_bytes: 13,
+    webm_sha256: '<sha>',
+    mp4_sha256: '<sha>',
     validation_status: 'passed',
     sensitive_data_check: 'passed',
+    pacing_review: 'pending',
+    pacing_reviewed_at: null,
+    marketing_candidate_status: 'not_approved',
   });
+  assert.match(metadata.webm_sha256, /^[a-f0-9]{64}$/);
+  assert.match(metadata.mp4_sha256, /^[a-f0-9]{64}$/);
   assert.equal(result.scenarioDir, join(paths.library, scenarioKey));
 });
 
@@ -171,4 +187,30 @@ test('durable metadata uses an allowlist and excludes secret-bearing source fiel
   assert.equal(serialized.includes('password'), false);
   assert.equal(serialized.includes('access_token'), false);
   assert.equal(basename(metadata.webm_filename), metadata.webm_filename);
+});
+
+test('explicit full-speed review is required before a durable package becomes Marketing-ready', async (t) => {
+  const paths = await fixture(t);
+  const promoted = await promoteValidatedRecording({
+    scenarioKey,
+    sourceWebmPath: paths.webm,
+    sourceMetadataPath: paths.metadata,
+    libraryRoot: paths.library,
+    mediaTools: fakeTools,
+    probe: fakeProbe,
+    convert: fakeConvert,
+  });
+  const pending = JSON.parse(await readFile(promoted.metadataPath, 'utf8'));
+  assert.equal(pending.pacing_review, 'pending');
+  const reviewed = await approveMarketingRecording(promoted.metadataPath, {
+    mediaTools: fakeTools,
+    probe: fakeProbe,
+    reviewedAt: '2026-08-15T18:00:00.000Z',
+  });
+  assert.equal(reviewed.pacingReview, 'passed');
+  const approved = JSON.parse(await readFile(promoted.metadataPath, 'utf8'));
+  assert.equal(approved.marketing_candidate_status, 'passed');
+  assert.equal(approved.pacing_reviewed_at, '2026-08-15T18:00:00.000Z');
+  assert.deepEqual(Object.values(approved.pacing_review_criteria), Array(8).fill(true));
+  await assert.rejects(() => approveMarketingRecording(promoted.metadataPath, { mediaTools: fakeTools, probe: fakeProbe }), /not awaiting/i);
 });

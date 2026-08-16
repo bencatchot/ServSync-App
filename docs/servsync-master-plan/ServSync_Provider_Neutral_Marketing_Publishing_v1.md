@@ -7,6 +7,7 @@ This foundation adds a durable publication decision after Marketing Content appr
 ```text
 Approved Marketing Content revision
 -> destination-specific owner visual preview
+-> optional exact-revision validated product-demo pairing
 -> explicit owner provider/timing decision
 -> explicit final public-action confirmation
 -> immutable publication snapshot
@@ -40,6 +41,9 @@ This ordering is ServSync internal strategy. It is not a default for future cont
 - A provider request is marked separately from the worker claim. An uncertain response after request start is not automatically retried because doing so could duplicate a public post.
 - Safe retries are bounded to three attempts and only become owner-eligible for conclusive rate-limit or temporary-provider failures before a provider request started.
 - Local paths including `file://`, `/Users/`, `/private/tmp/`, and `~/Documents/` are rejected.
+- Validated Demo-recorder MP4s may enter the private `marketing-assets` bucket only after technical, sensitive-data, and normal-speed pacing review passes. Registration and exact approved-revision pairing are one atomic platform-admin RPC.
+- Media assets are immutable and checksum-addressed. Pairing identity is immutable, review history is append-only, and approving text never approves video.
+- A text revision with a live media pairing remains provider-publication ineligible until a separately reviewed provider adapter can send the exact text and exact video together. ServSync will not silently drop the paired video.
 - No public social post is part of this foundation.
 
 ## Scheduler
@@ -60,7 +64,7 @@ The Production Vercel project has the exact Production reference as a Production
 
 Facebook Connection v1 supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. Production now has a provider-validated ServSync Page connection with required granular Page authority and readiness `ready_except_live_post_verification`. Public posting remains disabled by the database capability and absent/false environment kill switch. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
 
-Owner Visual Publication Preview v1 lists every currently approved Facebook-eligible text item, separates internal metadata from public content, and renders the exact adapter message in a responsive Facebook-style decision card. The owner can compare candidates, review Direction lineage and grounding notes, choose publish-now or one-time scheduled timing, and inspect the explicit final public action. With public posting disabled, that final action cannot create or schedule a publication.
+Owner Visual Publication Preview v1 lists every currently approved Facebook-eligible text item, separates internal metadata from public content, and renders the exact adapter message in a responsive Facebook-style decision card. Paired Text + Product Demo Assets v1 adds a playable exact-revision video candidate, recorder provenance, pacing/validation evidence, and a separate approve/reject/retire decision. The owner can compare candidates, review Direction lineage and grounding notes, choose publish-now or one-time scheduled timing, and inspect the explicit final public action. With public posting disabled, that final action cannot create or schedule a publication; with paired media, it also remains blocked until provider video publishing receives separate approval.
 
 The current Meta Pages API documentation describes Page publishing through `POST /{page-id}/feed` with a Page access token. The setup slice must verify the Page/business relationship and current app review/access for `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`, plus a Page task that permits content creation. The Graph API version must be selected and pinned when the real Meta app is connected, not guessed in this unconnected foundation.
 
@@ -110,7 +114,7 @@ Primary references:
 ## Deferred Boundaries
 
 - first owner-authorized Facebook post
-- media asset upload/storage
+- Facebook video publication adapter and first owner-approved text-plus-video provider post
 - Instagram adapter
 - TikTok adapter and provider audit
 - analytics, comments, moderation, ads, recurring posts, and campaign optimization

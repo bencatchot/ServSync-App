@@ -42,6 +42,12 @@ import {
   type MarketingPublishingState,
 } from './marketingPublishing';
 import {
+  createMarketingMediaAdapter,
+  type DurableDemoRecordingMetadata,
+  type MarketingMediaClient,
+  type MarketingMediaState,
+} from './marketingMedia';
+import {
   createMarketingPlanningAdapter,
   type MarketingBusinessProfile,
   type MarketingPlan,
@@ -381,13 +387,14 @@ function AuthorizedInternalMarketingWorkspace({
   client,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient;
 }) {
   const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
   const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
   const directionsAdapter = useMemo(() => createMarketingDirectionsAdapter(client), [client]);
   const publishingAdapter = useMemo(() => createMarketingPublishingAdapter(client), [client]);
   const facebookAdapter = useMemo(() => createMarketingFacebookConnectionAdapter(client), [client]);
+  const mediaAdapter = useMemo(() => createMarketingMediaAdapter(client), [client]);
   const [items, setItems] = useState<MarketingContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -404,6 +411,7 @@ function AuthorizedInternalMarketingWorkspace({
   const [publishingSaving, setPublishingSaving] = useState(false);
   const [publishingError, setPublishingError] = useState<string | null>(null);
   const [previewContentId, setPreviewContentId] = useState<string | null>(null);
+  const [mediaState, setMediaState] = useState<MarketingMediaState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -459,6 +467,16 @@ function AuthorizedInternalMarketingWorkspace({
   }, [publishingAdapter]);
 
   useEffect(() => { void loadPublishing(); }, [loadPublishing]);
+
+  const loadMedia = useCallback(async () => {
+    try { setMediaState(await mediaAdapter.get()); }
+    catch (loadError) {
+      setMediaState(null);
+      setPublishingError(loadError instanceof Error ? loadError.message : 'ServSync could not load Marketing media.');
+    }
+  }, [mediaAdapter]);
+
+  useEffect(() => { void loadMedia(); }, [loadMedia]);
 
   const withPlanningSave = async (operation: () => Promise<unknown>) => {
     setPlanningSaving(true);
@@ -553,7 +571,23 @@ function AuthorizedInternalMarketingWorkspace({
     loading: publishingLoading,
     error: publishingError,
     saving: publishingSaving,
-    onReload: loadPublishing,
+    onReload: async () => { await Promise.all([loadPublishing(), loadMedia()]); },
+    mediaState,
+    onUploadMedia: async ({ content: selectedContent, mp4, metadata, claimDemonstrated }: { content: MarketingContentItem; mp4: File; metadata: DurableDemoRecordingMetadata; claimDemonstrated: string }) => {
+      if (!mediaState) throw new Error('Marketing media is still loading.');
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await mediaAdapter.uploadAndPair({ workspaceId: mediaState.workspaceId, content: selectedContent, mp4, metadata, claimDemonstrated });
+        await loadMedia();
+      } finally { setPublishingSaving(false); }
+    },
+    onReviewMedia: async (pairingId: string, decision: 'approved' | 'rejected') => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await mediaAdapter.review(pairingId, decision); await loadMedia(); }
+      finally { setPublishingSaving(false); }
+    },
     onCancel: async (publication: MarketingPublication) => {
       setPublishingSaving(true);
       setPublishingError(null);
@@ -635,7 +669,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;

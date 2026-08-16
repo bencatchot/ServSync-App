@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-15 - FB-037C Paired Text + Product Demo Assets v1
+
+- Branch: `codex/fb037c-paired-text-product-demo-assets-v1`.
+- Starting main SHA: `fbaf9ce427d1495b5744756d1dc94734deb7a115`.
+- Files changed: shared Demo Recorder pacing and explicit normal-speed review; private Marketing media/Content-pairing migration; internal paired Facebook preview/upload/review UI; focused recorder, SQL, and browser tests; rollout ledger; recorder/provider architecture; FB-034A/FB-037 backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Marketing recordings now use eased 0.7/1.1/1.5-second pointer travel, a 550 ms click settle, 900 ms post-action pause, 75 ms visible typing, and a 3.2-second final hold. Technical output remains pacing-pending until an explicit eight-criterion 1x review passes. A private MP4-only asset boundary accepts only validated Demo packages, atomically registers immutable checksum/provenance and an exact approved Content revision pairing, records separate owner media decisions, and plays the exact pair in the Facebook owner preview. Paired content cannot silently fall back to text-only publication while provider media support is absent.
+- Real recording evidence: The replacement `homeowner-home-history` package passed technical and normal-speed visual review at 27.32 seconds, 1440x900, with no sensitive-data finding. The prior 14.32-second clip remains historical and is not reused as a Marketing candidate.
+- Rollout: Exact migration `servsync-marketing-media-assets.sql` (SHA-256 `4a516ad53ac2d5e75c2ed70103616c3dcce247c6c651604c240601f72b07fbf9`) was applied Sandbox -> Demo -> Production on 2026-08-16 UTC. All three received the private bucket, three forced-RLS tables, zero direct grants, and authenticated platform-admin RPC boundary. Production preserved 16 content records, three packages, 34 status events, and zero publications/events; the new media/pairing tables were empty immediately after migration. Facebook remained connected with database publishing disabled, and no provider request occurred.
+- Tests/checks run: 23 Demo Recorder/output tests; Marketing media migration/security/atomicity validation; 13 paired Publishing desktop/mobile browser tests; six provider-publishing tests; 21 Facebook connection tests; 16 backend-parity tests; strict TypeScript; Production build; focused JavaScript ESLint; rollout-ledger validation; sensitive-value/Markdown-link/diff checks; and real Demo recording plus full-speed visual review. Focused TypeScript ESLint remains blocked before source evaluation by the inherited ESLint 9 / `@typescript-eslint/no-unused-expressions` startup incompatibility.
+- Known risks or follow-ups: The first Production upload/pair and owner preview require the merged source deployment. Provider video publishing is intentionally absent; both public-post gates remain disabled. Older recorder clips are not Marketing-approved by this work. Instagram/TikTok and contractor-tenant Marketing assets remain separately gated.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the managed paired-media and human-pacing milestones while retaining owner media approval and provider video publishing as separate gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Adds an immutable Demo-media-to-approved-Content boundary without changing public-post authority or internal-versus-contractor ownership.
+
 ## 2026-08-15 - FB-037B Owner Visual Publication Preview v1
 
 - Branch: `codex/fb037b-owner-visual-publication-preview-v1`.

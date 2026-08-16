@@ -1,5 +1,7 @@
 import { constants } from 'node:fs';
 import { access, copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -89,7 +91,18 @@ function assertMetadataSafe(metadata) {
   }
 }
 
-export function buildDurableRecordingMetadata({ metadata, webmFilename, mp4Filename }) {
+async function sha256File(filePath) {
+  const hash = createHash('sha256');
+  await new Promise((resolveHash, rejectHash) => {
+    const stream = createReadStream(filePath);
+    stream.on('data', chunk => hash.update(chunk));
+    stream.on('end', resolveHash);
+    stream.on('error', rejectHash);
+  });
+  return hash.digest('hex');
+}
+
+export function buildDurableRecordingMetadata({ metadata, webmFilename, mp4Filename, webmProbe, mp4Probe, webmSha256, mp4Sha256, mp4SizeBytes }) {
   const durable = {
     schema_version: 2,
     scenario: metadata.scenario,
@@ -102,8 +115,17 @@ export function buildDurableRecordingMetadata({ metadata, webmFilename, mp4Filen
     pacing: metadata.pacing,
     webm_filename: webmFilename,
     mp4_filename: mp4Filename,
+    width: mp4Probe?.width ?? metadata.viewport?.width,
+    height: mp4Probe?.height ?? metadata.viewport?.height,
+    mime_type: 'video/mp4',
+    mp4_size_bytes: mp4SizeBytes ?? null,
+    webm_sha256: webmSha256 ?? null,
+    mp4_sha256: mp4Sha256 ?? null,
     validation_status: 'passed',
     sensitive_data_check: 'passed',
+    pacing_review: 'pending',
+    pacing_reviewed_at: null,
+    marketing_candidate_status: 'not_approved',
   };
   assertMetadataSafe(durable);
   return durable;
@@ -170,7 +192,21 @@ export async function promoteValidatedRecording({
       throw new Error('Distribution MP4 duration differs materially from the WebM source.');
     }
 
-    const durableMetadata = buildDurableRecordingMetadata({ metadata, webmFilename: sourceName, mp4Filename });
+    const [webmSha256, mp4Sha256, mp4Info] = await Promise.all([
+      sha256File(stagedWebm),
+      sha256File(stagedMp4),
+      stat(stagedMp4),
+    ]);
+    const durableMetadata = buildDurableRecordingMetadata({
+      metadata,
+      webmFilename: sourceName,
+      mp4Filename,
+      webmProbe,
+      mp4Probe,
+      webmSha256,
+      mp4Sha256,
+      mp4SizeBytes: mp4Info.size,
+    });
     await writeFile(stagedMetadata, `${JSON.stringify(durableMetadata, null, 2)}\n`, { mode: 0o600 });
     await mkdir(scenarioDir, { recursive: true, mode: 0o700 });
 
