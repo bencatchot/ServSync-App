@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import {
   checkpointByKey,
@@ -67,10 +67,13 @@ const DEMO_AUTH_METADATA = {
   role: 'servsync_demo_role',
 };
 const RESETTABLE_PRIMARY_KEYS = {
+  contractor_posts: 'id',
   workflow_activity_events: 'id',
   home_maintenance_log: 'id',
   home_documents: 'id',
   notifications: 'id',
+  invoice_line_items: 'id',
+  invoices: 'id',
   contractor_visit_events: 'id',
   job_work_items: 'id',
   estimate_payment_schedule_items: 'id',
@@ -109,6 +112,59 @@ const REQUIRED_SCENARIO_TABLES = [
 const DEMO_HOMEOWNER = personas.homeowner;
 const DEMO_CONTRACTOR = personas.contractor;
 const DEMO_PROPERTY = propertyFixture;
+
+const FLAGSHIP_DISCOVER_CONTRACTORS = Object.freeze([
+  Object.freeze({
+    key: 'carpentry',
+    email: 'flagship-carpentry@example.test',
+    fullName: 'Avery Collins',
+    businessName: 'Gulf Coast Deck & Fence',
+    slug: 'demo-gulf-coast-deck-fence',
+    category: 'Carpentry',
+    categories: ['Carpentry', 'Decks', 'Fences'],
+    title: 'Backyard deck replacement completed in Fairhope',
+    description: 'A recent deck replacement with a straightforward scope and a clean finished space for the homeowner.',
+  }),
+  Object.freeze({
+    key: 'electrical',
+    email: 'flagship-electrical@example.test',
+    fullName: 'Jordan Lee',
+    businessName: 'Coastal Electric Solutions',
+    slug: 'demo-coastal-electric-solutions',
+    category: 'Electrical',
+    categories: ['Electrical', 'Outlets', 'Lighting'],
+    title: 'When an outlet keeps tripping',
+    description: 'An outlet that feels warm or repeatedly trips a breaker is worth having checked.',
+  }),
+  Object.freeze({
+    key: 'washing',
+    email: 'flagship-washing@example.test',
+    fullName: 'Morgan Hayes',
+    businessName: 'Shoreline Exterior Cleaning',
+    slug: 'demo-shoreline-exterior-cleaning',
+    category: 'Pressure Washing',
+    categories: ['Pressure Washing', 'Exterior Cleaning'],
+    title: 'Driveway and exterior cleanup completed locally',
+    description: 'A recent driveway and exterior cleanup completed for a fictional local homeowner.',
+  }),
+  Object.freeze({
+    key: 'landscaping',
+    email: 'flagship-landscaping@example.test',
+    fullName: 'Taylor Brooks',
+    businessName: 'Fairhope Lawn & Landscape',
+    slug: 'demo-fairhope-lawn-landscape',
+    category: 'Landscaping',
+    categories: ['Landscaping', 'Lawn Care', 'Seasonal Cleanup'],
+    title: 'A practical late-summer yard reset',
+    description: 'Late-summer cleanup is a good time to clear overgrowth and prepare beds for fall.',
+  }),
+]);
+
+const FLAGSHIP_PRIMARY_POST = Object.freeze({
+  category: 'Water heaters',
+  title: 'A quick water-heater check between service visits',
+  description: 'Check around the base of your water heater periodically for signs of moisture or corrosion.',
+});
 
 function requireEnv(env, key) {
   const value = env[key];
@@ -2045,6 +2101,8 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (!run.anchor_timestamp) {
     issues.push(`Succeeded run ${run.id} is missing anchor_timestamp.`);
   }
+  const flagshipInvoiceExpected = run.metadata?.recorder_scenario === 'servsync-platform-introduction'
+    && Boolean(run.metadata?.invoice_id);
 
   const activeCheckpointKey = run.checkpoint || run.metadata?.selected_checkpoint || DEFAULT_CHECKPOINT_KEY;
   if (!SUPPORTED_CHECKPOINT_KEYS.includes(activeCheckpointKey)) {
@@ -2565,8 +2623,21 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (appointmentRows.length > 0) {
     issues.push('Demo job scheduling must not create homeowner appointment proposals.');
   }
-  if (scenarioInvoices.length !== 0) {
+  if (!flagshipInvoiceExpected && scenarioInvoices.length !== 0) {
     issues.push(`Demo Slice 2B must not create invoices, found ${scenarioInvoices.length}.`);
+  }
+  if (flagshipInvoiceExpected) {
+    const registeredInvoiceIds = recordIds(records, 'invoices', 'demo_invoice');
+    const registeredInvoiceLineIds = recordIds(records, 'invoice_line_items', 'demo_invoice_line_item');
+    if (scenarioInvoices.length !== 1 || scenarioInvoices[0]?.id !== run.metadata.invoice_id || scenarioInvoices[0]?.status !== 'draft') {
+      issues.push(`Flagship checkpoint expected one exact draft Invoice, found ${scenarioInvoices.length}.`);
+    }
+    if (registeredInvoiceIds.length !== 1 || registeredInvoiceIds[0] !== run.metadata.invoice_id) {
+      issues.push('Flagship Invoice is not owned by one exact registry row.');
+    }
+    if (registeredInvoiceLineIds.length !== Number(run.metadata?.invoice_line_count || 0) || registeredInvoiceLineIds.length < 1) {
+      issues.push('Flagship Invoice line ownership does not match the recorded canonical line count.');
+    }
   }
   if (!requiresHomeHistory && homeHistoryRows.length !== 0) {
     issues.push(`Demo Slice 2B must not file Home History rows, found ${homeHistoryRows.length}.`);
@@ -3455,7 +3526,7 @@ async function adoptRecorderFinalizedReport(env, target, scenarioKey) {
     report_file_size_bytes: reportBytes.byteLength,
     recorder_adopted_at: new Date().toISOString(),
     recorder_source: 'servsync_demo_recorder',
-    recorder_scenario: 'homeowner-home-history',
+    recorder_scenario: run.metadata?.recorder_scenario || 'homeowner-home-history',
     report_origin: 'canonical_product_ui',
     report_generator: 'generateInspectionPdf',
   });
@@ -3478,6 +3549,197 @@ async function adoptRecorderFinalizedReport(env, target, scenarioKey) {
       reportSha256,
     },
     verification,
+  };
+}
+
+async function prepareFlagshipDiscover(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Flagship Discover preparation refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'contractor_discovery_ready') {
+    throw new Error(`Flagship Discover preparation refused: active checkpoint must be contractor_discovery_ready, found ${run.checkpoint}.`);
+  }
+  if (run.records.some((record) => record.table_name === 'contractor_posts')) {
+    throw new Error('Flagship Discover preparation refused: the active run already owns contractor posts.');
+  }
+
+  const primaryContractorId = run.metadata?.contractor_id;
+  if (!primaryContractorId) throw new Error('Flagship Discover preparation refused: primary contractor identity is missing.');
+  const createdAt = new Date(run.anchor_timestamp || Date.now());
+  const postRows = [];
+
+  for (const [index, fixture] of FLAGSHIP_DISCOVER_CONTRACTORS.entries()) {
+    const user = await ensureAuthUser(
+      service,
+      fixture.email,
+      `Flagship-${randomUUID()}-A9!`,
+      scenarioKey,
+      `flagship_${fixture.key}`
+    );
+    await ensureOk(
+      await service.from('profiles').upsert({
+        id: user.id,
+        email: fixture.email,
+        role: 'contractor',
+        full_name: fixture.fullName,
+      }, { onConflict: 'id' }),
+      `Unable to upsert ${fixture.businessName} Demo profile`
+    );
+    const contractor = await ensureOk(
+      await service.from('contractor_profiles').upsert({
+        owner_user_id: user.id,
+        business_name: fixture.businessName,
+        slug: fixture.slug,
+        contact_name: fixture.fullName,
+        email: fixture.email,
+        phone: '251-555-01' + String(index + 20).padStart(2, '0'),
+        website_url: `https://example.test/${fixture.slug}`,
+        city: 'Fairhope',
+        state: 'AL',
+        zip_code: '36532',
+        service_categories: fixture.categories,
+        service_zip_codes: ['36532', '36526'],
+        business_summary: `Fictional Demo contractor profile for ${fixture.businessName}. No real services are offered.`,
+        public_profile_enabled: true,
+        account_status: 'active',
+        subscription_status: 'trialing',
+      }, { onConflict: 'owner_user_id' }).select('id').single(),
+      `Unable to upsert ${fixture.businessName} Demo contractor profile`
+    );
+    postRows.push({
+      contractor_id: contractor.id,
+      category: fixture.category,
+      title: fixture.title,
+      description: fixture.description,
+      photos: [],
+      city: 'Fairhope',
+      state: 'AL',
+      created_at: new Date(createdAt.getTime() - (index + 1) * 60 * 60 * 1000).toISOString(),
+      updated_at: createdAt.toISOString(),
+    });
+  }
+
+  postRows.push({
+    contractor_id: primaryContractorId,
+    ...FLAGSHIP_PRIMARY_POST,
+    photos: [],
+    city: 'Mobile',
+    state: 'AL',
+    created_at: createdAt.toISOString(),
+    updated_at: createdAt.toISOString(),
+  });
+
+  const posts = await ensureOk(
+    await service.from('contractor_posts').insert(postRows).select('id,contractor_id,category,title'),
+    'Unable to create registered flagship Discover posts'
+  );
+  for (const post of posts) {
+    await registerRecord(service, run.id, 'contractor_posts', post.id, 'demo_flagship_discover_post', 'contractor_discovery_ready', {
+      source: 'servsync_demo_flagship_recorder',
+      contractor_id: post.contractor_id,
+      category: post.category,
+    });
+  }
+  await finishRun(service, run.id, 'succeeded', {
+    flagship_discover_post_ids: posts.map((post) => post.id),
+    flagship_discover_post_count: posts.length,
+    flagship_discover_prepared_at: new Date().toISOString(),
+    recorder_scenario: 'servsync-platform-introduction',
+  });
+
+  return {
+    operation: 'prepare-flagship-discover',
+    runId: run.id,
+    checkpoint: run.checkpoint,
+    records: { postCount: posts.length, postIds: posts.map((post) => post.id) },
+    verification: { ok: true, checkpoint: run.checkpoint },
+  };
+}
+
+async function createAndAdoptFlagshipInvoice(env, target, scenarioKey) {
+  const { service, makeUserClient } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Flagship Invoice creation refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'job_completed') {
+    throw new Error(`Flagship Invoice creation refused: active checkpoint must be job_completed, found ${run.checkpoint}.`);
+  }
+  if (run.records.some((record) => record.table_name === 'invoices')) {
+    throw new Error('Flagship Invoice creation refused: job_completed already owns an Invoice.');
+  }
+  const workItems = await ensureOk(
+    await service.from('job_work_items')
+      .select('id,completion_status,billing_status,billable,unit_price_cents')
+      .eq('inspection_id', run.metadata?.job_id)
+      .eq('completion_status', 'completed')
+      .eq('billable', true),
+    'Unable to inspect completed flagship Job work items'
+  );
+  const invoiceableIds = workItems
+    .filter((item) => item.billing_status === 'unbilled' && item.unit_price_cents !== null)
+    .map((item) => item.id);
+  if (invoiceableIds.length < 1) throw new Error('Flagship Invoice creation refused: no completed priced work item is invoiceable.');
+  const contractorClient = await signInDemoUser(
+    makeUserClient,
+    requireEnv(env, 'DEMO_CONTRACTOR_EMAIL'),
+    requireEnv(env, 'DEMO_CONTRACTOR_PASSWORD')
+  );
+  const creation = await ensureOk(
+    await contractorClient.rpc('servsync_create_partial_invoice_from_job', {
+      p_inspection_id: run.metadata?.job_id,
+      p_work_item_ids: invoiceableIds,
+    }),
+    'Unable to create the flagship Invoice through the canonical authenticated RPC'
+  );
+  const invoiceId = creation?.invoice_id;
+  if (!invoiceId) throw new Error('Flagship Invoice creation did not return an Invoice id.');
+  const invoices = await ensureOk(
+    await service.from('invoices')
+      .select('id,contractor_id,homeowner_user_id,service_request_id,job_id,estimate_id,status,title,total_cents,created_at')
+      .eq('id', invoiceId)
+      .eq('contractor_id', run.metadata?.contractor_id)
+      .eq('homeowner_user_id', run.metadata?.homeowner_user_id)
+      .eq('service_request_id', run.metadata?.service_request_id)
+      .eq('job_id', run.metadata?.job_id)
+      .eq('estimate_id', run.metadata?.estimate_id)
+      .eq('status', 'draft'),
+    'Unable to inspect the canonical flagship Invoice draft'
+  );
+  if (invoices.length !== 1) {
+    throw new Error(`Flagship Invoice creation refused: expected exactly one new canonical draft, found ${invoices.length}.`);
+  }
+  const invoice = invoices[0];
+  const lines = await ensureOk(
+    await service.from('invoice_line_items').select('id,invoice_id,quantity,unit,unit_price_cents').eq('invoice_id', invoice.id),
+    'Unable to inspect recorder Invoice lines'
+  );
+  if (lines.length < 1 || invoice.total_cents !== estimateFixture.subtotalCents + estimateFixture.taxCents) {
+    throw new Error('Flagship Invoice creation refused: Invoice lines or total do not match the canonical accepted Estimate.');
+  }
+  for (const line of lines) {
+    await registerRecord(service, run.id, 'invoice_line_items', line.id, 'demo_invoice_line_item', run.checkpoint, { source: 'servsync_create_invoice_from_job' });
+  }
+  await registerRecord(service, run.id, 'invoices', invoice.id, 'demo_invoice', run.checkpoint, { source: 'servsync_create_invoice_from_job' });
+  await finishRun(service, run.id, 'succeeded', {
+    invoice_id: invoice.id,
+    invoice_line_count: lines.length,
+    invoice_total_cents: invoice.total_cents,
+    recorder_invoice_adopted_at: new Date().toISOString(),
+    recorder_scenario: 'servsync-platform-introduction',
+  });
+  return {
+    operation: 'create-flagship-invoice',
+    runId: run.id,
+    checkpoint: run.checkpoint,
+    records: { invoiceId: invoice.id, lineItemCount: lines.length, totalCents: invoice.total_cents },
+    verification: { ok: true, checkpoint: run.checkpoint },
   };
 }
 
@@ -3518,9 +3780,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'adopt-request', 'adopt-estimate', 'adopt-report'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|adopt-request|adopt-estimate|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-request|adopt-estimate|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -3528,7 +3790,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (['adopt-request', 'adopt-estimate', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
+  if (['prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -3544,12 +3806,20 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     return summarize(await resetScenario(env, target, scenarioKey), target, scenarioKey);
   }
 
+  if (operation === 'prepare-flagship-discover') {
+    return summarize(await prepareFlagshipDiscover(env, target, scenarioKey), target, scenarioKey);
+  }
+
   if (operation === 'adopt-request') {
     return summarize(await adoptRecorderServiceRequest(env, target, scenarioKey), target, scenarioKey);
   }
 
   if (operation === 'adopt-estimate') {
     return summarize(await adoptRecorderEstimateDraft(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'create-flagship-invoice') {
+    return summarize(await createAndAdoptFlagshipInvoice(env, target, scenarioKey), target, scenarioKey);
   }
 
   if (operation === 'adopt-report') {

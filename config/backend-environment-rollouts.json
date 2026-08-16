@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-15",
+  "updatedOn": "2026-08-16",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -630,6 +630,24 @@
         "production": {
           "status": "Applied",
           "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-16 at 01:54:56Z through 01:54:57Z after Sandbox and Demo passed. Exact 16-content/3-package/34-status-event fingerprints were preserved, media/pairing/publication/event counts remained zero, Facebook stayed connected and ready with database publishing disabled, and no provider request occurred."
+        }
+      }
+    },
+    {
+      "id": "demo-recorder-flagship-fixture-registry-v1",
+      "artifact": "servsync-demo-recorder-flagship-fixture-registry.sql (SHA-256 1e852f65090c124cbac4c07894ff1bfd156316f40d2cf45448284f0ed3583e9e)",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder infrastructure only; no shared Sandbox SQL was authorized or applied."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder infrastructure only; no Production SQL was authorized or applied."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The exact patch was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-16. It extends only the service-role reset helper's exact-table allowlist with contractor_posts, invoice_line_items, and invoices at dependency-safe priorities 125, 114, and 113. Browser grants and all Production-supported objects remain unchanged; a complete flagship run created, registered, verified, and reset only its owned fictional Discover, Invoice, and canonical-report records."
         }
       }
     }

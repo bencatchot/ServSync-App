@@ -1,9 +1,9 @@
--- ServSync Demo recorder Home History fixture-registry correction.
+-- ServSync Demo recorder flagship fixture-registry extension.
 --
 -- Dedicated Demo project only: bdytwgejqnlblhrnqxkp.
--- This patch adds exact-row reset ownership for finalized-report metadata. The
--- recorder operator removes and verifies the registered private Storage object
--- before invoking the database reset helper.
+-- This patch adds exact-row reset ownership for contractor-created Discover
+-- posts and canonical Invoice rows used by the platform-introduction recorder.
+-- It does not alter product RLS, grants, or Production/Sandbox projects.
 
 begin;
 

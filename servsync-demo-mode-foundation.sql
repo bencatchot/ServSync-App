@@ -32,10 +32,13 @@ set search_path = public
 as $$
   select case
     when p_schema_name <> 'public' then null
+    when p_table_name = 'contractor_posts' then 125
     when p_table_name = 'workflow_activity_events' then 120
     when p_table_name = 'home_maintenance_log' then 119
     when p_table_name = 'home_documents' then 118
     when p_table_name = 'notifications' then 115
+    when p_table_name = 'invoice_line_items' then 114
+    when p_table_name = 'invoices' then 113
     when p_table_name = 'contractor_visit_events' then 112
     when p_table_name = 'job_work_items' then 110
     when p_table_name = 'estimate_payment_schedule_items' then 100
