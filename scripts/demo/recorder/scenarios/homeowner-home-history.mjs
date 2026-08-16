@@ -49,7 +49,6 @@ export const homeownerHomeHistoryScenario = Object.freeze({
     }),
   ]),
   finalState: Object.freeze({
-    homeHistoryTitle: requestFixture.title,
     contractorLabel: personas.contractor.businessName,
     reportFileNamePattern: /^[a-z0-9-]+-Field-Work-\d{4}-\d{2}-\d{2}\.pdf$/i,
   }),
