@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/scenarios/contractor-create-estimate.mjs';
 import { homeownerHomeHistoryScenario } from '../../scripts/demo/recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
+import { servsyncPlatformIntroductionScenario } from '../../scripts/demo/recorder/scenarios/servsync-platform-introduction.mjs';
 import {
   resolveFinalizedReportRegistryRecords,
   validateFinalizedReportStoragePath,
@@ -57,6 +58,19 @@ test('homeowner Home History scenario is a bounded read-only finalized-report wo
   assert.doesNotMatch(JSON.stringify(homeownerHomeHistoryScenario), /password|service_role|@example/i);
 });
 
+test('flagship introduction uses the truthful contractor-created Discover model and canonical lifecycle surfaces', () => {
+  assert.equal(validateScenarioDefinition(servsyncPlatformIntroductionScenario), servsyncPlatformIntroductionScenario);
+  assert.equal(servsyncPlatformIntroductionScenario.initialCheckpoint, 'contractor_discovery_ready');
+  assert.equal(servsyncPlatformIntroductionScenario.finalCheckpoint, 'home_history_updated');
+  assert.deepEqual(servsyncPlatformIntroductionScenario.expectedDurationSeconds, { min: 65, max: 80 });
+  assert.deepEqual(
+    servsyncPlatformIntroductionScenario.scenes.map((scene) => scene.key),
+    ['homeowner-need', 'recommendation-list', 'contractor-side', 'servsync-intro', 'discover', 'profile-connection', 'service-request', 'estimate', 'job', 'invoice', 'home-history', 'beta'],
+  );
+  assert.match(servsyncPlatformIntroductionScenario.fixturePolicy, /canonical Invoice and finalized-report output/i);
+  assert.doesNotMatch(JSON.stringify(servsyncPlatformIntroductionScenario), /password|service_role|@example/i);
+});
+
 test('recorder target guard rejects Production, Sandbox, and non-durable app origins', () => {
   const scenario = homeownerServiceRequestScenario;
   assert.equal(assertSafeRecorderEnvironment({}, scenario).projectRef, 'bdytwgejqnlblhrnqxkp');
@@ -73,6 +87,7 @@ test('operator arguments stay intentionally small', () => {
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
   assert.equal(parseRecorderArgs(['homeowner-home-history']).scenarioKey, 'homeowner-home-history');
+  assert.equal(parseRecorderArgs(['servsync-platform-introduction']).scenarioKey, 'servsync-platform-introduction');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
 });
@@ -167,6 +182,34 @@ test('Home History fixture patch extends only the exact Demo reset allowlist wit
   }
   assert.match(patch, /Dedicated Demo project only: bdytwgejqnlblhrnqxkp/);
   assert.doesNotMatch(patch, /create table|alter table|delete from|truncate|storage\.objects/i);
+});
+
+test('flagship fixture patch allows only exact Discover and Invoice rows with dependency-safe reset ordering', () => {
+  const patch = readFileSync(resolve(process.cwd(), 'servsync-demo-recorder-flagship-fixture-registry.sql'), 'utf8');
+  const post = patch.indexOf("p_table_name = 'contractor_posts' then 125");
+  const notification = patch.indexOf("p_table_name = 'notifications' then 115");
+  const invoiceLine = patch.indexOf("p_table_name = 'invoice_line_items' then 114");
+  const invoice = patch.indexOf("p_table_name = 'invoices' then 113");
+  const job = patch.indexOf("p_table_name = 'inspections' then 80");
+  assert.ok(post >= 0 && notification > post && invoiceLine > notification && invoice > invoiceLine && job > invoice);
+  assert.match(patch, /Dedicated Demo project only: bdytwgejqnlblhrnqxkp/);
+  assert.doesNotMatch(patch, /create table|alter table|delete from|truncate|storage\.objects/i);
+});
+
+test('flagship preparation and adoption stay exact-row, Demo-only, and product-path based', () => {
+  const seedSource = readFileSync(resolve(process.cwd(), 'scripts/demo/seed-demo-scenario.mjs'), 'utf8');
+  const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/recorder/flagship-introduction.mjs'), 'utf8');
+  assert.match(seedSource, /FLAGSHIP_DISCOVER_CONTRACTORS/);
+  assert.match(seedSource, /demo_flagship_discover_post/);
+  assert.doesNotMatch(seedSource, /adopt-connection|pending_connection_id/);
+  assert.match(recorderSource, /Share property access with Gulf Coast Home Services/);
+  assert.match(seedSource, /expected exactly one new canonical draft/);
+  assert.match(recorderSource, /simple-job-finalize-report/);
+  assert.match(seedSource, /servsync_create_partial_invoice_from_job/);
+  assert.match(recorderSource, /create-flagship-invoice/);
+  assert.match(recorderSource, /adopt-report/);
+  assert.match(recorderSource, /fictional_product_capability_used: false/);
+  assert.doesNotMatch(recorderSource, /servsync\.app\/api|uqgtheclhxqlnjpfmheq|zpzdkoaubyjtsomccxya/);
 });
 
 test('finalized report ownership requires one exact document, history row, and notification', () => {

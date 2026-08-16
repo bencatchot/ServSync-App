@@ -9,6 +9,8 @@ import { runDemoCommand } from './seed-demo-scenario.mjs';
 import { contractorCreateEstimateScenario } from './recorder/scenarios/contractor-create-estimate.mjs';
 import { homeownerHomeHistoryScenario } from './recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from './recorder/scenarios/homeowner-service-request.mjs';
+import { servsyncPlatformIntroductionScenario } from './recorder/scenarios/servsync-platform-introduction.mjs';
+import { recordServsyncPlatformIntroduction } from './recorder/flagship-introduction.mjs';
 import {
   assertRecordingDuration,
   assertSafeRecorderEnvironment,
@@ -25,6 +27,7 @@ const scenarios = new Map([
   [homeownerServiceRequestScenario.key, homeownerServiceRequestScenario],
   [contractorCreateEstimateScenario.key, contractorCreateEstimateScenario],
   [homeownerHomeHistoryScenario.key, homeownerHomeHistoryScenario],
+  [servsyncPlatformIntroductionScenario.key, servsyncPlatformIntroductionScenario],
 ]);
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -937,6 +940,9 @@ export async function runRecorder(argv = process.argv.slice(2), processEnv = pro
   }
   if (scenario.key === homeownerHomeHistoryScenario.key) {
     return recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
+  }
+  if (scenario.key === servsyncPlatformIntroductionScenario.key) {
+    return recordServsyncPlatformIntroduction({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
   }
   return recordContractorCreateEstimate({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
 }

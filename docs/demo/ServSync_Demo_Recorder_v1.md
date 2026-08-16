@@ -4,7 +4,7 @@
 
 The Demo Recorder creates reproducible browser recordings for ServSync Marketing, support tutorials, and product demonstrations. It is intentionally a small scenario runner, not a video editor or publishing system.
 
-Recorder v1 includes three canonical scenarios:
+Recorder v1 includes four canonical scenarios:
 
 `homeowner-service-request`
 
@@ -17,6 +17,10 @@ The clip starts from the registered Demo request, uses the normal contractor UI 
 `homeowner-home-history`
 
 The clip starts from one registry-owned completed Job, opens Demo Bay Home, shows its property-scoped Home History entry, and reopens the real private finalized-report PDF. It stops on the report and does not continue into Invoice or payment activity.
+
+`servsync-platform-introduction`
+
+The 71-second flagship clip combines brand-neutral opening graphics with real dedicated-Demo product frames. It truthfully presents contractor-created Discover content, a contractor profile, the homeowner-controlled connection prompt, a separate Service Request, an accepted Estimate, a completed Job, a canonical draft Invoice, Home History, the finalized ServSync report, and the public beta signup screen. The connection prompt is demonstrated without submitting a new connection, and the Invoice is not sent or paid.
 
 ## Safety Boundary
 
@@ -35,6 +39,8 @@ The reviewable scenario definitions live at:
 `scripts/demo/recorder/scenarios/contractor-create-estimate.mjs`
 
 `scripts/demo/recorder/scenarios/homeowner-home-history.mjs`
+
+`scripts/demo/recorder/scenarios/servsync-platform-introduction.mjs`
 
 It defines:
 
@@ -73,6 +79,8 @@ For `contractor-create-estimate`, setup restores the registered `request_ready` 
 
 For `homeowner-home-history`, setup stops at the registry-owned `job_completed` checkpoint. In an offscreen contractor browser context, the recorder opens that exact Job and uses the normal **Finalize Report** product action. The application calls the canonical `generateInspectionPdf` generator, uploads the resulting customer report through the normal private Storage path, and calls `servsync_finalize_field_work`. The private runner then adopts only the exact resulting document, Home History row, notification, and SHA-bound Storage object before homeowner recording begins. Direct seeding of `home_history_updated` is refused so Marketing cannot substitute a fixture-only PDF for the product artifact.
 
+For `servsync-platform-introduction`, setup first registers exactly five contractor-created Discover posts and the fictional contractor profiles needed to display them. The browser opens the real profile and connection prompt but does not submit a connection. Later registered checkpoints supply the already-connected Service Request and accepted Estimate story. The recorder finalizes the exact completed Job through the normal UI, creates one canonical draft Invoice through the existing Job billing RPC, and adopts the exact finalized report lineage. The reset allowlist covers only those registered Discover, Invoice, and report records in dependency-safe order.
+
 If finalization is interrupted after upload but before any durable report lineage exists, recovery inspects only the exact registry-owned Demo Job folder and may remove only UUID-named PDF objects from that folder. Any report path, document row, or Home History row makes cleanup fail closed for operator review. Normal reset deletes only the exact registered object before dependency-safe row cleanup; it never sweeps the bucket.
 
 Fixture data may be fictional, but visible product output must be canonical. Marketing-ready scenarios must use the same Estimate, Invoice, report, Home History artifact, and profile UI produced by the normal supported product workflow. Bespoke PDFs, documents, or UI made only for a recording are prohibited.
@@ -93,6 +101,7 @@ Load the existing approved Demo variables, including the private runner values d
 npm run demo:record -- homeowner-service-request
 npm run demo:record -- contractor-create-estimate
 npm run demo:record -- homeowner-home-history
+npm run demo:record -- servsync-platform-introduction
 ```
 
 Optional bounded controls:
@@ -155,10 +164,12 @@ The contractor Estimate scenario additionally requires exact adoption at `estima
 
 The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, canonical report text extracted from the downloaded PDF, property-scoped homeowner visibility, a real download, and an 18-32 second final WebM.
 
+The flagship scenario additionally requires exactly five registered contractor-created Discover posts, the real profile and connection prompt without a new connection submission, one canonical draft Invoice, exact canonical report lineage, all scene captures free of page/console/HTTP errors, and a 65-80 second final WebM. Its approved storyboard and narration boundary are recorded in [ServSync Flagship Introduction Video v2](ServSync_Flagship_Intro_Video_v2.md).
+
 Failed runs remove their staging video. A failed run must not be described as a successful artifact.
 
 ## Deliberate Limits
 
-Recorder v1 does not provide video publishing, subtitles, transitions beyond a hard cut, audio, a browser-side role switcher, a generic editing timeline, Production capture, external-provider actions, or scenarios beyond the three listed above.
+Recorder v1 does not provide video publishing, subtitles, a browser-side role switcher, a generic editing timeline, Production capture, or external-provider actions. The flagship's Cedar narration is a separate local owner-review derivative; the recorder continues to preserve a silent source/master and does not upload or publish audio.
 
-Likely future scenarios include Estimate-to-Job, manual payment, and contractor discovery. Each requires its own reviewed fixture and final-state contract.
+Any future scenario requires its own reviewed fixture and final-state contract.

@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - ServSync flagship introduction video v2 recorder foundation
+
+- Branch: `codex/flagship-intro-video-v2`.
+- Starting main SHA: `1cd7855d4fbcb9b9000b3735e0dff2bf489b1480`.
+- Files changed: dedicated flagship scenario/capture code; exact Demo Discover/Invoice fixture ownership and reset allowlists; Demo parity fingerprint/rollout ledger; recorder contracts; flagship storyboard/runbook; FB-034A backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Adds a bounded 71-second `servsync-platform-introduction` recording. Brand-neutral opening graphics explain the homeowner and contractor problem; real dedicated-Demo screens then show contractor-created Discover posts, a contractor profile and unsubmitted connection choice, a separate Service Request, accepted Estimate, completed Job, canonical draft Invoice, Home History, finalized report, and current beta signup. The silent WebM remains the canonical master; Cedar audio and a narrated MP4 are local owner-review derivatives only.
+- Safety: Every disposable Discover post, support contractor identity/profile, Invoice/line, report row, and Storage object is registered for exact dependency-safe Demo cleanup. Production and shared Sandbox are refused. The recorder creates no public post, payment, sent Invoice, Production Marketing asset, publication, or provider request, and it does not invent homeowner Discover posts, ranking, reviews, verification, matching, or lead generation.
+- Tests/checks run: Demo recorder/output contracts; real dedicated-Demo fixture, Discover, profile, connection-prompt, Service Request, accepted-Estimate, canonical Job/Invoice/report/Home History, signup, error/sensitive-data, duration, codec, and promotion validation; strict TypeScript; Production build; backend parity; focused JavaScript lint; Markdown-link and sensitive-value scans; and `git diff --check`.
+- Known risks or follow-ups: The narrated flagship preview remains local and requires explicit owner review. No media upload, pairing, scheduling, Facebook provider call, or public publication is authorized. General video editing and future scenarios remain out of scope.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the fourth bounded recorder scenario and its explicit local owner-review/publication boundary.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the truthful Discover-to-connected-workflow flagship contract and local narration boundary.
+
 ## 2026-08-16 - FB-037C Home History card lineage correction
 
 - Branch: `codex/fb037c-home-history-row-lineage-v1`.
