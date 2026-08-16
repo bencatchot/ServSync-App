@@ -264,7 +264,8 @@ test('Marketing Home History uses the canonical product finalizer and cannot see
   assert.match(recorderSource, /getByTestId\('simple-job-finalize-report'\)\.click\(\)/);
   assert.match(recorderSource, /seed\.records\?\.jobId/);
   assert.match(recorderSource, /data-record-id="\$\{canonicalJobId\}"/);
-  assert.match(recorderSource, /filter\(\{ hasText: canonicalJobTitle \}\)/);
+  assert.match(recorderSource, /adoption\.records\?\.homeHistoryId/);
+  assert.match(recorderSource, /data-record-id="\$\{canonicalHomeHistoryId\}"/);
   assert.doesNotMatch(recorderSource, /scenario\.finalState\.homeHistoryTitle/);
   assert.match(recorderSource, /runDemoCommand\(\['adopt-report', scenario\.fixtureScenarioKey\], env\)/);
   assert.match(recorderSource, /extractPdfText/);

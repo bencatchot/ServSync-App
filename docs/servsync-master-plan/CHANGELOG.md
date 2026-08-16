@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037C Home History card lineage correction
+
+- Branch: `codex/fb037c-home-history-row-lineage-v1`.
+- Starting main SHA: `d4446f889f2d5371af3b9566cded9e092e865b31`.
+- Files changed: Home History recorder card selection, focused recorder regression, and this changelog.
+- Summary of change: Selects the homeowner Home History card by the exact row ID returned from canonical report adoption. The PDF contract continues to verify the real persisted Job title, while the Home History title remains free to use its supported request-oriented wording.
+- Reason for change: Live Demo finalization and adoption succeeded with exact canonical lineage, but the recorder incorrectly assumed the Home History card title must equal the Job title. The real supported row correctly used `Replace leaking water heater` while the Job/report used `Water heater replacement estimate`.
+- Tests/checks run: Focused Demo recorder/output contracts, strict TypeScript, Production build, JavaScript lint, sensitive-value scan, and `git diff --check`.
+- Known risks or follow-ups: The successful canonical fixture remains registry-owned and will be exactly reset by the next recording run. No media was promoted by the stopped run. Visual PDF/video review and a fresh owner candidate remain required.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NOT NEEDED
+  - REASON: The active canonical-output and owner-review gates are unchanged.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is deterministic lineage binding, not a workflow or roadmap change.
+
 ## 2026-08-16 - FB-037C Demo owner report-finalizer handler alignment
 
 - Branch: `codex/fb037c-demo-owner-report-handler-v1`.

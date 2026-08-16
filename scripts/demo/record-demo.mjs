@@ -710,6 +710,10 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     if (adoption.verification?.ok !== true) {
       throw new Error('Canonical product report did not reach the verified Home History checkpoint.');
     }
+    const canonicalHomeHistoryId = adoption.records?.homeHistoryId;
+    if (!canonicalHomeHistoryId) {
+      throw new Error('Canonical report adoption did not return the exact Home History row identity.');
+    }
     reportAdopted = true;
     await contractorContext.close();
 
@@ -780,10 +784,9 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await setCaption(page, scenario.scenes[1].caption);
     await moveAndClick(page, page.getByRole('button', { name: /^Home History$/i }).first(), scenePacing);
     await page.getByRole('heading', { level: 1, name: /^Home History$/i }).waitFor({ state: 'visible' });
-    const historyCard = page
-      .getByTestId('home-history-entry-card')
-      .filter({ hasText: canonicalJobTitle })
-      .first();
+    const historyCard = page.locator(
+      `[data-testid="home-history-entry-card"][data-record-id="${canonicalHomeHistoryId}"]`,
+    );
     await historyCard.waitFor({ state: 'visible', timeout: 30_000 });
     await historyCard.scrollIntoViewIfNeeded();
     const historyText = await historyCard.innerText();
