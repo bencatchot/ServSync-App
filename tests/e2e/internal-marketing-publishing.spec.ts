@@ -173,6 +173,10 @@ test('Marketing upload metadata requires exact Demo provenance and completed pac
   expect(parseDurableDemoRecordingMetadata(valid).scenario).toBe('homeowner-home-history');
   expect(() => parseDurableDemoRecordingMetadata({ ...valid, pacing_review: 'pending' })).toThrow(/completed 1x pacing review/i);
   expect(() => parseDurableDemoRecordingMetadata({ ...valid, environment: 'Production' })).toThrow(/validated Demo recording/i);
+  expect(() => parseDurableDemoRecordingMetadata({
+    ...valid,
+    pacing_review_criteria: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`invented_${index}`, true])),
+  })).toThrow(/completed 1x pacing review/i);
 });
 
 test('approved content has a separate fail-closed publication decision and Publishing history view', async ({ page }) => {

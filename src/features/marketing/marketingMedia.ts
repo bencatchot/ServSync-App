@@ -94,6 +94,16 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const SCENARIO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const COMMIT = /^[a-f0-9]{40}$/;
 const SAFE_MP4 = /^servsync-[a-z0-9-]+-v\d+-[0-9TZ-]+\.mp4$/;
+const PACING_REVIEW_CRITERIA = [
+  'cursor_followable',
+  'click_intent_visible',
+  'ui_changes_readable',
+  'cursor_speed_acceptable',
+  'cursor_motion_natural',
+  'text_readable',
+  'important_holds_sufficient',
+  'final_result_obvious',
+] as const;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isTimestamp = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value));
 
@@ -118,6 +128,12 @@ function requireNumber(value: unknown, min: number, max: number) {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 }
 
+function hasPassedPacingReviewCriteria(value: unknown) {
+  return isRecord(value)
+    && Object.keys(value).length === PACING_REVIEW_CRITERIA.length
+    && PACING_REVIEW_CRITERIA.every(criterion => value[criterion] === true);
+}
+
 export function parseDurableDemoRecordingMetadata(value: unknown): DurableDemoRecordingMetadata {
   if (!isRecord(value) || value.schema_version !== 2 || value.environment !== 'Demo'
     || typeof value.scenario !== 'string' || !SCENARIO.test(value.scenario)
@@ -133,9 +149,8 @@ export function parseDurableDemoRecordingMetadata(value: unknown): DurableDemoRe
     || typeof value.mp4_sha256 !== 'string' || !SHA256.test(value.mp4_sha256)
     || value.validation_status !== 'passed' || value.sensitive_data_check !== 'passed'
     || value.pacing_review !== 'passed' || !isTimestamp(value.pacing_reviewed_at)
-    || value.marketing_candidate_status !== 'passed' || !isRecord(value.pacing_review_criteria)
-    || Object.keys(value.pacing_review_criteria).length !== 8
-    || Object.values(value.pacing_review_criteria).some(result => result !== true)) {
+    || value.marketing_candidate_status !== 'passed'
+    || !hasPassedPacingReviewCriteria(value.pacing_review_criteria)) {
     throw new MarketingMediaError('validation', 'Choose a validated Demo recording package with a completed 1x pacing review.');
   }
   if (value.width !== value.viewport.width || value.height !== value.viewport.height) {
