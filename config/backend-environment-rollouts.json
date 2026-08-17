@@ -704,6 +704,78 @@
           "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained one internal workspace, 17 Content rows, 41 Content events, three assets, six pairings, three connections, one published flagship, four publication events, exact managed-asset checksum, and Facebook Video ID 1616577883220910. Six shared public functions and 47 validated workspace constraints are active; both public-post gates remained off and no provider request occurred."
         }
       }
+    },
+    {
+      "id": "marketing-beta-entitlements-cost-metering-v1",
+      "artifact": "servsync-marketing-beta-entitlements-cost-metering.sql (SHA-256 6cfc343136d9abd819a240c3369d4ebd1668272ffaaa36dbc5b287acc774cf26)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact bytes were applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17. Free-beta defaults, forced RLS, zero direct grants, fixed-path function ownership/volatility, replay-safe quota, cost status, and a rollback-only two-contractor role/tenant exercise passed with zero residue and publishing disabled."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Demo retained one internal workspace, zero Content/assets/publications/events, and no provider action; publishing remained disabled."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. One internal workspace received one free-beta entitlement; usage/cost history remained empty; 17 Content rows, three assets, six pairings, three connections, one publication, and four publication events were preserved with both public-post gates off."
+        }
+      }
+    },
+    {
+      "id": "marketing-media-intake-ephemeral-lifecycle-v1",
+      "artifact": "servsync-marketing-media-intake-ephemeral-lifecycle.sql (SHA-256 77dadb6e04ef24272369a238357d6716270de6a6e4a01e247329a0ad95bac0e2)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact bytes were applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17. Private JPEG/PNG/WebP/MP4 Storage policy, exact Job-media identity, rights acknowledgement, lifecycle, publication/purge race guard, exact-object purge, replay, poster retention, and role/cross-tenant validation passed."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Demo Recorder boundaries remained unchanged, no Marketing records were created, and no provider action occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. All three pre-existing assets were backfilled protected with zero purge eligibility. The published flagship retained exact Content revision 9, pairing, asset checksum, confirmed status, and Facebook Video ID 1616577883220910; counts and both posting gates remained unchanged."
+        }
+      }
+    },
+    {
+      "id": "marketing-abandoned-upload-cleanup-v1",
+      "artifact": "servsync-marketing-abandoned-upload-cleanup.sql (SHA-256 e5a67dc3c124f189870055e29354143169d89a71dd42ee9ee05427f9049f1dad)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact additive forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17 after the main G-B migrations passed. SQL and worker tests proved 30-day stale pre-finalization claims, exact source/poster deletion, claim-token completion, replay safety, zero public execute access, and a five-item total worker bound."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Demo retained zero Marketing intakes/assets/publications/events and no recorder or provider action occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production had zero pre-existing intake rows and zero purge claims; 17 Content rows, three protected assets, six pairings, one flagship publication, four events, and Facebook Video ID 1616577883220910 remained exact with both posting gates off."
+        }
+      }
+    },
+    {
+      "id": "marketing-storage-policy-helper-execute-v1",
+      "artifact": "servsync-marketing-storage-policy-helper-execute.sql (SHA-256 aa1bed743b1301f9a80cf2cc2f71a27795d963b613bdcbf82e1ddcd0d81c0eee)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 39-line additive review forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17. Authenticated execution is present only for the two purpose-bound Storage RLS predicates; anon/service_role execution remains denied and owner, stable volatility, and fixed search paths remain exact. The local SQL harness then passed an actual authenticated reserved-path Storage insert."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. The two policy-helper grants match Sandbox, Demo Marketing/Recorder records remained unchanged, and no provider action occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained 17 Content rows, three protected assets, six pairings, three provider connections, one flagship publication, and four events; intakes and usage events remained zero. Exact flagship SHA-256 and Facebook Video ID 1616577883220910 remained unchanged, database publishing stayed false, and no provider request occurred."
+        }
+      }
     }
   ]
 }

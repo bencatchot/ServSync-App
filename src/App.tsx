@@ -145,6 +145,7 @@ import {
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { InternalMarketingWorkspace } from './features/marketing/MarketingWorkspace';
+import { MarketingUsagePanel } from './features/marketing/MarketingUsagePanel';
 import { buildInternalMarketingOverview } from './features/marketing/marketingDomain';
 import { marketingFacebookReturnStatus } from './features/marketing/marketingFacebookConnection';
 import { FilterSummary } from './features/search/FilterSummary';
@@ -892,7 +893,7 @@ type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
 type RequestContractorAttributeFilter = 'licensed' | 'insured' | 'bonded' | 'website' | 'profileDetails' | 'discoverPosts';
 type HomeownerDocumentPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerMaintenancePropertyScope = 'selected' | 'all' | 'unassigned';
-type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
+type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'marketing' | 'inspections' | 'trust' | 'privacy' | 'support';
 type MobileNavItem = {
   id: string;
   label: string;
@@ -21535,7 +21536,7 @@ function ContractorDashboard({
   const [inviteLink, setInviteLink] = useState('');
   const [contractorReferralDraft, setContractorReferralDraft] = useState<ContractorReferralSubmitDraft>(() => createBlankContractorReferralSubmitDraft());
   const [submittingContractorReferral, setSubmittingContractorReferral] = useState(false);
-  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
+  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'marketing', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'archived' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'archived', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
@@ -29377,6 +29378,7 @@ function ContractorDashboard({
     calendar: 'Calendar',
     invites: 'Invites & Referrals',
     discover: 'Discover',
+    marketing: 'Marketing',
     inspections: 'Jobs',
     trust: 'Trust & Safety',
     privacy: 'Privacy & Data',
@@ -31480,6 +31482,12 @@ function ContractorDashboard({
   const canUseInvoiceDraftPriceBook = priceBookAccess.canView && effectiveDurableDraftCapabilities.canLaunchInvoice;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
+  const canManageMarketing = currentContractorTeamRole === 'owner'
+    || currentContractorTeamRole === 'admin'
+    || currentContractorTeamRole === 'office';
+  useEffect(() => {
+    if (!canManageMarketing && contractorTab === 'marketing') setContractorTab('overview');
+  }, [canManageMarketing, contractorTab]);
   const contractorAccountName = profile.full_name.trim() || profile.email;
   const contractorAccountSubtitle = currentContractorTeamRole === 'owner'
     ? 'Owner'
@@ -32599,6 +32607,7 @@ function ContractorDashboard({
         { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, group: 'Customer Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
+        ...(canManageMarketing ? [{ id: 'marketing', label: 'Marketing', icon: <Megaphone size={17} />, group: 'Growth' }] : []),
         { id: 'trust',        label: 'Trust & Safety',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: contractorSupportBadgeCount, group: 'Help' },
@@ -38402,6 +38411,10 @@ function ContractorDashboard({
           contractorProfile={contractor}
           connections={[]}
         />
+      )}
+
+      {contractorTab === 'marketing' && supabase && contractor?.id && canManageMarketing && (
+        <MarketingUsagePanel client={supabase} contractorId={contractor.id} />
       )}
 
       {contractorTab === 'trust' && (

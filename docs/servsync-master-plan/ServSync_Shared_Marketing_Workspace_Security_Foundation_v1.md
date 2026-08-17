@@ -73,7 +73,7 @@ Database publishing remained disabled and `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLE
 
 ## Decomposition
 
-FB-037G-B remains responsible for:
+FB-037G-B is completed in [Marketing Media, Cost, and Ephemeral Lifecycle v1](./ServSync_Marketing_Media_Cost_Ephemeral_Lifecycle_v1.md):
 
 - Job media intake and Marketing-only uploads;
 - image support;
@@ -89,4 +89,4 @@ FB-037G-C remains responsible for:
 - ordinary contractor provider connection and publication history UX;
 - replay-receipt and post-verification readiness presentation polish where still applicable.
 
-Neither later slice is implemented by this foundation.
+FB-037G-C is not implemented by either foundation.

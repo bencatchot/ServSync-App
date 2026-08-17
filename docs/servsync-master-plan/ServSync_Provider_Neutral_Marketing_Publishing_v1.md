@@ -123,6 +123,6 @@ Primary references:
 - analytics, comments, moderation, ads, recurring posts, and campaign optimization
 - contractor Marketing provider connections and authorization
 - contractor publishing queue, preview selection, Publish Now/Schedule, history, and Needs Attention UX
-- contractor media intake, quota/cost enforcement, retention, and purge
+- contractor media intake, quota/cost enforcement, retention, and purge are now provided by FB-037G-B; ordinary contractor publication authorization remains deferred to FB-037G-C
 
-None of those capabilities are implied by this foundation.
+Capabilities not explicitly marked as delivered by FB-037G-B remain deferred and are not implied by this foundation.

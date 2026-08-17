@@ -56,6 +56,8 @@ import {
   type MarketingPlanningState,
 } from './marketingPlanning';
 import { MarketingPlanningWorkspace } from './MarketingPlanningWorkspace';
+import { MarketingUsagePanel } from './MarketingUsagePanel';
+import type { MarketingUsageClient } from './marketingUsage';
 import {
   createMarketingDirectionsAdapter,
   type MarketingDirection,
@@ -279,6 +281,7 @@ export function MarketingWorkspace({
   content,
   planning,
   publishing,
+  settingsUsage,
 }: {
   audience: MarketingWorkspaceAudience;
   overview: MarketingOverviewData;
@@ -294,6 +297,7 @@ export function MarketingWorkspace({
   };
   planning: Parameters<typeof MarketingPlanningWorkspace>[0];
   publishing: Omit<Parameters<typeof MarketingPublishingWorkspace>[0], 'contentItems' | 'selectedContentId' | 'onSelectContent' | 'onReturnForRevision' | 'onCreate'> & { composer: { selectedContentId: string | null; onSelectContent: (content: MarketingContentItem) => void; onCreate: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] } };
+  settingsUsage: ReactNode;
 }) {
   const [section, setSection] = useState<MarketingWorkspaceSection>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'campaigns' : 'overview'
@@ -376,7 +380,7 @@ export function MarketingWorkspace({
                 onCreate={publishing.composer.onCreate}
               />
           : section === 'settings'
-            ? <MarketingPlanningWorkspace {...planning} />
+            ? <div className="space-y-5">{settingsUsage}<MarketingPlanningWorkspace {...planning} /></div>
             : <MarketingFoundationState section={section} />}
     </div>
   );
@@ -387,7 +391,7 @@ function AuthorizedInternalMarketingWorkspace({
   client,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
 }) {
   const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
   const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
@@ -658,7 +662,14 @@ function AuthorizedInternalMarketingWorkspace({
   };
 
   return <>
-    <MarketingWorkspace audience={{ kind: 'internal' }} overview={overview} content={content} planning={planning} publishing={publishing} />
+    <MarketingWorkspace
+      audience={{ kind: 'internal' }}
+      overview={overview}
+      content={content}
+      planning={planning}
+      publishing={publishing}
+      settingsUsage={<MarketingUsagePanel client={client} contractorId={null} platformControls />}
+    />
   </>;
 }
 
@@ -669,7 +680,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;
