@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-17 - FB-037G-A shared Marketing workspace and tenant security foundation v1
+
+- Branch: `codex/fb037g-a-shared-marketing-security-v1`.
+- Starting main SHA: `b20548d9a60d5bd011afb8a1b2e893d2cb0e9f67`.
+- Recovery: Preserved checkpoint `5c34f301799867a581f5869bffe537a67d6f6e44` and monolithic reference draft SHA-256 `5c10475444e1e42e5a085c46c7eec87b84d02057f5a933be8c8f8c75714e3e7e` remain untouched. Only workspace identity/access, same-workspace lineage, and shared Content adapter concepts were extracted into the bounded 685-line migration `servsync-shared-marketing-workspace-security-foundation.sql` at SHA-256 `fb7e626d4a44015df4172687d122e1822c696867dc81f4b5f4a80548c42d1e96`.
+- Summary: Adds a canonical server-side internal/contractor Marketing workspace resolver; tenant-bound Owner/Admin/Office management; Field Technician/Viewer denial; internal-only platform-admin scope; deterministic active-contractor workspace creation; shared Content list/create/update/transition RPCs; and validated composite workspace relationships across profiles, plans, Directions, Content, media, pairings, provider connections, OAuth/Vault references, publications, and events. Existing internal Content now consumes the shared resolver.
+- Security: All Marketing tables remain forced-RLS with no direct `anon`, `authenticated`, or generic `service_role` table privileges. New `SECURITY DEFINER` functions are `postgres`-owned, fixed-path, explicitly revoked/granted, and correctly `STABLE` or `VOLATILE`. A validation-discovered `NULL NOT IN` role guard was corrected before rollout so unrecognized roles fail closed. Platform admin receives no silent contractor-workspace visibility.
+- Rollout: The exact checksum was applied Sandbox -> Demo -> Production on 2026-08-17. Sandbox and Demo passed rollback-only two-contractor role/tenant fixtures and retained zero fixture residue. Production preserved one internal workspace, 17 Content rows, 41 events, three assets, six pairings, three provider connections, one publication, four publication events, exact flagship checksum, published status, and Facebook Video ID `1616577883220910`. Database publishing remained disabled, the public-post environment gate remained absent, and no provider request occurred.
+- Validation: Disposable and live rollback-only tenant matrices; role, RLS, grant, owner, search-path, volatility, repeat-install, same-workspace provider, and preservation checks; 48 focused Marketing browser tests; publishing worker 17/17; Facebook connection/managed-video 32/32; backend parity unit tests 16/16; Production/Demo live parity; TypeScript; Production build; migration checksum; rollout ledger; sensitive-value/Markdown/diff checks. Live Sandbox parity retains 21 unrelated pre-existing supported-schema findings and is not changed by this slice.
+- Decomposition: FB-037G-B retains Job/Marketing media intake, image support, active-media/monthly-generation quotas, cost metering/enforcement/circuit breakers, retention/purge, purge worker, and lightweight post-purge history. FB-037G-C retains contractor queue/preview selection, Publish Now, Schedule, publication authorization, history, Needs Attention, ordinary contractor provider UX, replay-receipt, and readiness-label polish.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the completed A security foundation and makes B/C boundaries explicit without claiming their product capability.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Establishes the shared tenant model and role boundary that later contractor Marketing slices must consume.
+
 ## 2026-08-16 - FB-037F first live Facebook flagship verification
 
 - Branch: `codex/fb037f-first-live-facebook-verification`.

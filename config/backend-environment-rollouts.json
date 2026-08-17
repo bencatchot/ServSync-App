@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-16",
+  "updatedOn": "2026-08-17",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -684,6 +684,24 @@
         "production": {
           "status": "Applied",
           "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-17 from 02:16:20Z through 02:16:22Z after Sandbox and Demo passed. The rollout preserved 17 Content records, 41 Content events, three assets, six pairings, and zero publications/events. During the separately owner-authorized first-live verification, exact Content 67790a72-b9c4-4796-9fcf-e0d5b9d6149a revision 9, pairing 460c7689-a2c6-4f8c-addd-511b5e8abd23, and asset 2097be01-0be4-4f8e-bef2-2e81adb9c95d at SHA-256 bc33dbfa9ce55944b4385841047b6a5980f49f77f5de09020649709f17c0c3a1 produced exactly one publication and Facebook Video ID 1616577883220910 on Page 1199023349954773. Meta confirmed exact description and reported upload, processing, and publishing complete; replay checks left one publication, one provider-request start, and one Video ID. Database and environment public-post gates were restored off immediately afterward."
+        }
+      }
+    },
+    {
+      "id": "shared-marketing-workspace-security-foundation-v1",
+      "artifact": "servsync-shared-marketing-workspace-security-foundation.sql (SHA-256 fb7e626d4a44015df4172687d122e1822c696867dc81f4b5f4a80548c42d1e96)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 685-line migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17. Catalog validation and rollback-only two-contractor Owner/Admin/Office/Field Technician/Viewer fixtures proved tenant denial, internal-only platform administration, provider/workspace isolation, safe grants, and zero durable fixture residue. Publications/events remained zero and publishing stayed disabled."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. The same rollback-only tenant/security matrix passed; Demo retained one internal workspace and zero contractor workspaces, Content, assets, pairings, publications, or events, with recorder data unaffected and no provider action."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained one internal workspace, 17 Content rows, 41 Content events, three assets, six pairings, three connections, one published flagship, four publication events, exact managed-asset checksum, and Facebook Video ID 1616577883220910. Six shared public functions and 47 validated workspace constraints are active; both public-post gates remained off and no provider request occurred."
         }
       }
     }

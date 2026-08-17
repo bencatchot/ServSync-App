@@ -92,7 +92,7 @@ async function installHarness(page: Page, options: { role?: 'platform_admin' | '
     const client = {
       rpc: async (name: string, args: Record<string, unknown>) => {
         calls.push({ name, args });
-        if (name === 'servsync_list_internal_marketing_content') return { data: [], error: null };
+        if (name === 'servsync_list_marketing_content') return { data: [], error: null };
         if (name === 'servsync_get_internal_marketing_planning') return { data: structuredClone(planningValue), error: null };
         if (name === 'servsync_get_internal_marketing_directions') {
           return errorValue ? { data: null, error: { message: 'private database detail' } } : { data: structuredClone(state), error: null };
@@ -192,7 +192,7 @@ test.describe('accepted Plan Marketing Directions', () => {
     expect(calls.some(call => call.name === 'servsync_update_internal_marketing_direction')).toBe(true);
     expect(calls.some(call => call.name === 'servsync_approve_internal_marketing_direction')).toBe(true);
     expect(calls.some(call => /content|package|publish|schedule/.test(call.name)
-      && !['servsync_list_internal_marketing_content', 'servsync_get_internal_marketing_publishing'].includes(call.name))).toBe(false);
+      && !['servsync_list_marketing_content', 'servsync_get_internal_marketing_publishing'].includes(call.name))).toBe(false);
   });
 
   test('empty, error, and unauthorized states fail closed', async ({ page }) => {

@@ -23,8 +23,8 @@ It does not publish, schedule, generate, recommend, email, post, attribute, anal
 `marketing_workspaces` establishes reusable workspace identity:
 
 - `internal` identifies ServSync's own private Marketing workspace;
-- `contractor` is a schema-level future scope only and has no creation, read, mutation, or UI path in this slice;
-- contractor workspaces, if later approved, must bind to the canonical contractor identity and receive separate tenant-derived RPCs and authorization.
+- `contractor` now has an additive tenant-derived workspace/access and Content contract through FB-037G-A, but no contractor-facing UI;
+- contractor workspaces bind to canonical contractor identity and never trust browser-supplied workspace identity.
 
 The migration seeds only deterministic empty workspace `servsync_internal`. It creates no content or activity fixture.
 
@@ -63,7 +63,9 @@ Only these RPCs are browser-callable by `authenticated`:
 - `servsync_update_internal_marketing_content`
 - `servsync_transition_internal_marketing_content`
 
-Each is `postgres`-owned, `SECURITY DEFINER`, and fixed-path. The server derives the internal workspace and actor; the browser cannot supply either. Contractor and homeowner calls fail closed. No contractor-facing or homeowner-facing Marketing API exists.
+Each is `postgres`-owned, `SECURITY DEFINER`, and fixed-path. The server derives the internal workspace and actor; the browser cannot supply either. Contractor and homeowner calls fail closed.
+
+The original platform-only RPCs remain as historical compatibility contracts. FB-037G-A adds shared Content RPCs that resolve internal or contractor context server-side. Owner/Admin/Office may manage only their own contractor workspace; Field Technician, Viewer, homeowner, anonymous, and unrelated tenants fail closed. The existing internal Content UI now uses that shared path. See [Shared Marketing Workspace Security Foundation v1](./ServSync_Shared_Marketing_Workspace_Security_Foundation_v1.md).
 
 ## Rollout State
 
@@ -82,6 +84,6 @@ Separately reviewed work remains required for:
 - campaigns;
 - prospecting and outreach;
 - acquisition analytics and referral measurement;
-- contractor Business Marketing workspaces and tenant authorization.
+- contractor Business Marketing UI, media lifecycle, cost controls, and publishing queue UX.
 
 Codex-assisted external preparation is now a separately documented foundation applied in Sandbox, Demo, and Production; in-app runtime AI generation remains pending.
