@@ -27,7 +27,7 @@ const approved: MarketingContentItem = {
 
 const publishingState = {
   providers: [
-    { connection_id: '00000000-0000-4000-8000-000000000061', provider: 'facebook', priority: 1, connection_status: 'setup_required', destination_label: null, capabilities: { text: true, media: false }, readiness_note: 'Setup required: no approved ServSync Facebook Page connection is configured.', connected_at: null },
+    { connection_id: '00000000-0000-4000-8000-000000000061', provider: 'facebook', priority: 1, connection_status: 'setup_required', destination_label: null, capabilities: { text: true, media: true }, readiness_note: 'Setup required: no approved ServSync Facebook Page connection is configured.', connected_at: null },
     { connection_id: '00000000-0000-4000-8000-000000000062', provider: 'instagram', priority: 2, connection_status: 'setup_required', destination_label: null, capabilities: { text: false, media: true }, readiness_note: 'Setup required: Instagram media publishing is not connected or enabled.', connected_at: null },
     { connection_id: '00000000-0000-4000-8000-000000000063', provider: 'tiktok', priority: 3, connection_status: 'setup_required', destination_label: null, capabilities: { text: false, media: true }, readiness_note: 'Setup required: TikTok Content Posting access is not connected or enabled.', connected_at: null },
   ], publications: [],
@@ -41,7 +41,7 @@ const connectedState = {
     destination_label: 'ServSync',
     readiness_status: 'ready_except_live_post_verification',
     readiness_note: 'Facebook Page connection is ready for owner preview.',
-    capabilities: { text: true, media: false, publishing_enabled: false },
+    capabilities: { text: true, media: true, publishing_enabled: false },
     connected_at: '2026-08-15T20:00:00.000Z',
     last_validated_at: '2026-08-15T21:00:00.000Z',
     token_expires_at: null,
@@ -88,7 +88,7 @@ test('publishing adapter preserves capability differences and rejects malformed 
   const adapter = createMarketingPublishingAdapter({ rpc: async () => ({ data: publishingState, error: null }) });
   const state = await adapter.get();
   expect(state.providers.map(provider => [provider.provider, provider.capabilities])).toEqual([
-    ['facebook', { text: true, media: false, publishingEnabled: false }],
+    ['facebook', { text: true, media: true, publishingEnabled: false }],
     ['instagram', { text: false, media: true, publishingEnabled: false }],
     ['tiktok', { text: false, media: true, publishingEnabled: false }],
   ]);
@@ -345,7 +345,7 @@ test('owner preview binds exact approved text revision to one playable reviewed 
   await expect(page.getByRole('button', { name: 'Approve video pairing' })).toBeVisible();
   await page.getByRole('button', { name: 'Review publication' }).click();
   await expect(page.getByTestId('marketing-publication-confirmation')).toContainText('Candidate product demo video');
-  await expect(page.getByTestId('marketing-publication-confirmation')).toContainText(/Provider media publishing is not enabled/i);
+  await expect(page.getByTestId('marketing-publication-confirmation')).toContainText(/Public posting is disabled/i);
   await expect(page.getByRole('button', { name: 'Publish to Facebook' })).toBeDisabled();
 });
 
