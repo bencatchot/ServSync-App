@@ -62,7 +62,7 @@ The Production Vercel project has the exact Production reference as a Production
 
 ### Facebook
 
-Facebook Connection v1 supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. Production now has a provider-validated ServSync Page connection with required granular Page authority and readiness `ready_except_live_post_verification`. Public posting remains disabled by the database capability and absent/false environment kill switch. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
+Facebook Connection v1 supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. Production has a provider-validated ServSync Page connection with required granular Page authority and one completed bounded live verification. The stored readiness label remains `ready_except_live_post_verification` because the current status contract has no post-verification `ready` value; the real provider result is recorded separately below. Public posting remains disabled by the database capability and absent environment kill switch. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
 
 Owner Visual Publication Preview v1 lists every currently approved Facebook-eligible text item, separates internal metadata from public content, and renders the exact adapter message in a responsive Facebook-style decision card. Paired Text + Product Demo Assets v1 adds a playable exact-revision video candidate, recorder provenance, pacing/validation evidence, and a separate approve/reject/retire decision. Narrated Marketing Asset + Publication Snapshot v1 adds a distinct narrated-derivative contract with silent-master provenance, OpenAI/Cedar/model/script/timing metadata, and an exact public AI-voice disclosure. Preview and worker input reference the same immutable Content revision, approved pairing, asset checksum, and private Storage identity.
 
@@ -76,7 +76,7 @@ Primary references:
 - [Meta Page videos reference](https://developers.facebook.com/docs/graph-api/reference/page/videos/)
 - [Meta Video reference](https://developers.facebook.com/docs/graph-api/reference/video/)
 
-The adapter remains doubly disabled by database `publishing_enabled=false` and absent/false `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED`. The next Facebook gate is one exact separately authorized live text-plus-video verification after migration rollout and final safety recheck. Raw passwords or pasted long-lived tokens remain outside the workflow.
+The managed-video migration is applied in Sandbox, Demo, and Production. One separately owner-authorized Production verification created one exact flagship publication and one confirmed Facebook Video ID; exact message/disclosure and managed-asset submission provenance passed, then database `publishing_enabled=false` and absent `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` were restored. That authorization is exhausted. Future Facebook posts remain disabled until a new exact owner authorization or separately approved publishing policy. Raw passwords or pasted long-lived tokens remain outside the workflow.
 
 ### Instagram
 

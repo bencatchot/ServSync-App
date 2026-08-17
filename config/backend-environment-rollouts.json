@@ -668,6 +668,24 @@
           "reason": "The exact patch was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-16. It extends only the service-role reset helper's exact-table allowlist with contractor_posts, invoice_line_items, and invoices at dependency-safe priorities 125, 114, and 113. Browser grants and all Production-supported objects remain unchanged; a complete flagship run created, registered, verified, and reset only its owned fictional Discover, Invoice, and canonical-report records."
         }
       }
+    },
+    {
+      "id": "facebook-managed-video-publishing-adapter-v1",
+      "artifact": "servsync-facebook-managed-video-publishing-adapter.sql (SHA-256 bc5303a1cb6b5fce9bb58d507d843e6faa4b9ac70dc6792fb0fc6c1b2482bec6)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17 from 02:13:58Z through 02:13:59Z. Additive catalog, forced-RLS, service-role grant, provider-state, media-authorization, bounded-reconciliation, and exact-checksum validation passed. Publications and publication events remained zero and database publishing_enabled remained false."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Demo bdytwgejqnlblhrnqxkp on 2026-08-17 from 02:15:39Z through 02:15:41Z after Sandbox passed. Existing Demo Recorder and Marketing records were preserved; publications and events remained zero and database publishing_enabled remained false."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied to Production uqgtheclhxqlnjpfmheq on 2026-08-17 from 02:16:20Z through 02:16:22Z after Sandbox and Demo passed. The rollout preserved 17 Content records, 41 Content events, three assets, six pairings, and zero publications/events. During the separately owner-authorized first-live verification, exact Content 67790a72-b9c4-4796-9fcf-e0d5b9d6149a revision 9, pairing 460c7689-a2c6-4f8c-addd-511b5e8abd23, and asset 2097be01-0be4-4f8e-bef2-2e81adb9c95d at SHA-256 bc33dbfa9ce55944b4385841047b6a5980f49f77f5de09020649709f17c0c3a1 produced exactly one publication and Facebook Video ID 1616577883220910 on Page 1199023349954773. Meta confirmed exact description and reported upload, processing, and publishing complete; replay checks left one publication, one provider-request start, and one Video ID. Database and environment public-post gates were restored off immediately afterward."
+        }
+      }
     }
   ]
 }
