@@ -4,7 +4,7 @@
 
 This adapter publishes one exact approved ServSync Marketing caption and one exact approved managed MP4 to the connected ServSync Facebook Page. It extends the provider-neutral publication worker; it does not create a parallel scheduler, approval system, retry model, or asset store.
 
-The adapter is source-ready but remains operationally disabled until a separate owner-authorized live-verification task enables both public-post gates for one exact publication. This implementation does not create a publication or make a Meta provider request.
+The adapter is deployed and the first bounded live verification is complete. Normal operation remains disabled behind both public-post gates; that one-post authorization is exhausted and grants no future publication authority.
 
 ## Current Meta Contract
 
@@ -58,18 +58,24 @@ Confirmation is a read-only `GET /{video-id}` for `id`, `created_time`, and `des
 
 Reconciliation never rereads or reuploads the media. A failed run cannot discard a known provider identifier. This deliberately favors duplicate prevention over automatic recovery from an ambiguous upload response.
 
-## First Live Verification Gate
+## First Live Verification Evidence
 
-The first real post remains a separate bounded owner action. Before that action:
+On 2026-08-17 UTC, the exact migration at SHA-256 `bc5303a1cb6b5fce9bb58d507d843e6faa4b9ac70dc6792fb0fc6c1b2482bec6` passed Sandbox -> Demo -> Production rollout. The subsequent separately owner-authorized Production action used:
 
-1. apply and validate the managed-video migration through the approved Sandbox -> Demo -> Production rollout;
-2. reconfirm the exact approved Content revision, approved pairing, asset checksum, Page connection, and Page permissions;
-3. confirm database `publishing_enabled=false`, environment `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` absent/false, and zero publication rows before authorization;
-4. obtain explicit owner authorization for the exact preview snapshot;
-5. enable only the reviewed Facebook path and create exactly one replay-safe publication;
-6. let the worker make one video POST, persist the returned Video ID, and reconcile the same ID;
-7. verify exactly one public Page video with exact caption, video, and disclosure;
-8. restore or confirm both public-post gates according to the approved one-post procedure;
-9. if the initial provider result is ambiguous, stop for operator reconciliation rather than retrying.
+- Content `67790a72-b9c4-4796-9fcf-e0d5b9d6149a`, revision 9;
+- pairing `460c7689-a2c6-4f8c-addd-511b5e8abd23`;
+- asset `2097be01-0be4-4f8e-bef2-2e81adb9c95d` at SHA-256 `bc33dbfa9ce55944b4385841047b6a5980f49f77f5de09020649709f17c0c3a1`;
+- ServSync Page `1199023349954773`;
+- publication `5b19fd6a-4d8a-4cc1-8017-3e2fda131d35` and client request `a2e716a3-9bf0-4ece-aeec-6c1e20443505`.
+
+One natural Production worker claim made one video upload and persisted Facebook Video ID `1616577883220910`. Immediate read-only confirmation matched the Video ID, provider creation time, and exact approved description including the Cedar disclosure. A later read-only status query reported upload, processing, and publishing complete, `video_status=ready`, `publish_status=published`, and permalink `/reel/1616577883220910/`; Meta's delivered H.264/AAC rendition decoded for 71 seconds. Final ServSync state is one publication, four events, attempt count one, one provider-request start, one provider ID, zero schedules, and zero unrelated publications.
+
+Database `publishing_enabled` was restored false and Production `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` was restored absent before documentation work. A post-shutdown claim returned no work. Same-request replay after shutdown remains duplicate-safe but currently returns the closed-gate error before conflict reconciliation rather than the existing receipt. The visually defaulted first preview also requires an explicit content-card selection before confirmation. The connection row retains `ready_except_live_post_verification` because the current status enum has no post-verification `ready` value. These are bounded follow-ups; none authorizes another provider request.
+
+The canonical public identifier is `https://www.facebook.com/reel/1616577883220910/`. Meta's API confirms the object is published, ready, and embeddable, but an unauthenticated Facebook browser shell did not render the reel during closeout; operator visual inspection may require Facebook login.
+
+## Future Publication Gate
+
+Every later post requires a new exact owner authorization or separately approved publishing policy. Before any such action, reconfirm immutable Content/media identity, duplicate state, Page authority, both gates off, and provider readiness. Enable only the reviewed provider for the shortest possible window, stop on any ambiguous response without retry, and restore both gates off before documentation or investigation.
 
 Instagram, TikTok, contractor-owned Marketing connections, analytics, comments, and recurring campaigns remain out of scope.

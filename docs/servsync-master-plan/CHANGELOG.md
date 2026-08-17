@@ -4,6 +4,23 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037F first live Facebook flagship verification
+
+- Branch: `codex/fb037f-first-live-facebook-verification`.
+- Starting main SHA: `771d2bbf94f6afcbc41b9e2ce60f647516aeb0d4`.
+- Files changed: managed-video rollout ledger; Facebook publishing runbook; provider-neutral publishing specification; FB-037 backlog, master-plan, and completed-feature governance; and this changelog. No application source, SQL, migration, dependency, or provider configuration is changed by the repository closeout.
+- Rollout: Exact migration `servsync-facebook-managed-video-publishing-adapter.sql` (SHA-256 `bc5303a1cb6b5fce9bb58d507d843e6faa4b9ac70dc6792fb0fc6c1b2482bec6`) was applied and validated Sandbox -> Demo -> Production on 2026-08-17 UTC. Existing records were preserved and both public-post gates remained off during rollout.
+- First-live result: The separately owner-authorized exact flagship package created publication `5b19fd6a-4d8a-4cc1-8017-3e2fda131d35`. One natural Production worker claim made one managed Page-video request for exact Content `67790a72-b9c4-4796-9fcf-e0d5b9d6149a` revision 9, pairing `460c7689-a2c6-4f8c-addd-511b5e8abd23`, and asset `2097be01-0be4-4f8e-bef2-2e81adb9c95d` at SHA-256 `bc33dbfa9ce55944b4385841047b6a5980f49f77f5de09020649709f17c0c3a1`. Meta returned Video ID `1616577883220910`; read-only confirmation preserved the exact approved description and disclosure, and later provider status reported upload, processing, and publishing complete with canonical permalink `/reel/1616577883220910/`. The provider-delivered H.264/AAC rendition decoded for its full 71-second duration.
+- Safety: Database `publishing_enabled` was enabled from `2026-08-17T02:57:55.279397Z` to `2026-08-17T03:01:45.612803Z`. Production-only `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` was enabled from `2026-08-17T02:55:43.479Z` to `2026-08-17T03:01:59.705Z`, then restored to absent. Final state is one publication, four events, one provider-request start, one Video ID, zero schedules, zero unrelated publications, and both gates off. Instagram, TikTok, and LinkedIn received no request.
+- Tests/checks run: exact package/approval/Page/token/checksum/duplicate preflight; migration and rollout-ledger validation; Production provider/event consistency; read-only Graph status and delivered-media decode; post-shutdown worker claim; replay count safety; Facebook/managed-video and backend-parity regressions; Markdown-link and sensitive-value scans; and `git diff --check`.
+- Known risks or follow-ups: The owner confirmation UI requires an explicit content-card selection even when the first preview is visually presented; the initial confirmation click otherwise no-ops. A same-request replay after gate shutdown is safely denied before insertion and produces no second request, but returns the closed-gate error instead of the existing publication receipt because the insert guard precedes conflict reconciliation. The connection row retains the historical `ready_except_live_post_verification` label because the current enum has no post-verification `ready` state. Logged-out Facebook browser shells did not render the reel even after Graph reported it published and ready; owner inspection may require Facebook login. Future product work should improve the selection, replay-receipt, and readiness-label behavior without issuing another provider upload.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Closes migration rollout and first-live verification while retaining duplicate-safe replay UX, monitoring, additional channels, campaigns, and contractor Marketing as active FB-037 work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Records the one-post operational proof and restored-off authority boundary without granting any future publishing authorization.
+
 ## 2026-08-16 - FB-037E Facebook managed video publishing adapter v1
 
 - Branch: `codex/fb037e-facebook-managed-video-adapter-v1`.
