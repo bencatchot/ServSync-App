@@ -121,7 +121,7 @@ async function installHarness(page: Page, role = 'platform_admin') {
     const client = {
       rpc: async (name: string, args: Record<string, unknown>) => {
         calls.push({ name, args });
-        if (name === 'servsync_list_internal_marketing_content') return { data: [], error: null };
+        if (name === 'servsync_list_marketing_content') return { data: [], error: null };
         if (name === 'servsync_get_internal_marketing_planning') return { data: structuredClone(state), error: null };
         if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
         if (name === 'servsync_update_internal_marketing_profile') {
@@ -567,11 +567,14 @@ test.describe('internal Business Marketing Profile and Plan', () => {
     expect(calls.find(call => call.name === 'servsync_create_internal_marketing_plan_v3')?.args.p_recommendation_contract_version).toBe(3);
     expect(calls.map(call => call.name)).toContain('servsync_update_internal_marketing_plan');
     expect(calls.map(call => call.name)).toContain('servsync_accept_internal_marketing_plan');
-    expect(calls.some(call => Object.keys(call.args).some(key => /workspace|contractor|actor/.test(key)))).toBe(false);
+    expect(calls.find(call => call.name === 'servsync_list_marketing_content')?.args.p_contractor_id).toBeNull();
+    expect(calls
+      .filter(call => call.name !== 'servsync_list_marketing_content')
+      .some(call => Object.keys(call.args).some(key => /workspace|contractor|actor/.test(key)))).toBe(false);
     expect(calls.some(call => [
-      'servsync_create_internal_marketing_content',
-      'servsync_update_internal_marketing_content',
-      'servsync_transition_internal_marketing_content',
+      'servsync_create_marketing_content',
+      'servsync_update_marketing_content',
+      'servsync_transition_marketing_content',
     ].includes(call.name) || (/publish|schedule/.test(call.name) && call.name !== 'servsync_get_internal_marketing_publishing'))).toBe(false);
   });
 

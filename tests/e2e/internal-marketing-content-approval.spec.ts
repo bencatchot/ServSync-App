@@ -112,9 +112,9 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
         calls.push({ name, args });
         if (behavior === 'pending') return new Promise(() => undefined);
         if (behavior === 'error') return { data: null, error: { message: 'database detail must stay private' } };
-        if (name === 'servsync_list_internal_marketing_content') return { data: state.map(row => ({ ...row })), error: null };
+        if (name === 'servsync_list_marketing_content') return { data: state.map(row => ({ ...row })), error: null };
         if (name === 'servsync_get_internal_marketing_directions') return { data: { accepted_plan: null, directions: [] }, error: null };
-        if (name === 'servsync_create_internal_marketing_content') {
+        if (name === 'servsync_create_marketing_content') {
           const id = `40000000-0000-4000-8000-${String(nextId++).padStart(12, '0')}`;
           state.unshift({
             content_id: id,
@@ -158,7 +158,7 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
         }
         const item = state.find(row => row.content_id === args.p_content_id);
         if (!item) return { data: null, error: { code: 'P0002', message: 'Marketing content not found.' } };
-        if (name === 'servsync_update_internal_marketing_content') {
+        if (name === 'servsync_update_marketing_content') {
           item.title = args.p_title;
           item.content_type = args.p_content_type;
           item.body = args.p_body;
@@ -167,7 +167,7 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
           item.updated_at = now();
           return { data: { content_id: item.content_id, status: item.status, revision_number: item.revision_number }, error: null };
         }
-        if (name === 'servsync_transition_internal_marketing_content') {
+        if (name === 'servsync_transition_marketing_content') {
           const from = item.status;
           item.status = args.p_to_status;
           item.revision_number = Number(item.revision_number) + 1;
@@ -208,7 +208,7 @@ test.describe('internal Marketing content approval', () => {
     const adapter = createMarketingContentAdapter({
       rpc: async (name, args) => {
         calls.push({ name, args });
-        if (name === 'servsync_list_internal_marketing_content') return { data: [rpcRow(item)], error: null };
+        if (name === 'servsync_list_marketing_content') return { data: [rpcRow(item)], error: null };
         return { data: { content_id: item.id, status: 'approved', revision_number: 4 }, error: null };
       },
     });
@@ -216,6 +216,7 @@ test.describe('internal Marketing content approval', () => {
     await expect(adapter.list('needs_approval')).resolves.toEqual([item]);
     await expect(adapter.transition({ contentId: item.id, expectedRevision: 3, toStatus: 'approved' })).resolves.toMatchObject({ status: 'approved' });
     expect(calls[1].args).toEqual({
+      p_contractor_id: null,
       p_content_id: item.id,
       p_expected_revision: 3,
       p_to_status: 'approved',
@@ -223,6 +224,24 @@ test.describe('internal Marketing content approval', () => {
     });
     expect(calls[1].args).not.toHaveProperty('workspace_id');
     expect(calls[1].args).not.toHaveProperty('actor_user_id');
+
+    const contractorId = '50000000-0000-4000-8000-000000000001';
+    const contractorItem = contentItem({
+      workspaceKey: 'contractor_50000000000040008000000000000001',
+      workspaceKind: 'contractor',
+    });
+    const contractorCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const contractorAdapter = createMarketingContentAdapter({
+      rpc: async (name, args) => {
+        contractorCalls.push({ name, args });
+        return { data: [rpcRow(contractorItem)], error: null };
+      },
+    }, contractorId);
+    await expect(contractorAdapter.list()).resolves.toEqual([contractorItem]);
+    expect(contractorCalls[0]).toEqual({
+      name: 'servsync_list_marketing_content',
+      args: { p_contractor_id: contractorId, p_status: 'all' },
+    });
 
     const malformed = createMarketingContentAdapter({ rpc: async () => ({ data: [{ ...rpcRow(item), workspace_key: 'contractor_1' }], error: null }) });
     await expect(malformed.list()).rejects.toMatchObject({ kind: 'malformed' });

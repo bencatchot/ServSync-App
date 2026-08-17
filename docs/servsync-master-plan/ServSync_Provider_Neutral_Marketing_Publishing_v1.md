@@ -2,7 +2,7 @@
 
 ## Scope
 
-This foundation adds a durable publication decision after Marketing Content approval. It is private to the ServSync internal Marketing workspace and platform administration.
+This foundation adds a durable publication decision after Marketing Content approval. Its current UI and provider operation remain private to the ServSync internal Marketing workspace and platform administration. FB-037G-A now enforces shared workspace lineage across Content, pairing, asset, publication, and provider connection so future contractor operation cannot cross tenant boundaries.
 
 ```text
 Approved Marketing Content revision
@@ -122,5 +122,7 @@ Primary references:
 - TikTok adapter and provider audit
 - analytics, comments, moderation, ads, recurring posts, and campaign optimization
 - contractor Marketing provider connections and authorization
+- contractor publishing queue, preview selection, Publish Now/Schedule, history, and Needs Attention UX
+- contractor media intake, quota/cost enforcement, retention, and purge
 
 None of those capabilities are implied by this foundation.

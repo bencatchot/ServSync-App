@@ -43,8 +43,8 @@ export type MarketingStrategicSource = 'approved_direction';
 
 export type MarketingContentItem = {
   id: string;
-  workspaceKey: 'servsync_internal';
-  workspaceKind: 'internal';
+  workspaceKey: string;
+  workspaceKind: 'internal' | 'contractor';
   title: string;
   contentType: MarketingContentType;
   body: string;
@@ -140,11 +140,19 @@ function parseItem(value: unknown): MarketingContentItem {
   const contentRole = value.content_role;
   const strategicSource = value.strategic_source;
   const sourceDirectionStatus = value.source_direction_status;
+  const workspaceKind = value.workspace_kind;
+  const workspaceKey = value.workspace_key;
+  const validWorkspace = (
+    workspaceKind === 'internal' && workspaceKey === 'servsync_internal'
+  ) || (
+    workspaceKind === 'contractor'
+    && typeof workspaceKey === 'string'
+    && /^contractor_[0-9a-f]{32}$/.test(workspaceKey)
+  );
   if (
     typeof value.content_id !== 'string'
     || !UUID_PATTERN.test(value.content_id)
-    || value.workspace_key !== 'servsync_internal'
-    || value.workspace_kind !== 'internal'
+    || !validWorkspace
     || typeof value.title !== 'string'
     || value.title.trim().length < 1
     || value.title.length > 160
@@ -253,8 +261,8 @@ function parseItem(value: unknown): MarketingContentItem {
 
   return {
     id: value.content_id,
-    workspaceKey: 'servsync_internal',
-    workspaceKind: 'internal',
+    workspaceKey: workspaceKey as string,
+    workspaceKind: workspaceKind as 'internal' | 'contractor',
     title: value.title,
     contentType: contentType as MarketingContentType,
     body: value.body,
@@ -340,10 +348,14 @@ async function mutationRpc(client: MarketingContentRpcClient, name: string, args
   return result.data;
 }
 
-export function createMarketingContentAdapter(client: MarketingContentRpcClient) {
+export function createMarketingContentAdapter(
+  client: MarketingContentRpcClient,
+  contractorId: string | null = null,
+) {
   return {
     async list(status: MarketingContentStatus | 'all' = 'all') {
-      const data = await readRpc(client, 'servsync_list_internal_marketing_content', {
+      const data = await readRpc(client, 'servsync_list_marketing_content', {
+        p_contractor_id: contractorId,
         p_status: status,
       });
       return parseMarketingContentItems(data);
@@ -356,7 +368,8 @@ export function createMarketingContentAdapter(client: MarketingContentRpcClient)
       body: string;
       channelCategory: MarketingChannelCategory | null;
     }) {
-      const data = await mutationRpc(client, 'servsync_create_internal_marketing_content', {
+      const data = await mutationRpc(client, 'servsync_create_marketing_content', {
+        p_contractor_id: contractorId,
         p_client_request_id: input.clientRequestId,
         p_title: input.title,
         p_content_type: input.contentType,
@@ -374,7 +387,8 @@ export function createMarketingContentAdapter(client: MarketingContentRpcClient)
       body: string;
       channelCategory: MarketingChannelCategory | null;
     }) {
-      const data = await mutationRpc(client, 'servsync_update_internal_marketing_content', {
+      const data = await mutationRpc(client, 'servsync_update_marketing_content', {
+        p_contractor_id: contractorId,
         p_content_id: input.contentId,
         p_expected_revision: input.expectedRevision,
         p_title: input.title,
@@ -393,7 +407,8 @@ export function createMarketingContentAdapter(client: MarketingContentRpcClient)
       toStatus: Exclude<MarketingContentStatus, 'idea'>;
       reason?: string | null;
     }) {
-      const data = await mutationRpc(client, 'servsync_transition_internal_marketing_content', {
+      const data = await mutationRpc(client, 'servsync_transition_marketing_content', {
+        p_contractor_id: contractorId,
         p_content_id: input.contentId,
         p_expected_revision: input.expectedRevision,
         p_to_status: input.toStatus,
