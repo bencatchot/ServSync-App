@@ -1,7 +1,8 @@
 {
   "crons": [
     { "path": "/api/storage-backup", "schedule": "17 4 * * *" },
-    { "path": "/api/marketing-publications-worker", "schedule": "*/15 * * * *" }
+    { "path": "/api/marketing-publications-worker", "schedule": "*/15 * * * *" },
+    { "path": "/api/marketing-media-cleanup", "schedule": "43 5 * * *" }
   ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
