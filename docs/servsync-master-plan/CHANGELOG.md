@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-16 - FB-037E Facebook managed video publishing adapter v1
+
+- Branch: `codex/fb037e-facebook-managed-video-adapter-v1`.
+- Starting main SHA: `3700c9271ae381305be3be225cc9d8cc053094f5`.
+- Files changed: Facebook Page video request/confirmation helpers; provider adapter and worker; additive provider-state/media-authorization SQL; disposable SQL and focused worker/connection/browser tests; validation command; provider-publishing architecture, FB-037 backlog/master-plan/completed-feature governance; and this changelog.
+- Summary of change: Adds a direct multipart Meta Page video adapter for exact ServSync-managed MP4 bytes and immutable public copy. The worker reauthorizes the approved pairing, verifies private Storage size/SHA-256 before request start, captures Meta's returned Video ID before confirmation, reconciles only that known ID, bounds processing checks, and refuses text-only fallback or blind retry after an ambiguous upload response. The approved flagship contract is Content `67790a72-b9c4-4796-9fcf-e0d5b9d6149a` revision 9, pairing `460c7689-a2c6-4f8c-addd-511b5e8abd23`, asset `2097be01-0be4-4f8e-bef2-2e81adb9c95d`, and Direction revision 2.
+- Safety: This task creates no publication and performs no Meta POST. Database `publishing_enabled` remains false and `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` remains absent/false. The additive migration is committed for reviewed rollout but is not applied to Production by this source task. Provider secrets remain Vault/server-only, and the worker never exposes private media or credentials to the browser.
+- Tests/checks run: disposable managed-video SQL/security/reconciliation validation; Facebook connection/provider-publishing/managed-media/owner-preview regressions; backend parity; strict TypeScript; Production build; focused lint; Markdown-link and sensitive-value scans; and `git diff --check`.
+- Known risks or follow-ups: Direct multipart upload is deliberately bounded to the current managed MP4 ceiling. Meta returns a Video ID, not an assumed feed-post ID. The migration requires the separately approved Sandbox -> Demo -> Production rollout before one owner-authorized live verification can enable both public-post gates and create exactly one publication. Instagram/TikTok and contractor Marketing remain out of scope.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records source completion of exact-byte Facebook video upload and duplicate-safe reconciliation while retaining rollout and first-live publication as explicit gates.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Replaces the prior no-media adapter boundary with the reviewed managed-video execution contract without changing public-post authority.
+
 ## 2026-08-16 - FB-037D flagship narrated Marketing asset and exact publication preview
 
 - Branch: `codex/fb037d-flagship-narrated-asset-v1`.

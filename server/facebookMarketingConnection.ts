@@ -388,3 +388,51 @@ export function facebookTextPublicationRequest(
     } satisfies RequestInit,
   };
 }
+
+export function facebookVideoPublicationRequest(
+  config: FacebookMarketingConfig,
+  pageId: string,
+  pageAccessToken: string,
+  message: string,
+  video: { bytes: Uint8Array; fileName: string; mimeType: 'video/mp4' },
+) {
+  const validation = validateFacebookText(message);
+  if (validation) throw validation;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}\.mp4$/.test(video.fileName)
+    || video.mimeType !== 'video/mp4' || video.bytes.byteLength === 0) {
+    throw new FacebookProviderError('content_validation', 'The managed Facebook video is invalid.');
+  }
+  const body = new FormData();
+  body.set('description', message.trim());
+  body.set('published', 'true');
+  body.set('appsecret_proof', appSecretProof(pageAccessToken, config.appSecret));
+  body.set('source', new Blob([video.bytes], { type: video.mimeType }), video.fileName);
+  return {
+    url: new URL(`https://graph-video.facebook.com/${config.graphApiVersion}/${pageId}/videos`),
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pageAccessToken}` },
+      body,
+    } satisfies RequestInit,
+  };
+}
+
+export function facebookVideoConfirmationRequest(
+  config: FacebookMarketingConfig,
+  videoId: string,
+  pageAccessToken: string,
+) {
+  if (!/^\d{3,80}$/.test(videoId)) {
+    throw new FacebookProviderError('provider_uncertain', 'The Facebook Video ID is invalid.', false, true);
+  }
+  const url = new URL(`https://graph.facebook.com/${config.graphApiVersion}/${videoId}`);
+  url.searchParams.set('fields', 'id,created_time,description');
+  url.searchParams.set('appsecret_proof', appSecretProof(pageAccessToken, config.appSecret));
+  return {
+    url,
+    init: {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${pageAccessToken}` },
+    } satisfies RequestInit,
+  };
+}

@@ -388,7 +388,7 @@ test('readiness-only connection cannot post, while the future kill-switch path b
   const gated = createFacebookPublishingAdapter({ config, getPageToken: async () => { tokenReads += 1; return pageToken; } });
   assert.equal(gated.getConnectionReadiness().status, 'setup_required');
   assert.equal(gated.validatePublication(claim)?.category, 'unsupported');
-  await assert.rejects(() => gated.publishText(claim), { category: 'unsupported' });
+  await assert.rejects(() => gated.preparePublication(claim), { category: 'unsupported' });
   assert.equal(tokenReads, 0);
 
   const request = facebookTextPublicationRequest({ ...config, publicPostsEnabled: true }, claim.destination_key, pageToken, claim.content_snapshot.body);
@@ -403,8 +403,11 @@ test('readiness-only connection cannot post, while the future kill-switch path b
     fetcher: queueFetcher([json({ id: '1122334455667788_4455667788990011' })], fetchCalls),
   });
   assert.equal(enabled.validatePublication(claim), null);
-  assert.deepEqual(await enabled.publishText(claim), {
-    providerPublicationId: '1122334455667788_4455667788990011', metadata: { page_id: '1122334455667788' },
+  const prepared = await enabled.preparePublication(claim);
+  assert.deepEqual(await enabled.publish(prepared), {
+    providerPublicationId: '1122334455667788_4455667788990011',
+    state: 'published',
+    metadata: { page_id: '1122334455667788', provider_identifier_kind: 'page_post_id' },
   });
   assert.equal(fetchCalls.length, 1);
 });
