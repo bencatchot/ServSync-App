@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-17",
+  "updatedOn": "2026-08-18",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -810,6 +810,24 @@
         "production": {
           "status": "Applied",
           "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production had no scheduled rows to mutate and retained one exact published flagship, four events, one matching published package, and provider submission stopped. The function hash matches Sandbox/Demo and no provider request occurred."
+        }
+      }
+    },
+    {
+      "id": "contractor-marketing-content-creation-v1",
+      "artifact": "servsync-contractor-marketing-content-creation.sql (SHA-256 570a10b8373a20df3324c89dd2c27c8ca2209b4a3f780147e403602550dc977a)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 515-line additive migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. Forced RLS, service-only claims, Owner/Admin/Office authority, Field Technician/Viewer denial, customer-safe Job context, exact derivative binding, and zero-publication guards passed. One real configured OpenAI draft completed with one token-usage event; exact replay returned the same draft with no second provider call or usage row."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration and JWT-protected Edge Function were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Existing workspace/profile and zero Content/assets/pairings/publications/events were preserved. Demo has no approved OpenAI secret, so the provider call remains intentionally fail-closed while database, tenant, upload, and draft contracts match Sandbox/Production."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration and JWT-protected Edge Function were applied to Production uqgtheclhxqlnjpfmheq after Demo passed. Production retained one internal workspace, 17 Content rows, 41 Content events, three assets, six pairings, three provider connections, one published flagship, four events, exact asset SHA-256, Page 1199023349954773, and Facebook Video ID 1616577883220910. Database provider submission remained false and no provider request occurred."
         }
       }
     }

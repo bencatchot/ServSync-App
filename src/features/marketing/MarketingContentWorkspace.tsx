@@ -303,7 +303,7 @@ export function MarketingContentWorkspace(props: Props) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-950">Content</h2>
-          <p className="mt-1 text-sm text-slate-500">Review manual ideas and Codex-prepared drafts, then submit only ready work for approval.</p>
+          <p className="mt-1 text-sm text-slate-500">Review manual ideas and prepared drafts, then submit only ready work for approval.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -387,6 +387,11 @@ export function MarketingContentWorkspace(props: Props) {
                           className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-1 text-xs font-bold text-cyan-800"
                         >
                           <Sparkles size={12} aria-hidden="true" /> Codex-prepared
+                        </span>
+                      )}
+                      {item.preparationSource === 'runtime_ai' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-xs font-bold text-violet-800">
+                          <Sparkles size={12} aria-hidden="true" /> Prepared draft
                         </span>
                       )}
                     </div>

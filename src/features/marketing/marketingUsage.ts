@@ -154,7 +154,6 @@ export function createMarketingUsageAdapter(client: MarketingUsageClient, contra
       }));
     },
     async upload(file: File, rightsAcknowledged: boolean) {
-      if (!contractorId) throw new Error('Marketing-only upload is available in contractor workspaces.');
       const requestId = crypto.randomUUID();
       const reserved = await rpc(client, 'servsync_reserve_marketing_upload', {
         p_contractor_id: contractorId,
