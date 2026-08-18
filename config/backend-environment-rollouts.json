@@ -670,6 +670,24 @@
       }
     },
     {
+      "id": "help-studio-human-paced-representative-proof-v1",
+      "artifact": "Production operational acceptance on merge fe724669da79f2eb1269cfebb590f6cadb971f87",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "The replacement walkthrough is an authorized Production internal Help record. Sandbox migration, forged-package denial, role security, and 390x844 playback contracts were already proved by the exact-head validation harness."
+        },
+        "demo": {
+          "status": "N/A",
+          "reason": "The existing Demo Recorder generated the exact recorder-owned contractor-create-estimate scenario at 44.64 seconds using servsync-human-paced-v1 from merge fe724669da79f2eb1269cfebb590f6cadb971f87. Validation passed with a preserved WebM master, H.264/yuv420p 1440x900 MP4, poster, metadata, and sensitive-data result; no Demo Help or Marketing record was created."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Production recording job 3503c5d6-6c92-4c26-82b3-d201d6b081d9 completed the six-event requested-to-approved lifecycle. Full 44.64-second playback completed at 1x with no browser error before explicit approval and Help publication. Walkthrough 9f62de0c-a06a-4840-86cb-6bf0362975f5 now publishes immutable revision 2 using video asset 1fec7ee6-7ccc-465c-b412-7ad5ec5296ac at SHA-256 56055781fb1e63f8effa071e8e86c24e7a7adef9a84c030d9b9331a256d4e9a7; revision 1 and its 23-second assets remain intact. Contextual contractor retrieval returns revision 2 and denies cross-tenant context. Marketing resolves the same canonical Help asset with zero derivative, while 21 Content rows, four Marketing assets, eight pairings, two publications, seven publication events, and Facebook Video ID 1616577883220910 remain unchanged. No paid API or public provider request occurred."
+        }
+      }
+    },
+    {
       "id": "provider-neutral-marketing-publishing-v1",
       "artifact": "servsync-provider-neutral-marketing-publishing.sql (SHA-256 0ae63afd8f9eebb6ec09b421adcf33cf40f3fa8281fa5e5e7cb50b1028844595)",
       "environments": {

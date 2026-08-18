@@ -104,3 +104,5 @@ Production acceptance proved desktop and 390x844 contextual playback with no con
 ## Deferred Work
 
 FB-038B may add a broader user Help Center and an Ask ServSync retrieval experience over published Help content. FB-038C may add separately approved support-gap-to-walkthrough assistance or generation. Paid AI, automatic generation, contractor Help authoring, public provider publishing, analytics, and autonomous support responses are not part of FB-038A1.
+
+Production operational acceptance completed on 2026-08-18. Recording job `3503c5d6-6c92-4c26-82b3-d201d6b081d9` produced the 44.64-second `contractor-create-estimate` candidate from merge `fe724669da79f2eb1269cfebb590f6cadb971f87`. A full 1x review preceded approval and explicit publication as walkthrough revision 2. The original 23-second revision 1 media remains immutable, contextual contractor retrieval resolves revision 2, and Marketing sees the same canonical Help asset without a derivative.
