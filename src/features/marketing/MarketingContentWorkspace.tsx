@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   ChevronRight,
+  Eye,
   FileText,
   Loader2,
   Megaphone,
@@ -92,6 +93,7 @@ type ContentFormValue = {
 };
 
 type Props = {
+  approvalPolicy: 'direct_owner' | 'team_review';
   items: MarketingContentItem[];
   loading: boolean;
   loadError: string | null;
@@ -298,12 +300,26 @@ export function MarketingContentWorkspace(props: Props) {
     });
   };
 
+  const approveForPreview = () => {
+    if (!selected) return;
+    void runAction(async () => {
+      if (dirty) throw new Error('Save the current edits before previewing this post.');
+      if (!selected.body.trim()) throw new Error('Add content before previewing this post.');
+      await props.onTransition(selected, 'approved');
+      props.onPublish(selected);
+    });
+  };
+
   return (
     <section data-testid="marketing-content-workspace" className="min-w-0 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-950">Content</h2>
-          <p className="mt-1 text-sm text-slate-500">Review manual ideas and prepared drafts, then submit only ready work for approval.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {props.approvalPolicy === 'direct_owner'
+              ? 'Review the draft, then open the exact Facebook preview for final approval.'
+              : 'Review manual ideas and prepared drafts, then submit only ready work for approval.'}
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -474,18 +490,21 @@ export function MarketingContentWorkspace(props: Props) {
               )}
 
               {selected.status === 'needs_approval' && (
-                <label className="block text-sm font-semibold text-slate-800">
-                  Return or rejection reason
-                  <textarea
-                    value={reviewReason}
-                    disabled={busy}
-                    maxLength={1000}
-                    rows={3}
-                    onChange={event => setReviewReason(event.target.value)}
-                    className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
-                    placeholder="Explain the decision"
-                  />
-                </label>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-800">
+                    Return or rejection reason
+                    <textarea
+                      value={reviewReason}
+                      disabled={busy}
+                      maxLength={1000}
+                      rows={3}
+                      onChange={event => setReviewReason(event.target.value)}
+                      className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+                      placeholder="Explain the decision"
+                    />
+                  </label>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Add at least 3 characters to return or reject this draft. Approval does not require a reason.</p>
+                </div>
               )}
 
               {actionError && <p role="alert" className="text-sm text-rose-700">{actionError}</p>}
@@ -502,9 +521,13 @@ export function MarketingContentWorkspace(props: Props) {
                   </button>
                 )}
                 {selected.status === 'draft' && (
-                  <button type="button" disabled={busy || dirty || !selected.body.trim()} onClick={() => transition('needs_approval')} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-                    <Send size={17} aria-hidden="true" /> Submit for approval
-                  </button>
+                  props.approvalPolicy === 'direct_owner'
+                    ? <button type="button" disabled={busy || dirty || !selected.body.trim()} onClick={approveForPreview} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                        <Eye size={17} aria-hidden="true" /> Preview for approval
+                      </button>
+                    : <button type="button" disabled={busy || dirty || !selected.body.trim()} onClick={() => transition('needs_approval')} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                        <Send size={17} aria-hidden="true" /> Submit for approval
+                      </button>
                 )}
                 {selected.status === 'needs_approval' && (
                   <>

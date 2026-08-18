@@ -866,6 +866,24 @@
           "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Demo passed. The corrected package-based count is active; 17 Content items, three assets, six pairings, one flagship publication, and four publication events remained unchanged with provider submission disabled."
         }
       }
+    },
+    {
+      "id": "owner-marketing-approval-policy-v1",
+      "artifact": "servsync-owner-marketing-approval-policy.sql (SHA-256 fb2d7e46d11843dcfa1b1648df1dfab107eb75824b561d75dee4cd2370ab09f1)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 128-line additive function migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. Direct internal-owner approval, contractor team-path preservation, function security, and zero-provider-action validation passed while existing Marketing counts and the database emergency stop remained unchanged."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Demo Marketing/Recorder state remained unchanged, the function security contract matched Sandbox, and no provider action occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained 21 Content rows, 53 Content events, four assets, eight pairings, three provider connections, five packages, one published flagship, and four publication events. The flagship Facebook Video ID 1616577883220910 and Ready Connect with Local Contractors Easily package remained exact; rollout created no publication, schedule, worker attempt, or provider request. The standing Facebook capability was installed only for the serv-sync-app-refresh Production environment, and the database emergency stop was opened through its audited platform-admin RPC at 2026-08-18T15:54:32Z after a zero-active-publication precheck."
+        }
+      }
     }
   ]
 }

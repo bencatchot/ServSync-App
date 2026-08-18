@@ -52,6 +52,15 @@ function StatusPill({ status }: { status: MarketingPublicationPackage['status'] 
   return <span className={`rounded-full px-2 py-1 text-xs font-bold ${tone}`}>{PACKAGE_LABELS[status]}</span>;
 }
 
+export function publicationStatusLabel(publication: MarketingPublication) {
+  if (publication.status === 'failed') return 'Needs Attention';
+  if (publication.status === 'publishing') {
+    return publication.providerPublicationId ? 'Processing on Facebook' : 'Publishing...';
+  }
+  if (publication.mode === 'publish_now') return 'Publishing...';
+  return `Scheduled ${formatDate(publication.scheduledAt)} (${publication.timezone})`;
+}
+
 function ScheduleEditor({ publication, busy, onReschedule }: {
   publication: MarketingPublication;
   busy: boolean;
@@ -110,7 +119,7 @@ function PreviewDialog({ item, asset, mediaUrl, busy, operationAvailable, onClos
 
           {item.requiredDisclosures.length > 0 && <div className="mx-auto mt-4 flex max-w-[36rem] items-start gap-2 text-xs text-slate-600"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" /><p>Required disclosure verified in the exact public message.</p></div>}
 
-          {item.status === 'needs_review' && <div className="mt-5 flex justify-end"><button type="button" disabled={busy} onClick={() => void onApprove()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50"><Check size={16} />Approve exact post</button></div>}
+          {item.status === 'needs_review' && <div className="mt-5 flex justify-end"><button type="button" disabled={busy} onClick={() => void onApprove()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50"><Check size={16} />Approve &amp; Ready</button></div>}
 
           {item.status === 'ready' && <section className="mt-5 border-t border-slate-200 pt-5">
             <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
@@ -121,7 +130,7 @@ function PreviewDialog({ item, asset, mediaUrl, busy, operationAvailable, onClos
             <div className="mt-4 flex justify-end">
               {!confirming
                 ? <button type="button" disabled={!canAuthorize || busy} onClick={() => setConfirming(true)} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{mode === 'publish_now' ? <Send size={16} /> : <CalendarClock size={16} />}{mode === 'publish_now' ? 'Publish Now' : 'Review Schedule'}</button>
-                : <div data-testid="publication-authorization-confirmation" className="w-full rounded-md border border-blue-200 bg-blue-50 p-4"><p className="text-sm font-bold text-slate-950">{mode === 'publish_now' ? `Publish this post to ${item.destinationLabel} now?` : `Schedule this post for ${formatDate(scheduledIso)} (${timezone})?`}</p><p className="mt-1 text-xs text-slate-600">This authorizes only the exact copy, media, and destination shown above.</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setConfirming(false)} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Back</button><button type="button" disabled={busy} onClick={() => void onAuthorize(mode, mode === 'scheduled' ? scheduledIso : null, timezone)} className="min-h-10 rounded-md bg-blue-700 px-4 text-sm font-bold text-white">{mode === 'publish_now' ? 'Publish' : 'Schedule'}</button></div></div>}
+                : <div data-testid="publication-authorization-confirmation" className="w-full rounded-md border border-blue-200 bg-blue-50 p-4"><p className="text-sm font-bold text-slate-950">{mode === 'publish_now' ? `Publish "${item.snapshot.title}" to ${item.destinationLabel} on Facebook now?` : `Schedule "${item.snapshot.title}" for ${formatDate(scheduledIso)} (${timezone})?`}</p><p className="mt-1 text-xs text-slate-600">{item.mediaPairingId ? 'Media post' : 'Text-only post'} · This authorizes only the exact copy, media, and destination shown above.</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setConfirming(false)} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Back</button><button type="button" disabled={busy} onClick={() => void onAuthorize(mode, mode === 'scheduled' ? scheduledIso : null, timezone)} className="min-h-10 rounded-md bg-blue-700 px-4 text-sm font-bold text-white">{mode === 'publish_now' ? 'Publish' : 'Schedule'}</button></div></div>}
             </div>
           </section>}
         </div>
@@ -162,6 +171,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
   const [mediaChoice, setMediaChoice] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const facebook = state?.providers.find(item => item.provider === 'facebook') ?? null;
   const selectedContent = contentItems.find(item => item.id === props.selectedContentId) ?? null;
   const preview = state?.packages.find(item => item.id === previewId) ?? null;
@@ -189,6 +199,12 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
     void openPreview(item);
   }, [openPreview, pendingPreviewId, state?.packages]);
 
+  useEffect(() => {
+    if (!state?.publications.some(item => item.status === 'scheduled' || item.status === 'publishing')) return;
+    const timer = window.setInterval(() => { void props.onReload(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, [props.onReload, state?.publications]);
+
   const prepareSelected = async () => {
     if (!selectedContent || !facebook) return;
     setActionError(null);
@@ -204,6 +220,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
 
       {error && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       {actionError && <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{actionError}</p>}
+      {actionNotice && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{actionNotice}</p>}
 
       <section aria-label="Prepared post allowance" className="flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3"><div><p className="text-sm font-bold text-slate-900">Prepared / scheduled</p><p className="text-xs text-slate-500">Published history does not count toward this limit.</p></div><p className="text-sm font-bold text-slate-800">{state?.preparedCount ?? 0} of {state?.preparedLimit ?? 5}</p></section>
 
@@ -230,7 +247,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
 
       <section aria-labelledby="active-heading"><h3 id="active-heading" className="text-sm font-bold text-slate-950">Scheduled / Publishing / Needs Attention</h3>{activePublications.length === 0 ? <p className="mt-3 border-y border-dashed border-slate-200 py-7 text-center text-sm text-slate-500">No active publications.</p> : <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{activePublications.map(publication => {
         const asset = state?.assets.find(item => item.id === mediaAssetId(publication)) ?? null;
-        return <article key={publication.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-950">{publication.snapshot.title}</p><p className="mt-1 text-xs text-slate-500">{publication.destinationLabel} · {publication.status === 'failed' ? 'Needs Attention' : publication.status === 'publishing' ? 'Publishing' : `Scheduled ${formatDate(publication.scheduledAt)} (${publication.timezone})`}</p>{publication.failureMessage && <p className="mt-2 text-sm text-rose-700">{publication.failureMessage}</p>}</div><div className="flex flex-wrap items-end gap-2">{publication.status === 'scheduled' && <><ScheduleEditor publication={publication} busy={saving} onReschedule={(scheduledAt, timezone) => props.onReschedule(publication, scheduledAt, timezone)} /><button type="button" aria-label={`Cancel ${publication.snapshot.title}`} disabled={saving} onClick={() => void props.onCancel(publication)} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300"><X size={16} /></button></>}{publication.status === 'failed' && publication.retryEligible && <button type="button" disabled={saving} onClick={() => void props.onRetry(publication)} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><RotateCcw size={15} />Retry</button>}</div></article>;
+        return <article key={publication.id} aria-live="polite" className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-950">{publication.snapshot.title}</p><p className="mt-1 text-xs text-slate-500">{publication.destinationLabel} · {publicationStatusLabel(publication)}</p>{publication.failureMessage && <p className="mt-2 text-sm text-rose-700">{publication.failureMessage}</p>}{publication.status === 'failed' && !publication.retryEligible && <p className="mt-2 text-xs text-slate-600">This result cannot be retried safely. Review it before taking another publishing action.</p>}</div><div className="flex flex-wrap items-end gap-2">{publication.status === 'scheduled' && publication.mode === 'scheduled' && <><ScheduleEditor publication={publication} busy={saving} onReschedule={(scheduledAt, timezone) => props.onReschedule(publication, scheduledAt, timezone)} /><button type="button" aria-label={`Cancel ${publication.snapshot.title}`} disabled={saving} onClick={() => void props.onCancel(publication)} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300"><X size={16} /></button></>}{publication.status === 'failed' && publication.retryEligible && <button type="button" disabled={saving} onClick={() => void props.onRetry(publication)} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><RotateCcw size={15} />Retry</button>}</div></article>;
       })}</div>}</section>
 
       <section aria-labelledby="history-heading"><h3 id="history-heading" className="text-sm font-bold text-slate-950">Published</h3>{history.length === 0 ? <p className="mt-3 border-y border-dashed border-slate-200 py-7 text-center text-sm text-slate-500">No published history yet.</p> : <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{history.map(publication => {
@@ -240,7 +257,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
 
       {!state?.operationAvailable && <div className="flex items-start gap-2 rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-600"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><p>The shared queue is operational in non-publishing mode. Existing history and previews remain available while new provider submissions are stopped.</p></div>}
 
-      {preview && <PreviewDialog item={preview} asset={previewAsset} mediaUrl={previewMediaUrl} busy={saving} operationAvailable={state?.operationAvailable === true} onClose={() => { setPreviewId(null); setPreviewMediaUrl(null); }} onApprove={async () => { await props.onApprove(preview); setPreviewId(null); }} onAuthorize={async (mode, scheduledAt, timezone) => { await props.onAuthorize(preview, mode, scheduledAt, timezone); setPreviewId(null); }} />}
+      {preview && <PreviewDialog item={preview} asset={previewAsset} mediaUrl={previewMediaUrl} busy={saving} operationAvailable={state?.operationAvailable === true} onClose={() => { setPreviewId(null); setPreviewMediaUrl(null); }} onApprove={async () => { await props.onApprove(preview); setActionNotice(`"${preview.snapshot.title}" is Ready. Publishing still requires Publish Now or Schedule.`); setPreviewId(null); }} onAuthorize={async (mode, scheduledAt, timezone) => { await props.onAuthorize(preview, mode, scheduledAt, timezone); setActionNotice(mode === 'publish_now' ? `Publishing authorized for "${preview.snapshot.title}". ServSync is sending this exact post to Facebook.` : `Schedule saved for "${preview.snapshot.title}" at ${formatDate(scheduledAt)}.`); setPreviewId(null); }} />}
     </section>
   );
 }

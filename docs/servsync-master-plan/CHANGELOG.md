@@ -4,6 +4,18 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - FB-037K owner publishing flow v1
+
+- Branch: `codex/fb037k-owner-publishing-flow-v1` from exact main `51ba7ecb9ff5db0b9962ece6f74cf9d97ca62382`.
+- Approval policy: The ServSync internal one-person workspace now uses `Draft -> Preview for approval -> Approve & Ready` without requiring the owner to submit Content to themselves. Contractor/team workspaces retain `Draft -> Submit for approval -> reviewer decision`; the server allows direct draft approval only for the canonical internal workspace and records the approving user/time in immutable Content history.
+- Review UX: Return to draft and Reject retain their required reason, and the UI now explains the minimum reason instead of presenting unexplained disabled controls. Exact package approval remains a separate non-publishing decision.
+- Publishing UX: Ready packages show exact title, Facebook destination/Page, and media mode before Publish Now or Schedule authorization. Publish-now rows show Publishing, Processing on Facebook, Published with View on Facebook, or Needs Attention; active state refreshes automatically and uncertain failures do not offer blind retry.
+- Migration: Added the 128-line additive `servsync-owner-marketing-approval-policy.sql` at SHA-256 `fb2d7e46d11843dcfa1b1648df1dfab107eb75824b561d75dee4cd2370ab09f1`. Exact bytes passed Sandbox -> Demo -> Production while preserving all Marketing counts, the published flagship, and the Ready **Connect with Local Contractors Easily** package.
+- Operational model: `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` was installed only on the `serv-sync-app-refresh` Production environment as standing deployment capability. The database emergency stop was opened through its audited platform-admin RPC at `2026-08-18T15:54:32Z`. The workspace connection plus one exact Publish Now/Schedule action remain mandatory; neither infrastructure control is per-post approval. Preview and Demo did not receive the environment capability.
+- Safety: This implementation and rollout created no publication, event, worker attempt, Facebook request, or schedule for the Ready target. The existing flagship Facebook Video ID `1616577883220910` remained exact. Broad contractor discovery remains gated.
+- Validation: Owner/team approval SQL and UI contracts; queue/Facebook/worker tests; desktop/mobile Playwright; TypeScript; Production build; backend parity; migration/security and cross-environment preservation checks; sensitive-value, Markdown-link, rollout-ledger, and `git diff --check` validation. Focused ESLint remains subject to the inherited ESLint 9/typescript-eslint startup incompatibility.
+- Backlog impact: FB-037K completes the bounded owner publishing-flow and sustainable Production capability model, but does not authorize the Ready target or any future public post. Selected-contractor beta availability remains separately governed.
+
 ## 2026-08-18 - FB-037J Marketing publication status recovery v1
 
 - Branch: `codex/fb037j-publication-status-recovery-v1` from exact main `ed2adc5ada3bfd077e83a3ac9c612467d8806885`.

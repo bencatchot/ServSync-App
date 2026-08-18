@@ -196,6 +196,15 @@ if [[ -n "${SERVSYNC_MARKETING_QUEUE_MIGRATION:-}" ]]; then
   fi
 fi
 
+if [[ -n "${SERVSYNC_OWNER_MARKETING_FLOW_MIGRATION:-}" ]]; then
+  psql_run --file "$ROOT_DIR/$SERVSYNC_OWNER_MARKETING_FLOW_MIGRATION" >/dev/null
+  psql_run --file "$ROOT_DIR/${SERVSYNC_OWNER_MARKETING_FLOW_VALIDATION:?Owner Marketing flow validation is required.}" >/dev/null
+  if psql_run --file "$ROOT_DIR/$SERVSYNC_OWNER_MARKETING_FLOW_MIGRATION" >/dev/null 2>&1; then
+    echo "Repeated owner Marketing flow migration unexpectedly succeeded." >&2
+    exit 1
+  fi
+fi
+
 if [[ -n "${SERVSYNC_MARKETING_CONTENT_CREATION_MIGRATION:-}" ]]; then
   psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_CONTENT_CREATION_MIGRATION" >/dev/null
   psql_run --file "$ROOT_DIR/${SERVSYNC_MARKETING_CONTENT_CREATION_VALIDATION:?Marketing content creation validation is required.}" >/dev/null

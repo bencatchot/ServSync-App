@@ -181,6 +181,12 @@ async function installHarness(page: Page, initial: MarketingContentItem[] = [], 
             item.reviewed_by_name = null;
             item.review_note = null;
           }
+          if (from === 'draft' && args.p_to_status === 'approved') {
+            item.reviewed_at = now();
+            item.reviewed_by = '10000000-0000-4000-8000-000000000001';
+            item.reviewed_by_name = 'Platform Owner';
+            item.review_note = null;
+          }
           if (from === 'needs_approval') {
             item.reviewed_at = now();
             item.reviewed_by = '10000000-0000-4000-8000-000000000001';
@@ -270,7 +276,7 @@ test.describe('internal Marketing content approval', () => {
       .rejects.toEqual(expect.objectContaining<Partial<MarketingContentAdapterError>>({ kind: 'ambiguous' }));
   });
 
-  test('empty queue is truthful and create-to-approval drives the Overview queue', async ({ page }) => {
+  test('internal owner moves a draft directly into exact preview without self-submission', async ({ page }) => {
     await installHarness(page);
     await expect(page.getByTestId('marketing-needs-approval')).toContainText('Nothing waiting for approval');
 
@@ -283,17 +289,16 @@ test.describe('internal Marketing content approval', () => {
     await expect(page.getByTestId('marketing-content-detail')).toContainText('Idea');
     await page.getByRole('button', { name: 'Start draft' }).click();
     await expect(page.getByTestId('marketing-content-detail')).toContainText('Draft');
-    await page.getByRole('button', { name: 'Submit for approval' }).click();
-    await expect(page.getByTestId('marketing-content-detail')).toContainText('Needs approval');
-
-    await page.getByTestId('marketing-nav-overview').click();
-    await expect(page.getByTestId('marketing-needs-approval')).toContainText('Launch reminder');
-    await page.getByRole('button', { name: /Launch reminder/ }).click();
-    await expect(page.getByTestId('marketing-content-detail')).toContainText('A real message prepared for owner review.');
-    await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.getByTestId('marketing-content-detail')).toContainText('Approved');
-    await page.getByTestId('marketing-nav-overview').click();
-    await expect(page.getByTestId('marketing-needs-approval')).toContainText('Nothing waiting for approval');
+    await expect(page.getByRole('button', { name: 'Submit for approval' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Preview for approval' }).click();
+    await expect(page.getByTestId('marketing-publishing-workspace')).toBeVisible();
+    const calls = await page.evaluate(() => (window as unknown as {
+      __marketingRpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
+    }).__marketingRpcCalls);
+    const transition = calls.find(call => call.name === 'servsync_transition_marketing_content'
+      && call.args.p_to_status === 'approved');
+    expect(transition?.args.p_to_status).toBe('approved');
+    expect(calls.some(call => call.name === 'servsync_authorize_marketing_publication')).toBe(false);
   });
 
   test('loading and failure states remain honest and do not expose server details', async ({ page }) => {
@@ -314,7 +319,11 @@ test.describe('internal Marketing content approval', () => {
     await page.getByTestId('marketing-nav-content').click();
     await page.getByRole('tab', { name: 'Needs approval' }).click();
     await page.getByRole('button', { name: /Review the launch message/ }).click();
+    await expect(page.getByText('Add at least 3 characters to return or reject this draft. Approval does not require a reason.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Return to draft' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Reject' })).toBeDisabled();
     await page.getByLabel('Return or rejection reason').fill('Clarify who this message is for.');
+    await expect(page.getByRole('button', { name: 'Return to draft' })).toBeEnabled();
     await page.getByRole('button', { name: 'Return to draft' }).click();
     await expect(page.getByTestId('marketing-content-detail')).toContainText('Draft');
     await expect(page.getByTestId('marketing-content-detail')).toContainText('Clarify who this message is for.');
@@ -354,7 +363,7 @@ test.describe('internal Marketing content approval', () => {
     await expect(page.getByTestId('marketing-preparation-provenance')).toContainText('Codex-prepared draft');
     await expect(page.getByTestId('marketing-preparation-provenance')).toContainText('HVAC contractors');
     await expect(page.getByTestId('marketing-preparation-provenance')).toContainText('LinkedIn post');
-    await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Preview for approval' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
   });
 
@@ -388,7 +397,7 @@ test.describe('internal Marketing content approval', () => {
     await expect(page.getByTestId('marketing-direction-lineage')).toContainText('From the approved Invoices Direction');
     await expect(page.getByTestId('marketing-direction-lineage')).toContainText('Plan item 1');
     await expect(page.getByTestId('marketing-direction-lineage')).toContainText('Direction revision 2');
-    await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Preview for approval' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
   });
 
@@ -424,7 +433,7 @@ test.describe('internal Marketing content approval', () => {
       await page.getByRole('button', { name: /Review the launch message/ }).click();
       await expect(page.getByTestId('marketing-preparation-provenance')).toBeVisible();
       await expect(page.getByTestId('marketing-direction-lineage')).toContainText('approved Invoices Direction');
-      await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Preview for approval' })).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
     });
