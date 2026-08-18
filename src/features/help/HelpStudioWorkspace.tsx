@@ -307,6 +307,7 @@ function RecordingJobCard({
         poster_asset_id: uploadedPoster.assetId,
         source_version: 'Demo Recorder / servsync-human-paced-v1',
         recorder_metadata: {
+          recording_job_id: manifest.recordingJobId,
           scenario: manifest.scenario,
           pacing_profile: manifest.pacingProfile,
           validation_status: manifest.raw.validation_status,
@@ -314,6 +315,10 @@ function RecordingJobCard({
           duration_seconds: manifest.durationSeconds,
           viewport: manifest.raw.viewport,
           source_git_commit: sourceCommit,
+          mp4_filename: manifest.mp4Filename,
+          poster_filename: manifest.posterFilename,
+          mp4_sha256: manifest.mp4Sha256,
+          poster_sha256: manifest.posterSha256,
           canonical_output_provenance: manifest.raw.canonical_output_provenance,
         },
       });

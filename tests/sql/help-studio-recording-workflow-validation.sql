@@ -113,6 +113,33 @@ select public.servsync_finalize_help_media_upload(
   'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',1440,900,null
 );
 
+do $$
+begin
+  perform public.servsync_transition_help_recording_job(
+    current_setting('servsync.test.recording_job_id')::uuid,'processing','complete',
+    jsonb_build_object(
+      'video_asset_id',current_setting('servsync.test.recording_video_id'),
+      'poster_asset_id',current_setting('servsync.test.recording_poster_id'),
+      'source_version','Demo Recorder / servsync-human-paced-v1',
+      'recorder_metadata',jsonb_build_object(
+        'recording_job_id',current_setting('servsync.test.recording_job_id'),
+        'scenario','contractor-create-estimate','pacing_profile','servsync-human-paced-v1',
+        'validation_status','passed','sensitive_data_check','passed','duration_seconds',30,
+        'viewport',jsonb_build_object('width',1440,'height',900),
+        'source_git_commit','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'mp4_filename','estimate-human-paced.mp4','poster_filename','estimate-human-paced.png',
+        'mp4_sha256','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+        'poster_sha256','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        'canonical_output_provenance','validated_servsync_demo_recorder'
+      )
+    )
+  );
+  raise exception 'Forged recorder checksum unexpectedly completed the job.';
+exception when sqlstate '22023' then
+  null;
+end;
+$$;
+
 select public.servsync_transition_help_recording_job(
   current_setting('servsync.test.recording_job_id')::uuid,'processing','complete',
   jsonb_build_object(
@@ -120,8 +147,14 @@ select public.servsync_transition_help_recording_job(
     'poster_asset_id',current_setting('servsync.test.recording_poster_id'),
     'source_version','Demo Recorder / servsync-human-paced-v1',
     'recorder_metadata',jsonb_build_object(
+      'recording_job_id',current_setting('servsync.test.recording_job_id'),
       'scenario','contractor-create-estimate','pacing_profile','servsync-human-paced-v1',
       'validation_status','passed','sensitive_data_check','passed','duration_seconds',30,
+      'viewport',jsonb_build_object('width',1440,'height',900),
+      'source_git_commit','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'mp4_filename','estimate-human-paced.mp4','poster_filename','estimate-human-paced.png',
+      'mp4_sha256','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'poster_sha256','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
       'canonical_output_provenance','validated_servsync_demo_recorder'
     )
   )

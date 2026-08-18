@@ -22,6 +22,24 @@
       }
     },
     {
+      "id": "help-studio-recording-package-validation-forward-fix-v1",
+      "artifact": "servsync-help-studio-recording-package-validation-forward-fix.sql (SHA-256 507140effb7e804922a4e916b01780558da0b5b5a12acebb9ba298182f0b0a91)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 130-line additive forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. The database now independently binds completion to the exact job, scenario, pacing profile, source commit, filenames, finalized MP4/poster checksums, dimensions, duration, validation results, and canonical recorder provenance. Forced RLS, grants, function owner/path/volatility, repeat-install refusal, forged-checksum denial, and zero-publication preservation passed."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. The package-validation marker and eight-function security contract match Sandbox; Help/Marketing counts remained zero and existing Demo Recorder fixtures were unaffected."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained one published Help walkthrough/revision, two Help assets, 21 Content rows, four Marketing assets, eight pairings, two publications, seven publication events, and Facebook Video ID 1616577883220910. No recording job, publication, schedule, worker attempt, or provider request was created."
+        }
+      }
+    },
+    {
       "id": "help-studio-representative-walkthrough-proof-v1",
       "artifact": "Operational acceptance on merge e479026025e5aff56a8e7696f8b848ad51127f56",
       "environments": {
