@@ -47,6 +47,16 @@ function sameOrigin(request: Request) {
   try { return new URL(origin).host === host; } catch { return false; }
 }
 
+function contractorId(input: Record<string, unknown>) {
+  const value = input.contractor_id;
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string'
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new Error('invalid');
+  }
+  return value;
+}
+
 async function rpc<T>(client: RpcClient, name: string, args: Record<string, unknown> = {}) {
   const { data, error } = await client.rpc(name, args);
   if (error) throw new Error(name);
@@ -94,9 +104,12 @@ export function createFacebookOauthStartHandler(dependencies: FacebookHttpDepend
     const config = dependencies.config();
     const clients = dependencies.clients();
     if (!config || !clients) return json({ status: 'failed', reason: 'facebook_setup_required' }, 503);
+    let input: Record<string, unknown>;
+    try { input = await body(request); } catch { return json({ status: 'failed', reason: 'invalid_request' }, 400); }
     const state = dependencies.createState();
     try {
-      await rpc(clients.user(accessToken), 'servsync_begin_internal_marketing_facebook_oauth', {
+      await rpc(clients.user(accessToken), 'servsync_begin_marketing_facebook_oauth', {
+        p_contractor_id: contractorId(input),
         p_state_hash: state.stateHash,
         p_redirect_uri: config.callbackUrl,
         p_provider_app_key: config.appId,
@@ -169,6 +182,7 @@ async function body(request: Request) {
   if (!Number.isFinite(length) || length > 2_048) throw new Error('invalid');
   const text = await request.text();
   if (new TextEncoder().encode(text).byteLength > 2_048) throw new Error('invalid');
+  if (text.trim() === '') return {};
   const parsed: unknown = JSON.parse(text);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid');
   return parsed as Record<string, unknown>;
@@ -186,10 +200,14 @@ export function createFacebookConnectionHandler(dependencies: FacebookHttpDepend
     let input: Record<string, unknown>;
     try { input = await body(request); } catch { return json({ status: 'failed', reason: 'invalid_request' }, 400); }
     const action = input.action;
+    let contextContractorId: string | null;
+    try { contextContractorId = contractorId(input); }
+    catch { return json({ status: 'failed', reason: 'invalid_request' }, 400); }
     try {
       if (action === 'select_page') {
         if (typeof input.session_id !== 'string' || typeof input.page_id !== 'string') throw new Error('invalid');
-        const authorized = await rpc<{ session_id: string }>(clients.user(accessToken), 'servsync_authorize_internal_marketing_facebook_page_selection', {
+        const authorized = await rpc<{ session_id: string }>(clients.user(accessToken), 'servsync_authorize_marketing_facebook_page_selection', {
+          p_contractor_id: contextContractorId,
           p_session_id: input.session_id,
           p_page_id: input.page_id,
         });
@@ -208,10 +226,12 @@ export function createFacebookConnectionHandler(dependencies: FacebookHttpDepend
           p_page_access_token: selected.accessToken,
           p_token_expires_at: null,
         });
-        return json({ status: 'connected', readiness: 'ready_except_live_post_verification' });
+        return json({ status: 'connected', readiness: 'ready' });
       }
       if (action === 'recheck') {
-        const authorized = await rpc<{ connection_id: string; page_id: string }>(clients.user(accessToken), 'servsync_authorize_internal_marketing_facebook_recheck');
+        const authorized = await rpc<{ connection_id: string; page_id: string }>(clients.user(accessToken), 'servsync_authorize_marketing_facebook_recheck', {
+          p_contractor_id: contextContractorId,
+        });
         const pageToken = await rpc<string>(clients.service, 'servsync_private_get_marketing_facebook_page_token', {
           p_connection_id: authorized.connection_id,
         });
@@ -222,10 +242,12 @@ export function createFacebookConnectionHandler(dependencies: FacebookHttpDepend
           p_page_name: page.pageName,
           p_page_tasks: page.tasks,
         });
-        return json({ status: 'connected', readiness: 'ready_except_live_post_verification' });
+        return json({ status: 'connected', readiness: 'ready' });
       }
       if (action === 'disconnect') {
-        await rpc(clients.user(accessToken), 'servsync_disconnect_internal_marketing_facebook');
+        await rpc(clients.user(accessToken), 'servsync_disconnect_marketing_facebook', {
+          p_contractor_id: contextContractorId,
+        });
         return json({ status: 'disconnected' });
       }
       return json({ status: 'failed', reason: 'invalid_request' }, 400);
@@ -233,7 +255,9 @@ export function createFacebookConnectionHandler(dependencies: FacebookHttpDepend
       if (action === 'recheck' && error instanceof FacebookProviderError
         && (error.category === 'provider_auth' || error.category === 'provider_permission')) {
         try {
-          const authorized = await rpc<{ connection_id: string }>(clients.user(accessToken), 'servsync_authorize_internal_marketing_facebook_recheck');
+          const authorized = await rpc<{ connection_id: string }>(clients.user(accessToken), 'servsync_authorize_marketing_facebook_recheck', {
+            p_contractor_id: contextContractorId,
+          });
           await rpc(clients.service, 'servsync_private_fail_marketing_facebook_recheck', {
             p_connection_id: authorized.connection_id,
             p_error_category: error.category,

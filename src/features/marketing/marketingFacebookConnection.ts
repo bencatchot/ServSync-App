@@ -42,10 +42,13 @@ async function request(client: MarketingFacebookAuthClient, path: string, body: 
   return result as Record<string, unknown>;
 }
 
-export function createMarketingFacebookConnectionAdapter(client: MarketingFacebookAuthClient) {
+export function createMarketingFacebookConnectionAdapter(
+  client: MarketingFacebookAuthClient,
+  contractorId: string | null = null,
+) {
   return {
     async start() {
-      const result = await request(client, '/api/marketing-facebook-oauth-start', {});
+      const result = await request(client, '/api/marketing-facebook-oauth-start', { contractor_id: contractorId });
       if (result.status !== 'authorization_required' || typeof result.authorization_url !== 'string') {
         throw new MarketingFacebookConnectionError('ServSync did not receive a safe Facebook authorization URL.');
       }
@@ -56,9 +59,15 @@ export function createMarketingFacebookConnectionAdapter(client: MarketingFacebo
       window.location.assign(url.toString());
     },
     async selectPage(sessionId: string, pageId: string) {
-      await request(client, '/api/marketing-facebook-connection', { action: 'select_page', session_id: sessionId, page_id: pageId });
+      await request(client, '/api/marketing-facebook-connection', {
+        action: 'select_page', contractor_id: contractorId, session_id: sessionId, page_id: pageId,
+      });
     },
-    async recheck() { await request(client, '/api/marketing-facebook-connection', { action: 'recheck' }); },
-    async disconnect() { await request(client, '/api/marketing-facebook-connection', { action: 'disconnect' }); },
+    async recheck() {
+      await request(client, '/api/marketing-facebook-connection', { action: 'recheck', contractor_id: contractorId });
+    },
+    async disconnect() {
+      await request(client, '/api/marketing-facebook-connection', { action: 'disconnect', contractor_id: contractorId });
+    },
   };
 }

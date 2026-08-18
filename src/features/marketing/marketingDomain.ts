@@ -108,3 +108,37 @@ export function buildInternalMarketingOverview(source: InternalMarketingOverview
     recommendedNextAction: null,
   };
 }
+
+export function buildContractorMarketingOverview(): MarketingOverviewData {
+  return {
+    metrics: [
+      {
+        id: 'published',
+        label: 'Published',
+        value: 0,
+        state: 'available',
+        helper: 'Published from this workspace.',
+      },
+      {
+        id: 'website_visits',
+        label: 'Website Visits',
+        value: null,
+        state: 'not_connected',
+        helper: 'Website analytics are not connected.',
+      },
+      {
+        id: 'signups',
+        label: 'Signups',
+        value: null,
+        state: 'unavailable',
+        helper: 'Acquisition attribution is unavailable.',
+      },
+      sourcedCount('contractors', 'Customers', null, 'Customer attribution is unavailable.'),
+      sourcedCount('homeowners', 'Homeowners', null, 'Homeowner attribution is unavailable.'),
+      sourcedCount('invites', 'Invites', null, 'Marketing invite attribution is unavailable.'),
+    ],
+    approvals: [],
+    upcoming: [],
+    recommendedNextAction: null,
+  };
+}

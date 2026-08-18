@@ -165,6 +165,21 @@ done
 
 psql_run --file "$ROOT_DIR/tests/sql/marketing-media-cost-lifecycle-validation.sql" >/dev/null
 
+if [[ -n "${SERVSYNC_MARKETING_QUEUE_MIGRATION:-}" ]]; then
+  if [[ -n "${SERVSYNC_MARKETING_QUEUE_COMPATIBILITY:-}" ]]; then
+    psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_COMPATIBILITY" >/dev/null
+  fi
+  psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_MIGRATION" >/dev/null
+  if [[ -n "${SERVSYNC_MARKETING_QUEUE_FORWARD_FIX:-}" ]]; then
+    psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_FORWARD_FIX" >/dev/null
+  fi
+  psql_run --file "$ROOT_DIR/${SERVSYNC_MARKETING_QUEUE_VALIDATION:?Marketing queue validation is required.}" >/dev/null
+  if psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_MIGRATION" >/dev/null 2>&1; then
+    echo "Repeated Marketing publishing queue migration unexpectedly succeeded." >&2
+    exit 1
+  fi
+fi
+
 if psql_run --file "$ROOT_DIR/servsync-marketing-media-intake-ephemeral-lifecycle.sql" >/dev/null 2>&1; then
   echo "Repeated Marketing media lifecycle migration unexpectedly succeeded." >&2
   exit 1

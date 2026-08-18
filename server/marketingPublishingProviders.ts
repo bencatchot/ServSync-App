@@ -162,7 +162,7 @@ export function createFacebookPublishingAdapter({
 }): MarketingPublishingProviderAdapter {
   const readiness = () => {
     if (!config) return { status: 'setup_required' as const, reason: 'Facebook Page setup and owner authorization are required.' };
-    if (!config.publicPostsEnabled) return { status: 'setup_required' as const, reason: 'Facebook is connected for readiness only; public posting remains owner-gated.' };
+    if (!config.publicPostsEnabled) return { status: 'setup_required' as const, reason: 'This deployment cannot start public Facebook submissions.' };
     return { status: 'connected' as const, reason: 'Facebook Page text and managed-video publishing are enabled.' };
   };
   return {
@@ -170,9 +170,13 @@ export function createFacebookPublishingAdapter({
     capabilities: { text: true, media: true },
     getConnectionReadiness: readiness,
     validatePublication(claim) {
-      const connection = readiness();
-      if (connection.status !== 'connected') return {
-        category: 'unsupported', message: connection.reason, retryEligible: false, requestStarted: false,
+      if (!config) return {
+        category: 'unsupported', message: 'Facebook Page setup and owner authorization are required.',
+        retryEligible: false, requestStarted: false,
+      };
+      if (claim.operation !== 'reconcile' && !config.publicPostsEnabled) return {
+        category: 'unsupported', message: 'This deployment cannot start public Facebook submissions.',
+        retryEligible: false, requestStarted: false,
       };
       if (!/^\d{3,80}$/.test(claim.destination_key)) return {
         category: 'provider_auth', message: 'The Facebook Page destination is invalid.', retryEligible: false, requestStarted: false,
@@ -196,7 +200,9 @@ export function createFacebookPublishingAdapter({
       } : null;
     },
     async preparePublication(claim) {
-      if (!config?.publicPostsEnabled) throw new FacebookProviderError('unsupported', 'Facebook public posting is not enabled.');
+      if (!config || (claim.operation !== 'reconcile' && !config.publicPostsEnabled)) {
+        throw new FacebookProviderError('unsupported', 'This deployment cannot start public Facebook submissions.');
+      }
       const pageToken = await getPageToken(claim.provider_connection_id);
       const publicMessage = publicMessageForProvider('facebook', claim.content_snapshot);
       const media = claim.media_snapshot && claim.operation !== 'reconcile'
@@ -271,7 +277,7 @@ export function createFacebookPublishingAdapter({
       };
     },
     async reconcile(prepared): Promise<ProviderReconciliationResult> {
-      if (!config?.publicPostsEnabled) throw new FacebookProviderError('unsupported', 'Facebook public posting is not enabled.');
+      if (!config) throw new FacebookProviderError('unsupported', 'Facebook Page setup is unavailable.');
       const videoId = prepared.claim.provider_publication_id;
       if (!videoId) throw new FacebookProviderError('provider_uncertain', 'The accepted Facebook Video ID is unavailable.', false, true);
       const request = facebookVideoConfirmationRequest(config, videoId, prepared.pageToken);

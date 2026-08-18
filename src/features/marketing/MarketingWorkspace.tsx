@@ -29,7 +29,7 @@ import {
   type MarketingContentStatus,
 } from './marketingContent';
 import { MarketingContentWorkspace } from './MarketingContentWorkspace';
-import { MarketingPublicationComposer, MarketingPublishingWorkspace } from './MarketingPublishingWorkspace';
+import { MarketingPublishingWorkspace } from './MarketingPublishingWorkspace';
 import {
   createMarketingFacebookConnectionAdapter,
   marketingFacebookReturnStatus,
@@ -42,10 +42,7 @@ import {
   type MarketingPublishingState,
 } from './marketingPublishing';
 import {
-  createMarketingMediaAdapter,
-  type MarketingMediaUploadMetadata,
   type MarketingMediaClient,
-  type MarketingMediaState,
 } from './marketingMedia';
 import {
   createMarketingPlanningAdapter,
@@ -295,8 +292,8 @@ export function MarketingWorkspace({
     onTransition: Parameters<typeof MarketingContentWorkspace>[0]['onTransition'];
     onPublish: Parameters<typeof MarketingContentWorkspace>[0]['onPublish'];
   };
-  planning: Parameters<typeof MarketingPlanningWorkspace>[0];
-  publishing: Omit<Parameters<typeof MarketingPublishingWorkspace>[0], 'contentItems' | 'selectedContentId' | 'onSelectContent' | 'onReturnForRevision' | 'onCreate'> & { composer: { selectedContentId: string | null; onSelectContent: (content: MarketingContentItem) => void; onCreate: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] } };
+  planning: Parameters<typeof MarketingPlanningWorkspace>[0] | null;
+  publishing: Omit<Parameters<typeof MarketingPublishingWorkspace>[0], 'contentItems' | 'selectedContentId' | 'onSelectContent' | 'onReturnForRevision'> & { selectedContentId: string | null; onSelectContent: (content: MarketingContentItem) => void };
   settingsUsage: ReactNode;
 }) {
   const [section, setSection] = useState<MarketingWorkspaceSection>(() => (
@@ -364,41 +361,41 @@ export function MarketingWorkspace({
               onCreate={content.onCreate}
               onUpdate={content.onUpdate}
               onTransition={content.onTransition}
-              onPublish={item => { publishing.composer.onSelectContent(item); setSection('campaigns'); }}
+              onPublish={item => { publishing.onSelectContent(item); setSection('campaigns'); }}
             />
           )
           : section === 'campaigns'
             ? <MarketingPublishingWorkspace
                 {...publishing}
                 contentItems={content.items}
-                selectedContentId={publishing.composer.selectedContentId}
-                onSelectContent={publishing.composer.onSelectContent}
                 onReturnForRevision={item => {
                   setContentFocus({ id: item.id, status: 'approved', token: Date.now() });
                   setSection('content');
                 }}
-                onCreate={publishing.composer.onCreate}
               />
           : section === 'settings'
-            ? <div className="space-y-5">{settingsUsage}<MarketingPlanningWorkspace {...planning} /></div>
+            ? <div className="space-y-5">{settingsUsage}{planning && <MarketingPlanningWorkspace {...planning} />}</div>
             : <MarketingFoundationState section={section} />}
     </div>
   );
 }
 
-function AuthorizedInternalMarketingWorkspace({
+function AuthorizedMarketingWorkspace({
   overview,
   client,
+  contractorId,
+  planningEnabled,
 }: {
   overview: MarketingOverviewData;
   client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
+  contractorId: string | null;
+  planningEnabled: boolean;
 }) {
-  const adapter = useMemo(() => createMarketingContentAdapter(client), [client]);
+  const adapter = useMemo(() => createMarketingContentAdapter(client, contractorId), [client, contractorId]);
   const planningAdapter = useMemo(() => createMarketingPlanningAdapter(client), [client]);
   const directionsAdapter = useMemo(() => createMarketingDirectionsAdapter(client), [client]);
-  const publishingAdapter = useMemo(() => createMarketingPublishingAdapter(client), [client]);
-  const facebookAdapter = useMemo(() => createMarketingFacebookConnectionAdapter(client), [client]);
-  const mediaAdapter = useMemo(() => createMarketingMediaAdapter(client), [client]);
+  const publishingAdapter = useMemo(() => createMarketingPublishingAdapter(client, contractorId), [client, contractorId]);
+  const facebookAdapter = useMemo(() => createMarketingFacebookConnectionAdapter(client, contractorId), [client, contractorId]);
   const [items, setItems] = useState<MarketingContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -415,7 +412,6 @@ function AuthorizedInternalMarketingWorkspace({
   const [publishingSaving, setPublishingSaving] = useState(false);
   const [publishingError, setPublishingError] = useState<string | null>(null);
   const [previewContentId, setPreviewContentId] = useState<string | null>(null);
-  const [mediaState, setMediaState] = useState<MarketingMediaState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -433,6 +429,10 @@ function AuthorizedInternalMarketingWorkspace({
   useEffect(() => { void load(); }, [load]);
 
   const loadPlanning = useCallback(async (showLoading = true) => {
+    if (!planningEnabled) {
+      setPlanningLoading(false);
+      return;
+    }
     if (showLoading) setPlanningLoading(true);
     setPlanningError(null);
     try {
@@ -443,11 +443,15 @@ function AuthorizedInternalMarketingWorkspace({
     } finally {
       setPlanningLoading(false);
     }
-  }, [planningAdapter]);
+  }, [planningAdapter, planningEnabled]);
 
   useEffect(() => { void loadPlanning(); }, [loadPlanning]);
 
   const loadDirections = useCallback(async (showLoading = true) => {
+    if (!planningEnabled) {
+      setDirectionsLoading(false);
+      return;
+    }
     if (showLoading) setDirectionsLoading(true);
     setDirectionsError(null);
     try {
@@ -458,7 +462,7 @@ function AuthorizedInternalMarketingWorkspace({
     } finally {
       setDirectionsLoading(false);
     }
-  }, [directionsAdapter]);
+  }, [directionsAdapter, planningEnabled]);
 
   useEffect(() => { void loadDirections(); }, [loadDirections]);
 
@@ -471,16 +475,6 @@ function AuthorizedInternalMarketingWorkspace({
   }, [publishingAdapter]);
 
   useEffect(() => { void loadPublishing(); }, [loadPublishing]);
-
-  const loadMedia = useCallback(async () => {
-    try { setMediaState(await mediaAdapter.get()); }
-    catch (loadError) {
-      setMediaState(null);
-      setPublishingError(loadError instanceof Error ? loadError.message : 'ServSync could not load Marketing media.');
-    }
-  }, [mediaAdapter]);
-
-  useEffect(() => { void loadMedia(); }, [loadMedia]);
 
   const withPlanningSave = async (operation: () => Promise<unknown>) => {
     setPlanningSaving(true);
@@ -575,21 +569,76 @@ function AuthorizedInternalMarketingWorkspace({
     loading: publishingLoading,
     error: publishingError,
     saving: publishingSaving,
-    onReload: async () => { await Promise.all([loadPublishing(), loadMedia()]); },
-    mediaState,
-    onUploadMedia: async ({ content: selectedContent, mp4, metadata, claimDemonstrated }: { content: MarketingContentItem; mp4: File; metadata: MarketingMediaUploadMetadata; claimDemonstrated: string }) => {
-      if (!mediaState) throw new Error('Marketing media is still loading.');
+    selectedContentId: previewContentId,
+    onSelectContent: (item: MarketingContentItem) => setPreviewContentId(item.id),
+    onReload: loadPublishing,
+    onPrepare: async (selectedContent: MarketingContentItem, pairingId: string | null) => {
+      const connection = publishingState?.providers.find(item => item.provider === 'facebook');
+      if (!connection) throw new Error('Connect Facebook before preparing this post.');
       setPublishingSaving(true);
       setPublishingError(null);
       try {
-        await mediaAdapter.uploadAndPair({ workspaceId: mediaState.workspaceId, content: selectedContent, mp4, metadata, claimDemonstrated });
-        await loadMedia();
-      } finally { setPublishingSaving(false); }
+        const result = await publishingAdapter.preparePackage({
+          requestId: crypto.randomUUID(),
+          contentId: selectedContent.id,
+          contentRevision: selectedContent.revisionNumber,
+          pairingId,
+          provider: 'facebook',
+          connectionId: connection.id,
+        });
+        if (!result.packageId) throw new Error('ServSync could not confirm the prepared post.');
+        await loadPublishing();
+        return result.packageId;
+      } finally {
+        setPublishingSaving(false);
+      }
     },
-    onReviewMedia: async (pairingId: string, decision: 'approved' | 'rejected') => {
+    onPreview: async (item: import('./marketingPublishing').MarketingPublicationPackage) => {
       setPublishingSaving(true);
       setPublishingError(null);
-      try { await mediaAdapter.review(pairingId, decision); await loadMedia(); }
+      try {
+        await publishingAdapter.recordPreview(item.id, item.fingerprint);
+        const assetId = typeof item.mediaSnapshot?.asset_id === 'string' ? item.mediaSnapshot.asset_id : null;
+        const url = assetId ? await publishingAdapter.mediaUrl(assetId) : null;
+        await loadPublishing();
+        return url;
+      } finally {
+        setPublishingSaving(false);
+      }
+    },
+    onApprove: async (item: import('./marketingPublishing').MarketingPublicationPackage) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await publishingAdapter.approvePackage(item.id, item.fingerprint); await loadPublishing(); }
+      finally { setPublishingSaving(false); }
+    },
+    onAuthorize: async (item: import('./marketingPublishing').MarketingPublicationPackage, mode: import('./marketingPublishing').MarketingPublicationMode, scheduledAt: string | null, timezone: string) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await publishingAdapter.authorize({
+          requestId: crypto.randomUUID(), packageId: item.id, fingerprint: item.fingerprint,
+          mode, scheduledAt, timezone,
+        });
+        await loadPublishing();
+      } finally { setPublishingSaving(false); }
+    },
+    onPairMedia: async (selectedContent: MarketingContentItem, asset: import('./marketingPublishing').MarketingQueueAsset) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await publishingAdapter.pairMedia({
+          pairingId: crypto.randomUUID(), contentId: selectedContent.id,
+          contentRevision: selectedContent.revisionNumber, assetId: asset.id,
+          claim: 'Selected as the exact media for this approved post.',
+        });
+        await loadPublishing();
+      } finally { setPublishingSaving(false); }
+    },
+    onReviewMedia: async (pairing: import('./marketingPublishing').MarketingQueuePairing, decision: 'approved' | 'rejected') => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await publishingAdapter.reviewMedia(pairing.id, decision); await loadPublishing(); }
       finally { setPublishingSaving(false); }
     },
     onCancel: async (publication: MarketingPublication) => {
@@ -615,6 +664,12 @@ function AuthorizedInternalMarketingWorkspace({
       } finally {
         setPublishingSaving(false);
       }
+    },
+    onReschedule: async (publication: MarketingPublication, scheduledAt: string, timezone: string) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try { await publishingAdapter.reschedule(publication.id, scheduledAt, timezone); await loadPublishing(); }
+      finally { setPublishingSaving(false); }
     },
     onConnectFacebook: async () => {
       setPublishingSaving(true);
@@ -646,29 +701,16 @@ function AuthorizedInternalMarketingWorkspace({
       catch (saveError) { setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not disconnect Facebook.'); }
       finally { setPublishingSaving(false); }
     },
-    composer: {
-      selectedContentId: previewContentId,
-      onSelectContent: (item: MarketingContentItem) => setPreviewContentId(item.id),
-      onCreate: async ({ connection, mode, scheduledAt }: Parameters<typeof MarketingPublicationComposer>[0]['onCreate'] extends (input: infer T) => Promise<void> ? T : never) => {
-        const previewContent = items.find(item => item.id === previewContentId);
-        if (!previewContent) return;
-        setPublishingSaving(true);
-        try {
-          await publishingAdapter.create({ requestId: crypto.randomUUID(), contentId: previewContent.id, contentRevision: previewContent.revisionNumber, provider: connection.provider, connectionId: connection.id, mode, scheduledAt });
-          await loadPublishing();
-        } finally { setPublishingSaving(false); }
-      },
-    },
   };
 
   return <>
     <MarketingWorkspace
-      audience={{ kind: 'internal' }}
+      audience={contractorId ? { kind: 'contractor', contractorId } : { kind: 'internal' }}
       overview={overview}
       content={content}
-      planning={planning}
+      planning={planningEnabled ? planning : null}
       publishing={publishing}
-      settingsUsage={<MarketingUsagePanel client={client} contractorId={null} platformControls />}
+      settingsUsage={<MarketingUsagePanel client={client} contractorId={contractorId} platformControls={contractorId === null} />}
     />
   </>;
 }
@@ -683,5 +725,17 @@ export function InternalMarketingWorkspace({
   client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
-  return <AuthorizedInternalMarketingWorkspace overview={overview} client={client} />;
+  return <AuthorizedMarketingWorkspace overview={overview} client={client} contractorId={null} planningEnabled />;
+}
+
+export function ContractorMarketingWorkspace({
+  contractorId,
+  overview,
+  client,
+}: {
+  contractorId: string;
+  overview: MarketingOverviewData;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
+}) {
+  return <AuthorizedMarketingWorkspace overview={overview} client={client} contractorId={contractorId} planningEnabled={false} />;
 }

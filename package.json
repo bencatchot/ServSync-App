@@ -70,6 +70,7 @@
     "test:facebook-managed-video-publishing": "bash scripts/validation/validate-facebook-managed-video-publishing.sh && node --import tsx --test tests/marketing/facebook-marketing-connection.test.ts tests/marketing/marketing-publishing-worker.test.ts",
     "test:shared-marketing-workspace-security": "bash scripts/validation/validate-shared-marketing-workspace-security-foundation.sh",
     "test:marketing-media-cost-lifecycle": "bash scripts/validation/validate-marketing-media-cost-lifecycle.sh && node --import tsx --test tests/marketing/marketing-media-cost-lifecycle.test.ts",
+    "test:marketing-publishing-queue": "bash scripts/validation/validate-marketing-publishing-queue-authorization.sh && node --import tsx --test tests/marketing/marketing-publishing-queue.test.ts tests/marketing/facebook-marketing-connection.test.ts tests/marketing/marketing-publishing-worker.test.ts",
     "test:approved-direction-content": "bash scripts/validation/validate-approved-direction-content-preparation.sh && node --test tests/marketing/approved-direction-package-contract.test.mjs",
     "test:price-book-import-rollback": "bash scripts/validation/validate-price-book-import-rollback.sh",
     "test:price-book-cost-margin": "bash scripts/validation/validate-price-book-cost-margin.sh",

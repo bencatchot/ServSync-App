@@ -262,7 +262,8 @@ test('start endpoint is same-origin, owner-authorized through RPC, and browser-t
   assert.equal(body.status, 'authorization_required');
   assert.equal(body.authorization_url.includes(config.appSecret), false);
   assert.equal(body.authorization_url.includes('test-owner-jwt'), false);
-  assert.deepEqual(calls.map(call => [call.scope, call.name]), [['user', 'servsync_begin_internal_marketing_facebook_oauth']]);
+  assert.deepEqual(calls.map(call => [call.scope, call.name]), [['user', 'servsync_begin_marketing_facebook_oauth']]);
+  assert.equal(calls[0]?.args.p_contractor_id, null);
 });
 
 test('callback consumes state once and returns only a safe same-site selection redirect', async () => {
@@ -366,9 +367,9 @@ test('explicit Page selection re-discovers authority and stores only the selecte
     body: JSON.stringify({ action: 'select_page', session_id: sessionId, page_id: '1122334455667788' }),
   }));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { status: 'connected', readiness: 'ready_except_live_post_verification' });
+  assert.deepEqual(await response.json(), { status: 'connected', readiness: 'ready' });
   assert.deepEqual(rpcCalls.map(call => call.name), [
-    'servsync_authorize_internal_marketing_facebook_page_selection',
+    'servsync_authorize_marketing_facebook_page_selection',
     'servsync_private_get_marketing_facebook_session_token',
     'servsync_private_complete_marketing_facebook_page',
   ]);
