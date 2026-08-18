@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "help-studio-recording-workflow-v1",
+      "artifact": "servsync-help-studio-recording-workflow.sql (SHA-256 97cbb3f562367922aa846c7c1fe10d2eaa5a0865b1baf7aa4f0d765ec11e2abc)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 607-line additive migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. Two recording tables use forced RLS with no direct client/service grants; eight fixed-path functions, lifecycle transitions, exact package lineage, immutable replacement behavior, current Help retrieval, Marketing source reuse, repeat-install refusal, and role denial passed. Existing one Marketing Content row remained unchanged and publications/events remained zero."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained one Help walkthrough/revision, two Help assets, 21 Content rows, four Marketing assets, eight pairings, two publications, seven publication events, and flagship Facebook Video ID 1616577883220910. The rollout created no recording job, Marketing derivative, publication, schedule, worker attempt, or provider request."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Help/Marketing counts remained zero, the new function/security contract matched Sandbox, and existing Demo Recorder fixtures remained outside the migration's scope with no provider action."
+        }
+      }
+    },
+    {
       "id": "help-studio-representative-walkthrough-proof-v1",
       "artifact": "Operational acceptance on merge e479026025e5aff56a8e7696f8b848ad51127f56",
       "environments": {

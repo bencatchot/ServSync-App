@@ -6,6 +6,24 @@ Help Studio is ServSync's private, platform-admin authoring surface for durable 
 
 FB-038A provides the authoring, storage, retrieval, and contextual-playback foundation. It does not add an AI support assistant, paid generation, broad contractor authoring, or public publishing.
 
+FB-038A1 adds a recorder-backed creation path without creating a second media system. Help Studio persists one recording specification and durable job lifecycle; the local Demo Recorder produces a candidate package; Help Studio validates and ingests that package as canonical private Help media; and explicit normal-speed review controls whether an immutable revision may become current.
+
+## Recording Workflow
+
+The ordinary platform-admin flow is:
+
+1. Choose **New recording** and define title, Support/Marketing/Both purpose, feature and route, audience, Demo scenario, approximate duration, narration expectation, starting/final states, actions, and optional talking points.
+2. Download the safe recording specification and run `npm run help:record -- /absolute/path/to/spec.json` locally.
+3. Attach the resulting validated MP4, poster, and JSON package to the matching request.
+4. Play the complete recording at normal speed, then approve it or return it for rerecord.
+5. Publish the approved immutable revision for Help. A prior published revision continues to serve until this explicit step.
+
+Jobs move only through `requested -> preparing -> recording -> processing -> ready_for_review -> approved`, with `failed` available before approval or when review returns the candidate. Append-only events preserve the real lifecycle. Ordinary UI shows plain-language status rather than process output.
+
+The attachment boundary requires exact job ID, scenario, `servsync-human-paced-v1` profile, source commit, file names, MP4/poster checksums, dimensions, duration, technical validation, sensitive-data validation, and canonical recorder provenance. A package from another job or altered media fails before managed upload reservation.
+
+The shared human-paced defaults are 700 ms nearby, 1100 ms medium, and 1500 ms large cursor travel; 550 ms settle before click; 900 ms post-click hold; 75 ms per typed character; 1300 ms opening hold; at least 3200 ms final hold; and smooth cubic ease-in-out interpolation. Scenario-specific longer reading holds remain allowed.
+
 ## Authoring Boundary
 
 - Only an authenticated ServSync `platform_admin` can create or change Help Studio records.
@@ -85,4 +103,4 @@ Production acceptance proved desktop and 390x844 contextual playback with no con
 
 ## Deferred Work
 
-FB-038B may add a broader user Help Center and an Ask ServSync retrieval experience over published Help content. FB-038C may add separately approved support-gap-to-walkthrough assistance or generation. Paid AI, automatic generation, contractor Help authoring, public provider publishing, analytics, and autonomous support responses are not part of FB-038A.
+FB-038B may add a broader user Help Center and an Ask ServSync retrieval experience over published Help content. FB-038C may add separately approved support-gap-to-walkthrough assistance or generation. Paid AI, automatic generation, contractor Help authoring, public provider publishing, analytics, and autonomous support responses are not part of FB-038A1.
