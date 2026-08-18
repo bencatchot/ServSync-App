@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "help-studio-usage-state-forward-fix-v1",
+      "artifact": "servsync-help-studio-usage-state-forward-fix.sql (SHA-256 9dbc5f5d8153bb21462166c623ed12417eafd77a6ef73e6d8f2813aaa14ed367)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 49-line additive forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18 after the Help Studio foundation. The usage function retained its fixed search path, postgres owner, stable volatility, and authenticated-only grant while excluding deprecated and archived walkthroughs from the published count. Help and Marketing records remained unchanged with zero publications/events."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained 21 Content rows, four Marketing assets, eight pairings, three provider connections, two published Facebook records, and seven publication events. Provider IDs 1616577883220910 and 1199023349954773_122115065175368590 remained exact, and no provider request occurred."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Function security metadata and state-aware usage semantics matched Sandbox; Demo Help and Marketing records remained unchanged with zero publications/events."
+        }
+      }
+    },
+    {
       "id": "help-studio-contextual-walkthrough-foundation-v1",
       "artifact": "servsync-help-studio-foundation.sql (SHA-256 8f3cb4a15e19b50464e10e641f3c12e46e4d46694743d694da7520e371244acb)",
       "environments": {

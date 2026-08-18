@@ -20,7 +20,7 @@ const walkthrough = {
   published_at: '2026-08-18T00:00:00Z',
 };
 
-async function installAdminHarness(page: Page) {
+async function installAdminHarness(page: Page, item = walkthrough) {
   await page.goto('/');
   await page.evaluate(async ({ item }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
@@ -82,6 +82,12 @@ test('admin sees searchable usage, durable metadata, preview, editing, and creat
   await page.getByRole('button', { name: 'Edit' }).click();
   await expect(page.getByTestId('help-studio-editor')).toBeVisible();
   await expect(page.getByLabel('Finished MP4')).toHaveCount(1);
+});
+
+test('needs-review walkthrough keeps both publish and unpublish decisions available', async ({ page }) => {
+  await installAdminHarness(page, { ...walkthrough, state: 'needs_review', current_revision: 2, published_revision: 1 });
+  await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Unpublish', exact: true })).toBeVisible();
 });
 
 test('published contextual help opens without admin controls and keeps text steps alongside video', async ({ page }) => {

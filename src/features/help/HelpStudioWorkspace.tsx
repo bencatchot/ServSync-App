@@ -318,10 +318,11 @@ export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
               <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
                 <button type="button" onClick={() => setEditing(item)} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Pencil size={15} /> Edit</button>
                 {item.videoAssetId && <button type="button" onClick={() => setPreview(previewFromWalkthrough(item))} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Play size={15} /> Preview</button>}
-                {item.state === 'published' ? (
-                  <button type="button" disabled={busyId === item.id} onClick={() => void transition(item, 'unpublish')} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Unpublish</button>
-                ) : item.state !== 'archived' && (
+                {item.state !== 'published' && item.state !== 'archived' && (
                   <button type="button" disabled={busyId === item.id} onClick={() => void transition(item, 'publish')} className="min-h-10 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60">Publish</button>
+                )}
+                {item.publishedRevision !== null && item.state !== 'deprecated' && item.state !== 'archived' && (
+                  <button type="button" disabled={busyId === item.id} onClick={() => void transition(item, 'unpublish')} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Unpublish</button>
                 )}
                 {item.state !== 'deprecated' && item.state !== 'archived' && (
                   <button type="button" disabled={busyId === item.id} onClick={() => void transition(item, 'deprecate')} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Deprecate</button>

@@ -13,6 +13,7 @@ FB-038A provides the authoring, storage, retrieval, and contextual-playback foun
 - Browsers cannot select another workspace or directly query the private Help tables.
 - Draft edits create a new immutable revision. They do not rewrite the published revision.
 - A published walkthrough edited into `needs_review` continues serving its prior published revision until the new revision is explicitly published.
+- Published usage includes only walkthroughs that remain available in `published` or `needs_review`; deprecated and archived records remain preserved but count as unpublished.
 - Publication requires a ready MP4, ready poster, and passed pacing, sensitive-data, product-truth, and overall validation reviews.
 - Unpublish, deprecate, and archive remove the walkthrough from ordinary contextual retrieval. Archived records remain durable history.
 

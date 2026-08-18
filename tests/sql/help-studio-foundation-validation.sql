@@ -243,3 +243,18 @@ begin
   end if;
 end;
 $$;
+
+set role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',false);
+do $$
+begin
+  perform public.servsync_transition_help_walkthrough(
+    current_setting('servsync.test.walkthrough_id')::uuid, 2, 'deprecate'
+  );
+  if (public.servsync_get_help_media_usage()->>'published_walkthroughs')::integer <> 0
+     or (public.servsync_get_help_media_usage()->>'unpublished_walkthroughs')::integer <> 1 then
+    raise exception 'Deprecated walkthrough was counted as available published Help.';
+  end if;
+end;
+$$;
+reset role;
