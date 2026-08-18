@@ -79,6 +79,10 @@ A representative walkthrough must additionally prove:
 - contextual desktop/mobile playback remains usable;
 - the existing published Facebook flagship and all Marketing history remain unchanged.
 
+The first operational proof completed on 2026-08-18 after merge `e479026025e5aff56a8e7696f8b848ad51127f56`. Production walkthrough `9f62de0c-a06a-4840-86cb-6bf0362975f5`, revision 1, publishes **How to create an estimate** for Owner/Admin/Office from the validated 23-second, 1440x900 Demo Recorder MP4. The durable video checksum is `441aff3a678595eec7d297e7d6820ce7338950dd66618c8c52911c93a0e1b7df`; the poster checksum is `a807bb7426051b58e59e78258527b6e330aa07e8fba5756ce618076387de06bf`.
+
+Production acceptance proved desktop and 390x844 contextual playback with no console/server errors or horizontal overflow; exact retrieval for `create estimate`, `quote`, `draft pricing`, and `contractor.drafts`; and denial when one contractor owner supplied another contractor's context. The Help source appeared in the internal Marketing product-media picker, but no derivative or Marketing draft was prepared. Publication/event counts remained 2/7, and no paid usage/cost event or provider request occurred.
+
 ## Deferred Work
 
 FB-038B may add a broader user Help Center and an Ask ServSync retrieval experience over published Help content. FB-038C may add separately approved support-gap-to-walkthrough assistance or generation. Paid AI, automatic generation, contractor Help authoring, public provider publishing, analytics, and autonomous support responses are not part of FB-038A.

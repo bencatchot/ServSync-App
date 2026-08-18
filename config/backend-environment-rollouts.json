@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "help-studio-representative-walkthrough-proof-v1",
+      "artifact": "Operational acceptance on merge e479026025e5aff56a8e7696f8b848ad51127f56",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "The representative walkthrough is an authorized Production internal Help record. Sandbox security and deterministic retrieval were already proved by the exact foundation migration harness."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "Published walkthrough 9f62de0c-a06a-4840-86cb-6bf0362975f5 revision 1 uses the exact 23-second 1440x900 canonical MP4 at SHA-256 441aff3a678595eec7d297e7d6820ce7338950dd66618c8c52911c93a0e1b7df and poster at SHA-256 a807bb7426051b58e59e78258527b6e330aa07e8fba5756ce618076387de06bf. Production Owner walkthrough playback passed at desktop and 390x844 with no console/server errors or horizontal overflow. Create estimate, quote, draft pricing, and contractor.drafts each returned the one walkthrough; cross-contractor context was denied. Marketing listed the canonical Help source but no derivative, draft, usage/cost event, publication, or provider request was created."
+        },
+        "demo": {
+          "status": "N/A",
+          "reason": "The representative walkthrough reuses a validated Demo Recorder artifact, but durable Help publication is intentionally confined to the Production internal Help workspace. Demo remained unchanged."
+        }
+      }
+    },
+    {
       "id": "help-studio-usage-state-forward-fix-v1",
       "artifact": "servsync-help-studio-usage-state-forward-fix.sql (SHA-256 9dbc5f5d8153bb21462166c623ed12417eafd77a6ef73e6d8f2813aaa14ed367)",
       "environments": {
