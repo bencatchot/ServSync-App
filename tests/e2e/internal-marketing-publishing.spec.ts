@@ -182,9 +182,14 @@ test('shared queue requires explicit selection and exact preview before package 
 test('ready exact package cannot authorize while provider operation is paused', async ({ page }) => {
   await install(page, { status: 'ready' });
   await page.getByTestId('marketing-nav-campaigns').click();
+  const card = page.getByTestId(`publishing-queue-card-${contentId}`);
+  await expect(card).toContainText('Ready - not published');
+  await expect(card).toContainText('Publishing requires a separate action.');
   await page.getByRole('button', { name: 'Preview' }).click();
-  await expect(page.getByText(/live provider execution remains paused/i)).toBeVisible();
+  await expect(page.getByText('This post is ready, but it has not been published. Public provider submissions are paused, and no Facebook request will be sent.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Publish Now' })).toBeDisabled();
+  const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string }> }).__marketingRpcCalls);
+  expect(calls.map(call => call.name)).not.toContain('servsync_authorize_marketing_publication');
 });
 
 test('contractor workspace propagates contractor context through shared RPCs', async ({ page }) => {

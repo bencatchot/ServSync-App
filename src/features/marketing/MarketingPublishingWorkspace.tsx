@@ -15,7 +15,7 @@ import type {
 } from './marketingPublishing';
 
 const PACKAGE_LABELS: Record<MarketingPublicationPackage['status'], string> = {
-  needs_review: 'Needs Review', ready: 'Ready', scheduled: 'Scheduled', publishing: 'Publishing',
+  needs_review: 'Needs Review', ready: 'Ready - not published', scheduled: 'Scheduled', publishing: 'Publishing',
   published: 'Published', needs_attention: 'Needs Attention', retired: 'Retired',
 };
 
@@ -117,7 +117,7 @@ function PreviewDialog({ item, asset, mediaUrl, busy, operationAvailable, onClos
               <label className="text-sm font-bold text-slate-700">Timing<select aria-label="Timing" value={mode} onChange={event => { setMode(event.target.value as MarketingPublicationMode); setConfirming(false); }} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-normal"><option value="publish_now">Publish now</option><option value="scheduled">Schedule</option></select></label>
               {mode === 'scheduled' && <label className="text-sm font-bold text-slate-700">Date and time<input aria-label="Scheduled time" type="datetime-local" value={scheduledAt} onChange={event => { setScheduledAt(event.target.value); setConfirming(false); }} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-normal" /><span className="mt-1 block text-xs font-normal text-slate-500">{timezone}</span></label>}
             </div>
-            {!operationAvailable && <p role="status" className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Publishing authorization is prepared, but live provider execution remains paused during the beta operational transition.</p>}
+            {!operationAvailable && <p role="status" className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This post is ready, but it has not been published. Public provider submissions are paused, and no Facebook request will be sent.</p>}
             <div className="mt-4 flex justify-end">
               {!confirming
                 ? <button type="button" disabled={!canAuthorize || busy} onClick={() => setConfirming(true)} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{mode === 'publish_now' ? <Send size={16} /> : <CalendarClock size={16} />}{mode === 'publish_now' ? 'Publish Now' : 'Review Schedule'}</button>
@@ -217,7 +217,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
           const pairing = state?.pairings.find(candidate => candidate.contentId === content.id && candidate.contentRevision === content.revisionNumber && candidate.status !== 'rejected') ?? null;
           const asset = pairing ? state?.assets.find(candidate => candidate.id === pairing.assetId) ?? null : null;
           const status = item?.status ?? 'needs_review';
-          return <article key={content.id} data-testid={`publishing-queue-card-${content.id}`} className={`py-4 ${props.selectedContentId === content.id ? 'bg-blue-50/60' : ''}`}><div className="flex min-w-0 flex-col gap-3 px-2 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><button type="button" onClick={() => props.onSelectContent(content)} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-bold text-slate-950">{content.title}</span><StatusPill status={status} /></span><span className="mt-1 block line-clamp-2 text-sm text-slate-600">{content.body}</span><span className="mt-1 block text-xs text-slate-500">{facebook?.destinationLabel ?? 'Facebook not connected'} · {asset ? assetLabel(asset) : 'Text only'}</span></button><button type="button" onClick={() => item ? void openPreview(item) : (props.onSelectContent(content), undefined)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Eye size={15} />{item ? 'Preview' : 'Select'}</button></div></article>;
+          return <article key={content.id} data-testid={`publishing-queue-card-${content.id}`} className={`py-4 ${props.selectedContentId === content.id ? 'bg-blue-50/60' : ''}`}><div className="flex min-w-0 flex-col gap-3 px-2 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><button type="button" onClick={() => props.onSelectContent(content)} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-bold text-slate-950">{content.title}</span><StatusPill status={status} /></span><span className="mt-1 block line-clamp-2 text-sm text-slate-600">{content.body}</span><span className="mt-1 block text-xs text-slate-500">{facebook?.destinationLabel ?? 'Facebook not connected'} · {asset ? assetLabel(asset) : 'Text only'}</span>{status === 'ready' && <span className="mt-1 block text-xs font-medium text-slate-600">Approval is complete. Publishing requires a separate action.</span>}</button><button type="button" onClick={() => item ? void openPreview(item) : (props.onSelectContent(content), undefined)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Eye size={15} />{item ? 'Preview' : 'Select'}</button></div></article>;
         })}</div>}
       </section>
 
