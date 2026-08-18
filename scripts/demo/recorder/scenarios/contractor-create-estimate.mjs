@@ -18,7 +18,7 @@ export const contractorCreateEstimateScenario = Object.freeze({
     appUrl: 'https://servsync-demo.vercel.app',
   }),
   viewport: Object.freeze({ width: 1440, height: 900 }),
-  expectedDurationSeconds: Object.freeze({ min: 20, max: 40 }),
+  expectedDurationSeconds: Object.freeze({ min: 38, max: 55 }),
   outputBaseName: 'servsync-contractor-create-estimate-v1',
   identities: Object.freeze({
     homeowner: Object.freeze({ role: 'homeowner', label: personas.homeowner.fullName }),

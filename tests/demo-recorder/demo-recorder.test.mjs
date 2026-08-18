@@ -42,7 +42,7 @@ test('contractor Estimate scenario is a bounded request-to-draft workflow', () =
     contractorCreateEstimateScenario.scenes.map((scene) => scene.key),
     ['request-context', 'estimate-draft', 'estimate-saved'],
   );
-  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 20, max: 40 });
+  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 38, max: 55 });
   assert.equal(contractorCreateEstimateScenario.estimate.line.unit_price_cents, 189500);
   assert.equal(contractorCreateEstimateScenario.estimate.unitPrice, '1895.00');
   assert.doesNotMatch(JSON.stringify(contractorCreateEstimateScenario), /password|service_role|@example/i);
