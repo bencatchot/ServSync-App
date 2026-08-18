@@ -20,7 +20,7 @@ The ordinary platform-admin flow is:
 
 Jobs move only through `requested -> preparing -> recording -> processing -> ready_for_review -> approved`, with `failed` available before approval or when review returns the candidate. Append-only events preserve the real lifecycle. Ordinary UI shows plain-language status rather than process output.
 
-The attachment boundary requires exact job ID, scenario, `servsync-human-paced-v1` profile, source commit, file names, MP4/poster checksums, dimensions, duration, technical validation, sensitive-data validation, and canonical recorder provenance. The client rejects a mismatched package before upload reservation, and the database independently revalidates those facts against finalized managed assets before the job can become ready for review. A package from another job or altered media fails closed.
+The attachment boundary requires exact job ID, scenario, `servsync-human-paced-v1` profile, source commit, file names, MP4/poster checksums, dimensions, duration, technical validation, sensitive-data validation, and canonical recorder provenance. The client rejects a mismatched package before upload reservation, and the database independently revalidates those facts against finalized managed assets before the job can become ready for review. Ready video assets cannot omit duration metadata. A package from another job or altered media fails closed.
 
 The shared human-paced defaults are 700 ms nearby, 1100 ms medium, and 1500 ms large cursor travel; 550 ms settle before click; 900 ms post-click hold; 75 ms per typed character; 1300 ms opening hold; at least 3200 ms final hold; and smooth cubic ease-in-out interpolation. Scenario-specific longer reading holds remain allowed.
 

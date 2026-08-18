@@ -286,6 +286,19 @@ $$;
 reset role;
 
 do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid='public.help_media_assets'::regclass
+      and conname='help_assets_ready_video_duration_check'
+      and pg_get_constraintdef(oid) like '%duration_seconds IS NOT NULL%'
+  ) then
+    raise exception 'Ready Help videos must retain validated duration metadata.';
+  end if;
+end;
+$$;
+
+do $$
 declare v_proc record;
 begin
   for v_proc in
