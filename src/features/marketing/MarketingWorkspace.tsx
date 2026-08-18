@@ -365,15 +365,16 @@ export function MarketingWorkspace({
             <div className="space-y-4">
               {createPost}
               <MarketingContentWorkspace
-              items={content.items}
-              loading={content.loading}
-              loadError={content.error}
-              focusRequest={contentFocus}
-              onReload={content.onReload}
-              onCreate={content.onCreate}
-              onUpdate={content.onUpdate}
-              onTransition={content.onTransition}
-              onPublish={item => { content.onPublish(item); setSection('campaigns'); }}
+                approvalPolicy={audience.kind === 'internal' ? 'direct_owner' : 'team_review'}
+                items={content.items}
+                loading={content.loading}
+                loadError={content.error}
+                focusRequest={contentFocus}
+                onReload={content.onReload}
+                onCreate={content.onCreate}
+                onUpdate={content.onUpdate}
+                onTransition={content.onTransition}
+                onPublish={item => { content.onPublish(item); setSection('campaigns'); }}
               />
             </div>
           )

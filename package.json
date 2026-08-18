@@ -71,6 +71,7 @@
     "test:shared-marketing-workspace-security": "bash scripts/validation/validate-shared-marketing-workspace-security-foundation.sh",
     "test:marketing-media-cost-lifecycle": "bash scripts/validation/validate-marketing-media-cost-lifecycle.sh && node --import tsx --test tests/marketing/marketing-media-cost-lifecycle.test.ts",
     "test:marketing-publishing-queue": "bash scripts/validation/validate-marketing-publishing-queue-authorization.sh && node --import tsx --test tests/marketing/marketing-publishing-queue.test.ts tests/marketing/facebook-marketing-connection.test.ts tests/marketing/marketing-publishing-worker.test.ts",
+    "test:owner-marketing-publishing-flow": "bash scripts/validation/validate-owner-marketing-publishing-flow.sh && node --import tsx --test tests/marketing/marketing-publishing-queue.test.ts tests/marketing/facebook-marketing-connection.test.ts tests/marketing/marketing-publishing-worker.test.ts",
     "test:contractor-marketing-content-creation": "bash scripts/validation/validate-contractor-marketing-content-creation.sh && node --import tsx --test tests/marketing/contractor-marketing-content-creation.test.ts",
     "test:approved-direction-content": "bash scripts/validation/validate-approved-direction-content-preparation.sh && node --test tests/marketing/approved-direction-package-contract.test.mjs",
     "test:price-book-import-rollback": "bash scripts/validation/validate-price-book-import-rollback.sh",

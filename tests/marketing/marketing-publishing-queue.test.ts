@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createMarketingPublishingAdapter } from '../../src/features/marketing/marketingPublishing.ts';
+import { publicationStatusLabel } from '../../src/features/marketing/MarketingPublishingWorkspace.tsx';
 
 const contractorId = '20000000-0000-4000-8000-000000000001';
 const workspaceId = '30000000-0000-4000-8000-000000000001';
@@ -170,17 +171,34 @@ test('queue presentation requires explicit selection, preview, confirmation, and
   assert.match(source, /pendingPreviewId/);
   assert.match(source, /setPendingPreviewId\(packageId\)/);
   assert.match(source, /Remove media/);
-  assert.match(source, /Approve exact post/);
+  assert.match(source, /Approve &amp; Ready/);
   assert.match(source, /Ready - not published/);
   assert.match(source, /Publishing requires a separate action/);
   assert.match(source, /no Facebook request will be sent/);
   assert.match(source, /Publish Now/);
   assert.match(source, /Review Schedule/);
+  assert.match(source, /Processing on Facebook/);
+  assert.match(source, /window\.setInterval\(\(\) => \{ void props\.onReload\(\); \}, 15000\)/);
+  assert.match(source, /publication\.status === 'scheduled' && publication\.mode === 'scheduled'/);
   assert.match(source, /providerPermalink \?/);
   assert.doesNotMatch(source, /packages\[0\]/);
   assert.doesNotMatch(source, /Content \{selectedContent\.id\}/);
   assert.doesNotMatch(source, /fingerprint\.slice/);
   assert.doesNotMatch(source, /window\.open\([^)]*providerPublicationId/);
+});
+
+test('owner queue distinguishes publishing, provider processing, schedules, and uncertain failures', async () => {
+  const adapter = createMarketingPublishingAdapter({
+    rpc: async name => ({ data: name === 'servsync_get_marketing_publishing' ? state : catalog, error: null }),
+    storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: 'https://signed.invalid/asset' }, error: null }) }) },
+  }, contractorId);
+  const loaded = await adapter.get();
+  const publication = loaded.publications[0]!;
+  assert.equal(publicationStatusLabel({ ...publication, mode: 'publish_now' }), 'Publishing...');
+  assert.equal(publicationStatusLabel({ ...publication, status: 'publishing', providerPublicationId: null }), 'Publishing...');
+  assert.equal(publicationStatusLabel({ ...publication, status: 'publishing', providerPublicationId: '123456789' }), 'Processing on Facebook');
+  assert.equal(publicationStatusLabel({ ...publication, status: 'failed', retryEligible: false }), 'Needs Attention');
+  assert.match(publicationStatusLabel(publication), /^Scheduled /);
 });
 
 test('queue SQL keeps the global kill switch default-off and claims reconciliation without reopening submission', async () => {

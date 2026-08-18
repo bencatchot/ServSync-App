@@ -26,10 +26,10 @@ const content = {
   source_direction_topic: null, source_direction_status: null,
 };
 
-function publishingState(status: 'needs_review' | 'ready' = 'needs_review', facebookSetup = false) {
+function publishingState(status: 'needs_review' | 'ready' = 'needs_review', facebookSetup = false, operationAvailable = false) {
   return {
     workspace: { workspace_id: workspaceId, workspace_kind: 'internal', display_name: 'ServSync Marketing' },
-    operation_available: false, prepared_limit: 5, prepared_count: status === 'ready' ? 1 : 0,
+    operation_available: operationAvailable, prepared_limit: 5, prepared_count: status === 'ready' ? 1 : 0,
     providers: [{
       connection_id: connectionId, provider: 'facebook', priority: 1,
       connection_status: facebookSetup ? 'setup_required' : 'connected',
@@ -80,6 +80,8 @@ async function install(page: Page, options: {
   contractor?: boolean;
   facebookSetup?: boolean;
   stalePairingUntilRefresh?: boolean;
+  operationAvailable?: boolean;
+  contentStatus?: 'draft' | 'approved';
 } = {}) {
   await page.goto('/');
   await page.evaluate(async ({ content, state, catalog, options, contractorId }) => {
@@ -139,9 +141,14 @@ async function install(page: Page, options: {
         });
     createRoot(document.getElementById('root')!).render(component);
   }, {
-    content, state: options.stalePairingUntilRefresh
-      ? { ...publishingState(options.status, options.facebookSetup), packages: [] }
-      : publishingState(options.status, options.facebookSetup),
+    content: options.contentStatus === 'draft' ? {
+      ...content, status: 'draft', revision_number: 3,
+      submitted_at: null, submitted_by: null, submitted_by_name: null,
+      reviewed_at: null, reviewed_by: null, reviewed_by_name: null,
+    } : content,
+    state: options.stalePairingUntilRefresh
+      ? { ...publishingState(options.status, options.facebookSetup, options.operationAvailable), packages: [] }
+      : publishingState(options.status, options.facebookSetup, options.operationAvailable),
     catalog, options,
     contractorId: options.contractor ? contractorId : null,
   });
@@ -172,7 +179,7 @@ test('shared queue requires explicit selection and exact preview before package 
   await page.getByRole('button', { name: 'Open exact preview' }).click();
   await expect(page.getByTestId('exact-publication-preview')).toContainText(content.body);
   await expect(page.getByTestId('exact-publication-preview').locator('video')).toBeVisible();
-  await page.getByRole('button', { name: 'Approve exact post' }).click();
+  await page.getByRole('button', { name: 'Approve & Ready' }).click();
   const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string }> }).__marketingRpcCalls);
   expect(calls.map(call => call.name)).toContain('servsync_record_marketing_package_preview');
   expect(calls.map(call => call.name)).toContain('servsync_approve_marketing_publication_package');
@@ -192,6 +199,21 @@ test('ready exact package cannot authorize while provider operation is paused', 
   expect(calls.map(call => call.name)).not.toContain('servsync_authorize_marketing_publication');
 });
 
+test('ready package confirmation names the exact post, Page, and media before one authorization', async ({ page }) => {
+  await install(page, { status: 'ready', operationAvailable: true });
+  await page.getByTestId('marketing-nav-campaigns').click();
+  await page.getByRole('button', { name: 'Preview' }).click();
+  await page.getByRole('button', { name: 'Publish Now' }).click();
+  const confirmation = page.getByTestId('publication-authorization-confirmation');
+  await expect(confirmation).toContainText('Publish "Approved social post" to ServSync on Facebook now?');
+  await expect(confirmation).toContainText('Media post');
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Publishing authorized for "Approved social post"');
+  const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string }> }).__marketingRpcCalls);
+  expect(calls.filter(call => call.name === 'servsync_authorize_marketing_publication')).toHaveLength(1);
+  expect(calls.filter(call => call.name.includes('facebook') && call.name.includes('post'))).toHaveLength(0);
+});
+
 test('contractor workspace propagates contractor context through shared RPCs', async ({ page }) => {
   await install(page, { contractor: true, status: 'ready' });
   await page.getByTestId('marketing-nav-campaigns').click();
@@ -199,6 +221,14 @@ test('contractor workspace propagates contractor context through shared RPCs', a
   const shared = calls.filter(call => ['servsync_list_marketing_content', 'servsync_get_marketing_publishing', 'servsync_get_marketing_media_catalog'].includes(call.name));
   expect(shared.length).toBe(3);
   expect(shared.every(call => call.args.p_contractor_id === contractorId)).toBe(true);
+});
+
+test('contractor workspace preserves the team submission policy', async ({ page }) => {
+  await install(page, { contractor: true, contentStatus: 'draft' });
+  await page.getByTestId('marketing-nav-content').click();
+  await page.getByRole('button', { name: /Approved social post/ }).click();
+  await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Preview for approval' })).toHaveCount(0);
 });
 
 test('Facebook setup requires explicit eligible Page selection', async ({ page }) => {

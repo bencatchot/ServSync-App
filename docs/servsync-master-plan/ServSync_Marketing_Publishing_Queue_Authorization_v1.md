@@ -17,6 +17,8 @@ approved Content + approved media + exact destination
 
 Approval means the exact package is acceptable for possible publication. It never authorizes provider execution. `Publish Now` and `Schedule` are separate durable user authorizations for one immutable package and destination.
 
+The ServSync internal workspace uses the one-person owner policy: a draft is previewed for approval and may transition directly to approved with immutable approving-user/time evidence. It does not require submission to the same owner. Contractor/team workspaces retain draft submission and reviewer Approve/Return/Reject; reason-gated Return/Reject explains the requirement before those actions become available. After Content approval, media/destination package approval remains a separate `Approve & Ready` decision and still does not publish.
+
 The ordinary queue renders that boundary literally: `Ready - not published`. A Ready card explains that approval is complete and publishing is a separate action. When provider submissions are globally paused, the exact Preview states that the post has not been published and that no Facebook request will be sent. Scheduled, Publishing, Needs Attention, and Published remain derived from durable publication state rather than inferred from Content or package approval.
 
 Owner, Admin, and Office may use their active contractor workspace. Field Technician, Viewer, homeowner, anonymous, inactive, and cross-tenant access are denied. Platform administrators use only the ServSync internal workspace. Every RPC resolves the workspace server-side through the FB-037G-A context resolver.
@@ -54,7 +56,7 @@ Provider operation has four independent layers:
 3. workspace-owned provider connection;
 4. exact user publication authorization.
 
-The environment value is a deployment capability, not per-post consent. The database control remains platform-admin-only and defaults to stopped. Contractors never see or operate either infrastructure control.
+The environment value is a standing Production deployment capability, not per-post consent. The database control remains platform-admin-only as the independent emergency stop. Contractors never see or operate either infrastructure control. Normal operation keeps both infrastructure layers available while the workspace connection and one exact durable Publish Now/Schedule authorization remain mandatory for every post.
 
 When the database stop is active, no new provider submission can be claimed. A row with a known provider Video ID can still be claimed for read-only reconciliation, and server provider code can perform that reconciliation even when deployment submission capability is disabled. This closes gates safely without stranding a known provider result.
 
@@ -93,3 +95,5 @@ Human authorization remains mandatory. Content generation never authorizes publi
 FB-037J audited the owner-prepared Production post **Connect with Local Contractors Easily** after its visible review flow was complete. Content revision 4 and its exact package were approved and Ready for the ServSync Facebook Page, but no authorization, publication, event, worker attempt, provider request start, provider ID, permalink, or schedule existed. Both provider-submission controls were off. The correct status was `READY / NOT PUBLISHED`; no Meta lookup or provider mutation was appropriate without a trustworthy provider identity.
 
 The one-person workspace's submit-then-self-approve sequence and the observed Return to draft/Reject availability remain a separate approval-flow simplification review. They do not weaken the exact package and publication authorization boundaries.
+
+FB-037K completes that simplification. Internal direct approval is policy-bound and server-enforced; it is not a general contractor bypass. Ready package confirmation identifies the exact title, Facebook Page, and media mode. Active publish-now state refreshes automatically and distinguishes initial Publishing from a known Facebook Video ID still processing. Published rows retain View on Facebook, while uncertain failures remain non-retryable.
