@@ -17,6 +17,8 @@ approved Content + approved media + exact destination
 
 Approval means the exact package is acceptable for possible publication. It never authorizes provider execution. `Publish Now` and `Schedule` are separate durable user authorizations for one immutable package and destination.
 
+The ordinary queue renders that boundary literally: `Ready - not published`. A Ready card explains that approval is complete and publishing is a separate action. When provider submissions are globally paused, the exact Preview states that the post has not been published and that no Facebook request will be sent. Scheduled, Publishing, Needs Attention, and Published remain derived from durable publication state rather than inferred from Content or package approval.
+
 Owner, Admin, and Office may use their active contractor workspace. Field Technician, Viewer, homeowner, anonymous, inactive, and cross-tenant access are denied. Platform administrators use only the ServSync internal workspace. Every RPC resolves the workspace server-side through the FB-037G-A context resolver.
 
 ## Exact Package
@@ -85,3 +87,9 @@ The G-B cleanup Cron remains configured for 05:43 UTC daily. As of this rollout,
 - campaigns, recurring auto-publish, and provider moderation.
 
 Human authorization remains mandatory. Content generation never authorizes publication.
+
+## Status Recovery Evidence
+
+FB-037J audited the owner-prepared Production post **Connect with Local Contractors Easily** after its visible review flow was complete. Content revision 4 and its exact package were approved and Ready for the ServSync Facebook Page, but no authorization, publication, event, worker attempt, provider request start, provider ID, permalink, or schedule existed. Both provider-submission controls were off. The correct status was `READY / NOT PUBLISHED`; no Meta lookup or provider mutation was appropriate without a trustworthy provider identity.
+
+The one-person workspace's submit-then-self-approve sequence and the observed Return to draft/Reject availability remain a separate approval-flow simplification review. They do not weaken the exact package and publication authorization boundaries.

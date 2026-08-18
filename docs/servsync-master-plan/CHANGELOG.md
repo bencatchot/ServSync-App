@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - FB-037J Marketing publication status recovery v1
+
+- Branch: `codex/fb037j-publication-status-recovery-v1` from exact main `ed2adc5ada3bfd077e83a3ac9c612467d8806885`.
+- Production recovery: **Connect with Local Contractors Easily** is approved Content revision 4 with one exact Ready package for the ServSync Facebook Page. It is text-only and has no publication authorization, publication row, event, worker attempt, provider request start, provider ID, permalink, or schedule. Its authoritative classification is `READY / NOT PUBLISHED`.
+- UX correction: Ready queue cards now say `Ready - not published`, explain that approval is complete but publishing is a separate action, and use explicit paused-preview copy stating that no Facebook request will be sent. The existing separate Publish Now/Schedule authorization, in-flight status, Needs Attention, replay protection, and Published history remain unchanged.
+- Safety: Production database provider submissions remained false and `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` remained absent. The investigation made no Meta call for the target because no trustworthy provider identity or submission marker existed, created no publication, and preserved the historical flagship Facebook Video ID `1616577883220910`.
+- Validation: Production lineage/publication/idempotency audit; Production Vercel environment-name audit; shared queue SQL validation; queue/Facebook/worker tests 36/36; focused internal Marketing Playwright 7/7 including 390x844; TypeScript; Production build; backend parity; sensitive-value scan; Markdown links; and `git diff --check`. Focused ESLint remains blocked before file evaluation by the inherited ESLint 9 / typescript-eslint `allowShortCircuit` startup incompatibility.
+- Follow-up: Self-submission/self-approval is redundant in a one-person workspace, and Return to draft/Reject availability needs a separate bounded approval-flow review. No approval model redesign is part of FB-037J.
+- Backlog impact: Adds the completed status-recovery milestone while keeping selected-contractor beta enrollment/availability as the next planned FB-037 product step.
+- Master plan impact: Makes `Ready` explicitly mean approved but not authorized, queued, submitted, or published.
+
 ## 2026-08-18 - FB-037I admin Marketing dogfood v1
 
 - Branch: `codex/fb037i-admin-marketing-dogfood-v1` from exact main `d646ad21c8a5bbeb4e3b9c4fed25cbc491660d81`.

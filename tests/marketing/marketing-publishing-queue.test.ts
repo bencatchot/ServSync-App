@@ -171,6 +171,9 @@ test('queue presentation requires explicit selection, preview, confirmation, and
   assert.match(source, /setPendingPreviewId\(packageId\)/);
   assert.match(source, /Remove media/);
   assert.match(source, /Approve exact post/);
+  assert.match(source, /Ready - not published/);
+  assert.match(source, /Publishing requires a separate action/);
+  assert.match(source, /no Facebook request will be sent/);
   assert.match(source, /Publish Now/);
   assert.match(source, /Review Schedule/);
   assert.match(source, /providerPermalink \?/);
