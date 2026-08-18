@@ -19,17 +19,25 @@ export const DEMO_RECORDING_ENV_KEYS = Object.freeze([
   'DEMO_VERCEL_AUTOMATION_BYPASS_SECRET',
 ]);
 
+export const HUMAN_PACED_PROFILE_NAME = 'servsync-human-paced-v1';
+export const HUMAN_PACED_RECORDING_PRESET = Object.freeze({
+  profile: HUMAN_PACED_PROFILE_NAME,
+  initialHold: 1300,
+  settleBeforeClick: 550,
+  postClick: 900,
+  typing: 75,
+  finalHold: 3200,
+  nearbyTravel: 700,
+  mediumTravel: 1100,
+  largeTravel: 1500,
+  easing: 'cubic-ease-in-out',
+  minimumCursorSteps: 24,
+  cursorStepInterval: 24,
+});
+
 const PACING = Object.freeze({
-  marketing: Object.freeze({
-    initialHold: 1300,
-    settleBeforeClick: 550,
-    postClick: 900,
-    typing: 75,
-    finalHold: 3200,
-    nearbyTravel: 700,
-    mediumTravel: 1100,
-    largeTravel: 1500,
-  }),
+  'human-paced': HUMAN_PACED_RECORDING_PRESET,
+  marketing: HUMAN_PACED_RECORDING_PRESET,
   tutorial: Object.freeze({
     initialHold: 1700,
     settleBeforeClick: 650,
@@ -117,7 +125,7 @@ export function parseRecorderArgs(args) {
     else if (option.startsWith('--output-dir=')) parsed.outputDir = option.slice('--output-dir='.length);
     else throw new Error(`Unsupported Demo recorder option: ${option}`);
   }
-  if (!scenarioKey) throw new Error('Usage: npm run demo:record -- <scenario> [--pacing=marketing|tutorial] [--headed]');
+  if (!scenarioKey) throw new Error('Usage: npm run demo:record -- <scenario> [--pacing=human-paced|marketing|tutorial] [--headed]');
   if (!PACING[parsed.pacing]) throw new Error(`Unsupported pacing preset: ${parsed.pacing}`);
   return parsed;
 }
@@ -125,6 +133,34 @@ export function parseRecorderArgs(args) {
 export function pacingFor(name) {
   if (!PACING[name]) throw new Error(`Unsupported pacing preset: ${name}`);
   return PACING[name];
+}
+
+export function easeInOutCubic(value) {
+  return value < 0.5 ? 4 * value ** 3 : 1 - ((-2 * value + 2) ** 3) / 2;
+}
+
+export function pointerTravelDuration(distance, pacing = HUMAN_PACED_RECORDING_PRESET) {
+  if (!Number.isFinite(distance) || distance < 0) throw new Error('Cursor distance must be a non-negative number.');
+  if (distance <= 260) return pacing.nearbyTravel;
+  if (distance <= 760) return pacing.mediumTravel;
+  return pacing.largeTravel;
+}
+
+export function cursorInterpolation(start, end, pacing = HUMAN_PACED_RECORDING_PRESET) {
+  const distance = Math.hypot(end.x - start.x, end.y - start.y);
+  const duration = pointerTravelDuration(distance, pacing);
+  const steps = Math.max(pacing.minimumCursorSteps || 24, Math.ceil(duration / (pacing.cursorStepInterval || 24)));
+  return {
+    duration,
+    stepDelay: duration / steps,
+    points: Array.from({ length: steps }, (_, index) => {
+      const progress = easeInOutCubic((index + 1) / steps);
+      return {
+        x: start.x + (end.x - start.x) * progress,
+        y: start.y + (end.y - start.y) * progress,
+      };
+    }),
+  };
 }
 
 export function scanVisibleTextForSensitiveData(text, credentials) {
@@ -147,6 +183,7 @@ export function assertRecordingDuration(durationSeconds, expected) {
 }
 
 export function buildArtifactMetadata({ scenario, sourceCommit, pacing, durationSeconds, fileName, createdAt }) {
+  const preset = pacingFor(pacing);
   return {
     schema_version: 1,
     scenario: scenario.key,
@@ -158,10 +195,23 @@ export function buildArtifactMetadata({ scenario, sourceCommit, pacing, duration
     viewport: scenario.viewport,
     duration_seconds: Number(durationSeconds.toFixed(3)),
     pacing,
+    pacing_profile: preset.profile || pacing,
+    pacing_defaults: {
+      nearby_cursor_travel_ms: preset.nearbyTravel,
+      medium_cursor_travel_ms: preset.mediumTravel,
+      large_cursor_travel_ms: preset.largeTravel,
+      settle_before_click_ms: preset.settleBeforeClick,
+      post_click_hold_ms: preset.postClick,
+      typing_ms_per_character: preset.typing,
+      initial_hold_ms: preset.initialHold,
+      final_hold_ms: preset.finalHold,
+      easing: preset.easing || 'playwright-steps',
+    },
     source_commit: sourceCommit,
     artifact: fileName,
     format: 'webm',
     fixture_policy: scenario.fixturePolicy || 'Leave one canonical request_ready Demo fixture; the next run resets only registry-owned scenario records.',
     contains_credentials: false,
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
   };
 }

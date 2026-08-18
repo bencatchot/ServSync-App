@@ -1,6 +1,8 @@
 export type HelpWalkthroughState = 'draft' | 'published' | 'needs_review' | 'deprecated' | 'archived';
 export type HelpWalkthroughPurpose = 'support' | 'marketing' | 'both';
 export type HelpReviewState = 'pending' | 'passed' | 'failed';
+export type HelpRecordingStatus = 'requested' | 'preparing' | 'recording' | 'processing' | 'ready_for_review' | 'approved' | 'failed';
+export type HelpNarrationMode = 'none' | 'human' | 'ai';
 
 export type HelpRpcResult<T> = PromiseLike<{ data: T | null; error: { message?: string } | null }>;
 
@@ -85,6 +87,65 @@ export type HelpUsage = {
   unpublishedWalkthroughs: number;
 };
 
+export type HelpRecordingJob = {
+  id: string;
+  targetWalkthroughId: string | null;
+  status: HelpRecordingStatus;
+  slug: string;
+  title: string;
+  summary: string;
+  purpose: HelpWalkthroughPurpose;
+  featureArea: string;
+  routeContexts: string[];
+  audienceRoles: string[];
+  keywords: string[];
+  requestedGoal: string;
+  targetScreen: string;
+  requiredStartingState: string;
+  scenarioKey: string;
+  actionSteps: string[];
+  expectedFinalState: string;
+  desiredDurationSeconds: number;
+  narrationMode: HelpNarrationMode;
+  talkingPoints: string[];
+  pacingProfile: 'servsync-human-paced-v1';
+  sourceKind: 'recorder_generated' | 'provider_generated';
+  sourceCommit: string | null;
+  sourceVersion: string | null;
+  videoAssetId: string | null;
+  posterAssetId: string | null;
+  recorderMetadata: Record<string, unknown>;
+  failureCategory: string | null;
+  failureMessage: string | null;
+  reviewNotes: string | null;
+  approvedWalkthroughId: string | null;
+  approvedRevision: number | null;
+  requestedAt: string;
+  readyForReviewAt: string | null;
+  reviewedAt: string | null;
+  updatedAt: string;
+};
+
+export type HelpRecordingSpecDraft = {
+  targetWalkthroughId: string;
+  title: string;
+  summary: string;
+  purpose: HelpWalkthroughPurpose;
+  featureArea: string;
+  routeContexts: string;
+  audienceRoles: string[];
+  keywords: string;
+  requestedGoal: string;
+  targetScreen: string;
+  requiredStartingState: string;
+  scenarioKey: string;
+  actionSteps: string;
+  expectedFinalState: string;
+  desiredDurationSeconds: string;
+  narrationMode: HelpNarrationMode;
+  talkingPoints: string;
+};
+
 export type HelpWalkthroughDraft = {
   title: string;
   summary: string;
@@ -160,6 +221,16 @@ export function emptyHelpWalkthroughDraft(): HelpWalkthroughDraft {
   };
 }
 
+export function emptyHelpRecordingSpecDraft(): HelpRecordingSpecDraft {
+  return {
+    targetWalkthroughId: '', title: '', summary: '', purpose: 'both', featureArea: '',
+    routeContexts: '', audienceRoles: ['owner', 'admin', 'office'], keywords: '',
+    requestedGoal: '', targetScreen: '', requiredStartingState: '',
+    scenarioKey: 'contractor-create-estimate', actionSteps: '', expectedFinalState: '',
+    desiredDurationSeconds: '30', narrationMode: 'none', talkingPoints: '',
+  };
+}
+
 export function draftFromWalkthrough(item: HelpWalkthrough): HelpWalkthroughDraft {
   return {
     title: item.title,
@@ -220,6 +291,36 @@ export function helpPayload(draft: HelpWalkthroughDraft) {
   };
 }
 
+export function helpRecordingSpecPayload(draft: HelpRecordingSpecDraft) {
+  const actionSteps = normalizedLines(draft.actionSteps);
+  const routeContexts = normalizedCommaList(draft.routeContexts);
+  const keywords = normalizedCommaList(draft.keywords);
+  const talkingPoints = normalizedLines(draft.talkingPoints);
+  const desiredDurationSeconds = Number(draft.desiredDurationSeconds);
+  const slug = draft.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
+  if (draft.title.trim().length < 3 || draft.summary.trim().length < 10
+    || draft.featureArea.trim().length < 2 || !routeContexts.length || !keywords.length
+    || draft.requestedGoal.trim().length < 10 || draft.targetScreen.trim().length < 2
+    || draft.requiredStartingState.trim().length < 3 || !actionSteps.length
+    || draft.expectedFinalState.trim().length < 3 || !draft.audienceRoles.length
+    || !Number.isInteger(desiredDurationSeconds) || desiredDurationSeconds < 10 || desiredDurationSeconds > 600) {
+    throw new Error('Complete the recording goal, screen, start and final states, steps, keywords, audience, and duration.');
+  }
+  if (!SAFE_SLUG.test(slug)) throw new Error('The recording title must produce a valid internal slug.');
+  if (routeContexts.some(item => !SAFE_CONTEXT.test(item))) throw new Error('Route contexts may use letters, numbers, dots, slashes, underscores, and hyphens.');
+  if (draft.targetWalkthroughId && !UUID.test(draft.targetWalkthroughId)) throw new Error('The selected walkthrough is invalid.');
+  return {
+    target_walkthrough_id: draft.targetWalkthroughId || null,
+    slug, title: draft.title.trim(), summary: draft.summary.trim(), purpose: draft.purpose,
+    feature_area: draft.featureArea.trim(), route_contexts: routeContexts,
+    audience_roles: draft.audienceRoles, keywords, requested_goal: draft.requestedGoal.trim(),
+    target_screen: draft.targetScreen.trim(), required_starting_state: draft.requiredStartingState.trim(),
+    scenario_key: draft.scenarioKey, action_steps: actionSteps,
+    expected_final_state: draft.expectedFinalState.trim(), desired_duration_seconds: desiredDurationSeconds,
+    narration_mode: draft.narrationMode, talking_points: talkingPoints,
+  };
+}
+
 export function parseHelpWalkthrough(value: unknown): HelpWalkthrough {
   const item = record(value);
   const id = String(item.walkthrough_id ?? '');
@@ -248,6 +349,35 @@ export function parseHelpWalkthrough(value: unknown): HelpWalkthrough {
   };
 }
 
+export function parseHelpRecordingJob(value: unknown): HelpRecordingJob {
+  const item = record(value);
+  const id = String(item.job_id ?? '');
+  if (!UUID.test(id)) throw new Error('Help Studio received an invalid recording job identity.');
+  const object = item.recorder_metadata;
+  return {
+    id, targetWalkthroughId: nullableString(item.target_walkthrough_id),
+    status: String(item.status) as HelpRecordingStatus, slug: String(item.slug ?? ''),
+    title: String(item.title ?? ''), summary: String(item.summary ?? ''),
+    purpose: String(item.purpose) as HelpWalkthroughPurpose,
+    featureArea: String(item.feature_area ?? ''), routeContexts: strings(item.route_contexts),
+    audienceRoles: strings(item.audience_roles), keywords: strings(item.keywords),
+    requestedGoal: String(item.requested_goal ?? ''), targetScreen: String(item.target_screen ?? ''),
+    requiredStartingState: String(item.required_starting_state ?? ''), scenarioKey: String(item.scenario_key ?? ''),
+    actionSteps: strings(item.action_steps), expectedFinalState: String(item.expected_final_state ?? ''),
+    desiredDurationSeconds: number(item.desired_duration_seconds), narrationMode: String(item.narration_mode) as HelpNarrationMode,
+    talkingPoints: strings(item.talking_points), pacingProfile: String(item.pacing_profile) as 'servsync-human-paced-v1',
+    sourceKind: String(item.source_kind) as HelpRecordingJob['sourceKind'], sourceCommit: nullableString(item.source_commit),
+    sourceVersion: nullableString(item.source_version), videoAssetId: nullableString(item.video_asset_id),
+    posterAssetId: nullableString(item.poster_asset_id),
+    recorderMetadata: object && typeof object === 'object' && !Array.isArray(object) ? object as Record<string, unknown> : {},
+    failureCategory: nullableString(item.failure_category), failureMessage: nullableString(item.failure_message),
+    reviewNotes: nullableString(item.review_notes), approvedWalkthroughId: nullableString(item.approved_walkthrough_id),
+    approvedRevision: nullableNumber(item.approved_revision), requestedAt: String(item.requested_at ?? ''),
+    readyForReviewAt: nullableString(item.ready_for_review_at), reviewedAt: nullableString(item.reviewed_at),
+    updatedAt: String(item.updated_at ?? ''),
+  };
+}
+
 export function parseHelpSearchResult(value: unknown): HelpSearchResult {
   const item = record(value);
   const id = String(item.walkthrough_id ?? '');
@@ -267,6 +397,34 @@ export function parseHelpSearchResult(value: unknown): HelpSearchResult {
 export async function listHelpWalkthroughs(client: HelpStudioClient, query = '') {
   const data = await rpc(client, 'servsync_list_help_walkthroughs', { p_query: query || null }, 'Unable to load Help Studio.');
   return (Array.isArray(data) ? data : []).map(parseHelpWalkthrough);
+}
+
+export async function listHelpRecordingJobs(client: HelpStudioClient) {
+  const data = await rpc(client, 'servsync_list_help_recording_jobs', {}, 'Unable to load recording requests.');
+  return (Array.isArray(data) ? data : []).map(parseHelpRecordingJob);
+}
+
+export async function createHelpRecordingJob(client: HelpStudioClient, draft: HelpRecordingSpecDraft) {
+  return record(await rpc(client, 'servsync_create_help_recording_job', {
+    p_spec: helpRecordingSpecPayload(draft),
+  }, 'Unable to create the recording request.'));
+}
+
+export async function transitionHelpRecordingJob(
+  client: HelpStudioClient,
+  job: Pick<HelpRecordingJob, 'id' | 'status'>,
+  action: 'start_preparing' | 'start_recording' | 'start_processing' | 'complete' | 'fail',
+  payload: Record<string, unknown> = {},
+) {
+  return record(await rpc(client, 'servsync_transition_help_recording_job', {
+    p_job_id: job.id, p_expected_status: job.status, p_action: action, p_payload: payload,
+  }, 'Unable to update the recording request.'));
+}
+
+export async function reviewHelpRecordingJob(client: HelpStudioClient, id: string, action: 'approve' | 'return', notes = '') {
+  return record(await rpc(client, 'servsync_review_help_recording_job', {
+    p_job_id: id, p_action: action, p_review_notes: notes.trim() || null,
+  }, action === 'approve' ? 'Unable to approve the recording.' : 'Unable to return the recording.'));
 }
 
 export async function findHelp(client: HelpStudioClient, input: { query?: string; routeContext?: string; contractorId?: string | null; limit?: number }) {
@@ -332,17 +490,29 @@ export async function inspectMediaFile(file: File, kind: 'video' | 'poster') {
   }
 }
 
-export async function uploadHelpMedia(client: HelpStudioClient, file: File, kind: 'video' | 'poster', sourceCommit?: string) {
+export async function uploadHelpMedia(
+  client: HelpStudioClient,
+  file: File,
+  kind: 'video' | 'poster',
+  sourceCommit?: string,
+  recording?: { jobId: string; scenario: string; pacingProfile: string },
+) {
   const expectedMime = kind === 'video' ? ['video/mp4'] : ['image/png', 'image/jpeg', 'image/webp'];
   if (!expectedMime.includes(file.type) || file.size < 1 || file.size > 104857600) throw new Error('Choose a supported file no larger than 100 MB.');
   const metadata = await inspectMediaFile(file, kind);
   const checksum = await sha256(file);
   if (!SHA256.test(checksum)) throw new Error('The media checksum could not be verified.');
-  const reservation = record(await rpc(client, 'servsync_reserve_help_media_upload', {
-    p_asset_kind: kind, p_original_file_name: file.name, p_mime_type: file.type,
-    p_file_size_bytes: file.size, p_source_commit: sourceCommit || null,
-    p_provenance: { canonical_product_output: true, imported_by: 'help_studio_v1' },
-  }, 'Unable to reserve private Help storage.'));
+  const reservation = record(await rpc(client,
+    recording ? 'servsync_reserve_help_recording_media_upload' : 'servsync_reserve_help_media_upload',
+    recording ? {
+      p_job_id: recording.jobId, p_asset_kind: kind, p_original_file_name: file.name,
+      p_mime_type: file.type, p_file_size_bytes: file.size, p_source_commit: sourceCommit || null,
+      p_provenance: { scenario: recording.scenario, pacing_profile: recording.pacingProfile },
+    } : {
+      p_asset_kind: kind, p_original_file_name: file.name, p_mime_type: file.type,
+      p_file_size_bytes: file.size, p_source_commit: sourceCommit || null,
+      p_provenance: { canonical_product_output: true, imported_by: 'help_studio_v1' },
+    }, 'Unable to reserve private Help storage.'));
   const assetId = String(reservation.asset_id ?? '');
   const bucket = String(reservation.bucket ?? '');
   const path = String(reservation.path ?? '');
@@ -358,6 +528,28 @@ export async function uploadHelpMedia(client: HelpStudioClient, file: File, kind
   return { assetId, checksum, ...metadata };
 }
 
+export function buildHelpRecordingExport(job: HelpRecordingJob) {
+  return {
+    schema_version: 1,
+    recording_job_id: job.id,
+    title: job.title,
+    purpose: job.purpose,
+    feature_area: job.featureArea,
+    target_screen: job.targetScreen,
+    route_contexts: job.routeContexts,
+    audience_roles: job.audienceRoles,
+    requested_goal: job.requestedGoal,
+    required_starting_state: job.requiredStartingState,
+    scenario: job.scenarioKey,
+    actions: job.actionSteps,
+    expected_final_state: job.expectedFinalState,
+    desired_duration_seconds: job.desiredDurationSeconds,
+    narration_mode: job.narrationMode,
+    talking_points: job.talkingPoints,
+    pacing_profile: job.pacingProfile,
+  };
+}
+
 export async function helpPlaybackUrl(client: HelpStudioClient, walkthroughId: string, contractorId?: string | null) {
   const { data, error } = await client.auth.getSession();
   const token = data.session?.access_token;
@@ -368,6 +560,19 @@ export async function helpPlaybackUrl(client: HelpStudioClient, walkthroughId: s
   });
   const payload = await response.json() as { signedUrl?: string; message?: string };
   if (!response.ok || !payload.signedUrl) throw new Error(payload.message || 'Unable to open this walkthrough.');
+  return payload.signedUrl;
+}
+
+export async function helpRecordingPlaybackUrl(client: HelpStudioClient, recordingJobId: string) {
+  const { data, error } = await client.auth.getSession();
+  const token = data.session?.access_token;
+  if (error || !token) throw new Error('Sign in again to review this recording.');
+  const response = await fetch('/api/help-walkthrough-media', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recordingJobId }),
+  });
+  const payload = await response.json() as { signedUrl?: string; message?: string };
+  if (!response.ok || !payload.signedUrl) throw new Error(payload.message || 'Unable to review this recording.');
   return payload.signedUrl;
 }
 

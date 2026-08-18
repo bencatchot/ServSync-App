@@ -2,25 +2,37 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Archive,
   CheckCircle2,
+  Clapperboard,
+  Download,
   HelpCircle,
   FileVideo,
   Loader2,
   Pencil,
   Play,
   Plus,
+  RotateCcw,
   Search,
   Upload,
 } from 'lucide-react';
 import {
+  buildHelpRecordingExport,
+  createHelpRecordingJob,
   createHelpWalkthrough,
   draftFromWalkthrough,
+  emptyHelpRecordingSpecDraft,
   emptyHelpWalkthroughDraft,
   formatHelpBytes,
+  helpRecordingPlaybackUrl,
+  listHelpRecordingJobs,
   listHelpWalkthroughs,
   loadHelpUsage,
+  reviewHelpRecordingJob,
   transitionHelpWalkthrough,
+  transitionHelpRecordingJob,
   updateHelpWalkthrough,
   uploadHelpMedia,
+  type HelpRecordingJob,
+  type HelpRecordingSpecDraft,
   type HelpSearchResult,
   type HelpStudioClient,
   type HelpUsage,
@@ -32,6 +44,13 @@ import { HelpWalkthroughDialog } from './ContextualHelp';
 const AUDIENCES = [
   ['owner', 'Owner'], ['admin', 'Admin'], ['office', 'Office'],
   ['field_tech', 'Field Technician'], ['viewer', 'Viewer'], ['homeowner', 'Homeowner'],
+] as const;
+
+const RECORDER_SCENARIOS = [
+  ['contractor-create-estimate', 'Contractor creates an estimate'],
+  ['homeowner-service-request', 'Homeowner sends a service request'],
+  ['homeowner-home-history', 'Homeowner opens Home History'],
+  ['servsync-platform-introduction', 'ServSync platform introduction'],
 ] as const;
 
 const fieldClass = 'mt-1 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
@@ -49,6 +68,24 @@ function purposeLabel(purpose: HelpWalkthrough['purpose']) {
   return purpose === 'support' ? 'Support' : 'Marketing';
 }
 
+function recordingStatusLabel(status: HelpRecordingJob['status']) {
+  const labels: Record<HelpRecordingJob['status'], string> = {
+    requested: 'Requested', preparing: 'Preparing', recording: 'Recording', processing: 'Processing',
+    ready_for_review: 'Ready for review', approved: 'Approved', failed: 'Needs rerecord',
+  };
+  return labels[status];
+}
+
+function downloadRecordingSpec(job: HelpRecordingJob) {
+  const contents = JSON.stringify(buildHelpRecordingExport(job), null, 2);
+  const url = URL.createObjectURL(new Blob([`${contents}\n`], { type: 'application/json' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${job.slug}-recording-spec.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function previewFromWalkthrough(item: HelpWalkthrough): HelpSearchResult {
   return {
     id: item.id, slug: item.slug, revision: item.currentRevision, title: item.title,
@@ -58,6 +95,301 @@ function previewFromWalkthrough(item: HelpWalkthrough): HelpSearchResult {
     durationSeconds: item.videoDuration ?? 0, width: item.videoWidth ?? 0, height: item.videoHeight ?? 0,
     narrationDisclosure: item.narrationDisclosure, rank: 0,
   };
+}
+
+function RecordingRequestEditor({
+  client,
+  walkthroughs,
+  onSaved,
+  onCancel,
+}: {
+  client: HelpStudioClient;
+  walkthroughs: HelpWalkthrough[];
+  onSaved: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState<HelpRecordingSpecDraft>(emptyHelpRecordingSpecDraft);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = <K extends keyof HelpRecordingSpecDraft>(key: K, value: HelpRecordingSpecDraft[K]) => setDraft(current => ({ ...current, [key]: value }));
+
+  const chooseTarget = (id: string) => {
+    set('targetWalkthroughId', id);
+    const target = walkthroughs.find(item => item.id === id);
+    if (!target) return;
+    setDraft(current => ({
+      ...current,
+      targetWalkthroughId: id,
+      title: target.title,
+      summary: target.summary,
+      purpose: target.purpose,
+      featureArea: target.featureArea,
+      routeContexts: target.routeContexts.join(', '),
+      audienceRoles: [...target.audienceRoles],
+      keywords: target.keywords.join(', '),
+      requestedGoal: `Create a clearer, human-paced recording of ${target.title.toLowerCase()}.`,
+      targetScreen: target.routeContexts[0] || target.featureArea,
+      actionSteps: target.steps.join('\n'),
+      expectedFinalState: `The completed ${target.title.toLowerCase()} result remains visible and easy to understand.`,
+    }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await createHelpRecordingJob(client, draft);
+      await onSaved();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to create the recording request.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-testid="help-recording-request-editor">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase text-blue-700">New recording</p>
+          <h2 className="text-lg font-bold text-slate-950">Create a walkthrough recording</h2>
+        </div>
+        <button type="button" onClick={onCancel} className="min-h-10 px-3 text-sm font-semibold text-slate-600 hover:text-slate-950">Cancel</button>
+      </div>
+      {error && <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <label className="text-sm font-semibold text-slate-700 md:col-span-2">Replace an existing walkthrough
+          <select className={fieldClass} value={draft.targetWalkthroughId} onChange={event => chooseTarget(event.target.value)}>
+            <option value="">Create a new walkthrough</option>
+            {walkthroughs.filter(item => item.state !== 'archived').map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Title
+          <input className={fieldClass} value={draft.title} onChange={event => set('title', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Intended use
+          <select className={fieldClass} value={draft.purpose} onChange={event => set('purpose', event.target.value as HelpRecordingSpecDraft['purpose'])}>
+            <option value="support">Support</option><option value="marketing">Marketing</option><option value="both">Support and Marketing</option>
+          </select>
+        </label>
+        <label className="text-sm font-semibold text-slate-700 md:col-span-2">Short summary
+          <textarea className={`${fieldClass} min-h-20`} value={draft.summary} onChange={event => set('summary', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Feature area
+          <input className={fieldClass} value={draft.featureArea} onChange={event => set('featureArea', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Screen or route
+          <input className={fieldClass} value={draft.targetScreen} onChange={event => set('targetScreen', event.target.value)} placeholder="Drafts" />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Route contexts
+          <input className={fieldClass} value={draft.routeContexts} onChange={event => set('routeContexts', event.target.value)} placeholder="contractor.drafts" />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Recorder scenario
+          <select className={fieldClass} value={draft.scenarioKey} onChange={event => set('scenarioKey', event.target.value)}>
+            {RECORDER_SCENARIOS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-semibold text-slate-700 md:col-span-2">What should this recording demonstrate?
+          <textarea className={`${fieldClass} min-h-20`} value={draft.requestedGoal} onChange={event => set('requestedGoal', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Required starting state
+          <textarea className={`${fieldClass} min-h-24`} value={draft.requiredStartingState} onChange={event => set('requiredStartingState', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Expected final state
+          <textarea className={`${fieldClass} min-h-24`} value={draft.expectedFinalState} onChange={event => set('expectedFinalState', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Actions, one per line
+          <textarea className={`${fieldClass} min-h-36`} value={draft.actionSteps} onChange={event => set('actionSteps', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Optional talking points, one per line
+          <textarea className={`${fieldClass} min-h-36`} value={draft.talkingPoints} onChange={event => set('talkingPoints', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Keywords and synonyms
+          <input className={fieldClass} value={draft.keywords} onChange={event => set('keywords', event.target.value)} />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Approximate duration
+          <div className="mt-1 flex items-center gap-2"><input className="min-h-10 w-28 rounded-md border border-slate-300 px-3 text-sm" type="number" min="10" max="600" value={draft.desiredDurationSeconds} onChange={event => set('desiredDurationSeconds', event.target.value)} /><span className="text-sm text-slate-500">seconds</span></div>
+        </label>
+        <label className="text-sm font-semibold text-slate-700">Narration
+          <select className={fieldClass} value={draft.narrationMode} onChange={event => set('narrationMode', event.target.value as HelpRecordingSpecDraft['narrationMode'])}>
+            <option value="none">None</option><option value="human">Human later</option><option value="ai">AI later</option>
+          </select>
+        </label>
+      </div>
+      <fieldset className="mt-4">
+        <legend className="text-sm font-bold text-slate-800">Audience</legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {AUDIENCES.map(([value, label]) => (
+            <label key={value} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm text-slate-700">
+              <input type="checkbox" checked={draft.audienceRoles.includes(value)} onChange={event => set('audienceRoles', event.target.checked ? [...draft.audienceRoles, value] : draft.audienceRoles.filter(role => role !== value))} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="mt-5 flex justify-end">
+        <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-60">
+          {saving ? <Loader2 className="animate-spin" size={17} /> : <Clapperboard size={17} />} Request recording
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function RecordingPreview({ client, job, onClose }: { client: HelpStudioClient; job: HelpRecordingJob; onClose: () => void }) {
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void helpRecordingPlaybackUrl(client, job.id)
+      .then(value => { if (active) setUrl(value); })
+      .catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Unable to review this recording.'); });
+    return () => { active = false; };
+  }, [client, job.id]);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-3" role="dialog" aria-modal="true" aria-label={`Review ${job.title}`}>
+      <div className="w-full max-w-5xl rounded-lg bg-white p-4 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="text-xs font-semibold uppercase text-blue-700">Normal-speed review</p><h2 className="text-lg font-bold text-slate-950">{job.title}</h2></div>
+          <button type="button" onClick={onClose} className="min-h-10 px-3 text-sm font-semibold text-slate-600">Close</button>
+        </div>
+        {error ? <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</div> : url ? (
+          <video className="mt-3 aspect-video w-full bg-black object-contain" controls autoPlay={false} src={url} data-testid="help-recording-review-video" />
+        ) : <div className="mt-3 flex aspect-video items-center justify-center bg-slate-100"><Loader2 className="animate-spin text-slate-500" /></div>}
+      </div>
+    </div>
+  );
+}
+
+function RecordingJobCard({
+  client,
+  job,
+  walkthroughs,
+  onChanged,
+  onPreview,
+}: {
+  client: HelpStudioClient;
+  job: HelpRecordingJob;
+  walkthroughs: HelpWalkthrough[];
+  onChanged: () => Promise<void>;
+  onPreview: () => void;
+}) {
+  const [video, setVideo] = useState<File | null>(null);
+  const [poster, setPoster] = useState<File | null>(null);
+  const [metadata, setMetadata] = useState<File | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const attach = async () => {
+    if (!video || !poster || !metadata) { setError('Choose the validated MP4, poster, and recorder metadata.'); return; }
+    setBusy(true);
+    setError('');
+    let status: HelpRecordingJob['status'] = job.status;
+    try {
+      const manifest = JSON.parse(await metadata.text()) as Record<string, unknown>;
+      const sourceCommit = String(manifest.source_git_commit ?? '');
+      if (manifest.scenario !== job.scenarioKey || manifest.pacing_profile !== job.pacingProfile
+        || manifest.validation_status !== 'passed' || manifest.sensitive_data_check !== 'passed'
+        || !/^[a-f0-9]{40}$/.test(sourceCommit)) {
+        throw new Error('Recorder metadata does not match this request or has not passed validation.');
+      }
+      await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_preparing'); status = 'preparing';
+      await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_recording'); status = 'recording';
+      await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_processing'); status = 'processing';
+      const recording = { jobId: job.id, scenario: job.scenarioKey, pacingProfile: job.pacingProfile };
+      const uploadedVideo = await uploadHelpMedia(client, video, 'video', sourceCommit, recording);
+      const uploadedPoster = await uploadHelpMedia(client, poster, 'poster', sourceCommit, recording);
+      await transitionHelpRecordingJob(client, { id: job.id, status }, 'complete', {
+        video_asset_id: uploadedVideo.assetId,
+        poster_asset_id: uploadedPoster.assetId,
+        source_version: 'Demo Recorder / servsync-human-paced-v1',
+        recorder_metadata: {
+          scenario: manifest.scenario,
+          pacing_profile: manifest.pacing_profile,
+          validation_status: manifest.validation_status,
+          sensitive_data_check: manifest.sensitive_data_check,
+          duration_seconds: manifest.duration_seconds,
+          viewport: manifest.viewport,
+          source_git_commit: sourceCommit,
+          canonical_output_provenance: manifest.canonical_output_provenance,
+        },
+      });
+      await onChanged();
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Recording failed before capture.';
+      setError(message);
+      if (['requested','preparing','recording','processing'].includes(status)) {
+        await transitionHelpRecordingJob(client, { id: job.id, status }, 'fail', { message }).catch(() => {});
+        await onChanged().catch(() => {});
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const review = async (action: 'approve' | 'return') => {
+    setBusy(true); setError('');
+    try { await reviewHelpRecordingJob(client, job.id, action, reviewNotes); await onChanged(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to review this recording.'); }
+    finally { setBusy(false); }
+  };
+
+  const publish = async () => {
+    const item = walkthroughs.find(candidate => candidate.id === job.approvedWalkthroughId);
+    if (!item) { setError('The approved walkthrough needs to be reloaded.'); return; }
+    setBusy(true); setError('');
+    try { await transitionHelpWalkthrough(client, item.id, item.currentRevision, 'publish'); await onChanged(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to publish this walkthrough.'); }
+    finally { setBusy(false); }
+  };
+
+  const approvedWalkthrough = walkthroughs.find(item => item.id === job.approvedWalkthroughId);
+  return (
+    <article className="rounded-md border border-slate-200 bg-white p-4" data-testid={`help-recording-job-${job.status}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className={`inline-flex rounded px-2 py-1 text-xs font-bold ${job.status === 'ready_for_review' ? 'bg-amber-50 text-amber-700' : job.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : job.status === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'}`}>{recordingStatusLabel(job.status)}</span>
+          <h3 className="mt-2 text-sm font-bold text-slate-950">{job.title}</h3>
+          <p className="mt-1 text-sm leading-5 text-slate-600">{job.requestedGoal}</p>
+        </div>
+        <span className="text-xs font-semibold text-slate-500">{job.desiredDurationSeconds} sec · {purposeLabel(job.purpose)}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5 text-xs text-slate-600">
+        <span className="rounded bg-slate-100 px-2 py-1">{job.featureArea}</span>
+        <span className="rounded bg-slate-100 px-2 py-1">Human-paced</span>
+        <span className="rounded bg-slate-100 px-2 py-1">{RECORDER_SCENARIOS.find(([value]) => value === job.scenarioKey)?.[1] ?? job.scenarioKey}</span>
+      </div>
+      {job.failureMessage && <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{job.failureMessage}</div>}
+      {error && <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
+      {job.status === 'requested' && (
+        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 md:grid-cols-3">
+          <label className="text-xs font-semibold text-slate-600">Validated MP4<input className="mt-1 block w-full text-xs font-normal" type="file" accept="video/mp4" onChange={event => setVideo(event.target.files?.[0] ?? null)} /></label>
+          <label className="text-xs font-semibold text-slate-600">Poster<input className="mt-1 block w-full text-xs font-normal" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => setPoster(event.target.files?.[0] ?? null)} /></label>
+          <label className="text-xs font-semibold text-slate-600">Recorder metadata<input className="mt-1 block w-full text-xs font-normal" type="file" accept="application/json" onChange={event => setMetadata(event.target.files?.[0] ?? null)} /></label>
+          <div className="flex flex-wrap gap-2 md:col-span-3">
+            <button type="button" onClick={() => downloadRecordingSpec(job)} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700"><Download size={15} /> Recording spec</button>
+            <button type="button" disabled={busy} onClick={() => void attach()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-blue-700 px-3 text-sm font-bold text-white disabled:opacity-60"><Upload size={15} /> Attach validated recording</button>
+          </div>
+        </div>
+      )}
+      {job.status === 'ready_for_review' && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <label className="text-xs font-semibold text-slate-600">Review notes<input className={fieldClass} value={reviewNotes} onChange={event => setReviewNotes(event.target.value)} placeholder="Optional pacing or rerecord notes" /></label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={onPreview} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700"><Play size={15} /> Review at normal speed</button>
+            <button type="button" disabled={busy} onClick={() => void review('approve')} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-60"><CheckCircle2 size={15} /> Approve recording</button>
+            <button type="button" disabled={busy} onClick={() => void review('return')} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 disabled:opacity-60"><RotateCcw size={15} /> Return for rerecord</button>
+          </div>
+        </div>
+      )}
+      {job.status === 'approved' && approvedWalkthrough?.publishedRevision !== job.approvedRevision && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <button type="button" disabled={busy} onClick={() => void publish()} className="min-h-10 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-60">Publish for Help</button>
+        </div>
+      )}
+    </article>
+  );
 }
 
 function HelpEditor({
@@ -209,10 +541,13 @@ function HelpEditor({
 
 export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
   const [items, setItems] = useState<HelpWalkthrough[]>([]);
+  const [recordingJobs, setRecordingJobs] = useState<HelpRecordingJob[]>([]);
   const [usage, setUsage] = useState<HelpUsage | null>(null);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<HelpWalkthrough | null | 'new'>(null);
+  const [creatingRecording, setCreatingRecording] = useState(false);
   const [preview, setPreview] = useState<HelpSearchResult | null>(null);
+  const [recordingPreview, setRecordingPreview] = useState<HelpRecordingJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
@@ -221,9 +556,12 @@ export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
     setLoading(true);
     setError('');
     try {
-      const [walkthroughs, mediaUsage] = await Promise.all([listHelpWalkthroughs(client), loadHelpUsage(client)]);
+      const [walkthroughs, mediaUsage, jobs] = await Promise.all([
+        listHelpWalkthroughs(client), loadHelpUsage(client), listHelpRecordingJobs(client),
+      ]);
       setItems(walkthroughs);
       setUsage(mediaUsage);
+      setRecordingJobs(jobs);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load Help Studio.');
     } finally {
@@ -252,6 +590,7 @@ export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
     }
   };
 
+  if (creatingRecording) return <RecordingRequestEditor client={client} walkthroughs={items} onCancel={() => setCreatingRecording(false)} onSaved={async () => { setCreatingRecording(false); await load(); }} />;
   if (editing) return <HelpEditor client={client} item={editing === 'new' ? null : editing} onCancel={() => setEditing(null)} onSaved={async () => { setEditing(null); await load(); }} />;
 
   return (
@@ -262,9 +601,14 @@ export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
           <h1 className="mt-1 text-2xl font-bold text-slate-950">Help Studio</h1>
           <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">Manage durable walkthroughs for in-product help and Marketing reuse.</p>
         </div>
-        <button type="button" onClick={() => setEditing('new')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800">
-          <Plus size={17} /> New walkthrough
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setEditing('new')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">
+            <Upload size={17} /> Import finished video
+          </button>
+          <button type="button" onClick={() => setCreatingRecording(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800">
+            <Plus size={17} /> New recording
+          </button>
+        </div>
       </header>
 
       {usage && (
@@ -277,6 +621,17 @@ export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
               <p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-950">{value}</p>
             </div>
           ))}
+        </section>
+      )}
+
+      {recordingJobs.length > 0 && (
+        <section className="space-y-2" aria-label="Recording requests">
+          <div className="flex items-center gap-2"><Clapperboard size={18} className="text-blue-700" /><h2 className="text-base font-bold text-slate-950">Recording requests</h2></div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {recordingJobs.map(job => (
+              <RecordingJobCard key={job.id} client={client} job={job} walkthroughs={items} onChanged={load} onPreview={() => setRecordingPreview(job)} />
+            ))}
+          </div>
         </section>
       )}
 
@@ -334,6 +689,7 @@ export function HelpStudioWorkspace({ client }: { client: HelpStudioClient }) {
         </div>
       )}
       {preview && <HelpWalkthroughDialog client={client} walkthrough={preview} onClose={() => setPreview(null)} />}
+      {recordingPreview && <RecordingPreview client={client} job={recordingPreview} onClose={() => setRecordingPreview(null)} />}
     </div>
   );
 }

@@ -5,8 +5,9 @@ const HELP_BUCKET = 'help-walkthroughs';
 const SIGNED_URL_SECONDS = 300;
 
 type HelpPlaybackGrant = {
-  walkthrough_id: string;
-  revision: number;
+  walkthrough_id?: string;
+  recording_job_id?: string;
+  revision?: number;
   video_asset_id: string;
   poster_asset_id?: string | null;
   title: string;
@@ -36,20 +37,30 @@ function bearer(request: Request) {
   return value.startsWith('Bearer ') ? value.slice(7).trim() : '';
 }
 
-function safeBody(value: unknown): { walkthroughId: string; contractorId: string | null } | null {
+function safeBody(value: unknown): { walkthroughId: string | null; recordingJobId: string | null; contractorId: string | null } | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   const keys = Object.keys(body);
-  if (keys.some(key => !['walkthroughId', 'contractorId'].includes(key))) return null;
-  const walkthroughId = typeof body.walkthroughId === 'string' ? body.walkthroughId : '';
+  if (keys.some(key => !['walkthroughId', 'recordingJobId', 'contractorId'].includes(key))) return null;
+  const walkthroughId = body.walkthroughId === null || body.walkthroughId === undefined
+    ? null : typeof body.walkthroughId === 'string' ? body.walkthroughId : '';
+  const recordingJobId = body.recordingJobId === null || body.recordingJobId === undefined
+    ? null : typeof body.recordingJobId === 'string' ? body.recordingJobId : '';
   const contractorId = body.contractorId === null || body.contractorId === undefined
     ? null
     : typeof body.contractorId === 'string' ? body.contractorId : '';
-  if (!UUID.test(walkthroughId) || (contractorId !== null && !UUID.test(contractorId))) return null;
-  return { walkthroughId, contractorId };
+  if ((walkthroughId === null) === (recordingJobId === null)
+    || (walkthroughId !== null && !UUID.test(walkthroughId))
+    || (recordingJobId !== null && !UUID.test(recordingJobId))
+    || (contractorId !== null && !UUID.test(contractorId))
+    || (recordingJobId !== null && contractorId !== null)) return null;
+  return { walkthroughId, recordingJobId, contractorId };
 }
 
-export function createHelpWalkthroughMediaHandler(environment: NodeJS.ProcessEnv = process.env) {
+export function createHelpWalkthroughMediaHandler(
+  environment: NodeJS.ProcessEnv = process.env,
+  clientFactory: typeof createClient = createClient,
+) {
   return async (request: Request) => {
     if (request.method !== 'POST') return json(405, { message: 'Method not allowed.' });
     const accessToken = bearer(request);
@@ -59,26 +70,31 @@ export function createHelpWalkthroughMediaHandler(environment: NodeJS.ProcessEnv
     const serviceRoleKey = environment.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? '';
     if (!supabaseUrl || !serviceRoleKey) return json(503, { message: 'Help playback is unavailable.' });
 
-    let body: { walkthroughId: string; contractorId: string | null } | null = null;
+    let body: { walkthroughId: string | null; recordingJobId: string | null; contractorId: string | null } | null = null;
     try { body = safeBody(await request.json()); } catch { body = null; }
     if (!body) return json(400, { message: 'Invalid walkthrough request.' });
 
     const options = { auth: { persistSession: false, autoRefreshToken: false } } as const;
-    const user = createClient(supabaseUrl, serviceRoleKey, {
+    const user = clientFactory(supabaseUrl, serviceRoleKey, {
       ...options,
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
     });
-    const service = createClient(supabaseUrl, serviceRoleKey, options);
+    const service = clientFactory(supabaseUrl, serviceRoleKey, options);
 
-    const { data: grantValue, error: grantError } = await user.rpc('servsync_get_help_playback_grant', {
-      p_walkthrough_id: body.walkthroughId,
-      p_contractor_id: body.contractorId,
-    });
+    const { data: grantValue, error: grantError } = body.recordingJobId
+      ? await user.rpc('servsync_get_help_recording_playback_grant', { p_job_id: body.recordingJobId })
+      : await user.rpc('servsync_get_help_playback_grant', {
+        p_walkthrough_id: body.walkthroughId,
+        p_contractor_id: body.contractorId,
+      });
     if (grantError || !grantValue || typeof grantValue !== 'object') {
       return json(grantError?.code === 'P0002' ? 404 : 403, { message: 'This walkthrough is not available for your account.' });
     }
     const grant = grantValue as HelpPlaybackGrant;
-    if (grant.walkthrough_id !== body.walkthroughId || !UUID.test(grant.video_asset_id)) {
+    const identityMatches = body.recordingJobId
+      ? grant.recording_job_id === body.recordingJobId
+      : grant.walkthrough_id === body.walkthroughId;
+    if (!identityMatches || !UUID.test(grant.video_asset_id)) {
       return json(409, { message: 'Walkthrough media identity could not be verified.' });
     }
 
@@ -100,7 +116,8 @@ export function createHelpWalkthroughMediaHandler(environment: NodeJS.ProcessEnv
     return json(200, {
       signedUrl: signed.signedUrl,
       expiresIn: SIGNED_URL_SECONDS,
-      walkthroughId: grant.walkthrough_id,
+      walkthroughId: grant.walkthrough_id ?? null,
+      recordingJobId: grant.recording_job_id ?? null,
       revision: grant.revision,
       mimeType: asset.mime_type,
       durationSeconds: Number(asset.duration_seconds),
