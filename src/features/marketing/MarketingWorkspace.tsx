@@ -29,6 +29,8 @@ import {
   type MarketingContentStatus,
 } from './marketingContent';
 import { MarketingContentWorkspace } from './MarketingContentWorkspace';
+import { MarketingCreatePost } from './MarketingCreatePost';
+import type { MarketingCreationClient } from './marketingCreation';
 import { MarketingPublishingWorkspace } from './MarketingPublishingWorkspace';
 import {
   createMarketingFacebookConnectionAdapter,
@@ -276,6 +278,7 @@ export function MarketingWorkspace({
   audience,
   overview,
   content,
+  createPost,
   planning,
   publishing,
   settingsUsage,
@@ -284,6 +287,7 @@ export function MarketingWorkspace({
   overview: MarketingOverviewData;
   content: {
     items: MarketingContentItem[];
+    createdContentId: string | null;
     loading: boolean;
     error: string | null;
     onReload: () => Promise<void>;
@@ -292,6 +296,7 @@ export function MarketingWorkspace({
     onTransition: Parameters<typeof MarketingContentWorkspace>[0]['onTransition'];
     onPublish: Parameters<typeof MarketingContentWorkspace>[0]['onPublish'];
   };
+  createPost: ReactNode;
   planning: Parameters<typeof MarketingPlanningWorkspace>[0] | null;
   publishing: Omit<Parameters<typeof MarketingPublishingWorkspace>[0], 'contentItems' | 'selectedContentId' | 'onSelectContent' | 'onReturnForRevision'> & { selectedContentId: string | null; onSelectContent: (content: MarketingContentItem) => void };
   settingsUsage: ReactNode;
@@ -305,6 +310,11 @@ export function MarketingWorkspace({
     token: number;
   } | null>(null);
   const approvalItems = content.items.filter(item => item.status === 'needs_approval');
+
+  useEffect(() => {
+    if (!content.createdContentId) return;
+    setContentFocus({ id: content.createdContentId, status: 'draft', token: Date.now() });
+  }, [content.createdContentId]);
 
   const openApproval = (id: string | null) => {
     setContentFocus({ id, status: 'needs_approval', token: Date.now() });
@@ -352,7 +362,9 @@ export function MarketingWorkspace({
         )
         : section === 'content'
           ? (
-            <MarketingContentWorkspace
+            <div className="space-y-4">
+              {createPost}
+              <MarketingContentWorkspace
               items={content.items}
               loading={content.loading}
               loadError={content.error}
@@ -362,7 +374,8 @@ export function MarketingWorkspace({
               onUpdate={content.onUpdate}
               onTransition={content.onTransition}
               onPublish={item => { publishing.onSelectContent(item); setSection('campaigns'); }}
-            />
+              />
+            </div>
           )
           : section === 'campaigns'
             ? <MarketingPublishingWorkspace
@@ -387,7 +400,7 @@ function AuthorizedMarketingWorkspace({
   planningEnabled,
 }: {
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient & MarketingCreationClient;
   contractorId: string | null;
   planningEnabled: boolean;
 }) {
@@ -412,6 +425,7 @@ function AuthorizedMarketingWorkspace({
   const [publishingSaving, setPublishingSaving] = useState(false);
   const [publishingError, setPublishingError] = useState<string | null>(null);
   const [previewContentId, setPreviewContentId] = useState<string | null>(null);
+  const [createdContentId, setCreatedContentId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -498,6 +512,7 @@ function AuthorizedMarketingWorkspace({
 
   const content = {
     items,
+    createdContentId,
     loading,
     error,
     onReload: load,
@@ -708,6 +723,10 @@ function AuthorizedMarketingWorkspace({
       audience={contractorId ? { kind: 'contractor', contractorId } : { kind: 'internal' }}
       overview={overview}
       content={content}
+      createPost={<MarketingCreatePost client={client} contractorId={contractorId} onCreated={async id => {
+        await load();
+        setCreatedContentId(id);
+      }} />}
       planning={planningEnabled ? planning : null}
       publishing={publishing}
       settingsUsage={<MarketingUsagePanel client={client} contractorId={contractorId} platformControls={contractorId === null} />}
@@ -722,7 +741,7 @@ export function InternalMarketingWorkspace({
 }: {
   role: UserRole | null | undefined;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient & MarketingCreationClient;
 }) {
   if (!canAccessInternalMarketing(role)) return null;
   return <AuthorizedMarketingWorkspace overview={overview} client={client} contractorId={null} planningEnabled />;
@@ -735,7 +754,7 @@ export function ContractorMarketingWorkspace({
 }: {
   contractorId: string;
   overview: MarketingOverviewData;
-  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient;
+  client: MarketingContentRpcClient & MarketingPlanningRpcClient & MarketingDirectionsRpcClient & MarketingPublishingRpcClient & MarketingFacebookAuthClient & MarketingMediaClient & MarketingUsageClient & MarketingCreationClient;
 }) {
   return <AuthorizedMarketingWorkspace overview={overview} client={client} contractorId={contractorId} planningEnabled={false} />;
 }

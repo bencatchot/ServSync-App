@@ -46,6 +46,8 @@ create table public.contractor_profiles (
   id uuid primary key,
   owner_user_id uuid not null references public.profiles(id),
   business_name text not null default '',
+  business_summary text not null default '',
+  service_categories text[] not null default '{}'::text[],
   account_status text not null default 'active'
 );
 create table public.contractor_team_members (
@@ -59,7 +61,21 @@ create table public.contractor_team_members (
 create table public.inspections (
   id uuid primary key,
   contractor_id uuid not null references public.contractor_profiles(id),
+  name text not null default 'Fixture Job',
+  summary text not null default '',
+  job_status text not null default 'draft',
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
   rooms_with_findings jsonb not null default '[]'::jsonb
+);
+create table public.job_work_items (
+  id uuid primary key default gen_random_uuid(),
+  inspection_id uuid not null references public.inspections(id),
+  title text not null,
+  customer_description text not null default '',
+  internal_notes text not null default '',
+  completion_status text not null default 'open',
+  created_at timestamptz not null default now()
 );
 create function public.current_user_is_platform_admin() returns boolean
 language sql security definer set search_path = pg_catalog, public, auth stable
@@ -176,6 +192,15 @@ if [[ -n "${SERVSYNC_MARKETING_QUEUE_MIGRATION:-}" ]]; then
   psql_run --file "$ROOT_DIR/${SERVSYNC_MARKETING_QUEUE_VALIDATION:?Marketing queue validation is required.}" >/dev/null
   if psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_MIGRATION" >/dev/null 2>&1; then
     echo "Repeated Marketing publishing queue migration unexpectedly succeeded." >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "${SERVSYNC_MARKETING_CONTENT_CREATION_MIGRATION:-}" ]]; then
+  psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_CONTENT_CREATION_MIGRATION" >/dev/null
+  psql_run --file "$ROOT_DIR/${SERVSYNC_MARKETING_CONTENT_CREATION_VALIDATION:?Marketing content creation validation is required.}" >/dev/null
+  if psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_CONTENT_CREATION_MIGRATION" >/dev/null 2>&1; then
+    echo "Repeated Marketing content creation migration unexpectedly succeeded." >&2
     exit 1
   fi
 fi
