@@ -39,7 +39,7 @@ async function installAdminHarness(page: Page, item = walkthrough) {
     };
     document.body.innerHTML = '<main class="mx-auto max-w-6xl bg-slate-50 p-4"><div id="root"></div></main>';
     createRoot(document.getElementById('root') as HTMLElement).render(React.createElement(Workspace, { client }));
-  }, { item: walkthrough });
+  }, { item });
 }
 
 async function installContextHarness(page: Page) {
