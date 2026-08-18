@@ -15,6 +15,7 @@ import {
   assertRecordingDuration,
   assertSafeRecorderEnvironment,
   buildArtifactMetadata,
+  cursorInterpolation,
   loadKnownLocalEnv,
   pacingFor,
   parseRecorderArgs,
@@ -106,32 +107,16 @@ async function setCaption(page, text) {
 
 const pointerPositions = new WeakMap();
 
-function easeInOutCubic(value) {
-  return value < 0.5 ? 4 * value ** 3 : 1 - ((-2 * value + 2) ** 3) / 2;
-}
-
-function pointerTravelDuration(distance, pacing) {
-  if (distance <= 260) return pacing.nearbyTravel;
-  if (distance <= 760) return pacing.mediumTravel;
-  return pacing.largeTravel;
-}
-
 async function moveCursorHuman(page, x, y, pacing) {
   const viewport = page.viewportSize();
   const start = pointerPositions.get(page) || {
     x: (viewport?.width || 1440) * 0.76,
     y: (viewport?.height || 900) * 0.7,
   };
-  const distance = Math.hypot(x - start.x, y - start.y);
-  const duration = pointerTravelDuration(distance, pacing);
-  const steps = Math.max(24, Math.ceil(duration / 24));
-  for (let step = 1; step <= steps; step += 1) {
-    const progress = easeInOutCubic(step / steps);
-    await page.mouse.move(
-      start.x + (x - start.x) * progress,
-      start.y + (y - start.y) * progress,
-    );
-    await wait(duration / steps);
+  const interpolation = cursorInterpolation(start, { x, y }, pacing);
+  for (const point of interpolation.points) {
+    await page.mouse.move(point.x, point.y);
+    await wait(interpolation.stepDelay);
   }
   pointerPositions.set(page, { x, y });
 }

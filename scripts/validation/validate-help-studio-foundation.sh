@@ -82,9 +82,28 @@ SQL
 
 psql_run --file "$ROOT_DIR/servsync-help-studio-foundation.sql" >/dev/null
 psql_run --file "$ROOT_DIR/servsync-help-studio-usage-state-forward-fix.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-help-studio-recording-workflow.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-help-studio-recording-package-validation-forward-fix.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-help-media-ready-video-duration-forward-fix.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/help-studio-foundation-validation.sql" >/dev/null
+psql_run --file "$ROOT_DIR/tests/sql/help-studio-recording-workflow-validation.sql" >/dev/null
 
 psql_run --file "$ROOT_DIR/servsync-help-studio-usage-state-forward-fix.sql" >/dev/null
+
+if psql_run --file "$ROOT_DIR/servsync-help-studio-recording-workflow.sql" >/dev/null 2>&1; then
+  echo "Repeated Help Studio recording workflow migration unexpectedly succeeded." >&2
+  exit 1
+fi
+
+if psql_run --file "$ROOT_DIR/servsync-help-studio-recording-package-validation-forward-fix.sql" >/dev/null 2>&1; then
+  echo "Repeated Help Studio recorder package validation unexpectedly succeeded." >&2
+  exit 1
+fi
+
+if psql_run --file "$ROOT_DIR/servsync-help-media-ready-video-duration-forward-fix.sql" >/dev/null 2>&1; then
+  echo "Repeated Help ready-video duration validation unexpectedly succeeded." >&2
+  exit 1
+fi
 
 if psql_run --file "$ROOT_DIR/servsync-help-studio-foundation.sql" >/dev/null 2>&1; then
   echo "Repeated Help Studio foundation migration unexpectedly succeeded." >&2

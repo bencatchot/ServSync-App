@@ -3,10 +3,14 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   emptyHelpWalkthroughDraft,
+  emptyHelpRecordingSpecDraft,
   findHelp,
+  helpRecordingSpecPayload,
   helpPayload,
   parseHelpSearchResult,
+  parseHelpRecordingJob,
   parseHelpWalkthrough,
+  validateHelpRecordingPackage,
 } from '../../src/features/help/helpStudio.ts';
 import { createHelpWalkthroughMediaHandler } from '../../server/helpWalkthroughMedia.ts';
 
@@ -70,6 +74,91 @@ test('walkthrough parser keeps durable revision and quality metadata', () => {
   assert.deepEqual(parsed.routeContexts, ['contractor.drafts']);
 });
 
+test('recording request payload preserves a future-ready spec without engineering-only fields', () => {
+  const draft = {
+    ...emptyHelpRecordingSpecDraft(),
+    targetWalkthroughId: walkthroughId,
+    title: 'How to create an estimate',
+    summary: 'Create an estimate from a service request at a readable pace.',
+    featureArea: 'Estimates',
+    routeContexts: 'contractor.drafts',
+    keywords: 'estimate, quote, draft pricing',
+    requestedGoal: 'Show a contractor creating and saving one estimate draft.',
+    targetScreen: 'Drafts',
+    requiredStartingState: 'One fictional Demo service request is ready for review.',
+    actionSteps: 'Open the service request.\nCreate the estimate.\nSave the draft.',
+    expectedFinalState: 'The saved estimate draft remains visible.',
+    talkingPoints: 'Start from the customer request.\nReview scope and pricing.',
+    desiredDurationSeconds: '30',
+  };
+  assert.deepEqual(helpRecordingSpecPayload(draft), {
+    target_walkthrough_id: walkthroughId,
+    slug: 'how-to-create-an-estimate',
+    title: draft.title,
+    summary: draft.summary,
+    purpose: 'both',
+    feature_area: 'Estimates',
+    route_contexts: ['contractor.drafts'],
+    audience_roles: ['owner', 'admin', 'office'],
+    keywords: ['estimate', 'quote', 'draft pricing'],
+    requested_goal: draft.requestedGoal,
+    target_screen: 'Drafts',
+    required_starting_state: draft.requiredStartingState,
+    scenario_key: 'contractor-create-estimate',
+    action_steps: ['Open the service request.', 'Create the estimate.', 'Save the draft.'],
+    expected_final_state: draft.expectedFinalState,
+    desired_duration_seconds: 30,
+    narration_mode: 'none',
+    talking_points: ['Start from the customer request.', 'Review scope and pricing.'],
+  });
+});
+
+test('recording job parser keeps lifecycle, managed media, and review evidence', () => {
+  const parsed = parseHelpRecordingJob({
+    job_id: '40000000-0000-4000-8000-000000000001', target_walkthrough_id: walkthroughId,
+    status: 'ready_for_review', slug: 'how-to-create-an-estimate', title: 'How to create an estimate',
+    summary: 'Create an estimate from a service request at a readable pace.', purpose: 'both',
+    feature_area: 'Estimates', route_contexts: ['contractor.drafts'], audience_roles: ['owner'],
+    keywords: ['estimate'], requested_goal: 'Show one human-paced estimate workflow.', target_screen: 'Drafts',
+    required_starting_state: 'One request is ready.', scenario_key: 'contractor-create-estimate',
+    action_steps: ['Open request.', 'Save estimate.'], expected_final_state: 'Draft remains visible.',
+    desired_duration_seconds: 30, narration_mode: 'none', talking_points: [],
+    pacing_profile: 'servsync-human-paced-v1', source_kind: 'recorder_generated', source_commit: 'a'.repeat(40),
+    source_version: 'Demo Recorder', video_asset_id: assetId,
+    poster_asset_id: '20000000-0000-4000-8000-000000000002',
+    recorder_metadata: { validation_status: 'passed' }, failure_category: null, failure_message: null,
+    review_notes: null, approved_walkthrough_id: null, approved_revision: null,
+    requested_at: '2026-08-18T00:00:00Z', ready_for_review_at: '2026-08-18T00:01:00Z',
+    reviewed_at: null, updated_at: '2026-08-18T00:01:00Z',
+  });
+  assert.equal(parsed.status, 'ready_for_review');
+  assert.equal(parsed.pacingProfile, 'servsync-human-paced-v1');
+  assert.equal(parsed.videoAssetId, assetId);
+});
+
+test('recording package is bound to the exact job and selected media checksums before upload', () => {
+  const job = {
+    id: '40000000-0000-4000-8000-000000000001',
+    scenarioKey: 'contractor-create-estimate',
+    pacingProfile: 'servsync-human-paced-v1' as const,
+  };
+  const video = new File(['video'], 'estimate.mp4', { type: 'video/mp4' });
+  const poster = new File(['poster'], 'estimate.png', { type: 'image/png' });
+  const manifest = {
+    recording_job_id: job.id, scenario: job.scenarioKey, pacing_profile: job.pacingProfile,
+    validation_status: 'passed', sensitive_data_check: 'passed',
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
+    source_git_commit: 'a'.repeat(40), mp4_filename: video.name, mp4_sha256: 'b'.repeat(64),
+    poster_filename: poster.name, poster_sha256: 'c'.repeat(64),
+    viewport: { width: 1440, height: 900 }, duration_seconds: 31.25,
+  };
+  assert.equal(validateHelpRecordingPackage(manifest, job, { video, poster }).recordingJobId, job.id);
+  assert.throws(() => validateHelpRecordingPackage({ ...manifest, recording_job_id: crypto.randomUUID() }, job, { video, poster }), /exactly match/);
+  assert.throws(() => validateHelpRecordingPackage({ ...manifest, mp4_sha256: 'd'.repeat(64) }, job, {
+    video: new File(['video'], 'other.mp4', { type: 'video/mp4' }), poster,
+  }), /exactly match/);
+});
+
 test('deterministic search adapter sends query, context, role context, and bounded limit', async () => {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const client = {
@@ -118,4 +207,35 @@ test('playback endpoint rejects non-POST, missing auth, and missing server confi
   }));
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { message: 'Help playback is unavailable.' });
+});
+
+test('recording-review playback uses the admin-only recording grant and rejects mixed identities', async () => {
+  const calls: string[] = [];
+  const fakeClient = {
+    rpc: async (name: string) => {
+      calls.push(name);
+      if (name === 'servsync_get_help_recording_playback_grant') return { data: {
+        recording_job_id: '40000000-0000-4000-8000-000000000001', video_asset_id: assetId, title: 'Review',
+      }, error: null };
+      return { data: [{
+        asset_id: assetId, storage_bucket: 'help-walkthroughs', storage_path: 'private/review.mp4',
+        mime_type: 'video/mp4', sha256: 'a'.repeat(64), file_size_bytes: 100,
+        duration_seconds: 30, width: 1440, height: 900,
+      }], error: null };
+    },
+    storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: 'https://signed.example/review' }, error: null }) }) },
+  };
+  const handler = createHelpWalkthroughMediaHandler({ SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-key' }, () => fakeClient as never);
+  const response = await handler(new Request('https://servsync.app/api/help-walkthrough-media', {
+    method: 'POST', headers: { Authorization: 'Bearer fixture-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recordingJobId: '40000000-0000-4000-8000-000000000001' }),
+  }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).recordingJobId, '40000000-0000-4000-8000-000000000001');
+  assert.deepEqual(calls, ['servsync_get_help_recording_playback_grant', 'servsync_get_help_media_for_service']);
+  const mixed = await handler(new Request('https://servsync.app/api/help-walkthrough-media', {
+    method: 'POST', headers: { Authorization: 'Bearer fixture-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recordingJobId: '40000000-0000-4000-8000-000000000001', walkthroughId }),
+  }));
+  assert.equal(mixed.status, 400);
 });

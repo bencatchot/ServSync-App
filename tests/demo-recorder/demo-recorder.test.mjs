@@ -14,6 +14,9 @@ import {
   assertRecordingDuration,
   assertSafeRecorderEnvironment,
   buildArtifactMetadata,
+  cursorInterpolation,
+  HUMAN_PACED_PROFILE_NAME,
+  HUMAN_PACED_RECORDING_PRESET,
   pacingFor,
   parseRecorderArgs,
   scanVisibleTextForSensitiveData,
@@ -39,7 +42,7 @@ test('contractor Estimate scenario is a bounded request-to-draft workflow', () =
     contractorCreateEstimateScenario.scenes.map((scene) => scene.key),
     ['request-context', 'estimate-draft', 'estimate-saved'],
   );
-  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 15, max: 25 });
+  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 38, max: 55 });
   assert.equal(contractorCreateEstimateScenario.estimate.line.unit_price_cents, 189500);
   assert.equal(contractorCreateEstimateScenario.estimate.unitPrice, '1895.00');
   assert.doesNotMatch(JSON.stringify(contractorCreateEstimateScenario), /password|service_role|@example/i);
@@ -85,6 +88,7 @@ test('operator arguments stay intentionally small', () => {
     scenarioKey: 'homeowner-service-request', pacing: 'marketing', outputDir: null, headed: false,
   });
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
+  assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=human-paced']).pacing, 'human-paced');
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
   assert.equal(parseRecorderArgs(['homeowner-home-history']).scenarioKey, 'homeowner-home-history');
   assert.equal(parseRecorderArgs(['servsync-platform-introduction']).scenarioKey, 'servsync-platform-introduction');
@@ -92,8 +96,13 @@ test('operator arguments stay intentionally small', () => {
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
 });
 
-test('Marketing pacing uses human-readable cursor, click, typing, and final-hold timing', () => {
+test('shared Help and Marketing pacing uses the reviewed human-paced defaults', () => {
   const marketing = pacingFor('marketing');
+  const help = pacingFor('human-paced');
+  assert.equal(help, marketing);
+  assert.equal(help, HUMAN_PACED_RECORDING_PRESET);
+  assert.equal(help.profile, HUMAN_PACED_PROFILE_NAME);
+  assert.equal(help.initialHold, 1300);
   assert.equal(marketing.settleBeforeClick, 550);
   assert.equal(marketing.postClick, 900);
   assert.equal(marketing.typing, 75);
@@ -102,10 +111,25 @@ test('Marketing pacing uses human-readable cursor, click, typing, and final-hold
   assert.ok(marketing.mediumTravel >= 1000);
   assert.ok(marketing.largeTravel >= 1500);
   const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
-  assert.match(recorderSource, /easeInOutCubic/);
+  assert.match(recorderSource, /cursorInterpolation/);
   assert.match(recorderSource, /await wait\(pacing\.settleBeforeClick\)/);
   assert.match(recorderSource, /await moveCursorToRest\(page, (?:scenePacing|pacing)\)/);
   assert.doesNotMatch(recorderSource, /preClick: 160|postClick: 300/);
+});
+
+test('human-paced cursor interpolation is smooth, categorized, and never teleports', () => {
+  const nearby = cursorInterpolation({ x: 100, y: 100 }, { x: 220, y: 140 });
+  const medium = cursorInterpolation({ x: 100, y: 100 }, { x: 620, y: 300 });
+  const large = cursorInterpolation({ x: 100, y: 100 }, { x: 1200, y: 780 });
+  assert.equal(nearby.duration, 700);
+  assert.equal(medium.duration, 1100);
+  assert.equal(large.duration, 1500);
+  assert.ok(nearby.points.length >= 24);
+  assert.ok(medium.points.length > nearby.points.length);
+  assert.ok(large.points.length > medium.points.length);
+  assert.deepEqual(large.points.at(-1), { x: 1200, y: 780 });
+  assert.ok(large.points.every((point, index) => index === 0 || point.x > large.points[index - 1].x));
+  assert.ok(Math.hypot(large.points[0].x - 100, large.points[0].y - 100) < 2);
 });
 
 test('sensitive visible-text scan catches configured credentials and token-like text', () => {
@@ -128,6 +152,9 @@ test('duration and metadata contracts fail closed', () => {
   });
   assert.equal(metadata.duration_seconds, 18.254);
   assert.equal(metadata.contains_credentials, false);
+  assert.equal(metadata.pacing_profile, HUMAN_PACED_PROFILE_NAME);
+  assert.equal(metadata.pacing_defaults.settle_before_click_ms, 550);
+  assert.equal(metadata.canonical_output_provenance, 'validated_servsync_demo_recorder');
   assert.match(metadata.fixture_policy, /registry-owned/i);
   const estimateMetadata = buildArtifactMetadata({
     scenario: contractorCreateEstimateScenario,

@@ -111,6 +111,14 @@ npm run demo:record -- homeowner-service-request --pacing=tutorial --headed
 npm run demo:record -- homeowner-service-request --output-dir="/absolute/review/path"
 ```
 
+Help Studio recording requests use the same recorder through one enforced profile:
+
+```bash
+npm run help:record -- "/absolute/path/to/help-recording-spec.json"
+```
+
+`servsync-human-paced-v1` is shared with Marketing pacing. Its baseline is 700/1100/1500 ms cursor travel, 550 ms settle-before-click, 900 ms post-click hold, 75 ms per typed character, 1300 ms initial hold, at least 3200 ms final hold, and cubic ease-in-out cursor interpolation. A successful Help run preserves the validated WebM and creates a Help-ready MP4, poster, and allowlisted metadata package under `~/Documents/Codex/ServSync Help Studio Recordings/<scenario>/<timestamp>/`. It never uploads by itself; Help Studio separately binds the package to the exact persisted recording request before private managed ingestion.
+
 The default working output directory is `demo-recordings/`, which is ignored by Git. WebM remains the native source/master. After the WebM passes scenario, playback, duration, final-state, browser-error, and sensitive-data validation, the recorder uses the locally installed Homebrew `ffmpeg`/`ffprobe` tools to create and verify an H.264/yuv420p MP4 with the same dimensions and duration. The package begins with `pacing_review: pending`; technical validation alone does not make it a Marketing asset.
 
 The approved package is then promoted to the durable owner library:
