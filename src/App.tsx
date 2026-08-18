@@ -16,6 +16,7 @@ import {
   ChevronRight,
   ChevronUp,
   CheckCircle2,
+  HelpCircle,
   ClipboardCheck,
   Compass,
   CreditCard,
@@ -148,6 +149,8 @@ import { ContractorMarketingWorkspace, InternalMarketingWorkspace } from './feat
 import { buildContractorMarketingOverview, buildInternalMarketingOverview } from './features/marketing/marketingDomain';
 import { CONTRACTOR_MARKETING_UI_ENABLED } from './features/marketing/contractorMarketingAvailability';
 import { marketingFacebookReturnStatus } from './features/marketing/marketingFacebookConnection';
+import { HelpStudioWorkspace } from './features/help/HelpStudioWorkspace';
+import { ContextualHelp } from './features/help/ContextualHelp';
 import { FilterSummary } from './features/search/FilterSummary';
 import {
   canCreateContractorLocalCustomersUi,
@@ -38567,9 +38570,12 @@ function ContractorDashboard({
 
               {contractorJobsView === 'drafts' && sharedDraftComposerEnabled && supabase ? (
                 <section data-testid="contractor-jobs-drafts-destination" className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50">
-                    <ArrowLeft size={16} /> Jobs overview
-                  </button>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50">
+                      <ArrowLeft size={16} /> Jobs overview
+                    </button>
+                    <ContextualHelp client={supabase} contextKey="contractor.drafts" contractorId={contractor?.id} label="How to create an estimate" />
+                  </div>
                   <DurableDraftWorkspace
                     client={supabase}
                     mode="list"
@@ -45007,7 +45013,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing'>(() => (
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing' | 'help_studio'>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'marketing' : 'overview'
   ));
   useEffect(() => {
@@ -45724,6 +45730,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
         { id: 'support',      label: 'Support',     icon: <MessageSquare size={17} />, badge: openSupportCount },
         { id: 'reports',      label: 'Reports',     icon: <Receipt size={17} /> },
         { id: 'marketing',    label: 'Marketing',   icon: <Megaphone size={17} />, group: 'Internal Workspace' },
+        { id: 'help_studio',  label: 'Help Studio', icon: <HelpCircle size={17} />, group: 'Internal Workspace' },
       ]}
       activeTab={adminTab}
       onChange={tab => {
@@ -45761,6 +45768,10 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
 
       {adminTab === 'marketing' && (
         <InternalMarketingWorkspace role={profile.role} overview={marketingOverview} client={supabase!} />
+      )}
+
+      {adminTab === 'help_studio' && supabase && (
+        <HelpStudioWorkspace client={supabase} />
       )}
 
       {adminTab === 'homeowners' && (

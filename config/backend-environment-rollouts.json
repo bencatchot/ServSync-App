@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "help-studio-contextual-walkthrough-foundation-v1",
+      "artifact": "servsync-help-studio-foundation.sql (SHA-256 8f3cb4a15e19b50464e10e641f3c12e46e4d46694743d694da7520e371244acb)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 1,030-line additive migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. Six forced-RLS Help tables, 18 fixed-path functions, one exact admin-upload Storage policy, private durable media, deterministic search, role/tenant denial, and canonical Help-to-ephemeral-Marketing lineage validation passed. Existing one Content row remained unchanged and publications/events remained zero."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained 21 Content rows, 53 Content events, four Marketing assets, eight pairings, three provider connections, two published Facebook records, and seven publication events. The flagship Video ID 1616577883220910 and recent text-post provider identity remained exact. The pre-existing enabled database submission control was not changed, and this rollout issued no provider request."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Six forced-RLS Help tables and the exact function/Storage contract matched Sandbox; Demo Marketing and Recorder state remained unchanged with zero publications/events and no provider action."
+        }
+      }
+    },
+    {
       "id": "supported-backend-schema-2026-08-06",
       "artifact": "PR #385 merge 67af5290b05fc88305d74818d5c0625fa93635f6",
       "environments": {

@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - FB-038A Help Studio and contextual walkthrough foundation v1
+
+- Branch: `codex/fb038a-help-studio-v1` from exact main `16cd630c0cc80ed2a73c3141a45b58af60be235a`.
+- Product: Adds a platform-admin-only Help Studio with durable private MP4/poster upload, storage usage, searchable walkthrough management, immutable revisions, passed-review publication, preview, unpublish, deprecate, and archive. Drafting remains manual/provider-neutral and no paid AI is called.
+- User Help: Published walkthroughs resolve through one deterministic text/context RPC using existing role and active contractor membership. The first data-driven hook sits in contractor Drafts for Estimate creation. Playback uses a role-aware grant plus a five-minute signed URL; ordinary users receive summary and steps with the video and cannot directly read the private Help bucket.
+- Marketing reuse: Published `marketing`/`both` walkthroughs appear only in the internal `Product demo / Help walkthrough` source. Preparing a post verifies canonical Help bytes, creates an ordinary ephemeral Marketing derivative, and records immutable checksum-matched Help lineage. Help media remains durable, the derivative keeps existing Marketing cleanup rules, and no publication authority is created.
+- Migration: Added the 1,030-line additive `servsync-help-studio-foundation.sql` at SHA-256 `8f3cb4a15e19b50464e10e641f3c12e46e4d46694743d694da7520e371244acb`. Exact bytes passed Sandbox -> Demo -> Production. Six forced-RLS Help tables, 18 fixed-path functions, one admin-upload-only Storage policy, no direct Help table grants, and private durable Storage are active in all three environments.
+- Preservation: Production retained 21 Content rows, 53 Content events, four Marketing assets, eight pairings, three provider connections, two published Facebook records, and seven publication events. Flagship Facebook Video ID `1616577883220910` and the newer text-post identity remained exact. The pre-existing enabled database provider-submission control was not changed; no public provider request occurred.
+- Validation: Disposable PostgreSQL authorization, private Storage, immutable revision, role/cross-tenant denial, deterministic search, support-gap frequency, Marketing derivative lineage, ownership/search-path/volatility/grant, and repeat-install tests; Help/Marketing unit contracts; focused desktop/mobile Playwright; shared Marketing, media-lifecycle, owner-publishing, Facebook-worker, backend-parity, TypeScript, Production build, migration checksum, rollout ledger, sensitive-value, Markdown-link, and `git diff --check` checks. Focused ESLint remains blocked before file evaluation by the inherited ESLint 9/typescript-eslint `allowShortCircuit` startup incompatibility.
+- Backlog impact: FB-038A is the bounded internal authoring/retrieval foundation. FB-038B retains the user Help Center/Ask ServSync experience, and FB-038C retains optional support-gap-assisted generation. Neither is implemented here.
+
 ## 2026-08-18 - FB-037K owner publishing flow v1
 
 - Branch: `codex/fb037k-owner-publishing-flow-v1` from exact main `51ba7ecb9ff5db0b9962ece6f74cf9d97ca62382`.
