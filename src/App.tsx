@@ -144,9 +144,8 @@ import {
 } from './features/referrals/statusPresentation';
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
-import { InternalMarketingWorkspace } from './features/marketing/MarketingWorkspace';
-import { MarketingUsagePanel } from './features/marketing/MarketingUsagePanel';
-import { buildInternalMarketingOverview } from './features/marketing/marketingDomain';
+import { ContractorMarketingWorkspace, InternalMarketingWorkspace } from './features/marketing/MarketingWorkspace';
+import { buildContractorMarketingOverview, buildInternalMarketingOverview } from './features/marketing/marketingDomain';
 import { marketingFacebookReturnStatus } from './features/marketing/marketingFacebookConnection';
 import { FilterSummary } from './features/search/FilterSummary';
 import {
@@ -38414,7 +38413,11 @@ function ContractorDashboard({
       )}
 
       {contractorTab === 'marketing' && supabase && contractor?.id && canManageMarketing && (
-        <MarketingUsagePanel client={supabase} contractorId={contractor.id} />
+        <ContractorMarketingWorkspace
+          client={supabase}
+          contractorId={contractor.id}
+          overview={buildContractorMarketingOverview()}
+        />
       )}
 
       {contractorTab === 'trust' && (

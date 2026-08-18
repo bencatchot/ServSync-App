@@ -2,7 +2,7 @@
 
 ## Scope
 
-This foundation adds a durable publication decision after Marketing Content approval. Its current UI and provider operation remain private to the ServSync internal Marketing workspace and platform administration. FB-037G-A now enforces shared workspace lineage across Content, pairing, asset, publication, and provider connection so future contractor operation cannot cross tenant boundaries.
+This foundation adds a durable publication decision after Marketing Content approval. FB-037G-C now gives the ServSync internal workspace and contractor Owner/Admin/Office workspaces one shared exact-package queue while FB-037G-A enforces workspace lineage across Content, pairing, asset, publication, and provider connection. Field Technician/Viewer remain denied, and platform administration remains internal-workspace-only.
 
 ```text
 Approved Marketing Content revision
@@ -29,26 +29,28 @@ This ordering is ServSync internal strategy. It is not a default for future cont
 
 ## State And Safety
 
-- Owner RPCs require an authenticated platform administrator and derive the internal workspace server-side.
+- Shared queue RPCs derive the internal or contractor workspace server-side. Owner/Admin/Office may manage their active contractor workspace; platform administrators resolve only the ServSync internal workspace.
 - Provider connection, publication, and event tables are forced-RLS and expose no direct browser or generic service-role table access.
 - Worker RPCs are purpose-bound and executable only by the server-side service role.
 - Creation requires an exact approved social-content revision and a connected destination with text capability.
-- Preview eligibility uses the same approved social-content boundary as creation. The Facebook card renders only the snapshot `body`; the internal title and lineage remain outside public content.
+- Every action uses an explicitly selected immutable package ID and fingerprint. Preview eligibility uses the same approved Content/media/destination snapshot as worker execution. The Facebook card renders only the snapshot `body`; internal title and lineage remain outside public content.
 - Provider previews are advisory rather than pixel-perfect. They do not invent timestamps, engagement, reach, or other provider-generated state.
-- The snapshot retains only public copy and bounded audit lineage. It is immutable after authorization.
+- Approval records review of the exact package but never publishes. Publish Now or Schedule records a separate exact user authorization with request identity, user, timestamp, destination, timezone, and immutable package fingerprint.
+- The snapshot retains only public copy and bounded audit lineage. It is immutable after authorization, and revision/media/provider identity changes retire the old package.
 - Published and cancelled rows are terminal. Publication events are append-only.
-- A replay-safe request UUID protects owner retries. Row claims use `FOR UPDATE SKIP LOCKED`.
+- A replay-safe request UUID protects user retries. Existing receipts are returned before evaluating whether new provider submissions are stopped. Row claims use `FOR UPDATE SKIP LOCKED`.
 - A provider request is marked separately from the worker claim. An uncertain response after request start is not automatically retried because doing so could duplicate a public post.
-- Safe retries are bounded to three attempts and only become owner-eligible for conclusive rate-limit or temporary-provider failures before a provider request started.
+- Safe retries are bounded to three attempts and only become user-eligible for conclusive rate-limit or temporary-provider failures before a provider request started. Ambiguous provider results remain Needs Attention without retry.
 - Local paths including `file://`, `/Users/`, `/private/tmp/`, and `~/Documents/` are rejected.
 - Validated Demo-recorder MP4s may enter the private `marketing-assets` bucket only after technical, sensitive-data, and normal-speed pacing review passes. Registration and exact approved-revision pairing are one atomic platform-admin RPC.
 - Media assets are immutable and checksum-addressed. Pairing identity is immutable, review history is append-only, and approving text never approves video.
 - A text revision with a live media pairing remains provider-publication ineligible unless the selected adapter can send the exact text and exact video together. ServSync will not silently drop the paired video.
-- No public social post is part of this foundation.
+- Published history keeps lightweight immutable lineage and shows a public link only when the provider supplied a real permalink. Purged full media never produces a broken player.
+- G-C rollout created no public social post.
 
 ## Scheduler
 
-Vercel Cron invokes `/api/marketing-publications-worker` every 15 minutes. The route requires `CRON_SECRET`, an exact `SERVSYNC_MARKETING_PUBLISHING_PROJECT_REF`, matching `SUPABASE_URL`, and the server-only service-role credential. Browser close, deployment, and process restart therefore do not discard scheduled state. The worker returns aggregate counts only.
+Vercel Cron invokes `/api/marketing-publications-worker` every 15 minutes. The route requires `CRON_SECRET`, an exact `SERVSYNC_MARKETING_PUBLISHING_PROJECT_REF`, matching `SUPABASE_URL`, and the server-only service-role credential. Browser close, deployment, and process restart therefore do not discard scheduled state. The worker returns aggregate counts only. It claims only due rows with exact durable user authorization. Approval alone is never claimable.
 
 The environment-specific project reference must be:
 
@@ -56,13 +58,13 @@ The environment-specific project reference must be:
 - Demo: `bdytwgejqnlblhrnqxkp`
 - Production: `uqgtheclhxqlnjpfmheq`
 
-The Production Vercel project has the exact Production reference as a Production-only server variable alongside its existing Cron and Supabase server configuration. Demo and Sandbox do not receive a Marketing worker Cron secret or service-role configuration in this slice, so their worker route remains fail-closed even though the additive database model is installed for parity. Provider setup remains absent in every environment, so no worker has an eligible destination and no outbound social request can occur.
+The Production Vercel project has the exact Production reference as a Production-only server variable alongside its existing Cron and Supabase server configuration. `SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED` is deployment capability, not per-post approval. `marketing_publishing_controls.provider_submissions_enabled` is the platform-admin emergency stop and defaults false. Workspace connection plus exact Publish Now/Schedule authorization provide the remaining authority. When stopped, new submissions cannot begin, but a known provider ID may continue read-only reconciliation. Demo and Sandbox remain fail-closed for provider operation.
 
 ## Provider Readiness
 
 ### Facebook
 
-Facebook Connection v1 supplies the reviewed internal OAuth, Vault, Page-selection, readiness, reconnect, and disconnect architecture. Production has a provider-validated ServSync Page connection with required granular Page authority and one completed bounded live verification. The stored readiness label remains `ready_except_live_post_verification` because the current status contract has no post-verification `ready` value; the real provider result is recorded separately below. Public posting remains disabled by the database capability and absent environment kill switch. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
+Facebook Connection v1 supplies reviewed workspace-scoped OAuth, Vault, explicit Page selection, readiness, reconnect, and disconnect. Production has a provider-validated ServSync Page connection with required granular Page authority and one completed bounded live verification. Connected destinations now use the truthful `ready` state. Public provider submission remains stopped by the database control and absent environment capability. See [ServSync Facebook Marketing Connection v1](./ServSync_Facebook_Marketing_Connection_v1.md).
 
 Owner Visual Publication Preview v1 lists every currently approved Facebook-eligible text item, separates internal metadata from public content, and renders the exact adapter message in a responsive Facebook-style decision card. Paired Text + Product Demo Assets v1 adds a playable exact-revision video candidate, recorder provenance, pacing/validation evidence, and a separate approve/reject/retire decision. Narrated Marketing Asset + Publication Snapshot v1 adds a distinct narrated-derivative contract with silent-master provenance, OpenAI/Cedar/model/script/timing metadata, and an exact public AI-voice disclosure. Preview and worker input reference the same immutable Content revision, approved pairing, asset checksum, and private Storage identity.
 
@@ -121,8 +123,7 @@ Primary references:
 - Instagram adapter
 - TikTok adapter and provider audit
 - analytics, comments, moderation, ads, recurring posts, and campaign optimization
-- contractor Marketing provider connections and authorization
-- contractor publishing queue, preview selection, Publish Now/Schedule, history, and Needs Attention UX
+- runtime Content-generation providers and contractor Create from Job / Upload Media / Simple Post entry
 - contractor media intake, quota/cost enforcement, retention, and purge are now provided by FB-037G-B; ordinary contractor publication authorization remains deferred to FB-037G-C
 
-Capabilities not explicitly marked as delivered by FB-037G-B remain deferred and are not implied by this foundation.
+Capabilities not explicitly marked as delivered by FB-037G-B/G-C remain deferred and are not implied by this foundation.

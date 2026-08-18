@@ -217,6 +217,26 @@ test('known Video ID processing remains a reconciliation-only operation', async 
   assert.equal(calls[0].init?.method, 'GET');
 });
 
+test('known Video ID can reconcile after the deployment submission capability is disabled', async () => {
+  const calls: Array<{ url: URL; init?: RequestInit }> = [];
+  const adapter = createFacebookPublishingAdapter({
+    config: { ...config, publicPostsEnabled: false },
+    getPageToken: async () => 'test-page-token-abcdefghijklmnopqrstuvwxyz',
+    getManagedMedia: async () => { throw new Error('reconciliation must not read media'); },
+    fetcher: queueFetcher([
+      json({ id: videoId, created_time: '2026-08-17T12:00:00+0000', description: message }),
+    ], calls),
+  });
+  const prepared = await adapter.preparePublication(claim({
+    operation: 'reconcile', provider_publication_id: videoId, provider_reconciliation_count: 2,
+  }));
+  const result = await adapter.reconcile(prepared);
+  assert.equal(result.state, 'published');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.init?.method, 'GET');
+  assert.equal(adapter.getConnectionReadiness().status, 'setup_required');
+});
+
 test('ambiguous upload response is terminal and never retry-eligible', async () => {
   const calls: Array<{ url: URL; init?: RequestInit }> = [];
   const adapter = enabledAdapter([new Error('network timeout')], calls);

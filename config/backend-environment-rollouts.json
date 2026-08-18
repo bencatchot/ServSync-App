@@ -776,6 +776,42 @@
           "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production retained 17 Content rows, three protected assets, six pairings, three provider connections, one flagship publication, and four events; intakes and usage events remained zero. Exact flagship SHA-256 and Facebook Video ID 1616577883220910 remained unchanged, database publishing stayed false, and no provider request occurred."
         }
       }
+    },
+    {
+      "id": "marketing-publishing-queue-authorization-v1",
+      "artifact": "servsync-marketing-publishing-queue-authorization.sql (SHA-256 06b1dd5dd5cc321b4fb46232addcc1ea1f73a3241ae0d32ef898ac87de154157)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 1,303-line migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17. Immutable packages, exact preview/approval, durable Publish Now/Schedule authorization, forced RLS, service-role-only worker claims, role/tenant denial, global stop default-false, and zero-residue queue validation passed. Content, asset, pairing, publication, and event counts remained zero and no provider request occurred."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Demo retained zero Content, assets, pairings, publications, publication events, and packages; provider submission remained stopped and Demo Recorder state was unaffected."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. The first attempt rolled back cleanly when the existing terminal immutability trigger rejected its one-time authorization backfill. A reviewed 74-line compatibility guard at SHA-256 bfb38b0e1a05d278be3feb4c7057172cb047ac9b131e41cbeb0ac6ac47bb99f6 permitted only that null-to-snapshot backfill while still denying ordinary terminal mutation; the primary migration immediately restored the final strict guard. Production retained 17 Content rows, three assets, six pairings, one published flagship, four events, exact revision/pairing/asset/Page/Facebook Video ID, and gained one matching published package. Database provider submission remained false, the Production environment flag remained absent, and no provider request occurred."
+        }
+      }
+    },
+    {
+      "id": "marketing-scheduled-destination-invalidation-v1",
+      "artifact": "servsync-marketing-scheduled-destination-invalidation.sql (SHA-256 eb00966a0db067ae75b32fd5f74458377dda2dd595ccdff95e758f7334018867)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 70-line forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-17. Disposable SQL proved a changed Page/connection identity moves an unsubmitted schedule to failed/Needs Attention with no safe retry, while terminal rows and provider reconciliation remain unchanged."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Demo retained zero packages, publications, and events; the security-definer function hash matches Sandbox and no provider action occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Production had no scheduled rows to mutate and retained one exact published flagship, four events, one matching published package, and provider submission stopped. The function hash matches Sandbox/Demo and no provider request occurred."
+        }
+      }
     }
   ]
 }
