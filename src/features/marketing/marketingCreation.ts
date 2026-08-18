@@ -16,6 +16,14 @@ export type MarketingCreationJob = {
   media: MarketingCreationMedia[];
 };
 
+export type MarketingCreationProductMedia = {
+  id: string;
+  label: string;
+  type: 'image' | 'video';
+  variant: string;
+  durationSeconds: number | null;
+};
+
 export type MarketingCreationContext = {
   profile: null | {
     id: string;
@@ -27,6 +35,7 @@ export type MarketingCreationContext = {
     generationReady: boolean;
   };
   jobs: MarketingCreationJob[];
+  productMedia: MarketingCreationProductMedia[];
 };
 
 type RpcResult = { data: unknown; error: unknown };
@@ -68,6 +77,13 @@ function parseContext(value: unknown): MarketingCreationContext {
   } : null;
   return {
     profile,
+    productMedia: Array.isArray(value.product_media) ? value.product_media.filter(record).map(item => ({
+      id: text(item.asset_id),
+      label: text(item.label) || 'ServSync product media',
+      type: item.asset_type === 'image' ? 'image' : 'video',
+      variant: text(item.media_variant),
+      durationSeconds: typeof item.duration_seconds === 'number' ? item.duration_seconds : null,
+    })) : [],
     jobs: value.jobs.filter(record).map(job => ({
       id: text(job.job_id), title: text(job.title), summary: typeof job.summary === 'string' ? job.summary : null,
       status: text(job.status), completedAt: typeof job.completed_at === 'string' ? job.completed_at : null,
@@ -92,6 +108,7 @@ export function createMarketingCreationAdapter(client: MarketingCreationClient, 
     async context() {
       return parseContext(await rpc(client, 'servsync_get_marketing_creation_context', { p_contractor_id: contractorId }));
     },
+    usage: usage.getSummary,
     upload: usage.upload,
     async selectJobMedia(jobId: string, media: MarketingCreationMedia, rightsAcknowledged: boolean) {
       if (!contractorId) throw new Error('Job media is available in contractor workspaces.');
@@ -133,7 +150,7 @@ export function createMarketingCreationAdapter(client: MarketingCreationClient, 
         throw error;
       }
     },
-    async generate(input: { sourceKind: 'job' | 'marketing_upload' | 'simple'; jobId: string | null; assetId: string | null; brief: string }) {
+    async generate(input: { sourceKind: 'job' | 'marketing_upload' | 'managed_asset' | 'simple'; jobId: string | null; assetId: string | null; brief: string }) {
       const { data, error } = await client.functions.invoke('marketing-content-draft', {
         body: {
           clientRequestId: crypto.randomUUID(), contractorId, sourceKind: input.sourceKind,

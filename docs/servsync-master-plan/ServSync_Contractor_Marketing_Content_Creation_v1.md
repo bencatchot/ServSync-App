@@ -12,7 +12,7 @@ FB-037H turns the shared Marketing workspace into a useful draft-creation surfac
 2. **Upload media** uses the G-B private reserved-path intake, rights acknowledgement, checksum, MIME/size/duration validation, poster, active-slot limit, and retention lifecycle. The uploaded source no longer depends on the operator's computer after finalization.
 3. **Simple post** creates a text-first draft from the user's brief. It requires no media and does not consume the video-generation allowance.
 
-ServSync internal Marketing receives Upload and Simple Post. Job sourcing is contractor-only because internal Marketing has no contractor Job tenant.
+ServSync internal Marketing receives Upload, Simple Post, and a friendly **ServSync product media** selector backed by validated internal managed assets. Job sourcing remains contractor-only because internal Marketing has no contractor Job tenant. The two source choices preserve the same canonical asset, private-media, candidate-pairing, and exact Preview contracts without asking an internal user to fabricate a contractor Job.
 
 ## Grounding And Privacy
 
@@ -44,6 +44,8 @@ No Create Post action creates a publication, schedule, provider request, or publ
 
 Private source/request tables use forced RLS. Security-definer functions are `postgres`-owned, use explicit safe search paths and volatility, revoke `PUBLIC`, and grant only the reviewed authenticated or service role.
 
+Contractor discovery is separately gated in the application. `VITE_CONTRACTOR_MARKETING_UI_ENABLED=true` is required before Owner/Admin/Office navigation or workspace rendering is exposed; absent/false is the default fail-closed state. This rollout gate does not replace backend role or tenant authority.
+
 ## Beta Limits And Media Lifecycle
 
 G-B remains authoritative: three active media slots, four video-generation reservations per rolling 30 days, five prepared/scheduled posts, 75-second MP4 ceiling, 72-hour verified-publication large-media retention, and 30-day abandoned-media expiration. This slice does not add generated video, multi-asset composition, narration, or permanent media storage.
@@ -54,7 +56,7 @@ Migration `servsync-contractor-marketing-content-creation.sql` is 515 lines with
 
 Sandbox proved one real configured text generation plus exact replay: one draft, one usage event, no video-generation consumption, and zero publications. Demo's database and function are installed but provider execution remains fail-closed because no approved Demo OpenAI secret exists. Production has the approved provider configuration and preserved every existing Marketing count and the exact live flagship.
 
-The Production cleanup Cron remains configured for 05:43 UTC. No qualifying natural successful execution has yet been observed; an unauthenticated 401 is not acceptance evidence and no manual run substitutes for it.
+The Production cleanup Cron remains configured for 05:43 UTC. Vercel recorded a natural HTTP 200 execution at `2026-08-18T05:43:24Z`; no manual run was substituted. No Production media was eligible for purge.
 
 ## Deferred
 
@@ -64,4 +66,4 @@ The Production cleanup Cron remains configured for 05:43 UTC. No qualifying natu
 - permanent or paid media library plans;
 - advanced regeneration controls and cost estimation/reconciliation;
 - additional publishing providers, analytics, and campaigns;
-- natural cleanup-Cron acceptance and broader real-contractor usability evidence.
+- selected-contractor beta enrollment and broader real-contractor usability evidence.

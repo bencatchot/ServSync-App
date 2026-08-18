@@ -130,7 +130,8 @@ test('shared queue requires explicit selection and exact preview before package 
   await page.getByTestId('marketing-nav-campaigns').click();
   await expect(page.getByTestId('selected-publishing-package')).toHaveCount(0);
   await page.getByRole('button', { name: /Approved social post/ }).click();
-  await expect(page.getByTestId('selected-publishing-package')).toContainText('revision 4');
+  await expect(page.getByTestId('selected-publishing-package')).toContainText('Current approved copy');
+  await expect(page.getByTestId('selected-publishing-package')).not.toContainText(contentId);
   await page.getByRole('button', { name: 'Open exact preview' }).click();
   await expect(page.getByTestId('exact-publication-preview')).toContainText(content.body);
   await expect(page.getByTestId('exact-publication-preview').locator('video')).toBeVisible();

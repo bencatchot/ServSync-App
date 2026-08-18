@@ -37,6 +37,14 @@ function Meter({ label, used, limit, helper }: { label: string; used: number; li
   );
 }
 
+function Count({ label, value, helper }: { label: string; value: number; helper: string }) {
+  return <div className="rounded-lg border border-slate-200 bg-white p-4" data-testid={`marketing-usage-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <p className="text-sm font-bold text-slate-950">{label}</p>
+    <p className="mt-3 text-xl font-bold text-slate-900">{value}</p>
+    <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>
+  </div>;
+}
+
 function CostControlsForm({ controls, saving, onSave }: {
   controls: MarketingCostControls;
   saving: boolean;
@@ -147,7 +155,8 @@ export function MarketingUsagePanel({ client, contractorId, platformControls = f
       {notice && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{notice}</p>}
       {summary && (
         <>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Count label="AI drafts" value={summary.usage.aiTextDraftsRolling30Days} helper="Recorded in the last 30 days; no separate draft limit is currently set." />
             <Meter label="Video generations" used={summary.usage.videoGenerationsRolling30Days} limit={summary.entitlements.monthlyVideoGenerations} helper="Rolling 30-day beta allowance." />
             <Meter label="Active media" used={summary.usage.activeMediaSlots} limit={summary.entitlements.activeMediaSlots} helper={`${formatBytes(summary.usage.activeMediaBytes)} temporarily retained.`} />
             <Meter label="Prepared posts" used={summary.usage.readyScheduledPosts} limit={summary.entitlements.readyScheduledPostLimit} helper="Ready, scheduled, or publishing." />
@@ -162,6 +171,15 @@ export function MarketingUsagePanel({ client, contractorId, platformControls = f
             <ShieldCheck size={16} className="mt-0.5 shrink-0 text-emerald-600" />
             <p>Published media is retained for {summary.entitlements.publishedMediaRetentionHours} hours before eligible large files are removed. Abandoned media expires after {summary.entitlements.abandonedMediaExpirationDays} days.</p>
           </div>
+          {summary.generation.recentTextDraft && <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">
+            <p className="font-bold text-slate-900">Latest AI draft evidence</p>
+            <p>{summary.generation.recentTextDraft.provider} · {summary.generation.recentTextDraft.model} · {summary.generation.recentTextDraft.outcome}</p>
+            <p>Cost: {summary.generation.recentTextDraft.costStatus === 'known' && summary.generation.recentTextDraft.knownCostMicrousd !== null
+              ? formatCost(summary.generation.recentTextDraft.knownCostMicrousd)
+              : summary.generation.recentTextDraft.costStatus === 'estimated' && summary.generation.recentTextDraft.estimatedCostMicrousd !== null
+                ? `${formatCost(summary.generation.recentTextDraft.estimatedCostMicrousd)} estimated`
+                : summary.generation.recentTextDraft.costStatus}.</p>
+          </div>}
         </>
       )}
 
@@ -193,12 +211,16 @@ export function MarketingUsagePanel({ client, contractorId, platformControls = f
       )}
 
       {platformControls && controls && (
-        <CostControlsForm controls={controls} saving={saving} onSave={async next => {
+        <details className="border-t border-slate-200 pt-4" data-testid="marketing-platform-operations">
+          <summary className="cursor-pointer text-sm font-bold text-slate-800">Platform operations</summary>
+          <p className="mt-1 text-xs leading-5 text-slate-500">Global generation controls for ServSync operators.</p>
+          <CostControlsForm controls={controls} saving={saving} onSave={async next => {
           setSaving(true); setError(''); setNotice('');
           try { setControls(await adapter.updateCostControls(next)); setNotice('Platform Marketing controls updated.'); }
           catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'ServSync could not update Marketing controls.'); }
           finally { setSaving(false); }
-        }} />
+          }} />
+        </details>
       )}
     </section>
   );

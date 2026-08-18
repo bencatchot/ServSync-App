@@ -205,6 +205,23 @@ if [[ -n "${SERVSYNC_MARKETING_CONTENT_CREATION_MIGRATION:-}" ]]; then
   fi
 fi
 
+if [[ -n "${SERVSYNC_ADMIN_MARKETING_DOGFOOD_MIGRATION:-}" ]]; then
+  psql_run --file "$ROOT_DIR/$SERVSYNC_ADMIN_MARKETING_DOGFOOD_MIGRATION" >/dev/null
+  if [[ -n "${SERVSYNC_ADMIN_MARKETING_DOGFOOD_FORWARD_FIX:-}" ]]; then
+    psql_run --file "$ROOT_DIR/$SERVSYNC_ADMIN_MARKETING_DOGFOOD_FORWARD_FIX" >/dev/null
+  fi
+  psql_run --file "$ROOT_DIR/${SERVSYNC_ADMIN_MARKETING_DOGFOOD_VALIDATION:?Admin Marketing dogfood validation is required.}" >/dev/null
+  if psql_run --file "$ROOT_DIR/$SERVSYNC_ADMIN_MARKETING_DOGFOOD_MIGRATION" >/dev/null 2>&1; then
+    echo "Repeated Admin Marketing dogfood migration unexpectedly succeeded." >&2
+    exit 1
+  fi
+  if [[ -n "${SERVSYNC_ADMIN_MARKETING_DOGFOOD_FORWARD_FIX:-}" ]] \
+      && psql_run --file "$ROOT_DIR/$SERVSYNC_ADMIN_MARKETING_DOGFOOD_FORWARD_FIX" >/dev/null 2>&1; then
+    echo "Repeated Admin Marketing dogfood forward fix unexpectedly succeeded." >&2
+    exit 1
+  fi
+fi
+
 if psql_run --file "$ROOT_DIR/servsync-marketing-media-intake-ephemeral-lifecycle.sql" >/dev/null 2>&1; then
   echo "Repeated Marketing media lifecycle migration unexpectedly succeeded." >&2
   exit 1

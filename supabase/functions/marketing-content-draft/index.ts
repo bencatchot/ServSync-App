@@ -84,7 +84,7 @@ Deno.serve(async req => {
     const sourceJobId = typeof body.sourceJobId === 'string' ? body.sourceJobId : null;
     const sourceAssetId = typeof body.sourceAssetId === 'string' ? body.sourceAssetId : null;
     const ownerBrief = text(body.ownerBrief);
-    if (!clientRequestId || !['job', 'marketing_upload', 'simple'].includes(sourceKind) || ownerBrief.length < 3) {
+    if (!clientRequestId || !['job', 'marketing_upload', 'managed_asset', 'simple'].includes(sourceKind) || ownerBrief.length < 3) {
       return response(req, { error: 'Add a short note about what this post should say.' }, 400);
     }
 

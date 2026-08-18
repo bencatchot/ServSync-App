@@ -146,6 +146,7 @@ import { reviewModerationStatusPresentation } from './features/reviews/statusPre
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { ContractorMarketingWorkspace, InternalMarketingWorkspace } from './features/marketing/MarketingWorkspace';
 import { buildContractorMarketingOverview, buildInternalMarketingOverview } from './features/marketing/marketingDomain';
+import { CONTRACTOR_MARKETING_UI_ENABLED } from './features/marketing/contractorMarketingAvailability';
 import { marketingFacebookReturnStatus } from './features/marketing/marketingFacebookConnection';
 import { FilterSummary } from './features/search/FilterSummary';
 import {
@@ -31481,9 +31482,11 @@ function ContractorDashboard({
   const canUseInvoiceDraftPriceBook = priceBookAccess.canView && effectiveDurableDraftCapabilities.canLaunchInvoice;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
-  const canManageMarketing = currentContractorTeamRole === 'owner'
+  const canManageMarketing = CONTRACTOR_MARKETING_UI_ENABLED && (
+    currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
-    || currentContractorTeamRole === 'office';
+    || currentContractorTeamRole === 'office'
+  );
   useEffect(() => {
     if (!canManageMarketing && contractorTab === 'marketing') setContractorTab('overview');
   }, [canManageMarketing, contractorTab]);
