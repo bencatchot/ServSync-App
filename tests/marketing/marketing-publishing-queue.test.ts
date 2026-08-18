@@ -167,11 +167,16 @@ test('queue presentation requires explicit selection, preview, confirmation, and
   assert.match(source, /selectedContentId: string \| null/);
   assert.match(source, /Exact publication preview/);
   assert.match(source, /publication-authorization-confirmation/);
+  assert.match(source, /pendingPreviewId/);
+  assert.match(source, /setPendingPreviewId\(packageId\)/);
+  assert.match(source, /Remove media/);
   assert.match(source, /Approve exact post/);
   assert.match(source, /Publish Now/);
   assert.match(source, /Review Schedule/);
   assert.match(source, /providerPermalink \?/);
   assert.doesNotMatch(source, /packages\[0\]/);
+  assert.doesNotMatch(source, /Content \{selectedContent\.id\}/);
+  assert.doesNotMatch(source, /fingerprint\.slice/);
   assert.doesNotMatch(source, /window\.open\([^)]*providerPublicationId/);
 });
 

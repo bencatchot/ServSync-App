@@ -4,6 +4,18 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - FB-037I admin Marketing dogfood v1
+
+- Branch: `codex/fb037i-admin-marketing-dogfood-v1` from exact main `d646ad21c8a5bbeb4e3b9c4fed25cbc491660d81`.
+- Migrations: Added the 294-line additive `servsync-admin-marketing-dogfood.sql` at SHA-256 `a1d7fc3958e79f4b48010621eeb6921a17d2bd66903b5955e1a9e6f3c27b814d` and the 72-line additive prepared-usage forward fix at SHA-256 `b9412772656ca0820c659cc609825c0ebc23619135b7a0f55a32ad0d924a0650`. The first exposes validated existing ServSync product media and honest recent AI text usage to the internal workspace; the second makes the five-prepared-post evidence count G-C Ready/Scheduled/Publishing packages rather than older publication rows. Exact bytes passed Sandbox -> Demo -> Production.
+- Shared UX: Internal Create Post now offers Simple Post, browser Upload Media, and friendly ServSync product-media selection without asset IDs, storage paths, source commits, or synthetic contractor Jobs. Exact package preparation opens the intended Preview after state refresh; Content and media remain independently reviewable/removable; ordinary cards no longer display Content UUID/revision/fingerprint infrastructure. Platform-wide controls sit behind a collapsed Platform operations boundary.
+- Rollout boundary: Ordinary contractor Marketing discovery is default-off unless `VITE_CONTRACTOR_MARKETING_UI_ENABLED=true`; this does not weaken the tenant-safe Owner/Admin/Office backend or Field Technician/Viewer denial. Broad contractor release is not part of FB-037I.
+- Usage and safety: Workspace usage exposes rolling AI draft count, active media, prepared exact packages, recent provider/model, and honest known/estimated/unavailable cost status. No schema path creates publication authority. Production retained 17 Content items, three assets, six pairings, one published flagship, four events, exact Page/Facebook Video ID, and database provider submission disabled. No public provider request occurred during rollout.
+- Natural cleanup: Vercel recorded a natural `GET /api/marketing-media-cleanup` at `2026-08-18T05:43:24Z`, matching `43 5 * * *`, with HTTP 200. No manual invocation was substituted and no Production media was eligible for purge.
+- Validation: Disposable PostgreSQL full Marketing chain with additive/repeat guards; FB-037H and FB-037I creation contracts 9/9; focused queue/usage contracts 12/12; shared desktop/mobile Playwright 9/9 at 1440x900 and 390x844; TypeScript; Production build; exact migration hashes; Sandbox/Demo/Production preservation; sensitive-value, Markdown-link, rollout-ledger, and `git diff --check`.
+- Backlog impact: FB-037I is the controlled internal proving step before selected-contractor beta. Broad rollout, advanced composition, generated media/TTS, additional providers, analytics, and campaigns remain separately governed.
+- Master plan impact: Records one contractor-shaped Marketing product, with platform operations separated and contractor discovery still fail-closed.
+
 ## 2026-08-17 - FB-037H contractor Marketing content creation v1
 
 - Branch: `codex/fb037h-contractor-content-creation-v1` from exact main `c2642659e717fa0fccf9b3d8da3a03d3ab0f9dc3`.

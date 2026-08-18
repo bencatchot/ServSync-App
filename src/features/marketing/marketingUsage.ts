@@ -13,11 +13,28 @@ export type MarketingUsageSummary = {
   };
   usage: {
     videoGenerationsRolling30Days: number;
+    aiTextDraftsRolling30Days: number;
     activeMediaSlots: number;
     activeMediaBytes: number;
     readyScheduledPosts: number;
   };
-  generation: { enabled: boolean; globalBudgetConfigured: boolean; globalWarning: boolean; globalHardStop: boolean };
+  generation: {
+    enabled: boolean;
+    globalBudgetConfigured: boolean;
+    globalWarning: boolean;
+    globalHardStop: boolean;
+    recentTextDraft: null | {
+      provider: string;
+      model: string;
+      costStatus: 'known' | 'estimated' | 'pending' | 'unavailable';
+      knownCostMicrousd: number | null;
+      estimatedCostMicrousd: number | null;
+      outcome: string;
+      inputTokens: number;
+      outputTokens: number;
+      occurredAt: string;
+    };
+  };
   recentMedia: Array<{
     assetId: string;
     assetType: 'image' | 'video';
@@ -93,6 +110,7 @@ export function parseMarketingUsageSummary(value: unknown): MarketingUsageSummar
     },
     usage: {
       videoGenerationsRolling30Days: number(value.usage.video_generations_rolling_30_days),
+      aiTextDraftsRolling30Days: number(value.usage.ai_text_drafts_rolling_30_days),
       activeMediaSlots: number(value.usage.active_media_slots),
       activeMediaBytes: number(value.usage.active_media_bytes),
       readyScheduledPosts: number(value.usage.ready_scheduled_posts),
@@ -102,6 +120,19 @@ export function parseMarketingUsageSummary(value: unknown): MarketingUsageSummar
       globalBudgetConfigured: value.generation.global_budget_configured === true,
       globalWarning: value.generation.global_warning === true,
       globalHardStop: value.generation.global_hard_stop === true,
+      recentTextDraft: isRecord(value.generation.recent_text_draft) ? {
+        provider: string(value.generation.recent_text_draft.provider),
+        model: string(value.generation.recent_text_draft.model),
+        costStatus: ['known', 'estimated', 'pending'].includes(string(value.generation.recent_text_draft.cost_status))
+          ? string(value.generation.recent_text_draft.cost_status) as 'known' | 'estimated' | 'pending'
+          : 'unavailable',
+        knownCostMicrousd: value.generation.recent_text_draft.known_cost_microusd === null ? null : number(value.generation.recent_text_draft.known_cost_microusd),
+        estimatedCostMicrousd: value.generation.recent_text_draft.estimated_cost_microusd === null ? null : number(value.generation.recent_text_draft.estimated_cost_microusd),
+        outcome: string(value.generation.recent_text_draft.outcome),
+        inputTokens: number(value.generation.recent_text_draft.input_tokens),
+        outputTokens: number(value.generation.recent_text_draft.output_tokens),
+        occurredAt: string(value.generation.recent_text_draft.occurred_at),
+      } : null,
     },
     recentMedia: value.recent_media.filter(isRecord).map(item => ({
       assetId: string(item.asset_id),

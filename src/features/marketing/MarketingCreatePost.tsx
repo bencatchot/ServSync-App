@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Briefcase, FileUp, Loader2, MessageSquareText, Sparkles, X } from 'lucide-react';
+import { Briefcase, FileUp, Film, Loader2, MessageSquareText, Sparkles, X } from 'lucide-react';
 import { createMarketingCreationAdapter, type MarketingCreationClient, type MarketingCreationContext } from './marketingCreation';
+import type { MarketingUsageSummary } from './marketingUsage';
 
-type Mode = 'job' | 'upload' | 'simple';
+type Mode = 'job' | 'upload' | 'product' | 'simple';
 
 export function MarketingCreatePost({ client, contractorId, onCreated }: {
   client: MarketingCreationClient;
@@ -14,11 +15,13 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('simple');
   const [context, setContext] = useState<MarketingCreationContext | null>(null);
+  const [usage, setUsage] = useState<MarketingUsageSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [brief, setBrief] = useState('');
   const [jobId, setJobId] = useState('');
   const [mediaPath, setMediaPath] = useState('');
+  const [productMediaId, setProductMediaId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [rights, setRights] = useState(false);
   const busyRef = useRef(false);
@@ -27,14 +30,18 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
     if (!open) return;
     setLoading(true);
     setError(null);
-    adapter.context().then(setContext).catch(reason => setError(reason instanceof Error ? reason.message : 'Marketing creation is unavailable.')).finally(() => setLoading(false));
+    Promise.all([adapter.context(), adapter.usage()])
+      .then(([nextContext, nextUsage]) => { setContext(nextContext); setUsage(nextUsage); })
+      .catch(reason => setError(reason instanceof Error ? reason.message : 'Marketing creation is unavailable.'))
+      .finally(() => setLoading(false));
   }, [adapter, open]);
 
   const selectedJob = context?.jobs.find(job => job.id === jobId) ?? null;
   const selectedMedia = selectedJob?.media.find(media => media.path === mediaPath) ?? null;
+  const selectedProductMedia = context?.productMedia.find(media => media.id === productMediaId) ?? null;
 
   const reset = () => {
-    setOpen(false); setMode('simple'); setBrief(''); setJobId(''); setMediaPath(''); setFile(null); setRights(false); setError(null);
+    setOpen(false); setMode('simple'); setBrief(''); setJobId(''); setMediaPath(''); setProductMediaId(''); setFile(null); setRights(false); setError(null);
   };
 
   const create = async () => {
@@ -42,6 +49,7 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
     if (brief.trim().length < 3) { setError('Add a short note about what this post should say.'); return; }
     if (mode === 'job' && (!selectedJob || !selectedMedia || !rights)) { setError('Choose Job media and confirm you have permission to use it.'); return; }
     if (mode === 'upload' && (!file || !rights)) { setError('Choose media and confirm you have permission to use it.'); return; }
+    if (mode === 'product' && !selectedProductMedia) { setError('Choose ServSync product media for this post.'); return; }
     busyRef.current = true; setLoading(true); setError(null);
     try {
       let assetId: string | null = null;
@@ -52,9 +60,9 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
         assetId = uploaded.asset_id;
       }
       const contentId = await adapter.generate({
-        sourceKind: mode === 'upload' ? 'marketing_upload' : mode,
+        sourceKind: mode === 'upload' ? 'marketing_upload' : mode === 'product' ? 'managed_asset' : mode,
         jobId: mode === 'job' ? selectedJob?.id ?? null : null,
-        assetId,
+        assetId: mode === 'product' ? selectedProductMedia?.id ?? null : assetId,
         brief: brief.trim(),
       });
       await onCreated(contentId);
@@ -78,6 +86,7 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-3" role="group" aria-label="Post source">
         {contractorId && <ModeButton active={mode === 'job'} onClick={() => setMode('job')} icon={<Briefcase size={18} />} label="From a Job" />}
+        {!contractorId && <ModeButton active={mode === 'product'} onClick={() => setMode('product')} icon={<Film size={18} />} label="ServSync product media" />}
         <ModeButton active={mode === 'upload'} onClick={() => setMode('upload')} icon={<FileUp size={18} />} label="Upload media" />
         <ModeButton active={mode === 'simple'} onClick={() => setMode('simple')} icon={<MessageSquareText size={18} />} label="Simple post" />
       </div>
@@ -87,9 +96,21 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
         {selectedJob && <div className="sm:col-span-2 rounded-lg bg-white p-3 text-sm text-slate-700"><p className="font-semibold">{selectedJob.title}</p>{selectedJob.summary && <p className="mt-1">{selectedJob.summary}</p>}<p className="mt-1 text-xs text-slate-500">Only customer-safe completed-work context is used. Pricing, contact details, addresses, and private notes stay out.</p></div>}
       </div>}
       {mode === 'upload' && <label className="mt-4 block text-sm font-semibold text-slate-700">Photo or MP4<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4" onChange={event => setFile(event.target.files?.[0] ?? null)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm" /></label>}
+      {mode === 'product' && <div className="mt-4">
+        <label className="block text-sm font-semibold text-slate-700">ServSync product media<select value={productMediaId} onChange={event => setProductMediaId(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Choose product media</option>{context?.productMedia.map(media => <option key={media.id} value={media.id}>{media.label}{media.type === 'video' && media.durationSeconds ? ` · ${Math.round(media.durationSeconds)} sec video` : ''}</option>)}</select></label>
+        <p className="mt-2 text-xs leading-5 text-slate-500">These are validated ServSync-owned product recordings already stored in private Marketing media.</p>
+      </div>}
       {(mode === 'job' || mode === 'upload') && <label className="mt-3 flex min-h-11 items-start gap-3 rounded-lg bg-white p-3 text-sm text-slate-700"><input type="checkbox" checked={rights} onChange={event => setRights(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>I have permission to use this media for Marketing.</span></label>}
       <label className="mt-4 block text-sm font-semibold text-slate-700">What should this post say?<textarea value={brief} onChange={event => setBrief(event.target.value)} maxLength={1000} rows={4} placeholder="Share the main point in your own words." className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" /></label>
       {context?.profile && <p className="mt-2 text-xs text-slate-500">Drafts use {context.profile.name || 'your business'}'s saved Marketing profile and do not count against the video-generation allowance.</p>}
+      {usage && <div data-testid="marketing-create-usage" className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 sm:grid-cols-3">
+        <p><span className="block font-bold text-slate-900">{usage.usage.aiTextDraftsRolling30Days}</span>AI drafts in 30 days</p>
+        <p><span className="block font-bold text-slate-900">{usage.usage.activeMediaSlots} of {usage.entitlements.activeMediaSlots}</span>active media slots</p>
+        <p><span className="block font-bold text-slate-900">{usage.usage.readyScheduledPosts} of {usage.entitlements.readyScheduledPostLimit}</span>prepared posts</p>
+        <p className="sm:col-span-3">{usage.generation.recentTextDraft
+          ? `Latest AI draft: ${usage.generation.recentTextDraft.provider} · ${usage.generation.recentTextDraft.model} · cost ${usage.generation.recentTextDraft.costStatus}.`
+          : 'No AI draft usage has been recorded for this workspace yet.'}</p>
+      </div>}
       {error && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       <button type="button" onClick={() => void create()} disabled={loading || !context?.profile?.generationReady} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400">
         {loading ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={17} />} Prepare draft

@@ -8,8 +8,10 @@ const summary = {
     published_media_retention_hours: 72, abandoned_media_expiration_days: 30,
     generation_enabled: true, usage_period: 'rolling_30_days',
   },
-  usage: { video_generations_rolling_30_days: 2, active_media_slots: 1, active_media_bytes: 2048, ready_scheduled_posts: 3 },
-  generation: { enabled: true, global_budget_configured: true, global_warning: false, global_hard_stop: false },
+  usage: { video_generations_rolling_30_days: 2, ai_text_drafts_rolling_30_days: 3, active_media_slots: 1, active_media_bytes: 2048, ready_scheduled_posts: 3 },
+  generation: { enabled: true, global_budget_configured: true, global_warning: false, global_hard_stop: false,
+    recent_text_draft: { provider: 'openai', model: 'gpt-4o-mini', cost_status: 'unavailable', known_cost_microusd: null,
+      estimated_cost_microusd: null, outcome: 'succeeded', input_tokens: 120, output_tokens: 38, occurred_at: '2026-08-18T12:00:00.000Z' } },
   recent_media: [],
 };
 
@@ -48,6 +50,7 @@ async function installHarness(page: Page, platformControls: boolean) {
 test('contractor sees simple quota state and rights-gated media upload without platform cost controls', async ({ page }) => {
   await installHarness(page, false);
   await expect(page.getByTestId('marketing-usage-video-generations')).toContainText('2 of 4');
+  await expect(page.getByTestId('marketing-usage-ai-drafts')).toContainText('3');
   await expect(page.getByTestId('marketing-usage-active-media')).toContainText('1 of 3');
   await expect(page.getByTestId('marketing-usage-prepared-posts')).toContainText('3 of 5');
   await expect(page.getByText('I have the right to use this media publicly')).toBeVisible();
@@ -58,6 +61,8 @@ test('contractor sees simple quota state and rights-gated media upload without p
 
 test('platform admin sees platform controls separately and no contractor upload', async ({ page }) => {
   await installHarness(page, true);
+  await expect(page.getByText('Platform generation controls')).toBeHidden();
+  await page.getByText('Platform operations').click();
   await expect(page.getByText('Platform generation controls')).toBeVisible();
   await expect(page.getByText('Current recorded or estimated Marketing spend: $1.50')).toBeVisible();
   await expect(page.getByText('Add Marketing media')).toHaveCount(0);

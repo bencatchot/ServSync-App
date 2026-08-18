@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CalendarClock, Check, ExternalLink, Eye, Facebook,
   Image as ImageIcon, Link2, Loader2, PencilLine, RefreshCw, RotateCcw,
@@ -26,6 +26,12 @@ const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat(und
 const mediaAssetId = (item: { mediaSnapshot: Record<string, unknown> | null }) => (
   typeof item.mediaSnapshot?.asset_id === 'string' ? item.mediaSnapshot.asset_id : null
 );
+
+const assetLabel = (asset: MarketingQueueAsset) => {
+  if (asset.source === 'demo_recorder') return asset.type === 'video' ? 'ServSync product demo video' : 'ServSync product image';
+  if (asset.source === 'job_media_derivative') return asset.type === 'video' ? 'Completed Job video' : 'Completed Job photo';
+  return asset.type === 'video' ? 'Uploaded video' : 'Uploaded image';
+};
 
 function QueueThumbnail({ asset }: { asset: MarketingQueueAsset | null }) {
   return (
@@ -88,7 +94,7 @@ function PreviewDialog({ item, asset, mediaUrl, busy, operationAvailable, onClos
     <div role="dialog" aria-modal="true" aria-label={`Preview ${item.snapshot.title}`} className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-3 sm:p-8">
       <div className="mx-auto max-w-3xl rounded-md bg-white shadow-xl">
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
-          <div className="min-w-0"><p className="text-xs font-bold uppercase text-blue-700">Exact publication preview</p><h2 className="mt-1 truncate text-lg font-bold text-slate-950">{item.snapshot.title}</h2><p className="mt-1 text-xs text-slate-500">Revision {item.contentRevision} · {item.destinationLabel} · {item.mediaPairingId ? 'Media post' : 'Text post'}</p></div>
+          <div className="min-w-0"><p className="text-xs font-bold uppercase text-blue-700">Exact publication preview</p><h2 className="mt-1 truncate text-lg font-bold text-slate-950">{item.snapshot.title}</h2><p className="mt-1 text-xs text-slate-500">Approved copy · {item.destinationLabel} · {item.mediaPairingId ? 'Media post' : 'Text post'}</p></div>
           <button type="button" aria-label="Close preview" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-300"><X size={18} /></button>
         </header>
 
@@ -115,7 +121,7 @@ function PreviewDialog({ item, asset, mediaUrl, busy, operationAvailable, onClos
             <div className="mt-4 flex justify-end">
               {!confirming
                 ? <button type="button" disabled={!canAuthorize || busy} onClick={() => setConfirming(true)} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{mode === 'publish_now' ? <Send size={16} /> : <CalendarClock size={16} />}{mode === 'publish_now' ? 'Publish Now' : 'Review Schedule'}</button>
-                : <div data-testid="publication-authorization-confirmation" className="w-full rounded-md border border-blue-200 bg-blue-50 p-4"><p className="text-sm font-bold text-slate-950">{mode === 'publish_now' ? `Publish this post to ${item.destinationLabel} now?` : `Schedule this post for ${formatDate(scheduledIso)} (${timezone})?`}</p><p className="mt-1 text-xs text-slate-600">This authorizes only package {item.fingerprint.slice(0, 12)}.</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setConfirming(false)} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Back</button><button type="button" disabled={busy} onClick={() => void onAuthorize(mode, mode === 'scheduled' ? scheduledIso : null, timezone)} className="min-h-10 rounded-md bg-blue-700 px-4 text-sm font-bold text-white">{mode === 'publish_now' ? 'Publish' : 'Schedule'}</button></div></div>}
+                : <div data-testid="publication-authorization-confirmation" className="w-full rounded-md border border-blue-200 bg-blue-50 p-4"><p className="text-sm font-bold text-slate-950">{mode === 'publish_now' ? `Publish this post to ${item.destinationLabel} now?` : `Schedule this post for ${formatDate(scheduledIso)} (${timezone})?`}</p><p className="mt-1 text-xs text-slate-600">This authorizes only the exact copy, media, and destination shown above.</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setConfirming(false)} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Back</button><button type="button" disabled={busy} onClick={() => void onAuthorize(mode, mode === 'scheduled' ? scheduledIso : null, timezone)} className="min-h-10 rounded-md bg-blue-700 px-4 text-sm font-bold text-white">{mode === 'publish_now' ? 'Publish' : 'Schedule'}</button></div></div>}
             </div>
           </section>}
         </div>
@@ -152,6 +158,7 @@ export type MarketingPublishingWorkspaceProps = {
 export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspaceProps) {
   const { state, contentItems, loading, error, saving } = props;
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
   const [mediaChoice, setMediaChoice] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -168,19 +175,26 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
   const activePublications = state?.publications.filter(item => ['scheduled', 'publishing', 'failed'].includes(item.status)) ?? [];
   const history = state?.publications.filter(item => item.status === 'published') ?? [];
 
-  const openPreview = async (item: MarketingPublicationPackage) => {
+  const openPreview = useCallback(async (item: MarketingPublicationPackage) => {
     setActionError(null);
     try { setPreviewMediaUrl(await props.onPreview(item)); setPreviewId(item.id); }
     catch (cause) { setActionError(cause instanceof Error ? cause.message : 'ServSync could not open the preview.'); }
-  };
+  }, [props.onPreview]);
+
+  useEffect(() => {
+    if (!pendingPreviewId) return;
+    const item = state?.packages.find(candidate => candidate.id === pendingPreviewId);
+    if (!item) return;
+    setPendingPreviewId(null);
+    void openPreview(item);
+  }, [openPreview, pendingPreviewId, state?.packages]);
 
   const prepareSelected = async () => {
     if (!selectedContent || !facebook) return;
     setActionError(null);
     try {
       const packageId = await props.onPrepare(selectedContent, currentPairing?.id ?? null);
-      const item = state?.packages.find(candidate => candidate.id === packageId);
-      if (item) await openPreview(item);
+      setPendingPreviewId(packageId);
     } catch (cause) { setActionError(cause instanceof Error ? cause.message : 'ServSync could not prepare this post.'); }
   };
 
@@ -203,13 +217,14 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
           const pairing = state?.pairings.find(candidate => candidate.contentId === content.id && candidate.contentRevision === content.revisionNumber && candidate.status !== 'rejected') ?? null;
           const asset = pairing ? state?.assets.find(candidate => candidate.id === pairing.assetId) ?? null : null;
           const status = item?.status ?? 'needs_review';
-          return <article key={content.id} data-testid={`publishing-queue-card-${content.id}`} className={`py-4 ${props.selectedContentId === content.id ? 'bg-blue-50/60' : ''}`}><div className="flex min-w-0 flex-col gap-3 px-2 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><button type="button" onClick={() => props.onSelectContent(content)} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-bold text-slate-950">{content.title}</span><StatusPill status={status} /></span><span className="mt-1 block line-clamp-2 text-sm text-slate-600">{content.body}</span><span className="mt-1 block text-xs text-slate-500">Revision {content.revisionNumber} · {facebook?.destinationLabel ?? 'Facebook not connected'} · {asset ? asset.type : 'Text only'}</span></button><button type="button" onClick={() => item ? void openPreview(item) : (props.onSelectContent(content), undefined)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Eye size={15} />{item ? 'Preview' : 'Select'}</button></div></article>;
+          return <article key={content.id} data-testid={`publishing-queue-card-${content.id}`} className={`py-4 ${props.selectedContentId === content.id ? 'bg-blue-50/60' : ''}`}><div className="flex min-w-0 flex-col gap-3 px-2 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><button type="button" onClick={() => props.onSelectContent(content)} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-bold text-slate-950">{content.title}</span><StatusPill status={status} /></span><span className="mt-1 block line-clamp-2 text-sm text-slate-600">{content.body}</span><span className="mt-1 block text-xs text-slate-500">{facebook?.destinationLabel ?? 'Facebook not connected'} · {asset ? assetLabel(asset) : 'Text only'}</span></button><button type="button" onClick={() => item ? void openPreview(item) : (props.onSelectContent(content), undefined)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Eye size={15} />{item ? 'Preview' : 'Select'}</button></div></article>;
         })}</div>}
       </section>
 
-      {selectedContent && <section data-testid="selected-publishing-package" className="border-y border-slate-200 py-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase text-blue-700">Selected post</p><h3 className="mt-1 font-bold text-slate-950">{selectedContent.title}</h3><p className="mt-1 text-xs text-slate-500">Content {selectedContent.id} · revision {selectedContent.revisionNumber}</p></div><button type="button" onClick={() => props.onReturnForRevision(selectedContent)} className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-blue-700"><PencilLine size={15} />Revise</button></div>
-        {!currentPairing && state && state.assets.filter(asset => !['purging', 'purged', 'abandoned'].includes(asset.lifecycleState)).length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><label className="text-sm font-bold text-slate-700">Optional media<select aria-label="Optional media" value={mediaChoice} onChange={event => setMediaChoice(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-normal"><option value="">Text only</option>{state.assets.filter(asset => !['purging', 'purged', 'abandoned'].includes(asset.lifecycleState)).map(asset => <option key={asset.id} value={asset.id}>{asset.type === 'video' ? 'Video' : 'Image'} · {asset.id.slice(0, 8)}</option>)}</select></label><button type="button" disabled={!mediaChoice || saving} onClick={() => { const asset = state.assets.find(item => item.id === mediaChoice); if (asset) void props.onPairMedia(selectedContent, asset); }} className="self-end min-h-10 rounded-md border border-blue-300 px-3 text-sm font-bold text-blue-700 disabled:opacity-50">Use selected media</button></div>}
+      {selectedContent && <section data-testid="selected-publishing-package" data-package-content-id={selectedContent.id} className="border-y border-slate-200 py-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase text-blue-700">Selected post</p><h3 className="mt-1 font-bold text-slate-950">{selectedContent.title}</h3><p className="mt-1 text-xs text-slate-500">Current approved copy</p></div><button type="button" onClick={() => props.onReturnForRevision(selectedContent)} className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-blue-700"><PencilLine size={15} />Revise</button></div>
+        {!currentPairing && state && state.assets.filter(asset => !['purging', 'purged', 'abandoned'].includes(asset.lifecycleState)).length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><label className="text-sm font-bold text-slate-700">Optional media<select aria-label="Optional media" value={mediaChoice} onChange={event => setMediaChoice(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-normal"><option value="">Text only</option>{state.assets.filter(asset => !['purging', 'purged', 'abandoned'].includes(asset.lifecycleState)).map(asset => <option key={asset.id} value={asset.id}>{assetLabel(asset)}</option>)}</select></label><button type="button" disabled={!mediaChoice || saving} onClick={() => { const asset = state.assets.find(item => item.id === mediaChoice); if (asset) void props.onPairMedia(selectedContent, asset); }} className="self-end min-h-10 rounded-md border border-blue-300 px-3 text-sm font-bold text-blue-700 disabled:opacity-50">Use selected media</button></div>}
         {currentPairing?.status === 'candidate' && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-3"><p className="text-sm text-amber-900">Review the selected media before preparing the exact post.</p><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => void props.onReviewMedia(currentPairing, 'rejected')} className="min-h-10 rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700">Remove</button><button type="button" disabled={saving} onClick={() => void props.onReviewMedia(currentPairing, 'approved')} className="min-h-10 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white">Approve media</button></div></div>}
+        {currentPairing?.status === 'approved' && !selectedPackage && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3"><p className="text-sm text-emerald-900">Selected media is approved for this post.</p><button type="button" disabled={saving} onClick={() => void props.onReviewMedia(currentPairing, 'rejected')} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700">Remove media</button></div>}
         <div className="mt-4 flex justify-end"><button type="button" disabled={saving || selectedContent.status !== 'approved' || currentPairing?.status === 'candidate' || !facebook || facebook.readinessStatus !== 'ready'} onClick={() => selectedPackage ? void openPreview(selectedPackage) : void prepareSelected()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}{selectedPackage ? 'Open exact preview' : 'Prepare exact preview'}</button></div>
       </section>}
 

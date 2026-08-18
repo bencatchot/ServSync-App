@@ -830,6 +830,42 @@
           "reason": "The same exact migration and JWT-protected Edge Function were applied to Production uqgtheclhxqlnjpfmheq after Demo passed. Production retained one internal workspace, 17 Content rows, 41 Content events, three assets, six pairings, three provider connections, one published flagship, four events, exact asset SHA-256, Page 1199023349954773, and Facebook Video ID 1616577883220910. Database provider submission remained false and no provider request occurred."
         }
       }
+    },
+    {
+      "id": "admin-marketing-dogfood-v1",
+      "artifact": "servsync-admin-marketing-dogfood.sql (SHA-256 a1d7fc3958e79f4b48010621eeb6921a17d2bd66903b5955e1a9e6f3c27b814d)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 294-line additive migration was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. Internal managed-product-media context, canonical asset lineage, recent AI text usage evidence, grants, volatility, replay, tenant denial, and zero-publication checks passed with provider submission disabled."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes and JWT-protected Edge Function source were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Existing Demo Marketing/Recorder records remained unchanged and no provider or public-post request occurred."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes and Edge Function source were applied to Production uqgtheclhxqlnjpfmheq after Demo passed. Production retained 17 Content items, three assets, six pairings, one published flagship, four events, Page 1199023349954773, and Facebook Video ID 1616577883220910; provider submission remained disabled and no provider request occurred."
+        }
+      }
+    },
+    {
+      "id": "admin-marketing-prepared-usage-forward-fix-v1",
+      "artifact": "servsync-admin-marketing-prepared-usage-forward-fix.sql (SHA-256 b9412772656ca0820c659cc609825c0ebc23619135b7a0f55a32ad0d924a0650)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 72-line additive forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-18. Disposable SQL proved that Ready/Scheduled/Publishing exact packages, rather than older publication rows, supply prepared-post usage and capacity evidence."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. The corrected function source is active, provider submission remains disabled, and no Marketing or Demo Recorder record changed."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Demo passed. The corrected package-based count is active; 17 Content items, three assets, six pairings, one flagship publication, and four publication events remained unchanged with provider submission disabled."
+        }
+      }
     }
   ]
 }
