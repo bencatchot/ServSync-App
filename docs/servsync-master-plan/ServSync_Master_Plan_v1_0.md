@@ -150,6 +150,12 @@ The intended mental model is:
 
 The current technical implementation may evolve incrementally, but future design should move toward this consistent mental model.
 
+## Help Studio And Product Guidance
+
+ServSync product guidance should come from one durable, reviewed walkthrough source rather than scattered videos or UI-only explanations. FB-038A establishes a private platform-admin Help Studio in the canonical internal workspace. It stores exact validated MP4/poster assets outside ephemeral Marketing cleanup, creates immutable revisions, and requires pacing, sensitive-data, product-truth, and overall validation before publication. Existing roles receive only published walkthroughs deliberately addressed to them; contractor context is resolved from active ownership/team membership on the server, and anonymous access is denied.
+
+Deterministic PostgreSQL search covers titles, summaries, features, keywords, steps, and transcripts without embeddings or paid AI. Route mappings provide lightweight contextual hooks, beginning with contractor Drafts and Estimate creation, while short-lived role-aware playback keeps raw Help tables and service media paths private. Published Help marked for Marketing reuse is exposed as one canonical source identity rather than copied into the ephemeral Marketing media lifecycle, and it grants no publication authority. FB-038B retains a broader Help Center/Ask ServSync retrieval experience; FB-038C retains optional support-gap-assisted creation or generation under separate product, cost, and security approval.
+
 ## Marketing Workspaces
 
 ServSync Marketing should develop as one shared Marketing Engine/domain with audience-specific workspaces, not as unrelated internal and contractor products. The first audience is the private ServSync internal workspace for operating ServSync's own marketing. A later, separately authorized Business Marketing workspace may reuse the same bounded domain contracts for contractor tenants while deriving its authorization and data from the exact contractor context. Homeowners are not a Marketing workspace audience.

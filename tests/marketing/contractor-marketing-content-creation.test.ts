@@ -13,6 +13,12 @@ function client(overrides: Record<string, unknown> = {}) {
     calls,
     rpc: async (name: string, args: Record<string, unknown>) => {
       calls.push({ name, args });
+      if (name === 'servsync_list_help_marketing_sources') return { data: [{
+        walkthrough_id: '82000000-0000-4000-8000-000000000001', revision: 1,
+        title: 'How to create an estimate', video_asset_id: '83000000-0000-4000-8000-000000000001',
+        sha256: 'a'.repeat(64), mime_type: 'video/mp4', file_size_bytes: 1401657,
+        duration_seconds: 23,
+      }], error: null };
       if (name === 'servsync_get_marketing_creation_context') return { data: {
         workspace_id: '30000000-0000-4000-8000-000000000001',
         profile: {
@@ -37,6 +43,7 @@ function client(overrides: Record<string, unknown> = {}) {
       calls.push({ name, args: options.body });
       return { data: { contentId, status: 'draft', replayed: false }, error: null };
     } },
+    auth: { getSession: async () => ({ data: { session: { access_token: 'test-token' } }, error: null }) },
     storage: { from: () => ({
       download: async () => ({ data: null, error: new Error('not used') }),
       upload: async () => ({ data: null, error: null }),
@@ -67,6 +74,20 @@ test('internal product-media draft keeps canonical asset identity under the shar
   assert.equal(call?.args.contractorId, null);
   assert.equal(call?.args.sourceKind, 'managed_asset');
   assert.equal(call?.args.sourceAssetId, '81000000-0000-4000-8000-000000000001');
+});
+
+test('internal Marketing context includes a canonical Help walkthrough source without exposing it to contractors', async () => {
+  const internal = client();
+  const internalContext = await createMarketingCreationAdapter(internal, null).context();
+  const help = internalContext.productMedia.find(item => item.sourceKind === 'help_walkthrough');
+  assert.equal(help?.label, 'How to create an estimate');
+  assert.equal(help?.sourceRevision, 1);
+  assert.equal(help?.sourceAssetId, '83000000-0000-4000-8000-000000000001');
+  assert.equal(internal.calls.filter(item => item.name === 'servsync_list_help_marketing_sources').length, 1);
+
+  const contractor = client();
+  await createMarketingCreationAdapter(contractor, contractorId).context();
+  assert.equal(contractor.calls.some(item => item.name === 'servsync_list_help_marketing_sources'), false);
 });
 
 test('simple post invokes one purpose-built function with no media or Job identity', async () => {
@@ -142,7 +163,8 @@ test('shared Create post UI exposes the three bounded paths without a publishing
   assert.match(source, /label="From a Job"/);
   assert.match(source, /label="Upload media"/);
   assert.match(source, /label="Simple post"/);
-  assert.match(source, /label="ServSync product media"/);
+  assert.match(source, /label="Product demo \/ Help walkthrough"/);
+  assert.match(source, /temporary Marketing derivative/);
   assert.match(source, /I have permission to use this media for Marketing\./);
   assert.match(source, /busyRef\.current/);
   assert.match(source, /marketing-create-usage/);

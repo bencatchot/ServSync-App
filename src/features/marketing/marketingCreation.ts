@@ -22,6 +22,12 @@ export type MarketingCreationProductMedia = {
   type: 'image' | 'video';
   variant: string;
   durationSeconds: number | null;
+  sourceKind: 'managed_asset' | 'help_walkthrough';
+  sourceAssetId: string;
+  sourceRevision: number | null;
+  sha256: string | null;
+  fileSizeBytes: number | null;
+  mimeType: string | null;
 };
 
 export type MarketingCreationContext = {
@@ -44,6 +50,9 @@ type StorageResult<T> = PromiseLike<{ data: T; error: unknown }>;
 export interface MarketingCreationClient extends MarketingUsageClient {
   rpc(name: string, args: Record<string, unknown>): PromiseLike<RpcResult>;
   functions: { invoke(name: string, options: { body: Record<string, unknown> }): PromiseLike<RpcResult> };
+  auth: {
+    getSession(): PromiseLike<{ data: { session: { access_token?: string } | null }; error: unknown }>;
+  };
   storage: {
     from(bucket: string): {
       download(path: string): StorageResult<Blob | null>;
@@ -64,7 +73,7 @@ async function rpc(client: MarketingCreationClient, name: string, args: Record<s
   return data;
 }
 
-function parseContext(value: unknown): MarketingCreationContext {
+function parseContext(value: unknown, helpSources: unknown = []): MarketingCreationContext {
   if (!record(value) || !Array.isArray(value.jobs)) throw new Error('ServSync returned malformed Marketing creation data.');
   const profile = record(value.profile) ? {
     id: text(value.profile.profile_id),
@@ -75,15 +84,26 @@ function parseContext(value: unknown): MarketingCreationContext {
     tone: text(value.profile.tone_style),
     generationReady: value.profile.generation_ready === true,
   } : null;
+  const productMedia: MarketingCreationProductMedia[] = [];
+  if (Array.isArray(value.product_media)) productMedia.push(...value.product_media.filter(record).map(item => ({
+    id: text(item.asset_id), label: text(item.label) || 'ServSync product media',
+    type: item.asset_type === 'image' ? 'image' as const : 'video' as const,
+    variant: text(item.media_variant),
+    durationSeconds: typeof item.duration_seconds === 'number' ? item.duration_seconds : null,
+    sourceKind: 'managed_asset' as const, sourceAssetId: text(item.asset_id),
+    sourceRevision: null, sha256: null, fileSizeBytes: null, mimeType: null,
+  })));
+  if (Array.isArray(helpSources)) productMedia.push(...helpSources.filter(record).map(item => ({
+    id: text(item.walkthrough_id), label: text(item.title) || 'Help walkthrough',
+    type: 'video' as const, variant: 'help_walkthrough',
+    durationSeconds: typeof item.duration_seconds === 'number' ? item.duration_seconds : null,
+    sourceKind: 'help_walkthrough' as const, sourceAssetId: text(item.video_asset_id),
+    sourceRevision: number(item.revision), sha256: text(item.sha256) || null,
+    fileSizeBytes: number(item.file_size_bytes) || null, mimeType: text(item.mime_type) || null,
+  })));
   return {
     profile,
-    productMedia: Array.isArray(value.product_media) ? value.product_media.filter(record).map(item => ({
-      id: text(item.asset_id),
-      label: text(item.label) || 'ServSync product media',
-      type: item.asset_type === 'image' ? 'image' : 'video',
-      variant: text(item.media_variant),
-      durationSeconds: typeof item.duration_seconds === 'number' ? item.duration_seconds : null,
-    })) : [],
+    productMedia,
     jobs: value.jobs.filter(record).map(job => ({
       id: text(job.job_id), title: text(job.title), summary: typeof job.summary === 'string' ? job.summary : null,
       status: text(job.status), completedAt: typeof job.completed_at === 'string' ? job.completed_at : null,
@@ -106,7 +126,9 @@ export function createMarketingCreationAdapter(client: MarketingCreationClient, 
   const usage = createMarketingUsageAdapter(client, contractorId);
   return {
     async context() {
-      return parseContext(await rpc(client, 'servsync_get_marketing_creation_context', { p_contractor_id: contractorId }));
+      const creation = await rpc(client, 'servsync_get_marketing_creation_context', { p_contractor_id: contractorId });
+      const helpSources = contractorId ? [] : await rpc(client, 'servsync_list_help_marketing_sources', {});
+      return parseContext(creation, helpSources);
     },
     usage: usage.getSummary,
     upload: usage.upload,
@@ -149,6 +171,35 @@ export function createMarketingCreationAdapter(client: MarketingCreationClient, 
         if (paths.length) await client.storage.from(bucket).remove(paths);
         throw error;
       }
+    },
+    async importHelpWalkthrough(source: MarketingCreationProductMedia) {
+      if (contractorId || source.sourceKind !== 'help_walkthrough' || !source.sha256
+        || !source.fileSizeBytes || source.mimeType !== 'video/mp4' || !source.sourceRevision) {
+        throw new Error('The selected Help walkthrough is not available for Marketing.');
+      }
+      const session = await client.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (session.error || !token) throw new Error('Sign in again to use this Help walkthrough.');
+      const grant = await fetch('/api/help-walkthrough-media', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walkthroughId: source.id, contractorId: null }),
+      });
+      const grantPayload = await grant.json() as { signedUrl?: string; message?: string };
+      if (!grant.ok || !grantPayload.signedUrl) throw new Error(grantPayload.message || 'ServSync could not open this Help walkthrough.');
+      const response = await fetch(grantPayload.signedUrl);
+      if (!response.ok) throw new Error('ServSync could not read the selected Help media.');
+      const blob = await response.blob();
+      if (blob.size !== source.fileSizeBytes || await sha256(blob) !== source.sha256) {
+        throw new Error('The selected Help media changed. Reload and choose it again.');
+      }
+      const uploaded = await usage.upload(new File([blob], 'servsync-help-walkthrough.mp4', { type: 'video/mp4' }), true);
+      if (!record(uploaded) || typeof uploaded.asset_id !== 'string') throw new Error('ServSync could not confirm the temporary Marketing derivative.');
+      await rpc(client, 'servsync_register_help_marketing_derivative', {
+        p_walkthrough_id: source.id, p_walkthrough_revision: source.sourceRevision,
+        p_help_asset_id: source.sourceAssetId, p_marketing_asset_id: uploaded.asset_id,
+        p_source_sha256: source.sha256,
+      });
+      return uploaded.asset_id;
     },
     async generate(input: { sourceKind: 'job' | 'marketing_upload' | 'managed_asset' | 'simple'; jobId: string | null; assetId: string | null; brief: string }) {
       const { data, error } = await client.functions.invoke('marketing-content-draft', {

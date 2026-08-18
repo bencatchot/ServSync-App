@@ -59,10 +59,15 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
         if (!uploaded || typeof uploaded !== 'object' || !('asset_id' in uploaded) || typeof uploaded.asset_id !== 'string') throw new Error('ServSync could not confirm the uploaded media.');
         assetId = uploaded.asset_id;
       }
+      if (mode === 'product' && selectedProductMedia?.sourceKind === 'help_walkthrough') {
+        assetId = await adapter.importHelpWalkthrough(selectedProductMedia);
+      }
       const contentId = await adapter.generate({
-        sourceKind: mode === 'upload' ? 'marketing_upload' : mode === 'product' ? 'managed_asset' : mode,
+        sourceKind: mode === 'upload' || selectedProductMedia?.sourceKind === 'help_walkthrough'
+          ? 'marketing_upload' : mode === 'product' ? 'managed_asset' : mode,
         jobId: mode === 'job' ? selectedJob?.id ?? null : null,
-        assetId: mode === 'product' ? selectedProductMedia?.id ?? null : assetId,
+        assetId: mode === 'product' && selectedProductMedia?.sourceKind === 'managed_asset'
+          ? selectedProductMedia.sourceAssetId : assetId,
         brief: brief.trim(),
       });
       await onCreated(contentId);
@@ -86,7 +91,7 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-3" role="group" aria-label="Post source">
         {contractorId && <ModeButton active={mode === 'job'} onClick={() => setMode('job')} icon={<Briefcase size={18} />} label="From a Job" />}
-        {!contractorId && <ModeButton active={mode === 'product'} onClick={() => setMode('product')} icon={<Film size={18} />} label="ServSync product media" />}
+        {!contractorId && <ModeButton active={mode === 'product'} onClick={() => setMode('product')} icon={<Film size={18} />} label="Product demo / Help walkthrough" />}
         <ModeButton active={mode === 'upload'} onClick={() => setMode('upload')} icon={<FileUp size={18} />} label="Upload media" />
         <ModeButton active={mode === 'simple'} onClick={() => setMode('simple')} icon={<MessageSquareText size={18} />} label="Simple post" />
       </div>
@@ -97,8 +102,8 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
       </div>}
       {mode === 'upload' && <label className="mt-4 block text-sm font-semibold text-slate-700">Photo or MP4<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4" onChange={event => setFile(event.target.files?.[0] ?? null)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm" /></label>}
       {mode === 'product' && <div className="mt-4">
-        <label className="block text-sm font-semibold text-slate-700">ServSync product media<select value={productMediaId} onChange={event => setProductMediaId(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Choose product media</option>{context?.productMedia.map(media => <option key={media.id} value={media.id}>{media.label}{media.type === 'video' && media.durationSeconds ? ` · ${Math.round(media.durationSeconds)} sec video` : ''}</option>)}</select></label>
-        <p className="mt-2 text-xs leading-5 text-slate-500">These are validated ServSync-owned product recordings already stored in private Marketing media.</p>
+        <label className="block text-sm font-semibold text-slate-700">Product demo or Help walkthrough<select value={productMediaId} onChange={event => setProductMediaId(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3"><option value="">Choose media</option>{context?.productMedia.map(media => <option key={`${media.sourceKind}:${media.id}`} value={media.id}>{media.label}{media.type === 'video' && media.durationSeconds ? ` · ${Math.round(media.durationSeconds)} sec video` : ''}{media.sourceKind === 'help_walkthrough' ? ' · Help Studio' : ''}</option>)}</select></label>
+        <p className="mt-2 text-xs leading-5 text-slate-500">Validated ServSync product media stays private. A Help Studio selection keeps its durable canonical source and creates only a temporary Marketing derivative when you prepare the draft.</p>
       </div>}
       {(mode === 'job' || mode === 'upload') && <label className="mt-3 flex min-h-11 items-start gap-3 rounded-lg bg-white p-3 text-sm text-slate-700"><input type="checkbox" checked={rights} onChange={event => setRights(event.target.checked)} className="mt-0.5 h-5 w-5" /><span>I have permission to use this media for Marketing.</span></label>}
       <label className="mt-4 block text-sm font-semibold text-slate-700">What should this post say?<textarea value={brief} onChange={event => setBrief(event.target.value)} maxLength={1000} rows={4} placeholder="Share the main point in your own words." className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" /></label>
