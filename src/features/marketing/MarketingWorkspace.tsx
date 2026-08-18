@@ -373,7 +373,7 @@ export function MarketingWorkspace({
               onCreate={content.onCreate}
               onUpdate={content.onUpdate}
               onTransition={content.onTransition}
-              onPublish={item => { publishing.onSelectContent(item); setSection('campaigns'); }}
+              onPublish={item => { content.onPublish(item); setSection('campaigns'); }}
               />
             </div>
           )
@@ -555,7 +555,10 @@ function AuthorizedMarketingWorkspace({
       });
       await load();
     },
-    onPublish: (item: MarketingContentItem) => setPreviewContentId(item.id),
+    onPublish: (item: MarketingContentItem) => {
+      setPreviewContentId(item.id);
+      void loadPublishing();
+    },
   };
 
   const planning = {
