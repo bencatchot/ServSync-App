@@ -146,6 +146,21 @@ export type HelpRecordingSpecDraft = {
   talkingPoints: string;
 };
 
+export type HelpRecordingPackageManifest = {
+  recordingJobId: string;
+  scenario: string;
+  pacingProfile: string;
+  sourceCommit: string;
+  mp4Filename: string;
+  mp4Sha256: string;
+  posterFilename: string;
+  posterSha256: string;
+  width: number;
+  height: number;
+  durationSeconds: number;
+  raw: Record<string, unknown>;
+};
+
 export type HelpWalkthroughDraft = {
   title: string;
   summary: string;
@@ -378,6 +393,38 @@ export function parseHelpRecordingJob(value: unknown): HelpRecordingJob {
   };
 }
 
+export function validateHelpRecordingPackage(
+  value: unknown,
+  job: Pick<HelpRecordingJob, 'id' | 'scenarioKey' | 'pacingProfile'>,
+  files: { video: File; poster: File },
+): HelpRecordingPackageManifest {
+  const manifest = record(value);
+  const recordingJobId = String(manifest.recording_job_id ?? '');
+  const scenario = String(manifest.scenario ?? '');
+  const pacingProfile = String(manifest.pacing_profile ?? '');
+  const sourceCommit = String(manifest.source_git_commit ?? '');
+  const mp4Filename = String(manifest.mp4_filename ?? '');
+  const mp4Sha256 = String(manifest.mp4_sha256 ?? '');
+  const posterFilename = String(manifest.poster_filename ?? '');
+  const posterSha256 = String(manifest.poster_sha256 ?? '');
+  const viewport = record(manifest.viewport);
+  const width = number(viewport.width);
+  const height = number(viewport.height);
+  const durationSeconds = number(manifest.duration_seconds);
+  if (recordingJobId !== job.id || scenario !== job.scenarioKey || pacingProfile !== job.pacingProfile
+    || manifest.validation_status !== 'passed' || manifest.sensitive_data_check !== 'passed'
+    || manifest.canonical_output_provenance !== 'validated_servsync_demo_recorder'
+    || !COMMIT.test(sourceCommit) || !SHA256.test(mp4Sha256) || !SHA256.test(posterSha256)
+    || mp4Filename !== files.video.name || posterFilename !== files.poster.name
+    || width < 1 || height < 1 || durationSeconds <= 0) {
+    throw new Error('Recorder package does not exactly match this request and its validated media.');
+  }
+  return {
+    recordingJobId, scenario, pacingProfile, sourceCommit, mp4Filename, mp4Sha256,
+    posterFilename, posterSha256, width, height, durationSeconds, raw: manifest,
+  };
+}
+
 export function parseHelpSearchResult(value: unknown): HelpSearchResult {
   const item = record(value);
   const id = String(item.walkthrough_id ?? '');
@@ -495,13 +542,30 @@ export async function uploadHelpMedia(
   file: File,
   kind: 'video' | 'poster',
   sourceCommit?: string,
-  recording?: { jobId: string; scenario: string; pacingProfile: string },
+  recording?: {
+    jobId: string;
+    scenario: string;
+    pacingProfile: string;
+    expectedChecksum?: string;
+    expectedWidth?: number;
+    expectedHeight?: number;
+    expectedDuration?: number | null;
+  },
 ) {
   const expectedMime = kind === 'video' ? ['video/mp4'] : ['image/png', 'image/jpeg', 'image/webp'];
   if (!expectedMime.includes(file.type) || file.size < 1 || file.size > 104857600) throw new Error('Choose a supported file no larger than 100 MB.');
   const metadata = await inspectMediaFile(file, kind);
   const checksum = await sha256(file);
   if (!SHA256.test(checksum)) throw new Error('The media checksum could not be verified.');
+  if (recording?.expectedChecksum && checksum !== recording.expectedChecksum) {
+    throw new Error('The selected media bytes do not match the validated recorder package.');
+  }
+  if ((recording?.expectedWidth && metadata.width !== recording.expectedWidth)
+    || (recording?.expectedHeight && metadata.height !== recording.expectedHeight)
+    || (recording?.expectedDuration !== undefined && recording.expectedDuration !== null
+      && (metadata.duration === null || Math.abs(metadata.duration - recording.expectedDuration) > 0.05))) {
+    throw new Error('The selected media dimensions or duration do not match the validated recorder package.');
+  }
   const reservation = record(await rpc(client,
     recording ? 'servsync_reserve_help_recording_media_upload' : 'servsync_reserve_help_media_upload',
     recording ? {

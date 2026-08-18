@@ -31,6 +31,7 @@ import {
   transitionHelpRecordingJob,
   updateHelpWalkthrough,
   uploadHelpMedia,
+  validateHelpRecordingPackage,
   type HelpRecordingJob,
   type HelpRecordingSpecDraft,
   type HelpSearchResult,
@@ -287,32 +288,33 @@ function RecordingJobCard({
     setError('');
     let status: HelpRecordingJob['status'] = job.status;
     try {
-      const manifest = JSON.parse(await metadata.text()) as Record<string, unknown>;
-      const sourceCommit = String(manifest.source_git_commit ?? '');
-      if (manifest.scenario !== job.scenarioKey || manifest.pacing_profile !== job.pacingProfile
-        || manifest.validation_status !== 'passed' || manifest.sensitive_data_check !== 'passed'
-        || !/^[a-f0-9]{40}$/.test(sourceCommit)) {
-        throw new Error('Recorder metadata does not match this request or has not passed validation.');
-      }
+      const manifest = validateHelpRecordingPackage(JSON.parse(await metadata.text()), job, { video, poster });
+      const sourceCommit = manifest.sourceCommit;
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_preparing'); status = 'preparing';
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_recording'); status = 'recording';
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_processing'); status = 'processing';
       const recording = { jobId: job.id, scenario: job.scenarioKey, pacingProfile: job.pacingProfile };
-      const uploadedVideo = await uploadHelpMedia(client, video, 'video', sourceCommit, recording);
-      const uploadedPoster = await uploadHelpMedia(client, poster, 'poster', sourceCommit, recording);
+      const uploadedVideo = await uploadHelpMedia(client, video, 'video', sourceCommit, {
+        ...recording, expectedChecksum: manifest.mp4Sha256, expectedWidth: manifest.width,
+        expectedHeight: manifest.height, expectedDuration: manifest.durationSeconds,
+      });
+      const uploadedPoster = await uploadHelpMedia(client, poster, 'poster', sourceCommit, {
+        ...recording, expectedChecksum: manifest.posterSha256, expectedWidth: manifest.width,
+        expectedHeight: manifest.height, expectedDuration: null,
+      });
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'complete', {
         video_asset_id: uploadedVideo.assetId,
         poster_asset_id: uploadedPoster.assetId,
         source_version: 'Demo Recorder / servsync-human-paced-v1',
         recorder_metadata: {
           scenario: manifest.scenario,
-          pacing_profile: manifest.pacing_profile,
-          validation_status: manifest.validation_status,
-          sensitive_data_check: manifest.sensitive_data_check,
-          duration_seconds: manifest.duration_seconds,
-          viewport: manifest.viewport,
+          pacing_profile: manifest.pacingProfile,
+          validation_status: manifest.raw.validation_status,
+          sensitive_data_check: manifest.raw.sensitive_data_check,
+          duration_seconds: manifest.durationSeconds,
+          viewport: manifest.raw.viewport,
           source_git_commit: sourceCommit,
-          canonical_output_provenance: manifest.canonical_output_provenance,
+          canonical_output_provenance: manifest.raw.canonical_output_provenance,
         },
       });
       await onChanged();

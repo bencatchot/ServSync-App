@@ -10,6 +10,7 @@ import {
   parseHelpSearchResult,
   parseHelpRecordingJob,
   parseHelpWalkthrough,
+  validateHelpRecordingPackage,
 } from '../../src/features/help/helpStudio.ts';
 import { createHelpWalkthroughMediaHandler } from '../../server/helpWalkthroughMedia.ts';
 
@@ -133,6 +134,29 @@ test('recording job parser keeps lifecycle, managed media, and review evidence',
   assert.equal(parsed.status, 'ready_for_review');
   assert.equal(parsed.pacingProfile, 'servsync-human-paced-v1');
   assert.equal(parsed.videoAssetId, assetId);
+});
+
+test('recording package is bound to the exact job and selected media checksums before upload', () => {
+  const job = {
+    id: '40000000-0000-4000-8000-000000000001',
+    scenarioKey: 'contractor-create-estimate',
+    pacingProfile: 'servsync-human-paced-v1' as const,
+  };
+  const video = new File(['video'], 'estimate.mp4', { type: 'video/mp4' });
+  const poster = new File(['poster'], 'estimate.png', { type: 'image/png' });
+  const manifest = {
+    recording_job_id: job.id, scenario: job.scenarioKey, pacing_profile: job.pacingProfile,
+    validation_status: 'passed', sensitive_data_check: 'passed',
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
+    source_git_commit: 'a'.repeat(40), mp4_filename: video.name, mp4_sha256: 'b'.repeat(64),
+    poster_filename: poster.name, poster_sha256: 'c'.repeat(64),
+    viewport: { width: 1440, height: 900 }, duration_seconds: 31.25,
+  };
+  assert.equal(validateHelpRecordingPackage(manifest, job, { video, poster }).recordingJobId, job.id);
+  assert.throws(() => validateHelpRecordingPackage({ ...manifest, recording_job_id: crypto.randomUUID() }, job, { video, poster }), /exactly match/);
+  assert.throws(() => validateHelpRecordingPackage({ ...manifest, mp4_sha256: 'd'.repeat(64) }, job, {
+    video: new File(['video'], 'other.mp4', { type: 'video/mp4' }), poster,
+  }), /exactly match/);
 });
 
 test('deterministic search adapter sends query, context, role context, and bounded limit', async () => {
