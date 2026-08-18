@@ -75,9 +75,14 @@ const catalog = {
   }],
 };
 
-async function install(page: Page, options: { status?: 'needs_review' | 'ready'; contractor?: boolean; facebookSetup?: boolean } = {}) {
+async function install(page: Page, options: {
+  status?: 'needs_review' | 'ready';
+  contractor?: boolean;
+  facebookSetup?: boolean;
+  stalePairingUntilRefresh?: boolean;
+} = {}) {
   await page.goto('/');
-  await page.evaluate(async ({ content, state, catalog, contractorId }) => {
+  await page.evaluate(async ({ content, state, catalog, options, contractorId }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as { createElement: (...args: unknown[]) => unknown };
     const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as {
@@ -88,13 +93,28 @@ async function install(page: Page, options: { status?: 'needs_review' | 'ready';
     const preparedPackage = (state as { packages: Array<{ package_id: string; package_fingerprint: string }> }).packages[0];
     const selectedAsset = (catalog as { assets: Array<{ storage_bucket: string; storage_path: string }> }).assets[0];
     const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    let mediaCatalogReads = 0;
     (window as unknown as { __marketingRpcCalls: typeof calls }).__marketingRpcCalls = calls;
     const client = {
       rpc: async (name: string, args: Record<string, unknown>) => {
         calls.push({ name, args });
         if (name === 'servsync_list_marketing_content') return { data: [content], error: null };
         if (name === 'servsync_get_marketing_publishing') return { data: state, error: null };
-        if (name === 'servsync_get_marketing_media_catalog') return { data: catalog, error: null };
+        if (name === 'servsync_get_marketing_media_catalog') {
+          mediaCatalogReads += 1;
+          if (options.stalePairingUntilRefresh && mediaCatalogReads === 1) {
+            return { data: { ...(catalog as Record<string, unknown>), pairings: [] }, error: null };
+          }
+          if (options.stalePairingUntilRefresh) {
+            const pairings = (catalog as { pairings: Array<Record<string, unknown>> }).pairings.map(pairing => ({
+              ...pairing,
+              status: 'candidate',
+              reviewed_at: null,
+            }));
+            return { data: { ...(catalog as Record<string, unknown>), pairings }, error: null };
+          }
+          return { data: catalog, error: null };
+        }
         if (name === 'servsync_get_marketing_media_access') return { data: {
           state: 'protected', storage_bucket: selectedAsset.storage_bucket,
           storage_path: selectedAsset.storage_path,
@@ -119,11 +139,28 @@ async function install(page: Page, options: { status?: 'needs_review' | 'ready';
         });
     createRoot(document.getElementById('root')!).render(component);
   }, {
-    content, state: publishingState(options.status, options.facebookSetup), catalog,
+    content, state: options.stalePairingUntilRefresh
+      ? { ...publishingState(options.status, options.facebookSetup), packages: [] }
+      : publishingState(options.status, options.facebookSetup),
+    catalog, options,
     contractorId: options.contractor ? contractorId : null,
   });
   await expect(page.getByTestId('marketing-workspace')).toBeVisible();
 }
+
+test('Preview for Facebook refreshes a newly created media pairing without a manual queue reload', async ({ page }) => {
+  await install(page, { stalePairingUntilRefresh: true });
+  await page.getByTestId('marketing-nav-content').click();
+  await page.getByRole('button', { name: /Approved social post/ }).click();
+  await page.getByRole('button', { name: 'Preview for Facebook' }).click();
+  await expect(page.getByText('Review the selected media before preparing the exact post.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve media' })).toBeVisible();
+  const calls = await page.evaluate(() => (window as unknown as {
+    __marketingRpcCalls: Array<{ name: string }>;
+  }).__marketingRpcCalls);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_publishing')).toHaveLength(2);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_media_catalog')).toHaveLength(2);
+});
 
 test('shared queue requires explicit selection and exact preview before package approval', async ({ page }) => {
   await install(page);
