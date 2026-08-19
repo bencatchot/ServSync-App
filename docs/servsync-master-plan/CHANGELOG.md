@@ -4,6 +4,50 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039A Work / Financials information architecture audit
+
+- Branch: `codex/servsync-product-roadmap-v1` from exact main `39bd885f660405b98729a799f2021ba5bd71cca1`.
+- Files changed: `docs/qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md`; Product Roadmap; Feature Backlog; and this changelog.
+- Summary: Completes the read-only FB-039A implementation audit and maps the current contractor Jobs workspace, shared Estimate/Invoice state, desktop/mobile navigation, role visibility, saved browser state, route limitations, Dashboard/notification/Customer/Draft/Estimate/Job/Invoice handoffs, and migration risks. It defines the approved end-state ownership, capability-based role/device contract, deterministic legacy-state compatibility, required cross-module handoffs, and one coherent FB-039B implementation sequence and acceptance set.
+- Reason: The visible Jobs workspace is one shared state machine rather than a label. Implementing the approved Work/Financials split safely requires central destination helpers, separate Estimate/Invoice state ownership, legacy browser-state handling, and exhaustive contextual navigation coverage so users do not encounter duplicate or conflicting workflow locations.
+- Validation: Focused source tracing against the exact audited application base; route and local-storage review; role-capability and existing test-contract review; cross-document link and status review; `git diff --check`; changed-file credential-shaped secret scan; and protected-scope review.
+- Known risks and follow-ups: Documentation only. The app still presents Jobs with combined Estimates/Invoices until FB-039B is implemented. No UI, lifecycle, permission, database, provider, environment, deployment, or Production-data behavior changed. FB-039B must not ship an intermediate duplicate-ownership state and must preserve homeowner behavior and existing server authority.
+- Backlog impact: FB-039 advances from Ready for Audit / Planning to Implementation Ready. FB-039B is now the next Launch Roadmap assignment; FB-039C is the expected following one-primary-action hierarchy slice.
+- Master plan impact: No product-direction change. The previously approved Work/Financials decision is now implementation-ready.
+
+## 2026-08-19 - Roadmap management and parallel-work operating model
+
+- Branch: `codex/servsync-product-roadmap-v1` continuing from Work/Financials decision commit `4f5aa78`.
+- Files changed: Product Roadmap; Feature Backlog; and this changelog.
+- Summary: Establishes the roadmap as the standing product compass with two visible lanes: a Launch Roadmap lane that must always retain a clear next outcome and a Strategic Investment lane for valuable bounded work that should not silently displace launch progress. FB-037 Marketing is explicitly approved to continue in the parallel strategic lane. The current control point is Phase 0 / FB-039, with FB-039A Work/Financials Navigation and Workflow Ownership Audit as the next recommended assignment and FB-039B implementation as the expected follow-up.
+- Reason: ServSync needs sustained launch-foundation progress while preserving room for valuable owner-led work such as the Marketing feature. The operating model is designed to maintain focus without prohibiting beneficial parallel development.
+- Validation: Roadmap/backlog cross-reference review; active backlog ID uniqueness; local Markdown-link validation; `git diff --check`; and changed-file credential-shaped secret scan.
+- Known risks and follow-ups: Documentation only. This does not start FB-039A, implement the Work/Financials UI, change Marketing rollout/provider/publication authority, alter SQL/RLS/RPC/auth/permissions/env, deploy, or mutate production data. The roadmap control point must be updated as work completes rather than becoming a static planning statement.
+- Backlog impact: FB-039 moves from generic Backlog to Ready for Audit / Planning and records FB-039A as the next step. FB-037 status and guardrails are unchanged.
+- Master plan impact: No update needed. The stage sequence and approved Work/Financials product direction are unchanged; this update defines roadmap management practice and the current execution control point.
+
+## 2026-08-19 - Work and Financials launch information architecture decision
+
+- Branch: `codex/servsync-product-roadmap-v1` continuing from roadmap commit `33aed47` on current `origin/main` planning base `39bd885f660405b98729a799f2021ba5bd71cca1`.
+- Files changed: Product Information Architecture; Contractor Work Module Product Specification; Product Roadmap; Master Plan; Feature Backlog; and this changelog.
+- Summary: Records the owner-approved contractor launch architecture: `Jobs` transitions to `Work`; Drafts, Estimates, Jobs, visits/scheduling context, checklists, Reports, templates, and Price Book remain in Work; Invoice Drafts, Invoices, deposits, payments, receivables, accounting-ready exports, and financial reporting move to a separate `Financials` destination. Contextual Create invoice actions remain available from Work and preserve source lineage. Payment/accounting provider setup remains in Company -> Integrations.
+- Reason: The original combined Jobs workspace was simpler when the feature surface was smaller. As Invoice, deposit, payment, export, and reporting capabilities mature, separating operational work from billing makes capabilities easier to discover and gives future financial features a stable home before contractors begin using the product.
+- Validation: Planning-source link review; cross-document ownership-term review; active backlog ID uniqueness; `git diff --check`; changed-file credential-shaped secret scan; and protected-scope review.
+- Known risks and follow-ups: Documentation only. Live navigation, routes, permissions, lifecycle behavior, financial authority, SQL/RLS/RPC, providers, environments, deployments, and production data are unchanged. FB-039 implementation must preserve deep links, Request/Estimate/Job/Invoice lineage, mobile role needs, and existing authorization while avoiding duplicate workflow surfaces.
+- Backlog impact: FB-039 now contains the approved Work/Financials ownership boundary and must be completed before the controlled pilot.
+- Master plan impact: The launch-foundation sequence now treats Work/Financials separation as decided rather than an open owner choice.
+
+## 2026-08-19 - Product roadmap consolidation v1
+
+- Branch: `codex/servsync-product-roadmap-v1` from exact main `39bd885f660405b98729a799f2021ba5bd71cca1`.
+- Files changed: `docs/servsync-master-plan/ServSync_Product_Roadmap.md`; planning README; Master Plan; Feature Backlog; and this changelog.
+- Summary: Adds one canonical gate-based Product Roadmap that reconciles product vision, information architecture, active backlog, beta operations, competitive/readiness audits, and a signed-in desktop/mobile workflow review. It sequences a bounded launch-foundation release, a 3-5-contractor controlled pilot, evidence-ordered operational table stakes, property-centered differentiation, and evidence-gated long-term options. The Master Plan and planning README now point to the roadmap for execution sequence; FB-039 and FB-040 preserve the two new unfinished launch outcomes in the active backlog.
+- Reason: Existing planning was substantial but fragmented across strategy, feature-state, beta-checklist, and audit documents. The product needs a stable launch sequence that improves core workflow clarity before real users arrive and then limits disruptive structural change after the pilot begins.
+- Validation: Planning-source link review; Markdown heading/link checks; feature-ID uniqueness review; `git diff --check`; changed-file credential-shaped secret scan; and protected-scope review.
+- Known risks and follow-ups: This is documentation-only. It does not implement or activate UI, workflow, SQL, RLS, RPC, storage, auth, permissions, provider, environment, payment, notification, deployment, or production-data changes. Phase 0 still requires an owner decision on final launch navigation labels and whether `Jobs` transitions to `Work` before or after the pilot.
+- Backlog impact: Adds FB-039 Launch Foundation UX and Information Architecture Stabilization and FB-040 Controlled Contractor Pilot and Adoption Evidence; existing feature rollout states and guardrails remain unchanged.
+- Master plan impact: Replaces the stale linear priority list and immediate-next-step list with the new stage-based execution sequence while preserving product vision and existing implementation history.
+
 ## 2026-08-19 - Estimate payment-schedule domain extraction v1
 
 - Branch: `codex/issue-500-app-domain-reassessment` from exact main `032fa3cbad5b2048b7fce2202a2a3f94f3df6b05` after PR #499.
