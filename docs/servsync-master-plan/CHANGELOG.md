@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - Estimate payment-schedule domain extraction v1
+
+- Branch: `codex/issue-500-app-domain-reassessment` from exact main `032fa3cbad5b2048b7fce2202a2a3f94f3df6b05` after PR #499.
+- Files changed: `src/features/estimates/paymentSchedule.ts`; `src/App.tsx`; focused Estimate payment-schedule contracts; the exact `App.tsx` architecture baseline; and this changelog.
+- Summary: Reassesses the remaining Contractor Work code first and finds no further cohesive pure-domain boundary worth extracting without moving UI orchestration, effects, persistence, permissions, or small display helpers artificially. The stronger adjacent boundary is Estimate payment-schedule policy: draft models and presets, persisted-row hydration and ordering, fixed/percentage calculations, deposit/final derivation, contractor and homeowner mismatch warnings, exact save-payload validation, and linked-Invoice schedule summaries now live in one typed Estimate-owned module. `App.tsx` falls by 254 lines from 51,243 to 50,989, and the checked-in ratchet is lowered to the new exact count.
+- Reason: Issue #500 makes reassessment authoritative and permits one stronger domain elsewhere when Contractor Work no longer offers a worthwhile extraction. Payment-schedule policy was substantial, deterministic, split across the App shell, and independently testable; React state, rendering, role/lifecycle enforcement, database writes, RPC invocation, notices, and refresh behavior remain in their existing owning layers.
+- Validation: Exact App-size and 80-warning ESLint ratchets; architecture contracts; focused Estimate payment-schedule domain, homeowner presentation, contractor authoring, and linked-Invoice contracts; TypeScript; Production build; backend parity; sensitive-value and protected-scope review; GitHub pull-request quality checks and normal Vercel Preview builds; and `git diff --check`.
+- Known risks and follow-ups: This is architecture-only and preserves routes, test IDs, copy, role authority, lifecycle behavior, RPC names and payload semantics, database/RLS/storage/auth contracts, environment/provider configuration, dependencies, and Production data. Further App decomposition remains separately reviewable and should proceed only when another cohesive boundary has a comparable ownership and testing payoff.
+- Backlog impact: No update needed. Product scope, status, priority, guardrails, and public/private capability boundaries are unchanged.
+- Master plan impact: No update needed. Estimate, Invoice, and Contractor Work product behavior remains unchanged.
+
 ## 2026-08-19 - Manual Job work-item draft-domain extraction v1
 
 - Branch: `codex/issue-498-app-domain-extraction` from exact main `6131c8fbe5e4b3567970c6c0761d1b615743ec82` after PR #497.

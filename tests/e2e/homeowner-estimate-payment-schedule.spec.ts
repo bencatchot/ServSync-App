@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
 const pdfDocumentsSource = () => sourceFile('src/utils/pdfDocuments.ts');
+const paymentScheduleSource = () => sourceFile('src/features/estimates/paymentSchedule.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -35,7 +36,7 @@ test.describe('homeowner estimate payment schedule display', () => {
 
   test('homeowner schedule helpers sort rows and keep warning copy display-only', () => {
     const source = appSource();
-    const helperSource = sourceBetween(source, 'function estimatePaymentScheduleInvoiceTypeCustomerLabel', 'function createBlankContractorPriceBookItemDraft');
+    const helperSource = paymentScheduleSource();
     const cardSource = sourceBetween(source, 'const renderHomeownerEstimateCard =', 'const renderHomeownerRecordsSection =');
 
     expect(helperSource).toContain("case 'total':");
