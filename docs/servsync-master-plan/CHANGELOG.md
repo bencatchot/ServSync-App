@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - Manual Job work-item draft-domain extraction v1
+
+- Branch: `codex/issue-498-app-domain-extraction` from exact main `6131c8fbe5e4b3567970c6c0761d1b615743ec82` after PR #497.
+- Files changed: `src/features/work/manualJobWorkItemDraft.ts`; `src/App.tsx`; focused manual Job work-item domain contracts; the exact `App.tsx` architecture baseline; and this changelog.
+- Summary: Moves one cohesive Contractor Job work-item authoring boundary out of `App.tsx`: new-item defaults, persisted-record hydration, blank-versus-zero price handling, quantity/price/labor-hours validation, text cleanup, legacy line-type normalization, and exact create/update RPC payload mapping. `App.tsx` falls by 90 lines from 51,333 to 51,243, and the checked-in ratchet is lowered to the new exact count.
+- Reason: Issue #498 authorizes the next behavior-preserving App decomposition and prioritizes coherent ownership over line reduction alone. These pure rules jointly define how manual priced Job work is prepared before the existing role-gated RPC handler, while authorization, modal state, persistence, notices, and refresh behavior remain in the App shell.
+- Validation: Exact App-size and 80-warning ESLint ratchets; architecture contracts; 27 focused Contractor Work, Job workflow, and manual work-item contracts covering defaults, record hydration, normalization, blank versus `$0`, rounding, existing validation copy, and removed-state protection; TypeScript; Production build; GitHub pull-request quality checks and normal Preview builds; sensitive-value review; and `git diff --check`.
+- Known risks and follow-ups: This is architecture-only and preserves routes, test IDs, copy, role authority, lifecycle semantics, RPC names/payloads, database/RLS/storage/auth contracts, environment/provider configuration, and Production data. Further `App.tsx` decomposition remains separately reviewable and must continue lowering the exact ratchet.
+- Backlog impact: No update needed. Product scope, status, priority, guardrails, and public/private capability boundaries are unchanged.
+- Master plan impact: No update needed. The established Contractor Work architecture and lifecycle remain unchanged.
+
 ## 2026-08-18 - Contractor Job workflow-domain extraction v1
 
 - Branch: `codex/issue-496-contractor-work-decomposition` from exact main `857f2c8bfb5de9ac2143570d4f88598f4d6f6591` after PR #495.
