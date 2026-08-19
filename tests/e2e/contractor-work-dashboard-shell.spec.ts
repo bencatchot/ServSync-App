@@ -1,6 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { durableDraftPrimaryListCount } from '../../src/features/drafts/durableDraftListSelectors';
 import { isContractorWorkUiEnabled } from '../../src/features/work/contractorWorkAvailability';
 import {
@@ -10,16 +8,7 @@ import {
   contractorWorkInvoicesNeedingAttentionFrom,
   contractorWorkJobHistoryFrom,
 } from '../../src/features/work/contractorWorkSelectors';
-
-const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
-
-function sourceBetween(source: string, start: string, end: string) {
-  const startIndex = source.indexOf(start);
-  expect(startIndex, `Expected source marker: ${start}`).toBeGreaterThanOrEqual(0);
-  const endIndex = source.indexOf(end, startIndex + start.length);
-  expect(endIndex, `Expected source end marker: ${end}`).toBeGreaterThan(startIndex);
-  return source.slice(startIndex, endIndex);
-}
+import { sourceBetween, sourceFile } from '../helpers/source-contract.mjs';
 
 function inspection(overrides: Record<string, unknown>) {
   return {

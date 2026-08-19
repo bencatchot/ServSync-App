@@ -1,0 +1,29 @@
+name: Pull Request Quality
+
+on:
+  pull_request:
+
+concurrency:
+  group: pull-request-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, architecture, types, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run check:app-size
+      - run: npm run test:architecture
+      - run: npm run typecheck
+      - run: npm run build
