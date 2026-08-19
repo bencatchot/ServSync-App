@@ -302,12 +302,15 @@ test('registered Storage cleanup is ordered before exact database reset and neve
   const source = readFileSync(resolve(process.cwd(), 'scripts/demo/seed-demo-scenario.mjs'), 'utf8');
   const resetStart = source.indexOf('async function resetRun');
   const cleanupCall = source.indexOf('cleanupRegisteredFinalizedReportStorage(service, run)', resetStart);
+  const invoiceReleaseCall = source.indexOf('releaseRegisteredInvoiceWorkItemsForReset(service, run)', resetStart);
   const resetRpc = source.indexOf("service.rpc('servsync_demo_reset_registered_run'", resetStart);
-  assert.ok(resetStart >= 0 && cleanupCall > resetStart && resetRpc > cleanupCall);
+  assert.ok(resetStart >= 0 && cleanupCall > resetStart && invoiceReleaseCall > cleanupCall && resetRpc > invoiceReleaseCall);
   assert.match(source, /\.remove\(\[storage\.path\]\)/);
   assert.doesNotMatch(source, /\.emptyBucket\(|\.remove\(\[[^\]]*\*|storage\.objects.*delete/i);
   assert.match(source, /cleanup\?\.state === 'deleted'/);
   assert.match(source, /cleanup\?\.state !== 'deleting'/);
+  assert.match(source, /a registered work item points to an unregistered Invoice/);
+  assert.match(source, /billing_status: 'unbilled', reserved_invoice_id: null, invoiced_invoice_id: null/);
 });
 
 test('Home History recording accepts only the canonical generator name or Storage UUID basename', () => {
