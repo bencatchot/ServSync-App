@@ -252,6 +252,7 @@ test.describe('FB-027 contractor pipeline summary', () => {
 
   test('actual accepted-estimate job creation remains on estimate cards only', () => {
     const source = appSource();
+    const estimateActionsSource = sourceFile('src/features/work/EstimateLifecycleActions.tsx');
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
     const workflowOverviewSource = sourceBetween(
       contractorSource,
@@ -266,15 +267,16 @@ test.describe('FB-027 contractor pipeline summary', () => {
 
     expect(workflowOverviewSource).not.toContain('data-testid="contractor-create-job-from-accepted-estimate"');
     expect(workflowOverviewSource).not.toContain('aria-label={`Create job from accepted estimate');
-    expect(estimateCardSource).toContain('data-testid="contractor-create-job-from-accepted-estimate"');
-    expect(estimateCardSource).toContain('aria-label={`Create job from accepted estimate ${estimate.title}`}');
-    expect(estimateCardSource).toContain('onClick={() => void createJobFromAcceptedEstimate(estimate)}');
-    expect(estimateCardSource).toContain('data-testid="accepted-estimate-job-handoff"');
-    expect(estimateCardSource).toContain("hasLinkedJob ? 'Job created' : 'Ready for job'");
-    expect(estimateCardSource).toContain("hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'");
-    expect(estimateCardSource).toContain('View Job');
-    expect(estimateCardSource).toContain('onClick={() => void openLinkedJobForEstimate(estimate)}');
-    expect(estimateCardSource).toContain("className={buttonClass('primary')}");
-    expect(estimateCardSource.indexOf('data-testid="contractor-create-job-from-accepted-estimate"')).toBeLessThan(estimateCardSource.indexOf('Create invoice from estimate'));
+    expect(estimateCardSource).toContain('<EstimateLifecycleActions');
+    expect(estimateCardSource).toContain('onCreateJob={() => void createJobFromAcceptedEstimate(estimate)}');
+    expect(estimateCardSource).toContain('onOpenJob={() => void openLinkedJobForEstimate(estimate)}');
+    expect(estimateCardSource.indexOf('<EstimateLifecycleActions')).toBeLessThan(estimateCardSource.indexOf('Create invoice from estimate'));
+    expect(estimateActionsSource).toContain('data-testid="contractor-create-job-from-accepted-estimate"');
+    expect(estimateActionsSource).toContain('aria-label={`Create job from accepted estimate ${estimate.title}`}');
+    expect(estimateActionsSource).toContain('onClick={onCreateJob}');
+    expect(estimateActionsSource).toContain('onClick={onOpenJob}');
+    expect(estimateActionsSource).toContain('View Job');
+    expect(estimateActionsSource).toContain("className={classForTone('primary')}");
+    expect(estimateActionsSource).toContain('data-lifecycle-primary-action="true"');
   });
 });

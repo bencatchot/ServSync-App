@@ -919,14 +919,63 @@ async function cleanupRegisteredFinalizedReportStorage(service, run) {
   return { ...storage, status: 'deleted' };
 }
 
+async function releaseRegisteredInvoiceWorkItemsForReset(service, run) {
+  const invoiceIds = new Set(
+    run.records.filter((record) => record.table_name === 'invoices').map((record) => record.record_id)
+  );
+  const workItemIds = run.records
+    .filter((record) => record.table_name === 'job_work_items')
+    .map((record) => record.record_id);
+  if (invoiceIds.size === 0 || workItemIds.length === 0) return [];
+
+  const workItems = await ensureOk(
+    await service
+      .from('job_work_items')
+      .select('id,billing_status,reserved_invoice_id,invoiced_invoice_id')
+      .in('id', workItemIds),
+    'Unable to inspect registered Invoice-linked work items before Demo reset'
+  );
+  if (workItems.length !== workItemIds.length) {
+    throw new Error('Invoice-aware Demo reset refused: one or more registered work items are missing.');
+  }
+  for (const item of workItems) {
+    for (const linkedInvoiceId of [item.reserved_invoice_id, item.invoiced_invoice_id].filter(Boolean)) {
+      if (!invoiceIds.has(linkedInvoiceId)) {
+        throw new Error('Invoice-aware Demo reset refused: a registered work item points to an unregistered Invoice.');
+      }
+    }
+  }
+
+  const linkedIds = workItems
+    .filter((item) => item.reserved_invoice_id || item.invoiced_invoice_id)
+    .map((item) => item.id);
+  if (linkedIds.length === 0) return [];
+  const released = await ensureOk(
+    await service
+      .from('job_work_items')
+      .update({ billing_status: 'unbilled', reserved_invoice_id: null, invoiced_invoice_id: null })
+      .in('id', linkedIds)
+      .select('id,billing_status,reserved_invoice_id,invoiced_invoice_id'),
+    'Unable to release registered Invoice-linked work items before Demo reset'
+  );
+  if (
+    released.length !== linkedIds.length ||
+    released.some((item) => item.billing_status !== 'unbilled' || item.reserved_invoice_id || item.invoiced_invoice_id)
+  ) {
+    throw new Error('Invoice-aware Demo reset refused: registered work-item billing lineage was not released exactly.');
+  }
+  return released.map((item) => item.id);
+}
+
 async function resetRun(service, run) {
   const finalizedReportStorage = await cleanupRegisteredFinalizedReportStorage(service, run);
   const retainedPropertyGraph = await retainRevisionBackedPropertyGraph(service, run);
+  const releasedInvoiceWorkItems = await releaseRegisteredInvoiceWorkItemsForReset(service, run);
   const data = await ensureOk(
     await service.rpc('servsync_demo_reset_registered_run', { p_run_id: run.id }),
     'Unable to reset registered demo records'
   );
-  return { removed: data || [], retainedPropertyGraph, finalizedReportStorage };
+  return { removed: data || [], retainedPropertyGraph, finalizedReportStorage, releasedInvoiceWorkItems };
 }
 
 async function resetNonResetRuns(service, scenarioKey, reason) {
@@ -948,6 +997,7 @@ async function resetNonResetRuns(service, scenarioKey, reason) {
         removed: resetResult.removed,
         retainedPropertyGraph: resetResult.retainedPropertyGraph,
         finalizedReportStorage: resetResult.finalizedReportStorage,
+        releasedInvoiceWorkItems: resetResult.releasedInvoiceWorkItems,
         action: 'reset',
         reason,
       });
