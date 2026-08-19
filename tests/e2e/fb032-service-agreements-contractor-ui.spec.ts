@@ -18,19 +18,20 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     const source = appSource();
     const overviewSource = sourceBetween(
       source,
-      "{contractorJobsView === 'overview' && (",
-      "{contractorJobsView === 'new_financial' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'overview' && (",
+      "{contractorTab === 'financials' && contractorFinancialsView === 'overview' && (",
     );
+    const dashboardSource = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
     const serviceAgreementSource = sourceBetween(
       source,
-      "{contractorJobsView === 'service_agreements' && (",
-      "{contractorJobsView === 'templates' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'service_agreements' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'templates' && (",
     );
 
-    expect(source).toContain("type ContractorJobsView = 'overview'");
+    expect(sourceFile('src/features/navigation/contractorWorkspaceNavigation.ts')).toContain("export type ContractorWorkView =");
     expect(source).toContain("'service_agreements'");
     expect(overviewSource).toContain('onOpenServicePlans={openContractorServicePlans}');
-    expect(overviewSource).toContain('Service Plans');
+    expect(dashboardSource).toContain('Service Plans');
     expect(serviceAgreementSource).toContain('<Card title="Service Plans"');
     expect(serviceAgreementSource).toContain('title="Draft service plan"');
     expect(serviceAgreementSource).toContain('Not visible to the homeowner yet. Save the draft, then send when ready.');
@@ -50,7 +51,7 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
       'const openJobs = operationalInspections.filter',
     );
 
-    expect(openServicePlansSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
+    expect(openServicePlansSource).toContain("setContractorWorkViewAndScroll('service_agreements')");
     expect(openServicePlansSource).toContain("setInspectionView('list')");
     expect(source).toContain('onOpenServicePlans={openContractorServicePlans}');
     expect(dashboardSource).toContain('testId="contractor-work-open-service-plans"');
@@ -58,7 +59,7 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     expect(source).toContain('data-testid="contractor-templates-service-plans-entry"');
     expect(source).toContain('onClick={openContractorServicePlans}');
     expect(source).toContain('Manage reusable plan templates, pricing, visits, duration, and offer terms.');
-    expect(source).toContain('Back to Jobs');
+    expect(source).toContain('Back to Work');
   });
 
   test('loads manager-visible lists with direct RLS-scoped reads only after manager checks', () => {
@@ -82,7 +83,7 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     const mutationSource = sourceBetween(
       source,
       'const resetServiceAgreementTemplateDraft = () => {',
-      'const resetContractorPriceBookCsvImport = () => {',
+      'const requirePriceBookImportAccess = () => {',
     );
 
     for (const rpc of [
@@ -116,8 +117,8 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     );
     const uiSource = sourceBetween(
       source,
-      "{contractorJobsView === 'service_agreements' && (",
-      "{contractorJobsView === 'templates' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'service_agreements' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'templates' && (",
     );
 
     expect(derivedSource).toContain('serviceAgreementEligibleConnections = connections');
@@ -140,8 +141,8 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     );
     const serviceAgreementSource = sourceBetween(
       source,
-      "{contractorJobsView === 'service_agreements' && (",
-      "{contractorJobsView === 'templates' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'service_agreements' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'templates' && (",
     );
 
     expect(roleHelperSource).toContain('contractor.owner_user_id === profileId');
@@ -158,8 +159,8 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     const source = appSource();
     const serviceAgreementSource = sourceBetween(
       source,
-      "{contractorJobsView === 'service_agreements' && (",
-      "{contractorJobsView === 'templates' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'service_agreements' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'templates' && (",
     );
 
     expect(serviceAgreementSource).not.toContain('service_agreement_visits');

@@ -53,13 +53,11 @@ test.describe('contractor selected-homeowner estimates tile', () => {
       "label: 'Invoices',",
     );
 
-    expect(estimatesCardSource).toContain('if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);');
+    expect(estimatesCardSource).toContain('if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId);');
     expect(estimatesCardSource).toContain('setFocusedEstimateRecordId(null);');
-    expect(estimatesCardSource).toContain("setContractorFinancialRecordKind('estimates');");
-    expect(estimatesCardSource).toContain("setContractorJobsView('open_financial');");
-    expect(estimatesCardSource).toContain("setContractorTab('inspections');");
-    expect(estimatesCardSource).not.toContain("setContractorJobsView('new_financial')");
-    expect(estimatesCardSource).not.toContain("estimateRecords.length > 0 ? 'open_financial' : 'new_financial'");
+    expect(estimatesCardSource).toContain("setContractorWorkView('open_estimates');");
+    expect(estimatesCardSource).toContain("setContractorTab('work');");
+    expect(estimatesCardSource).not.toContain("setContractorFinancialsView('new_invoices')");
     expect(estimatesCardSource).not.toContain('estimateTemplates');
     expect(estimatesCardSource).not.toContain('visibleEstimateTemplates');
   });

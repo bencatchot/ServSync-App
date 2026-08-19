@@ -281,13 +281,13 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     const durableAdoptionSource = sourceBetween(source, 'const adoptDurableDraftOutput =', 'const saveDraftJobComposer =');
     const financialListSource = sourceBetween(
       source,
-      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
 
-    expect(focusSource).toContain("setContractorFinancialRecordKind('invoices');");
+    expect(focusSource).toContain("setContractorTab('financials');");
     expect(focusSource).toContain('setFocusedInvoiceRecordId(invoice.id);');
-    expect(focusSource).toContain("setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');");
+    expect(focusSource).toContain('setContractorFinancialsView(invoiceFinancialsViewForStatus(invoice.status));');
     expect(saveSource).toContain('const savedInvoice = await loadInvoiceById(invoiceId);');
     expect(saveSource).toContain('focusSavedInvoiceRecord(savedInvoice);');
     expect(saveSource).toContain('Preview or download the PDF from the saved invoice actions now.');
@@ -313,8 +313,8 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     const source = appSource();
     const financialListSource = sourceBetween(
       source,
-      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
     const homeownerWorkspaceEstimateSource = sourceBetween(
       source,

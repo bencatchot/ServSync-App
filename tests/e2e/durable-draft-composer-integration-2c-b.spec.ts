@@ -732,18 +732,18 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     const focusContext = sourceBetween(app, 'const focusedDurableOutputType =', 'durableDraftOutputFocusContext.current =');
     const focusHelper = sourceBetween(app, 'const focusSavedEstimateRecord =', 'const saveEstimateDraft = async');
     const adopter = app.slice(app.indexOf('const adoptDurableDraftOutput'), app.indexOf('const saveDraftJobComposer'));
-    const estimateCard = sourceBetween(app, 'visibleEstimateRecords.map(estimate => {', "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
+    const estimateCard = sourceBetween(app, 'visibleEstimateRecords.map(estimate => {', "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (");
 
     expect(adopter).toMatch(/setEstimates[\s\S]*focusSavedEstimateRecord\(output\.record\)[\s\S]*focusDurableDraftOutputHeading/);
     expect(adopter).not.toContain('openEstimateRecord(output.record)');
-    expect(focusHelper).toContain("setContractorFinancialRecordKind('estimates');");
+    expect(focusHelper).toContain("setContractorTab('work');");
     expect(focusHelper).toContain("setInspectionView('list');");
     expect(focusHelper).toContain('setEstimateComposerOpen(false);');
     expect(focusHelper).toContain('setEditingEstimateId(null);');
     expect(focusHelper).toContain('setFocusedEstimateRecordId(estimate.id);');
-    expect(focusHelper).toContain("setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');");
+    expect(focusHelper).toContain('setContractorWorkView(estimateWorkViewForStatus(estimate.status));');
     expect(focusContext).toContain('focusedEstimateRecordId');
-    expect(focusContext).toContain("contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial'");
+    expect(focusContext).toContain("contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates'");
     expect(focusContext).toContain('editingEstimateId ?? focusedEstimateRecordId');
     expect(estimateCard).toContain('focusedEstimateRecord?.id === estimate.id');
     expect(estimateCard).toContain('<DurableDraftOutputHeading');

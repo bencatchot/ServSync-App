@@ -55,7 +55,7 @@ function draftRow(overrides: Record<string, unknown>) {
   } as any;
 }
 
-test.describe('Jobs overview redesign guardrails', () => {
+test.describe('Work and Financials overview guardrails', () => {
   test('keeps the strict Draft-first feature gate fail-closed', () => {
     expect(isContractorWorkUiEnabled({})).toBe(false);
     expect(isContractorWorkUiEnabled({ VITE_CONTRACTOR_WORK_UI_ENABLED: 'false' })).toBe(false);
@@ -80,7 +80,7 @@ test.describe('Jobs overview redesign guardrails', () => {
     expect(contractorWorkJobHistoryFrom([composerDraft, activeJob, closedJob]).map(item => item.id)).toEqual(['closed']);
     expect(ready.map(item => item.id)).toEqual(['ready']);
     expect(attentionInvoices.map(item => item.id)).toEqual(['draft', 'overdue', 'partial']);
-    expect(contractorJobsNeedsAttentionCount({ acceptedEstimateCount: ready.length, readyToInvoiceJobCount: 1, invoiceAttentionCount: attentionInvoices.length })).toBe(5);
+    expect(contractorJobsNeedsAttentionCount({ acceptedEstimateCount: ready.length, readyToInvoiceJobCount: 1 })).toBe(2);
   });
 
   test('keeps completed Job billing attention inside the pure Work domain boundary', () => {
@@ -118,7 +118,8 @@ test.describe('Jobs overview redesign guardrails', () => {
     expect(attention.acceptedEstimatesNeedingJobs.map(item => item.id)).toEqual(['ready']);
     expect(attention.completedJobsReadyToInvoice.map(item => item.id)).toEqual(['completed']);
     expect(attention.invoiceAttentionRecords.map(item => item.id)).toEqual(['overdue']);
-    expect(attention.total).toBe(3);
+    expect(attention.workTotal).toBe(2);
+    expect(attention.financialsTotal).toBe(1);
   });
 
   test('counts the same durable and earlier Draft rows the dedicated list presents', () => {
@@ -138,14 +139,12 @@ test.describe('Jobs overview redesign guardrails', () => {
     const overview = sourceBetween(source, 'export function ContractorWorkDashboard({', 'type AttentionRecordProps = {');
 
     expect(overview).toContain('data-testid="contractor-jobs-at-a-glance"');
-    expect(overview.match(/testId="contractor-jobs-summary-/g)).toHaveLength(5);
+    expect(overview.match(/testId="contractor-jobs-summary-/g)).toHaveLength(4);
     expect(overview).toContain('label="Needs Attention"');
     expect(overview).toContain('label="Drafts"');
     expect(overview).toContain('label="Estimates"');
     expect(overview).toContain('label="Active Jobs"');
-    expect(overview).toContain('label="Invoices"');
-    expect(overview).toContain('helper={`${openInvoiceCount} open · ${paidInvoiceCount} paid`}');
-    expect(overview).toContain('emptyHelper="No invoice records"');
+    expect(overview).not.toContain('label="Invoices"');
     expect(overview).not.toContain('Open invoice records');
     expect(overview).not.toContain('PreviewList');
     expect(overview).not.toContain('.map(job');
@@ -157,13 +156,13 @@ test.describe('Jobs overview redesign guardrails', () => {
 
   test('wires Drafts and Needs Attention to dedicated destinations without changing legacy fallback', () => {
     const source = sourceFile('src/App.tsx');
-    const sharedOverview = sourceBetween(source, "{contractorJobsView === 'overview' && (", "{contractorJobsView === 'drafts'");
-    const destinations = sourceBetween(source, "{contractorJobsView === 'drafts'", "{contractorJobsView === 'overview' && durableDraftLegacyFallbackReady");
+    const sharedOverview = sourceBetween(source, "{contractorTab === 'work' && contractorWorkView === 'overview' && (", "{contractorTab === 'financials' && contractorFinancialsView === 'overview' && (");
+    const destinations = sourceBetween(source, "{contractorTab === 'work' && contractorWorkView === 'drafts'", "{contractorTab === 'work' && contractorWorkView === 'overview' && durableDraftLegacyFallbackReady");
 
     expect(sharedOverview).toContain('<ContractorWorkDashboard');
     expect(sharedOverview).not.toContain('<DurableDraftWorkspace');
-    expect(sharedOverview).toContain("onViewDrafts={() => setContractorJobsViewAndScroll('drafts')}");
-    expect(sharedOverview).toContain("onViewNeedsAttention={() => setContractorJobsViewAndScroll('needs_attention')}");
+    expect(sharedOverview).toContain("onViewDrafts={() => setContractorWorkViewAndScroll('drafts')}");
+    expect(sharedOverview).toContain("onViewNeedsAttention={() => setContractorWorkViewAndScroll('needs_attention')}");
     expect(destinations).toContain('data-testid="contractor-jobs-drafts-destination"');
     expect(destinations).toContain('<DurableDraftWorkspace');
     expect(destinations).toContain('<ContractorNeedsAttention');
@@ -171,19 +170,19 @@ test.describe('Jobs overview redesign guardrails', () => {
     expect(source).toContain('durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled');
   });
 
-  test('preserves existing destination behavior for estimates, active Jobs, invoices, and history', () => {
+  test('keeps Work destinations operational and Invoice destinations in Financials', () => {
     const source = sourceFile('src/App.tsx');
     const overview = sourceBetween(source, '<ContractorWorkDashboard', "/>\n                ) : null");
 
-    expect(overview).toContain("setContractorFinancialRecordKind('estimates')");
-    expect(overview).toContain("setContractorFinancialRecordKind('invoices')");
-    expect(overview).toContain("setContractorJobsViewAndScroll('open_financial')");
-    expect(overview).toContain("setContractorJobsViewAndScroll('open_jobs')");
-    expect(source).toContain("{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
-    expect(source).toContain("contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'");
+    expect(overview).toContain("setContractorWorkViewAndScroll('open_estimates')");
+    expect(overview).toContain("setContractorWorkViewAndScroll('open_jobs')");
+    expect(overview).not.toContain('Invoice');
+    expect(source).toContain("contractorTab === 'financials' && contractorFinancialsView === 'overview'");
+    expect(source).toContain("setContractorFinancialsViewAndScroll('open_invoices')");
+    expect(source).toContain("contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs')");
   });
 
-  test('keeps Paid invoices discoverable from Jobs and the Customer profile', () => {
+  test('keeps Paid invoices discoverable from Financials and the Customer profile', () => {
     const source = sourceFile('src/App.tsx');
 
     expect(source).toContain('data-testid="contractor-invoice-status-shortcuts"');
@@ -200,17 +199,19 @@ test.describe('Jobs overview redesign guardrails', () => {
 
   test('opens qualifying attention rows through existing record workflows', () => {
     const source = sourceFile('src/App.tsx');
-    const destination = sourceBetween(source, "{contractorJobsView === 'needs_attention'", "{contractorJobsView === 'overview' && durableDraftLegacyFallbackReady");
+    const destination = sourceBetween(source, "{contractorTab === 'work' && contractorWorkView === 'needs_attention'", "{contractorTab === 'financials' && contractorFinancialsView === 'needs_attention'");
     const component = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
+    const financialsComponent = sourceFile('src/features/financials/ContractorFinancialsDashboard.tsx');
 
     expect(destination).toContain('estimates={acceptedEstimatesNeedingJobs}');
     expect(destination).toContain('jobs={completedJobsReadyToInvoice}');
-    expect(destination).toContain('invoices={invoiceAttentionRecords}');
     expect(destination).toContain('onOpenEstimate={focusSavedEstimateRecord}');
     expect(destination).toContain('onOpenJob={job => openInspection(job)}');
-    expect(destination).toContain('onOpenInvoice={focusSavedInvoiceRecord}');
-    expect(component).toContain("invoice.status === 'partially_paid'");
-    expect(component).toContain("invoice.status === 'overdue'");
+    expect(destination).not.toContain('onOpenInvoice');
+    expect(component).not.toContain('invoices: Invoice[]');
+    expect(component).not.toContain('onOpenInvoice');
+    expect(financialsComponent).toContain("invoice.status === 'partially_paid'");
+    expect(financialsComponent).toContain("invoice.status === 'overdue'");
   });
 
   test('keeps creation and management tools role-gated and outside Draft output choices', () => {
@@ -235,7 +236,7 @@ test.describe('Jobs overview redesign guardrails', () => {
   test('uses mobile-stable semantic buttons, loading, zero, and error states', () => {
     const source = sourceFile('src/features/work/ContractorWorkDashboard.tsx');
     expect(source).toContain("prominent ? 'col-span-2");
-    expect(source).toContain('grid min-w-0 grid-cols-2 gap-2 md:grid-cols-5');
+    expect(source).toContain('grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4');
     expect(source).toContain('min-h-[7.25rem] min-w-0 rounded-lg');
     expect(source).toContain('aria-label={`${label}:');
     expect(source).toContain("state.status === 'loading'");
@@ -248,7 +249,7 @@ test.describe('Jobs overview redesign guardrails', () => {
   test('starts overview Drafts clean while preserving contextual and legacy behavior', () => {
     const source = sourceFile('src/App.tsx');
     const cleanStart = sourceBetween(source, 'const startCleanDraftJobComposer = (', 'const continueDraftJob = async');
-    expect(cleanStart).toContain('setJobsCustomerFilterSubjectId(null)');
+    expect(cleanStart).toContain('setWorkCustomerFilterSubjectId(null)');
     expect(cleanStart).toContain("subject_type: 'connected'");
     expect(cleanStart).toContain("homeowner_user_id: ''");
     expect(cleanStart).toContain("local_contact_id: ''");

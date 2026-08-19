@@ -282,6 +282,12 @@ import {
 } from './features/trade-sections/tradeSectionAvailability';
 import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
+import { ContractorFinancialsDashboard, ContractorFinancialsNeedsAttention } from './features/financials/ContractorFinancialsDashboard';
+import {
+  estimateWorkViewForStatus, financialsHeaderTabForView, invoiceFinancialsViewForStatus, workHeaderTabForView,
+  type ContractorFinancialsHeaderTab, type ContractorWorkHeaderTab, type ContractorWorkView,
+} from './features/navigation/contractorWorkspaceNavigation';
+import { useContractorWorkspaceNavigation } from './features/navigation/useContractorWorkspaceNavigation';
 import {
   initialFindingStatusForJob,
   isChecklistJob,
@@ -937,7 +943,6 @@ type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
 type RequestContractorAttributeFilter = 'licensed' | 'insured' | 'bonded' | 'website' | 'profileDetails' | 'discoverPosts';
 type HomeownerDocumentPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerMaintenancePropertyScope = 'selected' | 'all' | 'unassigned';
-type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'marketing' | 'inspections' | 'trust' | 'privacy' | 'support';
 type MobileNavItem = {
   id: string;
   label: string;
@@ -950,9 +955,6 @@ type MobileNavItem = {
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
-type ContractorJobsView = 'overview' | 'needs_attention' | 'drafts' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing' | 'service_agreements';
-type ContractorJobsHeaderTab = 'overview' | 'estimates' | 'invoices' | 'jobs_reports' | 'templates';
-type ContractorFinancialRecordKind = 'estimates' | 'invoices';
 type ContractorEstimateRecordStatusFilter = 'all' | 'draft' | 'sent' | 'approved' | 'invoiced' | 'closed';
 type ContractorInvoiceRecordStatusFilter = 'all' | 'open' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';
 type ContractorEstimateRecordSort = 'updated_newest' | 'created_newest' | 'amount_high' | 'amount_low' | 'customer_az';
@@ -1488,12 +1490,12 @@ function storedFieldWorkState(): StoredFieldWorkState | null {
   }
 }
 
-function storedInspectionViewForJobsView(jobsView: ContractorJobsView): InspectionView {
+function storedInspectionViewForJobsView(workView: ContractorWorkView): InspectionView {
   const fieldWorkState = storedFieldWorkState();
-  if ((jobsView === 'open_jobs' || jobsView === 'closed_jobs') && fieldWorkState?.view === 'detail' && fieldWorkState.inspectionId) {
+  if ((workView === 'open_jobs' || workView === 'closed_jobs') && fieldWorkState?.view === 'detail' && fieldWorkState.inspectionId) {
     return 'detail';
   }
-  return jobsView === 'new_jobs' ? (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new') : 'list';
+  return workView === 'new_jobs' ? (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new') : 'list';
 }
 
 function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): EstimateLineDraft {
@@ -21157,7 +21159,16 @@ function ContractorDashboard({
   const [inviteLink, setInviteLink] = useState('');
   const [contractorReferralDraft, setContractorReferralDraft] = useState<ContractorReferralSubmitDraft>(() => createBlankContractorReferralSubmitDraft());
   const [submittingContractorReferral, setSubmittingContractorReferral] = useState(false);
-  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'marketing', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
+  const {
+    initialNavigation: initialContractorNavigation,
+    tab: contractorTab, setTab: setContractorTab,
+    workView: contractorWorkView, setWorkView: setContractorWorkView,
+    setWorkViewAndScroll: setContractorWorkViewAndScroll,
+    financialsView: contractorFinancialsView, setFinancialsView: setContractorFinancialsView,
+    setFinancialsViewAndScroll: setContractorFinancialsViewAndScroll,
+    workCustomerFilter: workCustomerFilterSubjectId, setWorkCustomerFilter: setWorkCustomerFilterSubjectId,
+    financialsCustomerFilter: financialsCustomerFilterSubjectId, setFinancialsCustomerFilter: setFinancialsCustomerFilterSubjectId,
+  } = useContractorWorkspaceNavigation();
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'archived' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'archived', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
@@ -21166,17 +21177,6 @@ function ContractorDashboard({
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
   const [homeownerWorkspacePropertyScope, setHomeownerWorkspacePropertyScope] = useState<ContractorHomeownerPropertyScope>('selected');
   const [selectedHomeownerWorkspaceHomeId, setSelectedHomeownerWorkspaceHomeId] = useState('');
-  const [jobsCustomerFilterSubjectId, setJobsCustomerFilterSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorJobsCustomerFilter));
-  const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'needs_attention', 'drafts', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates', 'custom_pricing', 'service_agreements'] as const, 'overview');
-  const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
-  const setContractorJobsViewAndScroll = useCallback((view: ContractorJobsView) => {
-    setContractorJobsView(view);
-    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return;
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }, []);
-  const [contractorFinancialRecordKind, setContractorFinancialRecordKind] = useState<ContractorFinancialRecordKind>('estimates');
   const [contractorEstimateRecordSearch, setContractorEstimateRecordSearch] = useState('');
   const [contractorEstimateRecordStatusFilter, setContractorEstimateRecordStatusFilter] = useState<ContractorEstimateRecordStatusFilter>('all');
   const [contractorEstimateRecordSort, setContractorEstimateRecordSort] = useState<ContractorEstimateRecordSort>('updated_newest');
@@ -21386,7 +21386,7 @@ function ContractorDashboard({
   const [connectedPropertyProposalDrafts, setConnectedPropertyProposalDrafts] = useState<Record<string, ConnectedPropertyProposalDraft>>({});
   const [creatingConnectedPropertyProposalFor, setCreatingConnectedPropertyProposalFor] = useState<string | null>(null);
   const [revokingConnectedPropertyProposalId, setRevokingConnectedPropertyProposalId] = useState<string | null>(null);
-  const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
+  const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorNavigation.workView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
   const durableDraftOutputFocusContext = useRef<DurableDraftOutputFocusContext>({
@@ -21396,20 +21396,18 @@ function ContractorDashboard({
     workspaceActive: false,
   });
   const durableDraftOutputFocusCoordinator = useRef<ReturnType<typeof createDurableDraftOutputFocusCoordinator> | null>(null);
-  const focusedDurableOutputType = contractorTab === 'inspections'
-    && contractorFinancialRecordKind === 'estimates'
+  const focusedDurableOutputType = contractorTab === 'work'
     && (
-      (contractorJobsView === 'new_financial' && estimateComposerOpen && editingEstimateId)
-      || ((contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && focusedEstimateRecordId)
+      (contractorWorkView === 'new_estimates' && estimateComposerOpen && editingEstimateId)
+      || ((contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates') && focusedEstimateRecordId)
     )
     ? 'estimate'
-    : contractorTab === 'inspections'
-      && contractorFinancialRecordKind === 'invoices'
-      && contractorJobsView === 'new_financial'
+    : contractorTab === 'financials'
+      && contractorFinancialsView === 'new_invoices'
       && invoiceComposerOpen
       && editingInvoiceId
       ? 'invoice'
-      : contractorTab === 'inspections' && inspectionView === 'detail' && activeInspection
+      : contractorTab === 'work' && inspectionView === 'detail' && activeInspection
         ? 'job'
         : null;
   const focusedDurableOutputId = focusedDurableOutputType === 'estimate'
@@ -21505,7 +21503,7 @@ function ContractorDashboard({
 
   useEffect(() => {
     let cancelled = false;
-    if (!sharedDraftComposerEnabled || !supabase) {
+    if (profile.role !== 'contractor' || !contractor?.id || !supabase) {
       setDurableDraftCapabilityLoading(false);
       setDurableDraftCapabilityError('');
       setDurableDraftCapabilities({
@@ -21543,7 +21541,7 @@ function ContractorDashboard({
         if (!cancelled) setDurableDraftCapabilityLoading(false);
       });
     return () => { cancelled = true; };
-  }, [sharedDraftComposerEnabled, profile.id, contractor?.id]);
+  }, [profile.id, profile.role, contractor?.id]);
 
   useEffect(() => {
     if (sharedDraftComposerEnabled) return;
@@ -21774,9 +21772,6 @@ function ContractorDashboard({
     window.localStorage.setItem(STORAGE_KEYS.contractorTab, contractorTab);
   }, [contractorTab]);
 
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEYS.contractorJobsView, contractorJobsView);
-  }, [contractorJobsView]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorHomeownerFilter, homeownerFilter);
@@ -21794,13 +21789,6 @@ function ContractorDashboard({
     }
   }, [selectedHomeownerSubjectId]);
 
-  useEffect(() => {
-    if (jobsCustomerFilterSubjectId) {
-      window.localStorage.setItem(STORAGE_KEYS.contractorJobsCustomerFilter, jobsCustomerFilterSubjectId);
-    } else {
-      window.localStorage.removeItem(STORAGE_KEYS.contractorJobsCustomerFilter);
-    }
-  }, [jobsCustomerFilterSubjectId]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorHomeownerDetailTab, homeownerDetailTab);
@@ -21863,14 +21851,17 @@ function ContractorDashboard({
     if (durableDraftCapabilityLoading || canManageFinancialActions) return;
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
-    if (contractorJobsView === 'new_financial' && contractorFinancialRecordKind === 'invoices') {
-      setContractorJobsView('open_financial');
+    if (contractorTab === 'financials' && focusedInvoiceRecordId) return;
+    if (contractorTab === 'financials') {
+      setContractorTab('work');
+      setContractorWorkView('overview');
+      setContractorFinancialsView('overview');
     }
   }, [
     canManageFinancialActions,
-    contractorFinancialRecordKind,
-    contractorJobsView,
+    contractorTab,
     durableDraftCapabilityLoading,
+    focusedInvoiceRecordId, setContractorFinancialsView, setContractorTab, setContractorWorkView,
   ]);
   const durableDraftInvoiceLaunchAvailable = sharedDraftComposerEnabled
     && !durableDraftCapabilityLoading
@@ -23520,7 +23511,6 @@ function ContractorDashboard({
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     setEditingInvoiceId(null);
-    setContractorFinancialRecordKind('invoices');
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
       ...(options.sourceEstimate
         ? {
@@ -23560,8 +23550,8 @@ function ContractorDashboard({
     setEstimateComposerOpen(false);
     setEstimateGuidedBuilderActive(false);
     setHomeownerWorkspaceEstimateView('draft');
-    setContractorJobsView('new_financial');
-    setContractorTab('inspections');
+    setContractorFinancialsView('new_invoices');
+    setContractorTab('financials');
   };
 
   const defaultEstimateDraftBuilderTrade = () => (
@@ -23576,7 +23566,6 @@ function ContractorDashboard({
     }
     const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();
     setEstimateDraftSessionId(crypto.randomUUID());
-    setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     setEditingEstimateId(null);
@@ -23606,8 +23595,8 @@ function ContractorDashboard({
     setEstimateComposerOpen(true);
     setInvoiceComposerOpen(false);
     setHomeownerWorkspaceEstimateView('draft');
-    setContractorJobsView('new_financial');
-    setContractorTab('inspections');
+    setContractorWorkView('new_estimates');
+    setContractorTab('work');
   };
 
   const applySavedEstimateTemplateStart = (
@@ -23642,8 +23631,8 @@ function ContractorDashboard({
     setInvoiceComposerOpen(false);
     setInvoiceTemplateStartNotice('');
     setHomeownerWorkspaceEstimateView('draft');
-    setContractorJobsView('new_financial');
-    setContractorTab('inspections');
+    setContractorWorkView('new_estimates');
+    setContractorTab('work');
   };
 
   const closeActiveInvoiceEditor = () => {
@@ -23657,20 +23646,18 @@ function ContractorDashboard({
       return;
     }
     setInspectionView('list');
-    setContractorFinancialRecordKind('invoices');
-    setContractorJobsView('open_financial');
-    setContractorTab('inspections');
+    setContractorFinancialsView('open_invoices');
+    setContractorTab('financials');
   };
 
   const estimateScheduleTotalCents = draftFinancialBreakdown(estimateDraft).subtotalCents;
 
   const focusSavedEstimateRecord = (estimate: Estimate) => {
-    setContractorFinancialRecordKind('estimates');
     setFocusedInvoiceRecordId(null);
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
     const local = estimate.local_contact_id ? localCustomerContext.find(item => item.id === estimate.local_contact_id) : null;
-    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-    setContractorTab('inspections');
+    setWorkCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : workCustomerFilterSubjectId));
+    setContractorTab('work');
     setInspectionView('list');
     setHomeownerWorkspaceEstimateView(
       estimate.status === 'accepted'
@@ -23687,16 +23674,15 @@ function ContractorDashboard({
     setEstimateGuidedBuilderActive(false);
     setEstimateLineSourcePanel(null);
     setFocusedEstimateRecordId(estimate.id);
-    setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+    setContractorWorkView(estimateWorkViewForStatus(estimate.status));
   };
 
   const focusSavedInvoiceRecord = (invoice: Invoice) => {
-    setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localCustomerContext.find(item => item.id === invoice.local_contact_id) : null;
-    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-    setContractorTab('inspections');
+    setFinancialsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : financialsCustomerFilterSubjectId));
+    setContractorTab('financials');
     setInspectionView('list');
     setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
     setEstimateComposerOpen(false);
@@ -23706,7 +23692,7 @@ function ContractorDashboard({
     setEstimateLineSourcePanel(null);
     setInvoiceTemplateStartNotice('');
     setFocusedInvoiceRecordId(invoice.id);
-    setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');
+    setContractorFinancialsView(invoiceFinancialsViewForStatus(invoice.status));
   };
 
   const saveEstimateDraft = async (subject: {
@@ -24164,14 +24150,13 @@ function ContractorDashboard({
   };
 
   const openInvoiceRecord = (invoice: Invoice) => {
-    setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(invoice.id);
     setInvoiceTemplateStartNotice('');
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localCustomerContext.find(item => item.id === invoice.local_contact_id) : null;
-    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-    setContractorTab('inspections');
+    setFinancialsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : financialsCustomerFilterSubjectId));
+    setContractorTab('financials');
     setInspectionView('list');
     setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
     if (invoiceRecordOpensEditable(invoice.status, financialActionVisibility)) {
@@ -24181,24 +24166,23 @@ function ContractorDashboard({
       setInvoiceComposerOpen(true);
       setEstimateComposerOpen(false);
       setEstimateGuidedBuilderActive(false);
-      setContractorJobsView('new_financial');
+      setContractorFinancialsView('new_invoices');
       return;
     }
     setEditingInvoiceId(null);
     setInvoiceComposerOpen(false);
     setEstimateComposerOpen(false);
-    setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');
+    setContractorFinancialsView(invoiceFinancialsViewForStatus(invoice.status));
   };
 
   const openEstimateRecord = (estimate: Estimate) => {
-    setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
     const local = estimate.local_contact_id ? localCustomerContext.find(item => item.id === estimate.local_contact_id) : null;
-    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-    setContractorTab('inspections');
+    setWorkCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : workCustomerFilterSubjectId));
+    setContractorTab('work');
     setInspectionView('list');
     setHomeownerWorkspaceEstimateView(
       estimate.status === 'draft'
@@ -24228,12 +24212,12 @@ function ContractorDashboard({
       setEstimateHelperExpanded(false);
       setEstimateSavedItemNotice('');
       setEstimateComposerOpen(true);
-      setContractorJobsView('new_financial');
+      setContractorWorkView('new_estimates');
       return;
     }
     setEditingEstimateId(null);
     setEstimateComposerOpen(false);
-    setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+    setContractorWorkView(estimateWorkViewForStatus(estimate.status));
   };
 
   const loadInvoiceById = async (invoiceId: string) => {
@@ -24348,9 +24332,8 @@ function ContractorDashboard({
       setError(readableError(err, 'Unable to create a draft invoice from this payment schedule row.'));
       const refreshedEstimate = estimates.find(item => item.id === estimate.id) ?? estimate;
       setFocusedEstimateRecordId(refreshedEstimate.id);
-      setContractorFinancialRecordKind('estimates');
-      setContractorJobsView('open_financial');
-      setContractorTab('inspections');
+      setContractorWorkView('open_estimates');
+      setContractorTab('work');
     } finally {
       setCreatingInvoiceSourceId(null);
     }
@@ -24934,9 +24917,9 @@ function ContractorDashboard({
 
       if (job.homeowner_user_id) {
         const connection = connections.find(item => item.homeowner_user_id === job.homeowner_user_id);
-        if (connection) setJobsCustomerFilterSubjectId(connection.connection_id);
+        if (connection) setWorkCustomerFilterSubjectId(connection.connection_id);
       } else if (job.local_contact_id) {
-        setJobsCustomerFilterSubjectId(`local:${job.local_contact_id}`);
+        setWorkCustomerFilterSubjectId(`local:${job.local_contact_id}`);
       }
 
       openInspection(job);
@@ -25090,7 +25073,7 @@ function ContractorDashboard({
     setEditingContractorPriceBookItemId(item.id);
     setContractorPriceBookDraft(contractorPriceBookItemDraftFromRecord(item));
     setContractorPriceBookFormOpen(true);
-    setContractorJobsView('custom_pricing');
+    setContractorWorkView('custom_pricing');
     setInspectionView('list');
   };
 
@@ -25289,7 +25272,7 @@ function ContractorDashboard({
   const editServiceAgreementTemplate = (template: ServiceAgreementTemplate) => {
     setEditingServiceAgreementTemplateId(template.id);
     setServiceAgreementTemplateDraft(serviceAgreementTemplateDraftFromRecord(template));
-    setContractorJobsView('service_agreements');
+    setContractorWorkView('service_agreements');
     setInspectionView('list');
   };
 
@@ -25403,7 +25386,7 @@ function ContractorDashboard({
       connection_id: firstEligibleConnection?.connection_id || '',
       home_id: firstHome?.id || '',
     }));
-    setContractorJobsView('service_agreements');
+    setContractorWorkView('service_agreements');
     setInspectionView('list');
   };
 
@@ -27880,7 +27863,7 @@ function ContractorDashboard({
       setSelectedVisitCalendarEvent(null);
       setNotice(mode === 'event_and_job'
         ? 'Calendar event and tied job deleted.'
-        : 'Calendar event removed. The tied job remains available in Jobs.'
+        : 'Calendar event removed. The tied Job remains available in Work.'
       );
     } catch (err) {
       setError(readableError(err, mode === 'event_and_job'
@@ -28147,7 +28130,7 @@ function ContractorDashboard({
     capabilityLoading: durableDraftCapabilityLoading,
     capabilityError: durableDraftCapabilityError,
     legacyDrafts: composerDraftJobs,
-    enabled: sharedDraftComposerEnabled && contractorJobsView === 'overview',
+    enabled: sharedDraftComposerEnabled && contractorTab === 'work' && contractorWorkView === 'overview',
   });
   const activeServiceVisitForRequest = (serviceRequestId: string) => operationalInspections.find(inspection =>
     inspection.service_request_id === serviceRequestId
@@ -28174,6 +28157,12 @@ function ContractorDashboard({
   const fieldWorkForLocalContact = (localContactId: string) => operationalInspections
     .filter(insp => insp.local_contact_id === localContactId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const jobsCustomerFilterSubjectId = contractorTab === 'financials'
+    ? financialsCustomerFilterSubjectId
+    : workCustomerFilterSubjectId;
+  const setJobsCustomerFilterSubjectId = contractorTab === 'financials'
+    ? setFinancialsCustomerFilterSubjectId
+    : setWorkCustomerFilterSubjectId;
   const selectedJobsConnection = jobsCustomerFilterSubjectId
     ? connections.find(connection =>
       connection.connection_id === jobsCustomerFilterSubjectId
@@ -28289,9 +28278,9 @@ function ContractorDashboard({
     if (linkedJob) {
       if (linkedJob.homeowner_user_id) {
         const connection = connections.find(item => item.homeowner_user_id === linkedJob.homeowner_user_id);
-        if (connection) setJobsCustomerFilterSubjectId(connection.connection_id);
+        if (connection) setWorkCustomerFilterSubjectId(connection.connection_id);
       } else if (linkedJob.local_contact_id) {
-        setJobsCustomerFilterSubjectId(`local:${linkedJob.local_contact_id}`);
+        setWorkCustomerFilterSubjectId(`local:${linkedJob.local_contact_id}`);
       }
       openInspection(linkedJob);
       setNotice('Opened the job linked to this accepted estimate.');
@@ -28314,9 +28303,9 @@ function ContractorDashboard({
     setInspections(prev => [job, ...prev.filter(item => item.id !== job.id)]);
     if (job.homeowner_user_id) {
       const connection = connections.find(item => item.homeowner_user_id === job.homeowner_user_id);
-      if (connection) setJobsCustomerFilterSubjectId(connection.connection_id);
+      if (connection) setWorkCustomerFilterSubjectId(connection.connection_id);
     } else if (job.local_contact_id) {
-      setJobsCustomerFilterSubjectId(`local:${job.local_contact_id}`);
+      setWorkCustomerFilterSubjectId(`local:${job.local_contact_id}`);
     }
     openInspection(job);
     setNotice('Opened the job linked to this accepted estimate.');
@@ -28338,29 +28327,28 @@ function ContractorDashboard({
     return label;
   };
   const openCompletedJobsReadyToInvoice = () => {
-    setContractorTab('inspections');
-    setContractorJobsView('closed_jobs');
+    setContractorTab('work');
+    setContractorWorkView('closed_jobs');
     setInspectionView('list');
-    setJobsCustomerFilterSubjectId(null);
+    setWorkCustomerFilterSubjectId(null);
     setJobsListDateFilter('');
     setJobsListStatusFilter('all');
     setJobsListTypeFilter('all');
   };
   const openAcceptedEstimatesNeedingJobs = () => {
-    setContractorTab('inspections');
-    setContractorFinancialRecordKind('estimates');
-    setContractorJobsViewAndScroll('open_financial');
+    setContractorTab('work');
+    setContractorWorkViewAndScroll('open_estimates');
     setInspectionView('list');
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
-    setJobsCustomerFilterSubjectId(null);
+    setWorkCustomerFilterSubjectId(null);
     setContractorEstimateRecordSearch('');
     setContractorEstimateRecordStatusFilter('approved');
     setContractorEstimateRecordSort('updated_newest');
   };
   const openContractorServicePlans = () => {
-    setContractorFinancialRecordKind('estimates');
-    setContractorJobsViewAndScroll('service_agreements');
+    setContractorTab('work');
+    setContractorWorkViewAndScroll('service_agreements');
     setInspectionView('list');
   };
   const openJobs = operationalInspections.filter(inspectionIsOpenJob);
@@ -28368,23 +28356,15 @@ function ContractorDashboard({
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
-  const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
-  const paidInvoiceRecords = invoices.filter(invoice => invoice.status === 'paid');
   const {
     acceptedEstimatesNeedingJobs,
     completedJobsReadyToInvoice,
     invoiceAttentionRecords,
-    total: contractorNeedsAttentionCount,
+    workTotal: contractorWorkNeedsAttentionCount,
+    financialsTotal: contractorFinancialsNeedsAttentionCount,
   } = contractorWorkAttentionFrom({ estimates, inspections, invoices, jobWorkItemsByJobId });
-  const contractorJobsHeaderTabForView = (view: ContractorJobsView): ContractorJobsHeaderTab => {
-    if (view === 'overview' || view === 'needs_attention' || view === 'drafts') return 'overview';
-    if (view === 'open_jobs' || view === 'closed_jobs' || view === 'new_jobs') return 'jobs_reports';
-    if (view === 'templates' || view === 'custom_pricing' || view === 'service_agreements') return 'templates';
-    if (view === 'new_financial') return contractorFinancialRecordKind;
-    if (view === 'open_financial' || view === 'closed_financial') return contractorFinancialRecordKind;
-    return 'overview';
-  };
-  const openContractorJobsHeaderTab = (tab: ContractorJobsHeaderTab) => {
+  const openContractorWorkHeaderTab = (tab: ContractorWorkHeaderTab) => {
+    setContractorTab('work');
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     setEstimateComposerOpen(false);
@@ -28393,38 +28373,43 @@ function ContractorDashboard({
     setEditingInvoiceId(null);
     setInspectionView('list');
     if (tab === 'overview') {
-      setContractorJobsViewAndScroll('overview');
+      setContractorWorkViewAndScroll('overview');
       return;
     }
     if (tab === 'estimates') {
-      setContractorFinancialRecordKind('estimates');
-      setContractorJobsViewAndScroll('open_financial');
-      return;
-    }
-    if (tab === 'invoices') {
-      setContractorFinancialRecordKind('invoices');
-      setContractorInvoiceRecordStatusFilter('all');
-      setContractorJobsViewAndScroll('open_financial');
+      setContractorWorkViewAndScroll('open_estimates');
       return;
     }
     if (tab === 'jobs_reports') {
-      setContractorJobsViewAndScroll('open_jobs');
+      setContractorWorkViewAndScroll('open_jobs');
       setInspectionView('list');
       return;
     }
-    setContractorJobsViewAndScroll('templates');
+    setContractorWorkViewAndScroll('templates');
     setShowTemplateLibrary(true);
+  };
+  const openContractorFinancialsHeaderTab = (tab: ContractorFinancialsHeaderTab) => {
+    setContractorTab('financials');
+    setFocusedEstimateRecordId(null);
+    setFocusedInvoiceRecordId(null);
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setInspectionView('list');
+    setContractorInvoiceRecordStatusFilter('all');
+    setContractorFinancialsViewAndScroll(tab === 'overview' ? 'overview' : 'open_invoices');
   };
   const onboardingCustomerCount = connections.length + localContacts.length;
   const onboardingSentEstimateCount = estimates.filter(estimate => estimate.status !== 'draft').length;
   const onboardingSentInvoiceCount = invoices.filter(invoice => invoice.status !== 'draft').length;
   const onboardingFiledReportCount = operationalInspections.filter(inspectionIsClosedJob).length;
   const openJobsOnboardingWorkspace = () => {
-    setContractorTab('inspections');
-    setContractorJobsView('new_jobs');
+    setContractorTab('work');
+    setContractorWorkView('new_jobs');
     setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new');
   };
-  const openFinancialOnboardingWorkspace = (kind: ContractorFinancialRecordKind = 'estimates') => {
+  const openFinancialOnboardingWorkspace = (kind: 'estimates' | 'invoices' = 'estimates') => {
     if (kind === 'estimates' && sharedDraftComposerEnabled) {
       startCleanDraftFirstEstimateComposer();
       return;
@@ -28433,9 +28418,9 @@ function ContractorDashboard({
       startCleanDraftFirstInvoiceComposer();
       return;
     }
-    setContractorTab('inspections');
-    setContractorFinancialRecordKind(kind);
-    setContractorJobsView('new_financial');
+    setContractorTab(kind === 'invoices' ? 'financials' : 'work');
+    if (kind === 'invoices') setContractorFinancialsView('new_invoices');
+    else setContractorWorkView('new_estimates');
     setInspectionView('list');
   };
   const canManageContractorCustomers = canManageContractorCustomersUi(contractorDraft, teamAccess, profile.id);
@@ -28538,8 +28523,8 @@ function ContractorDashboard({
     }
   };
   const openReportOnboardingWorkspace = () => {
-    setContractorTab('inspections');
-    setContractorJobsView(openJobs.length > 0 ? 'open_jobs' : 'new_jobs');
+    setContractorTab('work');
+    setContractorWorkView(openJobs.length > 0 ? 'open_jobs' : 'new_jobs');
     setInspectionView(openJobs.length > 0 ? 'list' : (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new'));
   };
   const contractorOnboardingItems: Array<{
@@ -28574,7 +28559,7 @@ function ContractorDashboard({
     },
     {
       label: 'Send your first estimate',
-      helper: 'Create and send an estimate from the Jobs workspace.',
+      helper: 'Create and send an estimate from Work.',
       complete: onboardingSentEstimateCount > 0,
       actionLabel: 'Create estimate',
       onAction: () => openFinancialOnboardingWorkspace('estimates'),
@@ -28735,7 +28720,7 @@ function ContractorDashboard({
     + contractorFollowUpCount
     + acceptedEstimatesNeedingJobs.length
     + completedJobsReadyToInvoice.length
-    + invoiceAttentionRecords.length
+    + (canManageFinancialActions ? invoiceAttentionRecords.length : 0)
     + (contractorProfileOnboardingComplete ? 0 : 1);
   const contractorHomeownersBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : connectionRequests.length;
   const contractorServiceRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : contractorFollowUpCount || openServiceRequestCount;
@@ -28761,16 +28746,16 @@ function ContractorDashboard({
       onClick: () => setContractorTab('requests'),
     },
     {
-      label: 'Estimates / invoices',
-      count: acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length,
+      label: 'Estimates',
+      count: acceptedEstimatesNeedingJobs.length,
+      onClick: openAcceptedEstimatesNeedingJobs,
+    },
+    {
+      label: 'Invoice attention',
+      count: canManageFinancialActions ? invoiceAttentionRecords.length : 0,
       onClick: () => {
-        if (acceptedEstimatesNeedingJobs.length > 0) {
-          openAcceptedEstimatesNeedingJobs();
-          return;
-        }
-        setContractorTab('inspections');
-        setContractorFinancialRecordKind('invoices');
-        setContractorJobsView('open_financial');
+        setContractorTab('financials');
+        setContractorFinancialsView('needs_attention');
         setInspectionView('list');
       },
     },
@@ -28800,8 +28785,8 @@ function ContractorDashboard({
       helper: 'Reusable multi-line estimate structures and starter templates.',
       meta: `${estimateTemplates.length} saved`,
       onAction: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('templates');
+        setContractorTab('work');
+        setContractorWorkView('templates');
         setInspectionView('list');
       },
     },
@@ -28812,8 +28797,8 @@ function ContractorDashboard({
       helper: 'Reusable pricing items for your contractor account.',
       meta: `${activeContractorPriceBookItems.length} active`,
       onAction: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('custom_pricing');
+        setContractorTab('work');
+        setContractorWorkView('custom_pricing');
         setInspectionView('list');
       },
     },
@@ -28846,9 +28831,8 @@ function ContractorDashboard({
       helper: `${acceptedEstimatesNeedingJobs.length} accepted`,
       icon: <FileText size={16} />,
       onClick: () => {
-        setContractorTab('inspections');
-        setContractorFinancialRecordKind('estimates');
-        setContractorJobsView('open_financial');
+        setContractorTab('work');
+        setContractorWorkView('open_estimates');
         setInspectionView('list');
       },
     },
@@ -28858,31 +28842,30 @@ function ContractorDashboard({
       helper: 'Draft, scheduled, or active',
       icon: <ClipboardCheck size={16} />,
       onClick: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('open_jobs');
+        setContractorTab('work');
+        setContractorWorkView('open_jobs');
         setInspectionView('list');
       },
     },
-    {
+    ...(canManageFinancialActions ? [{
       label: 'Invoices',
       value: String(openInvoiceRecords.length),
       helper: `${invoiceAttentionRecords.length} need attention`,
       icon: <Receipt size={16} />,
       onClick: () => {
-        setContractorTab('inspections');
-        setContractorFinancialRecordKind('invoices');
-        setContractorJobsView('open_financial');
+        setContractorTab('financials');
+        setContractorFinancialsView('open_invoices');
         setInspectionView('list');
       },
-    },
+    }] : []),
     {
       label: 'Records',
       value: String(closedJobs.length),
       helper: 'Completed jobs and reports',
       icon: <FolderOpen size={16} />,
       onClick: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('closed_jobs');
+        setContractorTab('work');
+        setContractorWorkView('closed_jobs');
         setInspectionView('list');
       },
     },
@@ -28896,7 +28879,8 @@ function ContractorDashboard({
     invites: 'Invites & Referrals',
     discover: 'Discover',
     marketing: 'Marketing',
-    inspections: 'Jobs',
+    work: 'Work',
+    financials: 'Financials',
     trust: 'Trust & Safety',
     privacy: 'Privacy & Data',
     support: 'Support',
@@ -29086,7 +29070,7 @@ function ContractorDashboard({
     if (!durableDraftCapabilities.canPersistDraft) {
       setError('You do not have access to save contractor Drafts.');
       setInspectionView('list');
-      setContractorJobsViewAndScroll('overview');
+      setContractorWorkViewAndScroll('overview');
       return true;
     }
 
@@ -29116,8 +29100,8 @@ function ContractorDashboard({
 
     setDurableDraftOpenTarget({ kind: 'new', initialDraft });
     setInspectionView('draft_job');
-    setContractorJobsView('new_jobs');
-    setContractorTab('inspections');
+    setContractorWorkView('new_jobs');
+    setContractorTab('work');
     return true;
   };
   const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: BeginFieldWorkOptions) => {
@@ -29126,7 +29110,7 @@ function ContractorDashboard({
     const defaultHome = options?.homeId
       ? connectedHomeList(connection).find(home => home.id === options.homeId) ?? connectedHomeList(connection)[0] ?? connection.home ?? null
       : connectedHomeList(connection)[0] ?? connection.home ?? null;
-    setJobsCustomerFilterSubjectId(connection.connection_id);
+    setWorkCustomerFilterSubjectId(connection.connection_id);
     const name = options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind, templateSource);
     if (openContextualSharedDraft(createBlankDraftJobComposerDraft({
       subject_type: 'connected',
@@ -29158,8 +29142,8 @@ function ContractorDashboard({
     });
     setManualJobTemplateStartNotice(options?.manualJobTemplateStartNotice ?? '');
     setInspectionView('new');
-    setContractorJobsView('new_jobs');
-    setContractorTab('inspections');
+    setContractorWorkView('new_jobs');
+    setContractorTab('work');
   };
   const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
     const currentContact = localContacts.find(item => item.id === contact.id) ?? null;
@@ -29170,7 +29154,7 @@ function ContractorDashboard({
     const selectedLocalHomeId = options?.localHomeId ?? (selectedHomeownerWorkspaceLocalHomeId || singleLocalHomeId(currentContact));
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
-    setJobsCustomerFilterSubjectId(`local:${currentContact.id}`);
+    setWorkCustomerFilterSubjectId(`local:${currentContact.id}`);
     const name = options?.name ?? buildLocalFieldWorkName(currentContact, starterTemplateId, workflowKind, templateSource);
     if (openContextualSharedDraft(createBlankDraftJobComposerDraft({
       subject_type: 'local',
@@ -29201,8 +29185,8 @@ function ContractorDashboard({
     });
     setManualJobTemplateStartNotice(options?.manualJobTemplateStartNotice ?? '');
     setInspectionView('new');
-    setContractorJobsView('new_jobs');
-    setContractorTab('inspections');
+    setContractorWorkView('new_jobs');
+    setContractorTab('work');
   };
   const fieldWorkSubjectLabel = (insp: Inspection) => {
     if (insp.homeowner_user_id) {
@@ -29264,13 +29248,13 @@ function ContractorDashboard({
   ) => {
     if (!DRAFT_JOB_UI_ENABLED) {
       setInspectionView('new');
-      setContractorJobsView('new_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('new_jobs');
+      setContractorTab('work');
       return;
     }
     if (durableDraftComposerRequested && SERVSYNC_DEMO_PRESENTATION_MODE) {
       setInspectionView('list');
-      setContractorJobsViewAndScroll('overview');
+      setContractorWorkViewAndScroll('overview');
       return;
     }
     const contextualCustomerKey = selectedJobsConnection
@@ -29287,7 +29271,7 @@ function ContractorDashboard({
       if (!durableDraftCapabilities.canPersistDraft) {
         setError('You do not have access to save contractor Drafts.');
         setInspectionView('list');
-        setContractorJobsViewAndScroll('overview');
+        setContractorWorkViewAndScroll('overview');
         return;
       }
       const intendedOutput = options.intendedOutput ?? null;
@@ -29299,8 +29283,8 @@ function ContractorDashboard({
       });
       setDurableDraftOpenTarget({ kind: 'new', initialDraft });
       setInspectionView('draft_job');
-      setContractorJobsView('new_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('new_jobs');
+      setContractorTab('work');
       return;
     }
     setDraftJobDraft(nextDraft);
@@ -29308,12 +29292,12 @@ function ContractorDashboard({
     setRemovedDraftJobWorkItemIds([]);
     setDraftJobFeedback(null);
     setInspectionView('draft_job');
-    setContractorJobsView('new_jobs');
-    setContractorTab('inspections');
+    setContractorWorkView('new_jobs');
+    setContractorTab('work');
   };
 
   const startCleanDraftJobComposer = (options: { intendedOutput?: DraftIntendedOutput | null } = {}) => {
-    setJobsCustomerFilterSubjectId(null);
+    setWorkCustomerFilterSubjectId(null);
     startDraftJobComposer({
       subject_type: 'connected',
       homeowner_user_id: '',
@@ -29363,7 +29347,7 @@ function ContractorDashboard({
       return;
     }
 
-    setJobsCustomerFilterSubjectId(subjectType === 'connected' ? customerId : `local:${customerId}`);
+    setWorkCustomerFilterSubjectId(subjectType === 'connected' ? customerId : `local:${customerId}`);
     startDraftJobComposer(
       applyDraftCustomerSelection(createBlankDraftJobComposerDraft(), customer, explicitPropertyId),
       { intendedOutput: null },
@@ -29371,7 +29355,7 @@ function ContractorDashboard({
   };
 
   const startDraftFirstEstimateComposer = () => {
-    setContractorFinancialRecordKind('estimates');
+    setContractorTab('work');
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
     setInvoiceComposerOpen(false);
@@ -29379,7 +29363,7 @@ function ContractorDashboard({
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
-      setContractorJobsViewAndScroll('overview');
+      setContractorWorkViewAndScroll('overview');
       setInspectionView('list');
       return;
     }
@@ -29387,12 +29371,12 @@ function ContractorDashboard({
       startDraftJobComposer({}, { intendedOutput: 'estimate' });
       return;
     }
-    setContractorJobsView('new_financial');
+    setContractorWorkView('new_estimates');
     setInspectionView('list');
   };
 
   const startCleanDraftFirstEstimateComposer = () => {
-    setContractorFinancialRecordKind('estimates');
+    setContractorTab('work');
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
     setInvoiceComposerOpen(false);
@@ -29400,7 +29384,7 @@ function ContractorDashboard({
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
-      setContractorJobsViewAndScroll('overview');
+      setContractorWorkViewAndScroll('overview');
       setInspectionView('list');
       return;
     }
@@ -29408,7 +29392,7 @@ function ContractorDashboard({
       startCleanDraftJobComposer({ intendedOutput: 'estimate' });
       return;
     }
-    setContractorJobsView('new_financial');
+    setContractorWorkView('new_estimates');
     setInspectionView('list');
   };
 
@@ -29417,7 +29401,7 @@ function ContractorDashboard({
       setError('Your current access does not allow creating Invoice Drafts.');
       return;
     }
-    setContractorFinancialRecordKind('invoices');
+    setContractorTab('financials');
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
     setInvoiceComposerOpen(false);
@@ -29425,7 +29409,7 @@ function ContractorDashboard({
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
-      setContractorJobsViewAndScroll('overview');
+      setContractorFinancialsViewAndScroll('overview');
       setInspectionView('list');
       return;
     }
@@ -29433,7 +29417,7 @@ function ContractorDashboard({
       startDraftJobComposer({}, { intendedOutput: 'invoice' });
       return;
     }
-    setContractorJobsView('new_financial');
+    setContractorFinancialsView('new_invoices');
     setInspectionView('list');
   };
 
@@ -29442,7 +29426,7 @@ function ContractorDashboard({
       setError('Your current access does not allow creating Invoice Drafts.');
       return;
     }
-    setContractorFinancialRecordKind('invoices');
+    setContractorTab('financials');
     setEstimateComposerOpen(false);
     setEditingEstimateId(null);
     setInvoiceComposerOpen(false);
@@ -29450,7 +29434,7 @@ function ContractorDashboard({
     setFocusedEstimateRecordId(null);
     setFocusedInvoiceRecordId(null);
     if (durableDraftCohortSafeHold) {
-      setContractorJobsViewAndScroll('overview');
+      setContractorFinancialsViewAndScroll('overview');
       setInspectionView('list');
       return;
     }
@@ -29458,7 +29442,7 @@ function ContractorDashboard({
       startCleanDraftJobComposer({ intendedOutput: 'invoice' });
       return;
     }
-    setContractorJobsView('new_financial');
+    setContractorFinancialsView('new_invoices');
     setInspectionView('list');
   };
 
@@ -29466,12 +29450,12 @@ function ContractorDashboard({
     if (!DRAFT_JOB_UI_ENABLED) {
       setError('Draft Job UI is not enabled in this environment.');
       setInspectionView('list');
-      setContractorJobsViewAndScroll('open_jobs');
+      setContractorWorkViewAndScroll('open_jobs');
       return;
     }
     if (durableDraftComposerRequested && SERVSYNC_DEMO_PRESENTATION_MODE) {
       setInspectionView('list');
-      setContractorJobsViewAndScroll('open_jobs');
+      setContractorWorkViewAndScroll('open_jobs');
       return;
     }
     if (!isComposerDraftJob(draft)) {
@@ -29485,8 +29469,8 @@ function ContractorDashboard({
       }
       setDurableDraftOpenTarget({ kind: 'legacy', inspectionId: draft.id });
       setInspectionView('draft_job');
-      setContractorJobsView('new_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('new_jobs');
+      setContractorTab('work');
       return;
     }
     setLoadingDraftJobId(draft.id);
@@ -29505,8 +29489,8 @@ function ContractorDashboard({
       setRemovedDraftJobWorkItemIds([]);
       setDraftJobFeedback(null);
       setInspectionView('draft_job');
-      setContractorJobsView('new_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('new_jobs');
+      setContractorTab('work');
     } catch (err) {
       setError(readableError(err, 'Unable to load this Draft Job.'));
     } finally {
@@ -29639,7 +29623,7 @@ function ContractorDashboard({
       setDraftJobFeedback({
         tone: 'success',
         title: 'Draft Job saved.',
-        body: 'This contractor-only draft is ready to resume from the Jobs area.',
+        body: 'This contractor-only draft is ready to resume from Work.',
         testId: 'draft-job-save-feedback',
       });
     } catch (err) {
@@ -29737,7 +29721,7 @@ function ContractorDashboard({
         setDraftJobFeedback(null);
         setNotice(actionFeedbackMessage(feedback.title, feedback.body, 'draft-job-create-job-refresh-warning'));
         setInspectionView('list');
-        setContractorJobsViewAndScroll('open_jobs');
+        setContractorWorkViewAndScroll('open_jobs');
       } else {
         setDraftJobFeedback({
           tone: feedback.tone,
@@ -30029,7 +30013,7 @@ function ContractorDashboard({
   };
 
   useEffect(() => {
-    if (contractorTab !== 'inspections' || inspectionView === 'detail') return;
+    if (contractorTab !== 'work' || inspectionView === 'detail') return;
     if (activeInspection) {
       resetInspectionLayoutBaseline();
       setActiveInspection(null);
@@ -30043,7 +30027,7 @@ function ContractorDashboard({
       setInspectionClosedForReview(false);
     }
     persistFieldWorkListState(inspectionView);
-  }, [contractorTab, contractorJobsView, inspectionView, activeInspection]);
+  }, [contractorTab, contractorWorkView, inspectionView, activeInspection]);
 
   // ── Inspection helpers ────────────────────────────────────────────────────
   const startNewInspection = async () => {
@@ -30238,11 +30222,11 @@ function ContractorDashboard({
           updated_at: new Date().toISOString(),
         }, ...prev.filter(event => event.inspection_id !== newInspectionId)]);
       }
-      if (nextJobsFilterSubjectId) setJobsCustomerFilterSubjectId(nextJobsFilterSubjectId);
+      if (nextJobsFilterSubjectId) setWorkCustomerFilterSubjectId(nextJobsFilterSubjectId);
       setInspectionSubTab(isSimpleJobDraft ? 'inspect' : 'checklist');
       setInspectionView('detail');
-      setContractorJobsView('open_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('open_jobs');
+      setContractorTab('work');
       persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: isSimpleJobDraft ? 'inspect' : 'checklist', selectedRoom: activeRoomSeed[0]?.room ?? null });
       if (scheduledDate) {
         setNotice(shareVisitWithHomeowner
@@ -30366,8 +30350,8 @@ function ContractorDashboard({
         setReportValueAddText('');
         setInspectionClosedForReview(false);
         setInspectionView('list');
-        setContractorJobsView('closed_jobs');
-        setContractorTab('inspections');
+        setContractorWorkView('closed_jobs');
+        setContractorTab('work');
         persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       }
       setNotice(insp.homeowner_user_id
@@ -30448,8 +30432,8 @@ function ContractorDashboard({
       setReportValueAddText('');
       setInspectionClosedForReview(false);
       setInspectionView('list');
-      setContractorJobsView('closed_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('closed_jobs');
+      setContractorTab('work');
       persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       setNotice(insp.service_request_id
         ? actionFeedbackMessage('Report sent', 'The homeowner can view the finalized report, and the linked service request was closed by the existing workflow.', 'contractor-report-send-feedback')
@@ -30583,8 +30567,8 @@ function ContractorDashboard({
         void continueDraftJob(insp);
       } else {
         setInspectionView('list');
-        setContractorJobsView('open_jobs');
-        setContractorTab('inspections');
+        setContractorWorkView('open_jobs');
+        setContractorTab('work');
         setNotice('Draft Job UI is not enabled in this environment.');
       }
       return;
@@ -30650,19 +30634,19 @@ function ContractorDashboard({
         const conn = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
         if (conn) {
           setSelectedHomeownerSubjectId(conn.connection_id);
-          setJobsCustomerFilterSubjectId(conn.connection_id);
+          setWorkCustomerFilterSubjectId(conn.connection_id);
           setHomeownerFilter(conn.status === 'active' ? 'active' : 'inactive');
         }
       } else if (insp.local_contact_id) {
         setSelectedHomeownerSubjectId(`local:${insp.local_contact_id}`);
-        setJobsCustomerFilterSubjectId(`local:${insp.local_contact_id}`);
+        setWorkCustomerFilterSubjectId(`local:${insp.local_contact_id}`);
         setHomeownerFilter('active');
       }
-      setContractorJobsView('open_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView('open_jobs');
+      setContractorTab('work');
     } else {
-      setContractorJobsView(inspectionIsOpenJob(insp) ? 'open_jobs' : 'closed_jobs');
-      setContractorTab('inspections');
+      setContractorWorkView(inspectionIsOpenJob(insp) ? 'open_jobs' : 'closed_jobs');
+      setContractorTab('work');
     }
     persistFieldWorkState({ inspectionId: insp.id, view: 'detail', subTab: nextSubTab, selectedRoom: nextSelectedRoom });
   };
@@ -30794,13 +30778,13 @@ function ContractorDashboard({
 
   useEffect(() => {
     if (
-      contractorTab !== 'inspections'
+      contractorTab !== 'work'
       || loading
       || restoredFieldWorkRef.current
       || activeInspection
       || inspections.length === 0
       || inspectionView !== 'detail'
-      || !['open_jobs', 'closed_jobs'].includes(contractorJobsView)
+      || !['open_jobs', 'closed_jobs'].includes(contractorWorkView)
     ) return;
     const saved = storedFieldWorkState();
     if (saved?.view !== 'detail') return;
@@ -30815,7 +30799,7 @@ function ContractorDashboard({
       subTab: savedSubTab,
       selectedRoom: savedSelectedRoom,
     });
-  }, [contractorTab, contractorJobsView, inspectionView, loading, inspections, activeInspection]);
+  }, [contractorTab, contractorWorkView, inspectionView, loading, inspections, activeInspection]);
 
   useEffect(() => {
     if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;
@@ -31006,7 +30990,7 @@ function ContractorDashboard({
   );
   useEffect(() => {
     if (!canManageMarketing && contractorTab === 'marketing') setContractorTab('overview');
-  }, [canManageMarketing, contractorTab]);
+  }, [canManageMarketing, contractorTab, setContractorTab]);
   const contractorAccountName = profile.full_name.trim() || profile.email;
   const contractorAccountSubtitle = currentContractorTeamRole === 'owner'
     ? 'Owner'
@@ -31088,7 +31072,7 @@ function ContractorDashboard({
   const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
     ? 'Field techs cannot create contractor Draft Jobs in this workflow yet.'
     : currentContractorTeamRole === 'viewer'
-      ? 'Viewers can review the Jobs workspace, but cannot save Draft Jobs.'
+      ? 'Viewers can review Work, but cannot save Draft Jobs.'
       : 'Only the contractor owner, admin, or office role can save Draft Jobs.';
   const contractorWorkflowReadOnlyReason = currentContractorTeamRole === 'field_tech'
     ? 'Field techs can view this job thread, but owner, admin, or office roles send customer-visible job messages in v1.'
@@ -31568,7 +31552,7 @@ function ContractorDashboard({
       successNotice: 'Customer saved. Continue building the estimate.',
       onCreated: ({ contact, home }) => {
         setEstimateCustomerCreateOpen(false);
-        setJobsCustomerFilterSubjectId(`local:${contact.id}`);
+        setWorkCustomerFilterSubjectId(`local:${contact.id}`);
         beginEstimateDraftForCustomer(contact.display_name || 'Customer', {
           localHomeId: home?.id ?? singleLocalHomeId(contact) ?? undefined,
         });
@@ -32081,13 +32065,13 @@ function ContractorDashboard({
       onSelect: () => setContractorTab('discover'),
     },
     {
-      id: 'jobs',
-      label: 'Jobs',
+      id: 'work',
+      label: 'Work',
       icon: <ClipboardCheck size={18} />,
-      active: contractorTab === 'inspections',
+      active: contractorTab === 'work',
       onSelect: () => {
-        setContractorTab('inspections');
-        setContractorJobsViewAndScroll('overview');
+        setContractorTab('work');
+        setContractorWorkViewAndScroll('overview');
         setInspectionView('list');
       },
     },
@@ -32120,7 +32104,8 @@ function ContractorDashboard({
       tabs={[
         { id: 'overview',     label: 'Dashboard',          icon: <LayoutDashboard size={17} />, group: 'Workspace' },
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
-        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Customer Work' },
+        { id: 'work',         label: 'Work',               icon: <ClipboardCheck size={17} />, group: 'Customer Work' },
+        ...(canManageFinancialActions ? [{ id: 'financials', label: 'Financials', icon: <Receipt size={17} />, group: 'Customer Work' }] : []),
         { id: 'connections',  label: 'Customers',          icon: <Users size={17} />, badge: contractorHomeownersBadgeCount, group: 'Customer Work' },
         { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorServiceRequestsBadgeCount, group: 'Customer Work' },
         { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, group: 'Customer Work' },
@@ -32133,9 +32118,9 @@ function ContractorDashboard({
       ]}
       activeTab={contractorTab}
       onChange={tab => {
-        if (tab === 'inspections') {
-          setContractorTab('inspections');
-          setContractorJobsViewAndScroll('overview');
+        if (tab === 'work') {
+          setContractorTab('work');
+          setContractorWorkViewAndScroll('overview');
           setInspectionView('list');
           setActiveInspection(null);
           setEstimateComposerOpen(false);
@@ -32148,6 +32133,18 @@ function ContractorDashboard({
           persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
           return;
         }
+        if (tab === 'financials') {
+          if (!canManageFinancialActions) return;
+          setContractorTab('financials');
+          setContractorFinancialsViewAndScroll('overview');
+          setInspectionView('list');
+          setActiveInspection(null);
+          setEstimateComposerOpen(false);
+          setEditingEstimateId(null);
+          setInvoiceComposerOpen(false);
+          setEditingInvoiceId(null);
+          return;
+        }
         setContractorTab(tab as typeof contractorTab);
       }}
       mobileNavItems={contractorMobileNavItems}
@@ -32158,28 +32155,11 @@ function ContractorDashboard({
         onOpenNotification={notification => {
           if (notification.estimate_id) {
             const estimate = estimates.find(item => item.id === notification.estimate_id);
-            if (estimate?.homeowner_user_id) {
-              const connection = connections.find(candidate => candidate.homeowner_user_id === estimate.homeowner_user_id);
-              if (connection) {
-                setJobsCustomerFilterSubjectId(connection.connection_id);
-                setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
-                setContractorFinancialRecordKind('estimates');
-                setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
-                setContractorTab('inspections');
-                return;
-              }
+            if (estimate) focusSavedEstimateRecord(estimate);
+            else {
+              setContractorTab('work');
+              setContractorWorkView('open_estimates');
             }
-            if (estimate?.local_contact_id) {
-              setJobsCustomerFilterSubjectId(`local:${estimate.local_contact_id}`);
-              setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
-              setContractorFinancialRecordKind('estimates');
-              setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
-              setContractorTab('inspections');
-              return;
-            }
-            setContractorFinancialRecordKind('estimates');
-            setContractorJobsView('open_financial');
-            setContractorTab('inspections');
             return;
           }
           if (notification.support_inquiry_id || notification.type.includes('support')) {
@@ -32188,7 +32168,7 @@ function ContractorDashboard({
           }
           if (!notification.request_id) {
             const category = notificationCategoryLabel(notification.type);
-            setContractorTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'inspections' : category === 'Job' ? 'inspections' : category === 'Connection' ? 'connections' : 'requests');
+            setContractorTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' || category === 'Job' ? 'work' : category === 'Invoice' && canManageFinancialActions ? 'financials' : category === 'Connection' ? 'connections' : 'requests');
             return;
           }
           const request = serviceRequests.find(item => item.id === notification.request_id);
@@ -32489,13 +32469,13 @@ function ContractorDashboard({
                         Items already marked by existing workflow statuses.
                       </p>
                     </div>
-                    {(acceptedEstimatesNeedingJobs.length > 0 || completedJobsReadyToInvoice.length > 0 || invoiceAttentionRecords.length > 0) && (
+                    {(acceptedEstimatesNeedingJobs.length > 0 || completedJobsReadyToInvoice.length > 0 || (canManageFinancialActions && invoiceAttentionRecords.length > 0)) && (
                       <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[260px]">
                         {acceptedEstimatesNeedingJobs.length > 0 && (
                           <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
                               <p className="text-sm font-bold text-emerald-950">Accepted estimates ready for jobs</p>
-                              <p className="mt-0.5 text-xs leading-5 text-emerald-800">Create jobs from approved estimates in the existing Jobs workspace.</p>
+                              <p className="mt-0.5 text-xs leading-5 text-emerald-800">Create Jobs from approved estimates in Work.</p>
                             </div>
                             <button
                               type="button"
@@ -32507,7 +32487,7 @@ function ContractorDashboard({
                             </button>
                           </div>
                         )}
-                        {invoiceAttentionRecords.length > 0 && (
+                        {canManageFinancialActions && invoiceAttentionRecords.length > 0 && (
                           <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
                               <p className="text-sm font-bold text-amber-950">Invoices need attention</p>
@@ -32517,8 +32497,8 @@ function ContractorDashboard({
                               type="button"
                               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 transition hover:border-amber-300 hover:text-amber-900 sm:w-auto"
                               onClick={() => {
-                                setContractorTab('inspections');
-                                setContractorJobsView('open_financial');
+                                setContractorTab('financials');
+                                setContractorFinancialsView('needs_attention');
                                 setInspectionView('list');
                               }}
                             >
@@ -33473,7 +33453,7 @@ function ContractorDashboard({
                       <button
                         type="button"
                         onClick={() => {
-                          setJobsCustomerFilterSubjectId(requestConnection.connection_id);
+                          setWorkCustomerFilterSubjectId(requestConnection.connection_id);
                           if (linkedRequestEstimate) {
                             openEstimateRecord(linkedRequestEstimate);
                             return;
@@ -35499,7 +35479,7 @@ function ContractorDashboard({
                         value: isConn && conn?.home ? 'Shared' : localHome ? 'Saved' : 'Basic',
                         helper: 'Contact and home details',
                         icon: <Home size={15} />,
-                        tone: 'slate',
+                        tone: 'slate' as const,
                       },
                       ...(isConn ? [
                         {
@@ -35539,13 +35519,12 @@ function ContractorDashboard({
                     const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'profile';
                     const workspaceSubjectFilterId = conn?.connection_id ?? (localCustomer ? `local:${localCustomer.id}` : '');
                     const openCustomerInvoiceRecords = (status: ContractorInvoiceRecordStatusFilter) => {
-                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                      if (workspaceSubjectFilterId) setFinancialsCustomerFilterSubjectId(workspaceSubjectFilterId);
                       setFocusedEstimateRecordId(null);
                       setFocusedInvoiceRecordId(null);
-                      setContractorFinancialRecordKind('invoices');
                       setContractorInvoiceRecordStatusFilter(status);
-                      setContractorJobsView(status === 'paid' ? 'closed_financial' : 'open_financial');
-                      setContractorTab('inspections');
+                      setContractorFinancialsView(status === 'paid' ? 'closed_invoices' : 'open_invoices');
+                      setContractorTab('financials');
                     };
                     const customerFinancialRecords = [
                       ...estimateRecords.map(record => ({ kind: 'estimate' as const, record })),
@@ -35625,11 +35604,11 @@ function ContractorDashboard({
                         value: String(workOrderRecords.length),
                         helper: `${workOrderDraftCount} draft${workOrderDraftCount === 1 ? '' : 's'} · ${workOrderFinalCount} filed`,
                         icon: <ClipboardCheck size={16} />,
-                        tone: workOrderDraftCount > 0 ? 'amber' : 'emerald',
+                        tone: workOrderDraftCount > 0 ? 'amber' as const : 'emerald' as const,
                         onClick: () => {
-                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                          setContractorJobsView(workOrderDraftCount > 0 ? 'open_jobs' : 'new_jobs');
-                          setContractorTab('inspections');
+                          if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId);
+                          setContractorWorkView(workOrderDraftCount > 0 ? 'open_jobs' : 'new_jobs');
+                          setContractorTab('work');
                         },
                       },
                       {
@@ -35637,11 +35616,11 @@ function ContractorDashboard({
                         value: String(inspectionRecords.length),
                         helper: `${inspectionDraftCount} draft${inspectionDraftCount === 1 ? '' : 's'} · ${inspectionFinalCount} filed`,
                         icon: <ClipboardList size={16} />,
-                        tone: inspectionDraftCount > 0 ? 'amber' : 'slate',
+                        tone: inspectionDraftCount > 0 ? 'amber' as const : 'slate' as const,
                         onClick: () => {
-                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                          setContractorJobsView(inspectionDraftCount > 0 ? 'open_jobs' : 'new_jobs');
-                          setContractorTab('inspections');
+                          if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId);
+                          setContractorWorkView(inspectionDraftCount > 0 ? 'open_jobs' : 'new_jobs');
+                          setContractorTab('work');
                         },
                       },
                       {
@@ -35651,34 +35630,32 @@ function ContractorDashboard({
                           ? `${subjectEstimateDraftCountAcrossProperties} draft${subjectEstimateDraftCountAcrossProperties === 1 ? '' : 's'} · ${subjectEstimateAcceptedCountAcrossProperties} accepted`
                           : noSubjectEstimateCopy,
                         icon: <Receipt size={16} />,
-                        tone: subjectEstimateAcceptedCountAcrossProperties > 0 ? 'emerald' : subjectEstimateDraftCountAcrossProperties > 0 ? 'amber' : 'slate',
+                        tone: subjectEstimateAcceptedCountAcrossProperties > 0 ? 'emerald' as const : subjectEstimateDraftCountAcrossProperties > 0 ? 'amber' as const : 'slate' as const,
                         onClick: () => {
-                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                          if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId);
                           setFocusedEstimateRecordId(null);
-                          setContractorFinancialRecordKind('estimates');
                           setHomeownerWorkspaceEstimateView(subjectEstimateAcceptedCountAcrossProperties > 0 ? 'accepted' : subjectEstimateDraftCountAcrossProperties > 0 ? 'draft' : 'sent');
-                          setContractorJobsView('open_financial');
-                          setContractorTab('inspections');
+                          setContractorWorkView('open_estimates');
+                          setContractorTab('work');
                         },
                       },
-                      {
+                      ...(canManageFinancialActions ? [{
                         label: 'Invoices',
                         value: String(invoiceRecords.length + subjectInvoiceRecords.length),
                         helper: `${openSubjectInvoiceRecords.length} open · ${paidSubjectInvoiceRecords.length} paid`,
                         icon: <Receipt size={16} />,
-                        tone: openSubjectInvoiceRecords.length > 0 || draftInvoiceCount > 0 ? 'amber' : paidSubjectInvoiceRecords.length > 0 ? 'emerald' : 'slate',
+                        tone: openSubjectInvoiceRecords.length > 0 || draftInvoiceCount > 0 ? 'amber' as const : paidSubjectInvoiceRecords.length > 0 ? 'emerald' as const : 'slate' as const,
                         onClick: () => {
                           if (subjectInvoiceRecords.length > 0) {
                             openCustomerInvoiceRecords(openSubjectInvoiceRecords.length > 0 ? 'open' : paidSubjectInvoiceRecords.length > 0 ? 'paid' : 'all');
                             return;
                           }
-                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                          setContractorFinancialRecordKind('estimates');
+                          if (workspaceSubjectFilterId) setFinancialsCustomerFilterSubjectId(workspaceSubjectFilterId);
                           setHomeownerWorkspaceEstimateView(invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftInvoiceCount > 0 ? 'draft' : 'sent');
-                          setContractorJobsView(invoiceRecords.length > 0 ? 'open_financial' : 'new_financial');
-                          setContractorTab('inspections');
+                          setContractorFinancialsView(invoiceRecords.length > 0 ? 'open_invoices' : 'new_invoices');
+                          setContractorTab('financials');
                         },
-                      },
+                      }] : []),
                       ...(isConn ? [
                         {
                           label: 'Schedule',
@@ -35694,7 +35671,7 @@ function ContractorDashboard({
                         value: isConn && conn?.home ? 'Shared' : localHome ? 'Saved' : 'Basic',
                         helper: 'Customer and property details',
                         icon: <Home size={16} />,
-                        tone: 'slate',
+                        tone: 'slate' as const,
                         onClick: () => setHomeownerDetailTab(isConn ? 'home' : 'profile'),
                       },
                     ];
@@ -36408,7 +36385,7 @@ function ContractorDashboard({
                                       <h3 className="font-bold text-slate-950">Recent jobs</h3>
                                       <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed</p>
                                     </div>
-                                    <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
+                                    <button type="button" onClick={() => { if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorWorkView('open_jobs'); setContractorTab('work'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Work</button>
                                   </div>
                                   {recentWorkOrders.length === 0 ? (
                                     <EmptyState text="No jobs yet for this workspace." />
@@ -36449,7 +36426,7 @@ function ContractorDashboard({
                                       <h3 className="font-bold text-slate-950">Recent checklist reports</h3>
                                       <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed</p>
                                     </div>
-                                    <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
+                                    <button type="button" onClick={() => { if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorWorkView('open_jobs'); setContractorTab('work'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Work</button>
                                   </div>
                                   {recentInspections.length === 0 ? (
                                     <EmptyState text="No checklist report jobs yet for this workspace." />
@@ -36884,8 +36861,8 @@ function ContractorDashboard({
                               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <h3 className="font-bold text-slate-950">Jobs dashboard</h3>
-                                    <p className="mt-1 text-sm text-slate-500">Quick view for this customer. Create and manage the actual workflow in Jobs.</p>
+                                    <h3 className="font-bold text-slate-950">Work summary</h3>
+                                    <p className="mt-1 text-sm text-slate-500">Quick view for this customer. Create and manage the full workflow in Work.</p>
                                   </div>
 	                                  {!isConn && localCustomer && !localCustomerArchived && canPrepareLocalCustomerClaimInvites && (
                                     <button
@@ -36949,7 +36926,7 @@ function ContractorDashboard({
                                         <h4 className="text-sm font-bold text-slate-950">Jobs in progress</h4>
                                         <p className="mt-1 text-xs text-slate-500">{activeJobRecords.length} active job{activeJobRecords.length === 1 ? '' : 's'}</p>
                                       </div>
-                                      <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open Jobs</button>
+                                      <button type="button" onClick={() => { if (workspaceSubjectFilterId) setWorkCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorWorkView('open_jobs'); setContractorTab('work'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open Work</button>
                                     </div>
                                     {activeJobRecords.slice(0, 5).length === 0 ? (
                                       <EmptyState text="No active jobs for this customer." />
@@ -37972,34 +37949,41 @@ function ContractorDashboard({
         />
       )}
 
-      {(contractorTab === 'inspections' || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (
+      {(contractorTab === 'work' || (contractorTab === 'financials' && (canManageFinancialActions || Boolean(focusedInvoiceRecordId))) || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (
         <div className="space-y-5">
           {/* ── LIST VIEW ── */}
           {inspectionView === 'list' && (
             <>
               {(() => {
-                const activeHeaderTab = contractorJobsHeaderTabForView(contractorJobsView);
-                const jobsHeaderTabs: Array<{ id: ContractorJobsHeaderTab; label: string; helper: string; mobileClassName: string }> = [
-                  { id: 'overview', label: 'Overview', helper: 'Summary and next actions', mobileClassName: 'col-span-2' },
-                  { id: 'estimates', label: 'Estimates', helper: `${openFinancialRecords.length} open`, mobileClassName: 'col-span-2' },
-                  { id: 'invoices', label: 'Invoices', helper: `${openInvoiceRecords.length} open`, mobileClassName: 'col-span-2' },
-                  { id: 'jobs_reports', label: 'Jobs & Reports', helper: `${openJobs.length} active`, mobileClassName: 'col-span-3' },
-                  { id: 'templates', label: 'Templates', helper: 'Reusable tools', mobileClassName: 'col-span-3' },
-                ];
+                const financialsWorkspace = contractorTab === 'financials';
+                const activeHeaderTab = financialsWorkspace
+                  ? financialsHeaderTabForView(contractorFinancialsView)
+                  : workHeaderTabForView(contractorWorkView);
+                const headerTabs = financialsWorkspace
+                  ? [
+                      { id: 'overview', label: 'Overview', helper: 'Billing summary', mobileClassName: 'col-span-3' },
+                      { id: 'invoices', label: 'Invoices', helper: `${openInvoiceRecords.length} open`, mobileClassName: 'col-span-3' },
+                    ]
+                  : [
+                      { id: 'overview', label: 'Overview', helper: 'Summary and next actions', mobileClassName: 'col-span-2' },
+                      { id: 'estimates', label: 'Estimates', helper: `${openFinancialRecords.length} open`, mobileClassName: 'col-span-2' },
+                      { id: 'jobs_reports', label: 'Jobs & Reports', helper: `${openJobs.length} active`, mobileClassName: 'col-span-3' },
+                      { id: 'templates', label: 'Templates', helper: 'Reusable tools', mobileClassName: 'col-span-3' },
+                    ];
                 return (
-                  <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="contractor-jobs-header-tabs">
+                  <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid={financialsWorkspace ? 'contractor-financials-header-tabs' : 'contractor-work-header-tabs'}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div className="min-w-0">
-                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Jobs workspace</p>
-                        <h2 className="mt-1 text-xl font-bold text-slate-950">Jobs</h2>
-                        <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">Create and manage customer work from Draft through Invoice.</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{financialsWorkspace ? 'Financials workspace' : 'Work workspace'}</p>
+                        <h2 className="mt-1 text-xl font-bold text-slate-950">{financialsWorkspace ? 'Financials' : 'Work'}</h2>
+                        <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and payments.' : 'Plan, estimate, perform, and document customer work.'}</p>
                       </div>
-                      {contractorJobsView !== 'overview' ? <div
+                      {(financialsWorkspace ? contractorFinancialsView !== 'overview' : contractorWorkView !== 'overview') && (canManageFinancialActions || !financialsWorkspace) ? <div
                         role="tablist"
-                        aria-label="Contractor Jobs section tabs"
+                        aria-label={financialsWorkspace ? 'Contractor Financials section tabs' : 'Contractor Work section tabs'}
                         className="grid w-full grid-cols-6 gap-1.5 lg:w-auto lg:grid-cols-5 lg:gap-2"
                       >
-                        {jobsHeaderTabs.map(tab => {
+                        {headerTabs.map(tab => {
                           const active = activeHeaderTab === tab.id;
                           return (
                             <button
@@ -38007,8 +37991,10 @@ function ContractorDashboard({
                               type="button"
                               role="tab"
                               aria-selected={active}
-                              data-testid={`contractor-jobs-header-tab-${tab.id}`}
-                              onClick={() => openContractorJobsHeaderTab(tab.id)}
+                              data-testid={`contractor-${financialsWorkspace ? 'financials' : 'work'}-header-tab-${tab.id}`}
+                              onClick={() => financialsWorkspace
+                                ? openContractorFinancialsHeaderTab(tab.id as ContractorFinancialsHeaderTab)
+                                : openContractorWorkHeaderTab(tab.id as ContractorWorkHeaderTab)}
                               className={`${tab.mobileClassName} min-h-[3.25rem] rounded-xl border px-2 py-1.5 text-left transition sm:px-2.5 lg:col-span-1 lg:min-w-[8.5rem] lg:px-3 lg:py-2 ${
                                 active
                                   ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
@@ -38026,7 +38012,7 @@ function ContractorDashboard({
                 );
               })()}
 
-              {contractorJobsView === 'overview' && (
+              {contractorTab === 'work' && contractorWorkView === 'overview' && (
                 durableDraftCohortSafeHold ? (
                   <section
                     className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
@@ -38038,7 +38024,7 @@ function ContractorDashboard({
                 ) : sharedDraftComposerEnabled ? (
                   <ContractorWorkDashboard
                     loading={loading}
-                    loadError={!loading && !contractor ? 'Save the business profile before Jobs can load.' : ''}
+                    loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
                     draftSummary={durableDraftSummary}
                     canReadDrafts={Boolean(supabase) && (durableDraftCapabilityLoading || Boolean(durableDraftCapabilityError) || effectiveDurableDraftCapabilities.canReadDrafts)}
                     canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canPersistDraft}
@@ -38047,42 +38033,42 @@ function ContractorDashboard({
                     canViewPriceBook={priceBookAccess.canView}
                     estimateCount={openFinancialRecords.length}
                     activeJobCount={openJobs.length}
-                    invoiceCount={invoices.length}
-                    openInvoiceCount={openInvoiceRecords.length}
-                    paidInvoiceCount={paidInvoiceRecords.length}
-                    needsAttentionCount={contractorNeedsAttentionCount}
-                    onViewNeedsAttention={() => setContractorJobsViewAndScroll('needs_attention')}
-                    onViewDrafts={() => setContractorJobsViewAndScroll('drafts')}
-                    onViewEstimates={() => {
-                      setContractorFinancialRecordKind('estimates');
-                      setContractorJobsViewAndScroll('open_financial');
-                    }}
+                    needsAttentionCount={contractorWorkNeedsAttentionCount}
+                    onViewNeedsAttention={() => setContractorWorkViewAndScroll('needs_attention')}
+                    onViewDrafts={() => setContractorWorkViewAndScroll('drafts')}
+                    onViewEstimates={() => setContractorWorkViewAndScroll('open_estimates')}
                     onViewActiveJobs={() => {
-                      setContractorJobsViewAndScroll('open_jobs');
+                      setContractorWorkViewAndScroll('open_jobs');
                       setInspectionView('list');
-                    }}
-                    onViewInvoices={() => {
-                      setContractorFinancialRecordKind('invoices');
-                      setContractorInvoiceRecordStatusFilter('all');
-                      setContractorJobsViewAndScroll('open_financial');
                     }}
                     onStartNewDraft={startCleanDraftJobComposer}
                     onOpenTemplates={() => {
-                      setContractorFinancialRecordKind('estimates');
-                      setContractorJobsViewAndScroll('templates');
+                      setContractorWorkViewAndScroll('templates');
                       setShowTemplateLibrary(true);
                     }}
                     onOpenServicePlans={openContractorServicePlans}
-                    onOpenCustomPricing={() => setContractorJobsViewAndScroll('custom_pricing')}
+                    onOpenCustomPricing={() => setContractorWorkViewAndScroll('custom_pricing')}
                   />
                 ) : null
               )}
 
-              {contractorJobsView === 'drafts' && sharedDraftComposerEnabled && supabase ? (
+              {contractorTab === 'financials' && contractorFinancialsView === 'overview' && (
+                <ContractorFinancialsDashboard
+                  invoices={invoices}
+                  attentionCount={contractorFinancialsNeedsAttentionCount}
+                  canCreateInvoice={durableDraftInvoiceLaunchAvailable}
+                  onCreateInvoice={startCleanDraftFirstInvoiceComposer}
+                  onViewAttention={() => setContractorFinancialsViewAndScroll('needs_attention')}
+                  onViewOpen={() => setContractorFinancialsViewAndScroll('open_invoices')}
+                  onViewClosed={() => setContractorFinancialsViewAndScroll('closed_invoices')}
+                />
+              )}
+
+              {contractorTab === 'work' && contractorWorkView === 'drafts' && sharedDraftComposerEnabled && supabase ? (
                 <section data-testid="contractor-jobs-drafts-destination" className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50">
-                      <ArrowLeft size={16} /> Jobs overview
+                    <button type="button" onClick={() => setContractorWorkViewAndScroll('overview')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50">
+                      <ArrowLeft size={16} /> Work overview
                     </button>
                     <ContextualHelp client={supabase} contextKey="contractor.drafts" contractorId={contractor?.id} label="How to create an estimate" />
                   </div>
@@ -38106,9 +38092,9 @@ function ContractorDashboard({
                     onOpenTarget={target => {
                       setDurableDraftOpenTarget(target);
                       setInspectionView('draft_job');
-                      setContractorJobsView('new_jobs');
+                      setContractorWorkView('new_jobs');
                     }}
-                    onBack={() => setContractorJobsViewAndScroll('overview')}
+                    onBack={() => setContractorWorkViewAndScroll('overview')}
                     launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
                     onRefreshCapabilities={refreshEffectiveDurableDraftCapabilities}
                     onLoadOutput={loadDurableDraftOutput}
@@ -38117,23 +38103,29 @@ function ContractorDashboard({
                 </section>
               ) : null}
 
-              {contractorJobsView === 'needs_attention' && sharedDraftComposerEnabled ? (
+              {contractorTab === 'work' && contractorWorkView === 'needs_attention' && sharedDraftComposerEnabled ? (
                 <ContractorNeedsAttention
                   estimates={acceptedEstimatesNeedingJobs}
                   jobs={completedJobsReadyToInvoice}
-                  invoices={invoiceAttentionRecords}
-                  onBack={() => setContractorJobsViewAndScroll('overview')}
+                  onBack={() => setContractorWorkViewAndScroll('overview')}
                   onOpenEstimate={focusSavedEstimateRecord}
                   onOpenJob={job => openInspection(job)}
+                />
+              ) : null}
+
+              {contractorTab === 'financials' && contractorFinancialsView === 'needs_attention' ? (
+                <ContractorFinancialsNeedsAttention
+                  invoices={invoiceAttentionRecords}
+                  onBack={() => setContractorFinancialsViewAndScroll('overview')}
                   onOpenInvoice={focusSavedInvoiceRecord}
                 />
               ) : null}
 
-              {contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (
+              {contractorTab === 'work' && contractorWorkView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (
               <section data-testid="contractor-jobs-overview" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-950">Jobs</h2>
+                    <h2 className="text-xl font-bold text-slate-950">Work</h2>
                     <p className="mt-1 text-sm text-slate-500">Create, track, and close work without mixing it into the homeowner profile page.</p>
                   </div>
                   <div className="min-w-[240px]">
@@ -38193,17 +38185,17 @@ function ContractorDashboard({
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs' as const, label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' }] : []),
+                        ...(canManageJobOperations && !SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs' as const, label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' }] : []),
                         { id: 'open_jobs' as const, label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Scheduled and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
                         { id: 'closed_jobs' as const, label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} />, mobileTileClassName: 'order-3 md:order-none' },
-                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName: string }>).map(item => {
-                        const active = contractorJobsView === item.id;
+                      ] as Array<{ id: ContractorWorkView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName: string }>).map(item => {
+                        const active = contractorWorkView === item.id;
                         return (
                           <button
                             key={item.id}
                             type="button"
                             onClick={() => {
-                              setContractorJobsViewAndScroll(item.id);
+                              setContractorWorkViewAndScroll(item.id);
                               if (item.id === 'new_jobs') setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new');
                               if (item.id !== 'new_jobs') setInspectionView('list');
                             }}
@@ -38228,23 +38220,23 @@ function ContractorDashboard({
                   <div className="rounded-2xl border border-slate-200 bg-white p-3">
                     <div className="mb-2 flex items-center gap-2">
                       <Receipt size={16} className="text-blue-700" />
-                      <h3 className="text-sm font-bold text-slate-950">Estimates / Invoices</h3>
+                      <h3 className="text-sm font-bold text-slate-950">Estimates</h3>
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE && (effectiveDurableDraftCapabilities.canLaunchEstimate || canManageFinancialActions) ? [{ id: 'new_financial' as const, label: canManageFinancialActions ? 'New Estimate/Invoice' : 'New Estimate', value: '+', helper: 'Create document', icon: <Receipt size={15} /> }] : []),
-                        { id: 'open_financial' as const, label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
-                        { id: 'closed_financial' as const, label: 'Closed / Billed Records', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Paid invoices and closed estimates', icon: <Receipt size={15} /> },
-                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName?: string }>).map((item, index) => {
-                        const active = contractorJobsView === item.id;
+                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canLaunchEstimate ? [{ id: 'new_estimates' as const, label: 'New Estimate', value: '+', helper: 'Create estimate', icon: <Receipt size={15} /> }] : []),
+                        { id: 'open_estimates' as const, label: 'Open Estimates', value: String(jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length), helper: 'Draft, sent, and accepted estimates', icon: <FileText size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
+                        { id: 'closed_estimates' as const, label: 'Closed Estimates', value: String(jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length), helper: 'Declined, expired, or revised estimates', icon: <Receipt size={15} /> },
+                      ] as Array<{ id: ContractorWorkView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName?: string }>).map((item, index) => {
+                        const active = contractorWorkView === item.id;
                         const mobileTileClassName = item.mobileTileClassName || (index === 0 ? 'order-2 md:order-none' : 'order-3 md:order-none');
                         return (
                           <button
                             key={item.id}
                             type="button"
                             onClick={() => {
-                              if (item.id === 'new_financial') setContractorFinancialRecordKind('estimates');
-                              setContractorJobsViewAndScroll(item.id);
+                              if (item.id === 'new_estimates') setContractorTab('work');
+                              setContractorWorkViewAndScroll(item.id);
                               setInspectionView('list');
                             }}
 	                            className={`${mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3 ${
@@ -38279,8 +38271,8 @@ function ContractorDashboard({
                           helper: 'Saved work templates and inspection checklists',
                           icon: <ClipboardList size={15} />,
                           onClick: () => {
-                            setContractorFinancialRecordKind('estimates');
-                            setContractorJobsViewAndScroll('templates');
+                            setContractorTab('work');
+                            setContractorWorkViewAndScroll('templates');
                             setInspectionView('list');
                             setShowTemplateLibrary(true);
                           },
@@ -38292,8 +38284,8 @@ function ContractorDashboard({
                           helper: 'Reusable pricing library',
                           icon: <Receipt size={15} />,
                           onClick: () => {
-                            setContractorFinancialRecordKind('estimates');
-                            setContractorJobsViewAndScroll('custom_pricing');
+                            setContractorTab('work');
+                            setContractorWorkViewAndScroll('custom_pricing');
                             setInspectionView('list');
                           },
                         },
@@ -38305,7 +38297,7 @@ function ContractorDashboard({
                           icon: <ClipboardList size={15} />,
                           onClick: openContractorServicePlans,
                         },
-                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; onClick: () => void }>).map(item => (
+                      ] as Array<{ id: ContractorWorkView; label: string; value: string; helper: string; icon: React.ReactNode; onClick: () => void }>).map(item => (
                         <button
                           key={item.id}
                           type="button"
@@ -38326,7 +38318,7 @@ function ContractorDashboard({
               </section>
               )}
 
-              {contractorJobsView === 'new_financial' && (
+              {((contractorTab === 'work' && contractorWorkView === 'new_estimates') || (contractorTab === 'financials' && contractorFinancialsView === 'new_invoices')) && (
                 durableDraftCohortSafeHold ? (
                 <Card title="Work tools" icon={<Receipt size={18} />}>
                   <div
@@ -38338,14 +38330,14 @@ function ContractorDashboard({
                   </div>
                 </Card>
                 ) : (
-                <Card title={authorizedInvoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
+                <Card title={authorizedInvoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorTab === 'work' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
                   <div className="space-y-4">
                     {!authorizedInvoiceComposerOpen && (
                       <>
                         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
-                            {contractorFinancialRecordKind === 'estimates' && editingEstimateId ? (
+                            {contractorTab === 'work' && editingEstimateId ? (
                               <DurableDraftOutputHeading
                                 as="h3"
                                 outputType="estimate"
@@ -38354,7 +38346,7 @@ function ContractorDashboard({
                               >
                                 Estimate workspace
                               </DurableDraftOutputHeading>
-                            ) : contractorFinancialRecordKind === 'invoices' && editingInvoiceId ? (
+                            ) : contractorTab === 'financials' && editingInvoiceId ? (
                               <DurableDraftOutputHeading
                                 as="h3"
                                 outputType="invoice"
@@ -38364,12 +38356,12 @@ function ContractorDashboard({
                                 Invoice workspace
                               </DurableDraftOutputHeading>
                             ) : (
-                              <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
+                              <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorTab === 'work' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
                             )}
                             <p className="mt-1 text-sm leading-6 text-slate-500">
-                              {contractorFinancialRecordKind === 'estimates'
-                                ? 'Create or edit a customer-facing estimate without the Jobs overview cards above it.'
-                                : 'Create or edit a customer-facing invoice without the Jobs overview cards above it.'}
+                              {contractorTab === 'work'
+                                ? 'Create or edit a customer-facing estimate inside Work.'
+                                : 'Create or edit a customer-facing Invoice inside Financials.'}
                             </p>
                           </div>
                           <button
@@ -38379,16 +38371,17 @@ function ContractorDashboard({
                               setEditingEstimateId(null);
                               setInvoiceComposerOpen(false);
                               setEditingInvoiceId(null);
-                              setContractorJobsViewAndScroll('overview');
+                              if (contractorTab === 'financials') setContractorFinancialsViewAndScroll('overview');
+                              else setContractorWorkViewAndScroll('overview');
                             }}
                             className={buttonClass('secondary')}
                           >
-                            Back to Jobs Overview
+                            {contractorTab === 'financials' ? 'Back to Financials Overview' : 'Back to Work Overview'}
                           </button>
                         </div>
                         {!SERVSYNC_DEMO_PRESENTATION_MODE
                           && !estimateComposerOpen
-                          && (!sharedDraftComposerEnabled || contractorFinancialRecordKind === 'estimates') && (
+                          && (!sharedDraftComposerEnabled || contractorTab === 'work') && (
                         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
@@ -38405,7 +38398,7 @@ function ContractorDashboard({
                               ))}
                             </select>
                           </Field>
-                          {contractorFinancialRecordKind === 'estimates' && canCreateContractorLocalCustomers && (
+                          {contractorTab === 'work' && canCreateContractorLocalCustomers && (
                             <button
                               type="button"
                               onClick={openEstimateCustomerCreate}
@@ -38415,7 +38408,7 @@ function ContractorDashboard({
                               Create new customer
                             </button>
                           )}
-                          {contractorFinancialRecordKind === 'estimates' ? (
+                          {contractorTab === 'work' ? (
                             <button
                               type="button"
                               disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}
@@ -38443,7 +38436,7 @@ function ContractorDashboard({
                         </div>
                         )}
 
-                        {canManageFinancialActions && sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen ? (
+                        {canManageFinancialActions && sharedDraftComposerEnabled && contractorTab === 'financials' && !invoiceComposerOpen ? (
                           <div
                             className={`rounded-2xl border p-4 ${durableDraftInvoiceLaunchAvailable ? 'border-blue-200 bg-blue-50' : 'border-amber-200 bg-amber-50'}`}
                             data-testid={durableDraftInvoiceLaunchAvailable ? 'durable-draft-invoice-planning-entry' : 'durable-draft-invoice-planning-unavailable'}
@@ -38472,8 +38465,8 @@ function ContractorDashboard({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setContractorFinancialRecordKind('estimates');
-                                  setContractorJobsViewAndScroll('open_financial');
+                                  setContractorTab('work');
+                                  setContractorWorkViewAndScroll('open_estimates');
                                   setInspectionView('list');
                                   setFocusedEstimateRecordId(null);
                                   setFocusedInvoiceRecordId(null);
@@ -38495,8 +38488,8 @@ function ContractorDashboard({
                           </div>
                         ) : null}
 
-                        {!selectedJobsCustomerName && !(sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices' && !invoiceComposerOpen) && (
-                          <Notice tone="info" text={contractorFinancialRecordKind === 'estimates' ? 'Choose a customer before creating an estimate.' : 'Choose a customer before creating an invoice.'} />
+                        {!selectedJobsCustomerName && !(sharedDraftComposerEnabled && contractorTab === 'financials' && !invoiceComposerOpen) && (
+                          <Notice tone="info" text={contractorTab === 'work' ? 'Choose a customer before creating an estimate.' : 'Choose a customer before creating an invoice.'} />
                         )}
                         {readOnlyContractorActionReason && (
                           <Notice tone="info" text={readOnlyContractorActionReason} />
@@ -38942,8 +38935,8 @@ function ContractorDashboard({
                                   openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
                                 } else {
                                   setInspectionView('list');
-                                  setContractorJobsView('open_financial');
-                                  setContractorTab('inspections');
+                                  setContractorWorkView('open_estimates');
+                                  setContractorTab('work');
                                 }
                               }
                             }}
@@ -38994,20 +38987,26 @@ function ContractorDashboard({
                 )
               )}
 
-              {(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (
-                <Card title={contractorFinancialRecordKind === 'estimates' ? 'Estimates' : 'Invoices'} icon={<Receipt size={18} />}>
+              {((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (
+                <Card title={contractorTab === 'work' ? 'Estimates' : 'Invoices'} icon={<Receipt size={18} />}>
                   {(() => {
-                    const estimateRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates : estimates;
-                    const invoiceRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices : invoices;
+                    const allEstimateRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates : estimates;
+                    const allInvoiceRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices : invoices;
+                    const estimateRecordsForView = contractorWorkView === 'closed_estimates'
+                      ? allEstimateRecordsForView.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status))
+                      : allEstimateRecordsForView.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
+                    const invoiceRecordsForView = contractorFinancialsView === 'closed_invoices'
+                      ? allInvoiceRecordsForView.filter(invoice => ['paid', 'void'].includes(invoice.status))
+                      : allInvoiceRecordsForView.filter(invoice => !['paid', 'void'].includes(invoice.status));
                     const focusedEstimateRecord = focusedEstimateRecordId
-                      ? estimateRecordsForView.find(estimate => estimate.id === focusedEstimateRecordId) ?? null
+                      ? allEstimateRecordsForView.find(estimate => estimate.id === focusedEstimateRecordId) ?? null
                       : null;
                     const focusedInvoiceRecord = focusedInvoiceRecordId
-                      ? invoiceRecordsForView.find(invoice => invoice.id === focusedInvoiceRecordId)
+                      ? allInvoiceRecordsForView.find(invoice => invoice.id === focusedInvoiceRecordId)
                         ?? invoices.find(invoice => invoice.id === focusedInvoiceRecordId)
                         ?? null
                       : null;
-                    const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);
+                    const showingEstimates = contractorTab === 'work' || Boolean(focusedEstimateRecord);
                     const estimateCustomerSearchText = (estimate: Estimate) => {
                       const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
                       const local = estimate.local_contact_id ? localCustomerContext.find(c => c.id === estimate.local_contact_id) : null;
@@ -39185,11 +39184,11 @@ function ContractorDashboard({
                                   type="button"
                                   disabled={durableDraftCohortSafeHold}
                                   onClick={durableDraftCohortSafeHold ? () => {
-                                    setContractorJobsViewAndScroll('overview');
+                                    setContractorWorkViewAndScroll('overview');
                                     setInspectionView('list');
                                   } : sharedDraftComposerEnabled ? startDraftFirstEstimateComposer : () => {
-                                    setContractorFinancialRecordKind('estimates');
-                                    setContractorJobsViewAndScroll('new_financial');
+                                    setContractorTab('work');
+                                    setContractorWorkViewAndScroll('new_estimates');
                                   }}
                                   className={buttonClass('primary')}
                                 >
@@ -39201,7 +39200,7 @@ function ContractorDashboard({
                                 <button
                                   type="button"
                                   onClick={durableDraftCohortSafeHold ? () => {
-                                    setContractorJobsViewAndScroll('overview');
+                                    setContractorFinancialsViewAndScroll('overview');
                                     setInspectionView('list');
                                   } : sharedDraftComposerEnabled ? startDraftFirstInvoiceComposer : () => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
                                   disabled={durableDraftCohortSafeHold || (!sharedDraftComposerEnabled && !selectedJobsCustomerName)}
@@ -39231,11 +39230,12 @@ function ContractorDashboard({
                                 onClick={() => {
                                   setFocusedEstimateRecordId(null);
                                   setFocusedInvoiceRecordId(null);
-                                  setContractorJobsViewAndScroll('overview');
+                                  if (contractorTab === 'financials') setContractorFinancialsViewAndScroll('overview');
+                                  else setContractorWorkViewAndScroll('overview');
                                 }}
                                 className={buttonClass('secondary')}
                               >
-                                Back to Jobs Overview
+                                {contractorTab === 'financials' ? 'Back to Financials Overview' : 'Back to Work Overview'}
                               </button>
                             </div>
                           </div>
@@ -39563,7 +39563,7 @@ function ContractorDashboard({
                                               setInvoiceDraft(invoiceDraftFromInvoice(invoice));
                                               setInvoiceComposerOpen(true);
                                               setEstimateComposerOpen(false);
-                                              setContractorJobsView('new_financial');
+                                              setContractorFinancialsView('new_invoices');
                                             }}
                                             className={mobileButtonClass('secondary')}
                                           >
@@ -39773,7 +39773,7 @@ function ContractorDashboard({
                                             setEstimateHelperExpanded(false);
                                             setEstimateSavedItemNotice('');
                                             setEstimateComposerOpen(true);
-                                            setContractorJobsView('new_financial');
+                                            setContractorWorkView('new_estimates');
                                           }}
                                           className={mobileButtonClass('secondary')}
                                         >
@@ -39827,10 +39827,10 @@ function ContractorDashboard({
                 </Card>
               )}
 
-              {(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (
-                <Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'} icon={<ClipboardCheck size={18} />}>
+              {contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (
+                <Card title={contractorWorkView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'} icon={<ClipboardCheck size={18} />}>
                   {(() => {
-                    const baseRecords = contractorJobsView === 'open_jobs'
+                    const baseRecords = contractorWorkView === 'open_jobs'
                       ? (jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer : openJobs)
                       : (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer : closedJobs);
                     const filteredRecords = baseRecords.filter(insp => {
@@ -39840,9 +39840,9 @@ function ContractorDashboard({
                       const dateMatches = !jobsListDateFilter || updatedDate === jobsListDateFilter;
                       return statusMatches && typeMatches && dateMatches;
                     });
-                    const records = contractorJobsView === 'closed_jobs' ? filteredRecords.slice(0, 10) : filteredRecords;
-                    const listTitle = contractorJobsView === 'open_jobs' ? 'Open Jobs' : 'Completed / Closed Jobs';
-                    const listDescription = contractorJobsView === 'open_jobs'
+                    const records = contractorWorkView === 'closed_jobs' ? filteredRecords.slice(0, 10) : filteredRecords;
+                    const listTitle = contractorWorkView === 'open_jobs' ? 'Open Jobs' : 'Completed / Closed Jobs';
+                    const listDescription = contractorWorkView === 'open_jobs'
                       ? 'Scheduled and in-progress jobs that still need work.'
                       : 'Completed, closed, and cancelled jobs.';
                     const jobTypeFilterOptions = [
@@ -39856,7 +39856,7 @@ function ContractorDashboard({
                     ];
                     const jobStatusFilterOptions = [
                       { value: 'all', label: 'All statuses' },
-                      ...(contractorJobsView === 'open_jobs' ? OPEN_JOB_STATUSES : CLOSED_JOB_STATUSES).map(status => ({
+                      ...(contractorWorkView === 'open_jobs' ? OPEN_JOB_STATUSES : CLOSED_JOB_STATUSES).map(status => ({
                         value: status,
                         label: inspectionJobStatusLabel({ status: status === 'completed' ? 'finalized' : 'draft', job_status: status }),
                       })),
@@ -39883,7 +39883,7 @@ function ContractorDashboard({
 	                    ].filter((label): label is string => Boolean(label));
 	                    return (
                       <div className="space-y-4">
-                        {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && !sharedDraftComposerEnabled && (
+                        {DRAFT_JOB_UI_ENABLED && contractorWorkView === 'open_jobs' && !sharedDraftComposerEnabled && (
                           durableDraftCohortSafeHold ? (
                             <div
                               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
@@ -39915,11 +39915,11 @@ function ContractorDashboard({
                               type="button"
                               onClick={() => {
                                 clearJobFilters();
-                                setContractorJobsViewAndScroll('overview');
+                                setContractorWorkViewAndScroll('overview');
                               }}
                               className={mobileButtonClass('secondary')}
                             >
-                              Back to Jobs Overview
+                              Back to Work Overview
                             </button>
                           </div>
                           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -39987,9 +39987,9 @@ function ContractorDashboard({
                           baseRecords.length === 0 && !jobsListDateFilter && jobsListStatusFilter === 'all' && jobsListTypeFilter === 'all' && !jobsCustomerFilterSubjectId ? (
                             <EmptyState
                               icon={<ClipboardCheck size={18} />}
-                              title={contractorJobsView === 'open_jobs' ? 'No open jobs yet' : 'No completed jobs yet'}
+                              title={contractorWorkView === 'open_jobs' ? 'No open jobs yet' : 'No completed jobs yet'}
                               body={
-                                contractorJobsView === 'open_jobs'
+                                contractorWorkView === 'open_jobs'
                                   ? 'Jobs created from accepted estimates or supported job creation paths will appear here while work is active.'
                                   : 'Completed, closed, and cancelled jobs will appear here after field work is wrapped up.'
                               }
@@ -39997,7 +39997,7 @@ function ContractorDashboard({
 	                          ) : (
 	                            <EmptyState
 	                              compact
-	                              title={contractorJobsView === 'open_jobs' ? 'No matching open jobs' : 'No matching closed jobs'}
+	                              title={contractorWorkView === 'open_jobs' ? 'No matching open jobs' : 'No matching closed jobs'}
 	                              body="Adjust the filters or clear them to see jobs in this view."
 	                              action={
 	                                <button type="button" onClick={clearAllJobFilters} className={buttonClass('secondary')}>
@@ -40127,7 +40127,7 @@ function ContractorDashboard({
                             </div>
                           );
                             })}
-                            {contractorJobsView === 'closed_jobs' && (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
+                            {contractorWorkView === 'closed_jobs' && (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
                               <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
                                 Showing the 10 most recent closed jobs. Search and deeper filters can be added as this list grows.
                               </p>
@@ -40203,7 +40203,7 @@ function ContractorDashboard({
                 </Card>
               )}
 
-              {contractorJobsView === 'custom_pricing' && (
+              {contractorTab === 'work' && contractorWorkView === 'custom_pricing' && (
                 <ContractorPriceBookWorkspace
                     items={contractorPriceBookItems}
                     contractorSaved={Boolean(contractor?.id)}
@@ -40216,7 +40216,7 @@ function ContractorDashboard({
                     editingItemId={editingContractorPriceBookItemId}
                     savingItem={savingContractorPriceBookItem}
                     togglingItemId={togglingContractorPriceBookItemId}
-                    onBack={() => setContractorJobsViewAndScroll('overview')}
+                    onBack={() => setContractorWorkViewAndScroll('overview')}
                     onRetry={() => void loadContractor()}
                     onOpenAddForm={openContractorPriceBookAddForm}
                     onCancelForm={resetContractorPriceBookDraft}
@@ -40257,7 +40257,7 @@ function ContractorDashboard({
                 />
               )}
 
-              {contractorJobsView === 'service_agreements' && (
+              {contractorTab === 'work' && contractorWorkView === 'service_agreements' && (
                 <Card title="Service Plans" icon={<ClipboardList size={18} />}>
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -40268,8 +40268,8 @@ function ContractorDashboard({
                           Choose one explicitly shared property for each offer. Homeowners can review and respond after an offer is sent, and accepted plans stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
                         </p>
                       </div>
-                      <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className={buttonClass('secondary')}>
-                        Back to Jobs
+                      <button type="button" onClick={() => setContractorWorkViewAndScroll('overview')} className={buttonClass('secondary')}>
+                        Back to Work
                       </button>
                     </div>
 
@@ -40664,7 +40664,7 @@ function ContractorDashboard({
                 </Card>
               )}
 
-              {contractorJobsView === 'templates' && (
+              {contractorTab === 'work' && contractorWorkView === 'templates' && (
               <>
               <Card title="Templates" icon={<ClipboardList size={18} />}>
                 <p className="text-sm text-slate-600 mb-4">
@@ -41193,7 +41193,7 @@ function ContractorDashboard({
               </>
               )}
 
-              {contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (
+              {contractorTab === 'work' && contractorWorkView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {operationalInspections.length === 0 ? (
                   <EmptyState
@@ -41290,7 +41290,7 @@ function ContractorDashboard({
                   onBack={() => {
                     setDurableDraftOpenTarget(null);
                     setInspectionView('list');
-                    setContractorJobsViewAndScroll('overview');
+                    setContractorWorkViewAndScroll('overview');
                   }}
                   launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
                   onRefreshCapabilities={refreshEffectiveDurableDraftCapabilities}
@@ -41313,11 +41313,11 @@ function ContractorDashboard({
                     onCreateJob={() => void createJobFromDraftComposer()}
                     onCancel={() => {
                       setInspectionView('list');
-                      setContractorJobsViewAndScroll('open_jobs');
+                      setContractorWorkViewAndScroll('open_jobs');
                     }}
                     onLegacyJob={() => {
                       setInspectionView('new');
-                      setContractorJobsView('new_jobs');
+                      setContractorWorkView('new_jobs');
                     }}
                     onRemovePersistedLine={id => setRemovedDraftJobWorkItemIds(prev => prev.includes(id) ? prev : [...prev, id])}
                   />
@@ -42143,12 +42143,12 @@ function ContractorDashboard({
                     type="button"
                     onClick={() => {
                       setInspectionView('list');
-                      setContractorJobsView(inspectionIsOpenJob(activeInspection) ? 'open_jobs' : 'closed_jobs');
-                      setContractorTab('inspections');
+                      setContractorWorkView(inspectionIsOpenJob(activeInspection) ? 'open_jobs' : 'closed_jobs');
+                      setContractorTab('work');
                     }}
                     className="text-xs font-medium text-slate-500 hover:text-slate-700"
                   >
-                    ← Back to Jobs
+                    ← Back to Work
                   </button>
 
                   {renderJobCardHeader()}
@@ -42433,12 +42433,12 @@ function ContractorDashboard({
                   type="button"
                   onClick={() => {
                     setInspectionView('list');
-                    setContractorJobsView(inspectionIsOpenJob(activeInspection) ? 'open_jobs' : 'closed_jobs');
-                    setContractorTab('inspections');
+                    setContractorWorkView(inspectionIsOpenJob(activeInspection) ? 'open_jobs' : 'closed_jobs');
+                    setContractorTab('work');
                   }}
                   className="text-xs font-medium text-slate-500 hover:text-slate-700"
                 >
-                  ← Back to Jobs
+                  ← Back to Work
                 </button>
 
                 {renderJobCardHeader()}
