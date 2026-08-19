@@ -8,7 +8,7 @@ Branch: `codex/fb039d-homeowner-properties-progressive-v1`
 
 Base: `7c4aefb544e430abe4882b3c8215a54cef470947`
 
-Draft PR: pending assignment
+Draft PR: [#507](https://github.com/bencatchot/ServSync-App/pull/507)
 
 ## Accepted Product Contract
 
@@ -51,8 +51,15 @@ One-property users see the selected home directly without a collection chooser. 
 - Fictional Sandbox shared member and viewer fixtures: Access rendered only privacy-approved shared-home details and read-only actions; owner-only controls remained absent.
 - Full-frame mobile review confirmed that the section control, property summary, actions, Home Map entry, Access boundaries, and collapsed setup progress do not overlap the homeowner navigation.
 
-Exact-head Vercel Preview acceptance remains to be recorded after the draft PR is assigned.
+### Exact-head Preview
+
+- Application-bearing head: `f6fb8e687ef3574e4ca853f4f18fc7f3c89dae42`.
+- Protected ServSync Demo Preview: `READY` and authenticated with the approved fictional homeowner credential.
+- Desktop: all four sections, Home Map Builder return, saved-section reload, Home History handoff, and Properties return passed.
+- 390x844: all four sections and Home Access remained readable with zero horizontal overflow.
+- Browser console/page errors: 0.
+- The separate Sandbox Preview requires a project-specific protection bypass that was unavailable. No deployment protection was changed. Shared member/viewer presentation and denial behavior instead passed against the same exact application source and resettable Sandbox backend; all temporary membership/reminder fixtures were cleaned up.
 
 ## Remaining FB-039 Work
 
-FB-039 remains active. After owner review and merge of this bounded Phase 0.3 slice, the next assignment is Phase 0.4: atomic loading, useful empty states, actionable recovery/error handling, and duplicate-safe core transitions. Field-critical mobile density remains Phase 0.5.
+FB-039 remains active. Owner review and explicit merge approval remain for this bounded Phase 0.3 slice. After merge, the next assignment is Phase 0.4: atomic loading, useful empty states, actionable recovery/error handling, and duplicate-safe core transitions. Field-critical mobile density remains Phase 0.5.

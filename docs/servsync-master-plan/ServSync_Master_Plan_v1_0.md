@@ -603,7 +603,7 @@ These items need more founder input or beta learning before they can be finalize
 1. Use Phase 0 of the Product Roadmap as the next planning boundary; do not begin another broad feature expansion first.
 2. Treat the merged and Preview-accepted FB-039B contractor `Work` and `Financials` ownership split as the frozen Phase 0.1 information architecture baseline.
 3. Treat the merged and Preview-accepted FB-039C one-primary-action hierarchy as the frozen Phase 0.2 lifecycle-action baseline.
-4. Complete exact-head Preview acceptance and owner review for FB-039D Homeowner Properties Progressive Disclosure. The implementation now organizes the existing experience into Overview, Home Map, Access, and Property Settings without changing privacy, role, property, or Home Map authority.
+4. Complete owner review and explicit merge approval for Preview-accepted draft PR #507, FB-039D Homeowner Properties Progressive Disclosure. The implementation organizes the existing experience into Overview, Home Map, Access, and Property Settings without changing privacy, role, property, or Home Map authority.
 5. After FB-039D merges, continue Phase 0 through atomic loading, useful empty states, actionable recovery/error handling, and duplicate-safe core transitions.
 6. Preserve the accepted full-loop evidence on desktop and field-critical mobile: Owner/Admin/Office financial actions, Field Technician operational actions, Viewer read-only behavior, homeowner owner/shared-role boundaries, and resettable non-production fixture safety all passed.
 7. Recruit the FB-040 pilot cohort only after the Phase 0 exit gate passes.
