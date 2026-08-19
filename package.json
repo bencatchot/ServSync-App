@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint . --max-warnings 80",
+    "lint": "node scripts/validation/check-eslint-warning-budget.mjs",
     "check:app-size": "node scripts/validation/check-app-monolith-budget.mjs",
     "test:architecture": "node --test tests/architecture/*.test.mjs",
     "preview": "vite preview",
