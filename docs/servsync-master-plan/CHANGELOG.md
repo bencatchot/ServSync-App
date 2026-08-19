@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039B Work / Financials navigation, ownership, and compatibility
+
+- Branch: `codex/fb039b-work-financials-ia-v1` from exact `origin/main` `df6d8ade7d3babbf8d2d855d928fc043e1834328`.
+- Files changed: contractor navigation/state helpers; Work and Financials dashboard ownership; `src/App.tsx` contextual navigation integration; local-storage compatibility keys; focused Work/Financials, Draft, Estimate, Job, Invoice, role, and mobile regression contracts; Product Roadmap; Master Plan; Feature Backlog; and this changelog.
+- Summary: Implements the approved contractor ownership split. The visible Jobs workspace becomes Work and retains Drafts, Estimates, Jobs, Reports, Templates, Service Plans, and Price Book. Billing-authorized Owner/Admin/Office users receive Financials for Invoice Drafts, Invoices, billing, and payments, with Financials under More on mobile. Work and Financials use separate saved views and customer filters; identifiable legacy combined state migrates deterministically; ambiguous legacy financial state falls back safely; contextual Invoice handoffs open Financials while preserving source/customer lineage; Work attention and Invoice attention are distinct; Field Technician operational access and Viewer read-only access remain capability-driven; homeowner navigation is unchanged.
+- Reason: The combined Jobs/Estimate/Invoice state machine made operational work and money management look like one workspace. The approved launch information architecture needs canonical ownership before contractor pilot use without changing the server's established lifecycle or role model.
+- Validation: Focused FB-039B contracts; existing Work, Draft, Estimate, Job, Invoice, PDF, role-visibility, mobile-shell, filter-recovery, and pipeline source regressions; TypeScript; Production build; ESLint warning budget; App monolith budget; architecture guardrails; backend parity; Markdown links; sensitive-value scan; `git diff --check`; and role/mobile Preview validation.
+- Known risks and follow-ups: This changes presentation and browser-state compatibility only. No SQL, schema, RLS, RPC, auth, backend permission, Invoice lifecycle, provider, environment, deployment setting, or Production data changes are included. The draft PR still requires exact-head Preview acceptance. FB-039C remains responsible for one-primary-action hierarchy; later FB-039 slices retain homeowner surface, loading/recovery, duplicate-safety, and field-density work.
+- Backlog impact: FB-039 is Implementation In Progress with FB-039B implemented for Preview acceptance; FB-039C is the next product slice after acceptance.
+- Master plan impact: The immediate launch-foundation step advances from implementing the Work/Financials boundary to accepting it and continuing with FB-039C.
+
 ## 2026-08-19 - FB-039A Work / Financials information architecture audit
 
 - Branch: `codex/servsync-product-roadmap-v1` from exact main `39bd885f660405b98729a799f2021ba5bd71cca1`.

@@ -158,74 +158,50 @@ test.describe('contractor estimate creation UI structure', () => {
     const focusHelperSource = sourceBetween(source, 'const focusSavedEstimateRecord = (estimate: Estimate) => {', 'const saveEstimateDraft = async');
     const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
 
-    expect(focusHelperSource).toContain("setContractorFinancialRecordKind('estimates');");
-    expect(focusHelperSource).toContain('setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));');
+    expect(focusHelperSource).toContain('setWorkCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : workCustomerFilterSubjectId));');
+    expect(focusHelperSource).toContain("setContractorTab('work');");
     expect(focusHelperSource).toContain('setFocusedEstimateRecordId(estimate.id);');
-    expect(focusHelperSource).toContain("setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');");
+    expect(focusHelperSource).toContain('setContractorWorkView(estimateWorkViewForStatus(estimate.status));');
     expect(saveSource).toContain('focusSavedEstimateRecord(savedEstimate);');
     expect(saveSource).not.toContain('if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);');
   });
 
-  test('Jobs financial records split estimates and invoices behind section tabs', () => {
+  test('Work owns Estimate records while Financials owns Invoice records', () => {
     const source = appSource();
-    const financialListSource = sourceBetween(
+    const navigationHook = sourceFile('src/features/navigation/useContractorWorkspaceNavigation.ts');
+    const recordListSource = sourceBetween(
       source,
-      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
-    const newFinancialSource = sourceBetween(
+    const composerSource = sourceBetween(
       source,
-      "{contractorJobsView === 'new_financial' && (",
-      "{(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
+      "{((contractorTab === 'work' && contractorWorkView === 'new_estimates') || (contractorTab === 'financials' && contractorFinancialsView === 'new_invoices')) && (",
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (",
     );
 
-    expect(source).toContain("type ContractorFinancialRecordKind = 'estimates' | 'invoices';");
-    expect(source).toContain("const [contractorFinancialRecordKind, setContractorFinancialRecordKind] = useState<ContractorFinancialRecordKind>('estimates');");
+    expect(navigationHook).toContain('const [workView, setWorkView] = useState<ContractorWorkView>');
+    expect(navigationHook).toContain('const [financialsView, setFinancialsView] = useState<ContractorFinancialsView>');
     expect(source).toContain("type ContractorEstimateRecordStatusFilter = 'all' | 'draft' | 'sent' | 'approved' | 'invoiced' | 'closed';");
     expect(source).toContain("type ContractorEstimateRecordSort = 'updated_newest' | 'created_newest' | 'amount_high' | 'amount_low' | 'customer_az';");
     expect(source).toContain('const [contractorEstimateRecordSearch, setContractorEstimateRecordSearch] = useState');
     expect(source).toContain('const [contractorEstimateRecordStatusFilter, setContractorEstimateRecordStatusFilter]');
     expect(source).toContain('const [contractorEstimateRecordSort, setContractorEstimateRecordSort]');
-    expect(financialListSource).toContain("const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);");
-    expect(financialListSource).toContain('const estimateRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates : estimates;');
-    expect(financialListSource).toContain('const filteredEstimateRecords = estimateRecordsForView');
-    expect(financialListSource).toContain('.filter(estimate => estimateMatchesSearch(estimate) && estimateMatchesStatus(estimate))');
-    expect(financialListSource).toContain('const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : showingEstimates ? filteredEstimateRecords : [];');
-    expect(financialListSource).toContain('const focusedInvoiceRecord = focusedInvoiceRecordId');
-    expect(financialListSource).toContain('const visibleInvoiceRecords = focusedInvoiceRecord ? [focusedInvoiceRecord] : showingEstimates ? [] : filteredInvoiceRecords;');
-    expect(financialListSource).toContain('visibleInvoiceRecords.map(invoice => {');
-    expect(financialListSource).toContain('visibleEstimateRecords.map(estimate => {');
-    expect(financialListSource).toContain('New estimate');
-    expect(financialListSource).toContain('New invoice');
-    expect(financialListSource).toContain('data-testid={showingEstimates ? \'contractor-estimate-list-controls\' : \'contractor-invoice-list-controls\'}');
-    expect(financialListSource).toContain('data-testid="contractor-estimate-search"');
-    expect(financialListSource).toContain('aria-label="Search estimates"');
-    expect(financialListSource).toContain('data-testid="contractor-estimate-status-filter"');
-    expect(financialListSource).toContain('<option value="all">All</option>');
-    expect(financialListSource).toContain('<option value="draft">Draft</option>');
-    expect(financialListSource).toContain('<option value="sent">Sent</option>');
-    expect(financialListSource).toContain('<option value="approved">Approved</option>');
-    expect(financialListSource).toContain('<option value="invoiced">Invoiced</option>');
-    expect(financialListSource).toContain('<option value="closed">Closed</option>');
-    expect(financialListSource).toContain('contractorEstimateRecordStatusFilter === \'invoiced\'');
-    expect(financialListSource).toContain("invoices.some(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void')");
-    expect(financialListSource).toContain("contractorEstimateRecordStatusFilter === 'closed'");
-    expect(financialListSource).toContain("['declined', 'expired', 'revised'].includes(estimate.status)");
-    expect(financialListSource).toContain('data-testid="contractor-estimate-sort"');
-    expect(financialListSource).toContain('<option value="updated_newest">Updated newest</option>');
-    expect(financialListSource).toContain('<option value="created_newest">Created newest</option>');
-    expect(financialListSource).toContain('<option value="amount_high">Amount high</option>');
-    expect(financialListSource).toContain('<option value="amount_low">Amount low</option>');
-    expect(financialListSource).toContain('<option value="customer_az">Customer A-Z</option>');
-    expect(financialListSource).toContain('estimateCustomerSearchText(estimate)');
-    expect(financialListSource).toContain('recordPropertyLabelForContractor(estimate)');
-    expect(financialListSource).toContain('estimate.title');
-    expect(financialListSource).toContain('estimate.scope');
-    expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'");
-    expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'");
-    expect(newFinancialSource).toContain("(!sharedDraftComposerEnabled || contractorFinancialRecordKind === 'estimates') && (");
-    expect(newFinancialSource).toContain('Create estimate');
-    expect(newFinancialSource).toContain('Create invoice');
+    expect(recordListSource).toContain("const showingEstimates = contractorTab === 'work' || Boolean(focusedEstimateRecord);");
+    expect(recordListSource).toContain('const allEstimateRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates : estimates;');
+    expect(recordListSource).toContain('const allInvoiceRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices : invoices;');
+    expect(recordListSource).toContain('const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : showingEstimates ? filteredEstimateRecords : [];');
+    expect(recordListSource).toContain('const visibleInvoiceRecords = focusedInvoiceRecord ? [focusedInvoiceRecord] : showingEstimates ? [] : filteredInvoiceRecords;');
+    expect(recordListSource).toContain('visibleInvoiceRecords.map(invoice => {');
+    expect(recordListSource).toContain('visibleEstimateRecords.map(estimate => {');
+    expect(recordListSource).toContain('data-testid="contractor-estimate-search"');
+    expect(recordListSource).toContain('data-testid="contractor-invoice-search"');
+    expect(recordListSource).toContain('Preview PDF');
+    expect(recordListSource).toContain('Download PDF');
+    expect(composerSource).toContain("contractorTab === 'work' ? 'New estimate' : 'New invoice'");
+    expect(composerSource).toContain("contractorTab === 'work' ? 'Estimate workspace' : 'Invoice workspace'");
+    expect(composerSource).toContain('Create estimate');
+    expect(composerSource).toContain('Create invoice');
   });
 });
 

@@ -143,7 +143,7 @@ test.describe('contractor estimate-to-invoice eligibility', () => {
     const invoiceComposerSource = sourceBetween(
       source,
       '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (',
-      "{contractorJobsView === 'templates' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'templates' && (",
     );
 
     expect(invoiceStateSource).toContain('const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId))');
@@ -156,30 +156,29 @@ test.describe('contractor estimate-to-invoice eligibility', () => {
     expect(invoiceComposerActionsSource).not.toContain("savingInvoice ? 'Sending...'");
   });
 
-  test('Jobs Invoices tab keeps invoice records and actions reachable', () => {
+  test('Financials keeps Invoice records and actions reachable', () => {
     const source = appSource();
     const tabSource = sourceBetween(
       source,
-      'const openContractorJobsHeaderTab = (tab: ContractorJobsHeaderTab) => {',
+      'const openContractorFinancialsHeaderTab = (tab: ContractorFinancialsHeaderTab) => {',
       'const onboardingCustomerCount =',
     );
     const financialListSource = sourceBetween(
       source,
-      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
     const beginInvoiceSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
     const openInvoiceSource = sourceBetween(source, 'const openInvoiceRecord = (invoice: Invoice) => {', 'const openEstimateRecord = (estimate: Estimate) => {');
 
-    expect(tabSource).toContain("if (tab === 'invoices') {");
-    expect(tabSource).toContain("setContractorFinancialRecordKind('invoices');");
-    expect(tabSource).toContain("setContractorJobsViewAndScroll('open_financial');");
+    expect(tabSource).toContain("setContractorTab('financials');");
+    expect(tabSource).toContain("setContractorFinancialsViewAndScroll(tab === 'overview' ? 'overview' : 'open_invoices');");
     expect(source).toContain("type ContractorInvoiceRecordStatusFilter = 'all' | 'open' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';");
     expect(source).toContain("type ContractorInvoiceRecordSort = ContractorEstimateRecordSort | 'due_date';");
     expect(source).toContain('const [contractorInvoiceRecordSearch, setContractorInvoiceRecordSearch] = useState');
     expect(source).toContain('const [contractorInvoiceRecordStatusFilter, setContractorInvoiceRecordStatusFilter]');
     expect(source).toContain('const [contractorInvoiceRecordSort, setContractorInvoiceRecordSort]');
-    expect(financialListSource).toContain('const invoiceRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices : invoices;');
+    expect(financialListSource).toContain('const allInvoiceRecordsForView = jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices : invoices;');
     expect(financialListSource).toContain('const filteredInvoiceRecords = invoiceRecordsForView');
     expect(financialListSource).toContain('.filter(invoice => invoiceMatchesSearch(invoice) && invoiceMatchesStatus(invoice))');
     expect(financialListSource).toContain("const invoiceMatchesStatus = (invoice: Invoice) => contractorInvoiceRecordStatusFilter === 'all'");
@@ -218,8 +217,10 @@ test.describe('contractor estimate-to-invoice eligibility', () => {
     expect(financialListSource).toContain('Record payment');
     expect(financialListSource).toContain('Payment history');
     expect(financialListSource).toContain('New invoice');
-    expect(beginInvoiceSource).toContain("setContractorFinancialRecordKind('invoices');");
-    expect(openInvoiceSource).toContain("setContractorFinancialRecordKind('invoices');");
+    expect(beginInvoiceSource).toContain("setContractorTab('financials');");
+    expect(beginInvoiceSource).toContain("setContractorFinancialsView('new_invoices');");
+    expect(openInvoiceSource).toContain("setContractorTab('financials');");
+    expect(openInvoiceSource).toContain('setContractorFinancialsView(invoiceFinancialsViewForStatus(invoice.status));');
   });
 });
 

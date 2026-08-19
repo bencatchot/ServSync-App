@@ -621,7 +621,7 @@ test.describe('durable Draft cohort App integration boundaries', () => {
     expect(app).toContain("'durable-draft-cohort-editor-loading'");
     expect(app).toContain('const durableDraftCohortSafeHold = durableDraftCohortLoading || durableDraftCohortUnavailable;');
     expect(app).toContain('const durableDraftLegacyFallbackReady = !durableDraftCohortSafeHold;');
-    expect(app).toContain("contractorJobsView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled");
+    expect(app).toContain("contractorWorkView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled");
     expect(app).toContain('if (!sharedDraftComposerEnabled || !supabase)');
     expect(app).toContain('if (entitlementDefinitivelyUnavailable) setDurableDraftOpenTarget(null);');
     expect(app).toContain('launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}');
@@ -630,12 +630,12 @@ test.describe('durable Draft cohort App integration boundaries', () => {
   test('fails closed in App while contractor eligibility is unresolved or unavailable', () => {
     const app = sourceFile('src/App.tsx');
     const overviewSource = app.slice(
-      app.indexOf("{contractorJobsView === 'overview' && ("),
-      app.indexOf("{contractorJobsView === 'new_financial' && ("),
+      app.indexOf("{contractorTab === 'work' && contractorWorkView === 'overview' && ("),
+      app.indexOf("{contractorTab === 'financials' && contractorFinancialsView === 'overview' && ("),
     );
     const newFinancialSource = app.slice(
-      app.indexOf("{contractorJobsView === 'new_financial' && ("),
-      app.indexOf("{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && ("),
+      app.indexOf("{((contractorTab === 'work' && contractorWorkView === 'new_estimates') || (contractorTab === 'financials' && contractorFinancialsView === 'new_invoices')) && ("),
+      app.indexOf("{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && ("),
     );
     const openFinancialActions = app.slice(
       app.indexOf('const invoiceStatusFilterLabels'),
@@ -650,12 +650,12 @@ test.describe('durable Draft cohort App integration boundaries', () => {
     expect(app).toContain("'Work tools could not be verified. Refresh and try again.'");
     expect(app).toContain("'Loading work tools...'");
     expect(overviewSource).toContain('durableDraftCohortSafeHold ? (');
-    expect(overviewSource).toContain('durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled');
+    expect(app).toContain("contractorWorkView === 'overview' && durableDraftLegacyFallbackReady && !sharedDraftComposerEnabled");
     expect(newFinancialSource).toContain('durableDraftCohortSafeHold ? (');
     expect(newFinancialSource).toContain('<Card title="Work tools"');
     expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold}');
     expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold || (!sharedDraftComposerEnabled && !selectedJobsCustomerName)}');
-    expect(openFinancialActions).toContain("setContractorJobsViewAndScroll('overview');");
+    expect(openFinancialActions).toContain("setContractorWorkViewAndScroll('overview');");
   });
 
   test('keeps cohort presentation separate from existing persistence and launch authority', () => {

@@ -38,9 +38,9 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(isDraftJobUiEnabled({ VITE_DRAFT_JOB_UI_ENABLED: 'true' })).toBe(true);
 
     const appSource = sourceFile('src/App.tsx');
-    expect(appSource).toContain("return jobsView === 'new_jobs' ? (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new') : 'list';");
+    expect(appSource).toContain("return workView === 'new_jobs' ? (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new') : 'list';");
     expect(appSource).toContain("setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new')");
-    expect(appSource).toContain("DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs'");
+    expect(appSource).toContain("DRAFT_JOB_UI_ENABLED && contractorWorkView === 'open_jobs'");
     expect(appSource).toContain("DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job'");
     expect(appSource).toContain("(!DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job')");
     expect(appSource).toContain('Draft Job UI is not enabled in this environment.');
@@ -535,7 +535,7 @@ test.describe('Draft Job UI persistence and resume', () => {
     const listSource = sourceFile('src/features/jobs/DraftJobList.tsx');
     const appSource = sourceFile('src/App.tsx');
     const openJobsSource = sourceBetween(appSource, "{ id: 'open_jobs' as const", "{ id: 'closed_jobs' as const");
-    const focusedListSource = sourceBetween(appSource, "const listTitle = contractorJobsView === 'open_jobs'", 'const jobTypeFilterOptions = [');
+    const focusedListSource = sourceBetween(appSource, "const listTitle = contractorWorkView === 'open_jobs'", 'const jobTypeFilterOptions = [');
 
     expect(listSource).toContain('data-testid="contractor-draft-jobs-section"');
     expect(listSource).toContain('Continue Draft');

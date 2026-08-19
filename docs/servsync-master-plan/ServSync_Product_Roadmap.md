@@ -85,12 +85,12 @@ Focus rules:
 | --- | --- |
 | Current release stage | Phase 0 — Launch Foundation |
 | Primary active outcome | FB-039 Launch Foundation UX and Information Architecture Stabilization |
-| Completed control-point evidence | FB-039A Work/Financials Navigation and Workflow Ownership Audit is complete. See [the implementation-ready audit](../qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md). |
-| Next recommended assignment | FB-039B Work/Financials Navigation, Ownership, and Compatibility Implementation |
-| Assignment outcome | Deliver one coherent contractor presentation migration: visible Work and role-aware Financials destinations, separate Estimate/Invoice state ownership, legacy saved-state compatibility, centralized contextual handoffs, and desktop/mobile evidence without changing backend lifecycle or authority. |
-| Expected following slice | FB-039C one-primary-action hierarchy across Request, Draft, Estimate, Job, and Invoice states after the new destinations are stable. |
+| Completed control-point evidence | FB-039A audit is complete. FB-039B implements the coherent Work/Financials ownership split, separate saved state, deterministic legacy compatibility, capability-based Financials visibility, and contextual Invoice handoffs on its focused Preview branch. See [the implementation-ready audit](../qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md). |
+| Next recommended assignment | Complete FB-039B Preview acceptance and merge review; then begin FB-039C one-primary-action hierarchy. |
+| Assignment outcome | Validate the complete contractor Work/Financials split across desktop, 390x844 mobile, Owner/Admin/Office billing authority, Field Technician operational access, Viewer read-only access, saved-state migration, and Estimate/Job-to-Invoice handoffs without changing backend lifecycle or authority. |
+| Expected following slice | FB-039C one-primary-action hierarchy across Request, Draft, Estimate, Job, and Invoice states after FB-039B is accepted. |
 | Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
-| Roadmap return point | After each Marketing or other parallel task, reassess FB-039B progress and recommend the next unfinished Phase 0 item. |
+| Roadmap return point | After each Marketing or other parallel task, finish FB-039B acceptance if still open; otherwise return to FB-039C. |
 
 ### Completion update protocol
 

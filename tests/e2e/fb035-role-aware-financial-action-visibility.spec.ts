@@ -25,19 +25,19 @@ function roleCredential(name: string): string {
   return value;
 }
 
-async function openJobsAs(page: Page, role: ContractorRole) {
+async function openWorkAs(page: Page, role: ContractorRole) {
   await page.goto('/#/contractor');
   const main = page.getByRole('main');
   await main.getByLabel(/^Email$/i).fill(roleCredential(ROLE_ENV[role].email));
   await main.getByLabel(/^Password$/i).fill(roleCredential(ROLE_ENV[role].password));
   await main.getByRole('button', { name: /^Sign in$/i }).click();
   await expect(page.getByText(/Contractor command center/i)).toBeVisible({ timeout: 30_000 });
-  const jobsWorkspace = main.getByText(/^Jobs workspace$/i);
-  if (!(await jobsWorkspace.isVisible())) {
-    await page.getByRole('button', { name: /^Jobs(?:\s+\d+)?$/i }).last().click();
+  const workWorkspace = main.getByText(/^Work workspace$/i);
+  if (!(await workWorkspace.isVisible())) {
+    await page.getByRole('button', { name: /^Work(?:\s+\d+)?$/i }).last().click();
   }
-  await expect(jobsWorkspace).toBeVisible();
-  await expect(main.getByRole('heading', { level: 2, name: /^Jobs$/i })).toBeVisible();
+  await expect(workWorkspace).toBeVisible();
+  await expect(main.getByRole('heading', { level: 2, name: /^Work$/i })).toBeVisible();
   await expect(main.getByText(/Loading contractor workspace/i)).toBeHidden({ timeout: 30_000 });
   return main;
 }
@@ -125,21 +125,21 @@ test.describe('FB-035 role-aware financial action visibility', () => {
     const schedule = sourceBetween(source, 'const renderContractorEstimatePaymentScheduleSection =', 'const createInvoiceFromJob = async');
     const invoiceList = sourceBetween(
       source,
-      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
     const jobList = sourceBetween(
       source,
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
       '{showLocalContactForm && canCreateContractorLocalCustomers && (',
     );
 
     expect(openInvoice).toContain('setFocusedInvoiceRecordId(invoice.id)');
     expect(openInvoice).toContain('invoiceRecordOpensEditable(invoice.status, financialActionVisibility)');
     expect(schedule).toContain('canManageFinancialActions && estimate.status === \'accepted\' && canRequest');
-    expect(source).toContain("canManageFinancialActions && sharedDraftComposerEnabled && contractorFinancialRecordKind === 'invoices'");
-    expect(source).toContain("contractorJobsView === 'new_financial' && contractorFinancialRecordKind === 'invoices'");
-    expect(source).toContain("setContractorJobsView('open_financial')");
+    expect(source).toContain("canManageFinancialActions && sharedDraftComposerEnabled && contractorTab === 'financials'");
+    expect(source).toContain("contractorTab === 'financials' && contractorFinancialsView === 'new_invoices'");
+    expect(source).toContain("setContractorFinancialsView('open_invoices')");
     expect(invoiceList).toContain("invoice.status === 'draft' && canManageFinancialActions");
     expect(invoiceList).toContain("canManageInvoicePayments && ['draft', 'sent', 'viewed', 'overdue', 'partially_paid', 'paid']");
     expect(jobList).toContain('Boolean(linkedInvoice || canManageFinancialActions)');
@@ -191,7 +191,8 @@ test.describe('FB-035 exact-head Sandbox role presentation', () => {
 
   for (const role of ['owner', 'admin', 'office'] as const) {
     test(`${role} retains the billing-authorized Draft Invoice entry`, async ({ page }) => {
-      const main = await openJobsAs(page, role);
+      const main = await openWorkAs(page, role);
+      await expect(page.getByRole('button', { name: /^Financials$/i })).toBeVisible();
       await main.getByTestId('contractor-work-start-draft').click();
       await expect(main.getByRole('radio', { name: /Draft Invoice/i })).toBeVisible();
     });
@@ -204,7 +205,8 @@ test.describe('FB-035 exact-head Sandbox role presentation', () => {
     ]) {
       test(`${role} has no financial authoring entry on ${viewport.name}`, async ({ page }) => {
         await page.setViewportSize(viewport);
-        const main = await openJobsAs(page, role);
+        const main = await openWorkAs(page, role);
+        await expect(page.getByRole('button', { name: /^Financials$/i })).toHaveCount(0);
         await expect(main.getByRole('button', { name: /New Estimate\/Invoice/i })).toHaveCount(0);
         await expect(main.getByRole('button', { name: /^New invoice$/i })).toHaveCount(0);
         await expect(main.getByRole('button', { name: /^Create Invoice$/i })).toHaveCount(0);

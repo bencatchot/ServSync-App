@@ -98,8 +98,8 @@ test.describe('Bundle 4B-1 search and filter recovery', () => {
     const app = read(appPath);
     const contractorSource = sourceBetween(app, 'function ContractorDashboard({', 'function PlatformAdminDashboard({');
     const customerSource = contractorSource;
-    const financialSource = sourceBetween(contractorSource, "{(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (", "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
-    const jobsSource = sourceBetween(contractorSource, "<Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'}", "{contractorJobsView === 'custom_pricing' && (");
+    const financialSource = sourceBetween(contractorSource, "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates' || contractorWorkView === 'closed_estimates')) || (contractorTab === 'financials' && (contractorFinancialsView === 'open_invoices' || contractorFinancialsView === 'closed_invoices'))) && (", "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (");
+    const jobsSource = sourceBetween(contractorSource, "<Card title={contractorWorkView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'}", "{contractorTab === 'work' && contractorWorkView === 'custom_pricing' && (");
 
     expect(customerSource).toContain('>Customers</h2>');
     expect(customerSource).toContain('aria-label="Search customers"');
@@ -126,7 +126,7 @@ test.describe('Bundle 4B-1 search and filter recovery', () => {
     expect(jobsSource).toContain('testId="contractor-job-filter-summary"');
     expect(jobsSource).toContain('resultCount={records.length}');
     expect(jobsSource).toContain('totalCount={baseRecords.length}');
-    expect(jobsSource).not.toContain("totalCount={contractorJobsView === 'open_jobs' ? openJobs.length : closedJobs.length}");
+    expect(jobsSource).not.toContain("totalCount={contractorWorkView === 'open_jobs' ? openJobs.length : closedJobs.length}");
     expect(jobsSource).toContain('No matching open jobs');
     expect(jobsSource).toContain('No matching closed jobs');
     expect(jobsSource).toContain('const filteredRecords = baseRecords.filter');

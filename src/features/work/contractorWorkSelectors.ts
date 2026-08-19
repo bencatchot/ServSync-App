@@ -12,7 +12,8 @@ export type ContractorWorkAttention = {
   acceptedEstimatesNeedingJobs: Estimate[];
   completedJobsReadyToInvoice: Inspection[];
   invoiceAttentionRecords: Invoice[];
-  total: number;
+  workTotal: number;
+  financialsTotal: number;
 };
 
 export function contractorWorkActiveJobsFrom(inspections: Inspection[]) {
@@ -86,22 +87,20 @@ export function contractorWorkAttentionFrom({
     acceptedEstimatesNeedingJobs,
     completedJobsReadyToInvoice,
     invoiceAttentionRecords,
-    total: contractorJobsNeedsAttentionCount({
+    workTotal: contractorJobsNeedsAttentionCount({
       acceptedEstimateCount: acceptedEstimatesNeedingJobs.length,
       readyToInvoiceJobCount: completedJobsReadyToInvoice.length,
-      invoiceAttentionCount: invoiceAttentionRecords.length,
     }),
+    financialsTotal: invoiceAttentionRecords.length,
   };
 }
 
 export function contractorJobsNeedsAttentionCount({
   acceptedEstimateCount,
   readyToInvoiceJobCount,
-  invoiceAttentionCount,
 }: {
   acceptedEstimateCount: number;
   readyToInvoiceJobCount: number;
-  invoiceAttentionCount: number;
 }) {
-  return acceptedEstimateCount + readyToInvoiceJobCount + invoiceAttentionCount;
+  return acceptedEstimateCount + readyToInvoiceJobCount;
 }

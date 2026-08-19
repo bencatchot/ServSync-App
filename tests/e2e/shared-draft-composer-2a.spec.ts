@@ -140,18 +140,18 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     const appSource = sourceFile('src/App.tsx');
     const sharedOverview = sourceBetween(
       appSource,
-      "{contractorJobsView === 'overview' && (",
-      "{contractorJobsView === 'drafts'",
+      "{contractorTab === 'work' && contractorWorkView === 'overview' && (",
+      "{contractorTab === 'work' && contractorWorkView === 'drafts'",
     );
     const draftsDestination = sourceBetween(
       appSource,
-      "{contractorJobsView === 'drafts'",
-      "{contractorJobsView === 'needs_attention'",
+      "{contractorTab === 'work' && contractorWorkView === 'drafts'",
+      "{contractorTab === 'work' && contractorWorkView === 'needs_attention'",
     );
     const openJobsSource = sourceBetween(
       appSource,
-      "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
-      "{contractorJobsView === 'templates' && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
+      "{contractorTab === 'work' && contractorWorkView === 'templates' && (",
     );
     const sharedEditorSource = sourceBetween(
       appSource,
@@ -165,11 +165,11 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(draftsDestination).toContain('<DurableDraftWorkspace');
     expect(draftsDestination).toContain('mode="list"');
     expect(draftsDestination).toContain('onOpenTarget={target => {');
-    expect(draftsDestination).toContain("setContractorJobsView('new_jobs');");
-    expect(openJobsSource).toContain("DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && !sharedDraftComposerEnabled");
+    expect(draftsDestination).toContain("setContractorWorkView('new_jobs');");
+    expect(openJobsSource).toContain("DRAFT_JOB_UI_ENABLED && contractorWorkView === 'open_jobs' && !sharedDraftComposerEnabled");
     expect(openJobsSource).toContain('<DraftJobList');
     expect(openJobsSource).not.toContain('sharedDraftComposerEnabled && supabase ? (');
-    expect(sharedEditorSource).toContain("setContractorJobsViewAndScroll('overview');");
+    expect(sharedEditorSource).toContain("setContractorWorkViewAndScroll('overview');");
   });
 
   test('shared creation entry points route Estimates and draft Invoices through Drafts', () => {

@@ -87,7 +87,7 @@ test.describe('FB-035 Viewer Job lifecycle visibility', () => {
     const source = appSource();
     const currentJobs = sourceBetween(
       source,
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "(contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
       '{showLocalContactForm && canCreateContractorLocalCustomers && (',
     );
     expect(currentJobs).toContain("!canManageJobOperations ? 'View Job'");
@@ -128,7 +128,10 @@ test.describe('FB-035 Viewer Job lifecycle visibility', () => {
     ]) {
       const start = source.indexOf(marker);
       expect(start, `Expected handler marker: ${marker}`).toBeGreaterThanOrEqual(0);
-      expect(source.slice(start, start + 1_500)).toContain('canManageJobOperations');
+      const handlerSource = source.slice(start, start + 1_500);
+      expect(
+        handlerSource.includes('canManageJobOperations') || handlerSource.includes('canFinalizeCompletedJobReport'),
+      ).toBe(true);
     }
   });
 

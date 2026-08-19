@@ -8,12 +8,11 @@ import {
   FileText,
   Layers3,
   Plus,
-  Receipt,
   Settings2,
   Sparkles,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { Estimate, Inspection, Invoice } from '../../types';
+import type { Estimate, Inspection } from '../../types';
 import type { DurableDraftSummaryState } from '../drafts/useDurableDraftSummary';
 import { contractorJobsNeedsAttentionCount } from './contractorWorkSelectors';
 
@@ -110,15 +109,11 @@ export type ContractorWorkDashboardProps = {
   canViewPriceBook: boolean;
   estimateCount: number;
   activeJobCount: number;
-  invoiceCount: number;
-  openInvoiceCount: number;
-  paidInvoiceCount: number;
   needsAttentionCount: number;
   onViewNeedsAttention: () => void;
   onViewDrafts: () => void;
   onViewEstimates: () => void;
   onViewActiveJobs: () => void;
-  onViewInvoices: () => void;
   onStartNewDraft: () => void;
   onOpenTemplates: () => void;
   onOpenServicePlans: () => void;
@@ -136,15 +131,11 @@ export function ContractorWorkDashboard({
   canViewPriceBook,
   estimateCount,
   activeJobCount,
-  invoiceCount,
-  openInvoiceCount,
-  paidInvoiceCount,
   needsAttentionCount,
   onViewNeedsAttention,
   onViewDrafts,
   onViewEstimates,
   onViewActiveJobs,
-  onViewInvoices,
   onStartNewDraft,
   onOpenTemplates,
   onOpenServicePlans,
@@ -161,7 +152,7 @@ export function ContractorWorkDashboard({
       {loadError ? (
         <div data-testid="contractor-work-dashboard-error" role="alert" className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <span>Some Jobs information is unavailable. Counts stay hidden until access is restored.</span>
+          <span>Some Work information is unavailable. Counts stay hidden until access is restored.</span>
         </div>
       ) : null}
 
@@ -170,7 +161,7 @@ export function ContractorWorkDashboard({
           <h2 id="jobs-at-a-glance-heading" className="text-lg font-bold text-slate-950">At a Glance</h2>
           <p className="mt-1 text-sm text-slate-600">Open an existing workflow or review the items that need a next step.</p>
         </div>
-        <div data-testid="contractor-jobs-at-a-glance" className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-5 md:gap-3">
+        <div data-testid="contractor-jobs-at-a-glance" className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
           <SummaryTile
             testId="contractor-jobs-summary-needs-attention"
             label="Needs Attention"
@@ -209,15 +200,6 @@ export function ContractorWorkDashboard({
             state={loadedState(activeJobCount)}
             icon={<ClipboardCheck size={18} />}
             onClick={onViewActiveJobs}
-          />
-          <SummaryTile
-            testId="contractor-jobs-summary-invoices"
-            label="Invoices"
-            helper={`${openInvoiceCount} open · ${paidInvoiceCount} paid`}
-            emptyHelper="No invoice records"
-            state={loadedState(invoiceCount)}
-            icon={<Receipt size={18} />}
-            onClick={onViewInvoices}
           />
         </div>
       </section>
@@ -276,24 +258,19 @@ function formatRecordDate(value: string) {
 export function ContractorNeedsAttention({
   estimates,
   jobs,
-  invoices,
   onBack,
   onOpenEstimate,
   onOpenJob,
-  onOpenInvoice,
 }: {
   estimates: Estimate[];
   jobs: Inspection[];
-  invoices: Invoice[];
   onBack: () => void;
   onOpenEstimate: (estimate: Estimate) => void;
   onOpenJob: (job: Inspection) => void;
-  onOpenInvoice: (invoice: Invoice) => void;
 }) {
   const total = contractorJobsNeedsAttentionCount({
     acceptedEstimateCount: estimates.length,
     readyToInvoiceJobCount: jobs.length,
-    invoiceAttentionCount: invoices.length,
   });
   return (
     <section data-testid="contractor-needs-attention" className="space-y-5">
@@ -303,7 +280,7 @@ export function ContractorNeedsAttention({
           <p className="mt-1 text-sm text-slate-600">Only records with a clear contractor next step appear here.</p>
         </div>
         <button type="button" onClick={onBack} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50">
-          <ArrowLeft size={16} /> Jobs overview
+          <ArrowLeft size={16} /> Work overview
         </button>
       </div>
 
@@ -311,7 +288,7 @@ export function ContractorNeedsAttention({
         <div data-testid="contractor-needs-attention-empty" className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
           <CheckCircle2 size={22} className="mx-auto text-emerald-700" />
           <h3 className="mt-3 text-base font-bold text-slate-950">Nothing needs attention</h3>
-          <p className="mt-1 text-sm text-slate-600">Accepted estimates, completed invoiceable Jobs, and invoices requiring action will appear here.</p>
+          <p className="mt-1 text-sm text-slate-600">Accepted estimates and completed invoiceable Jobs will appear here.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -330,15 +307,6 @@ export function ContractorNeedsAttention({
               <p className="mt-1 text-xs text-slate-600">Completed work with no current Invoice.</p>
               <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 {jobs.map(job => <AttentionRecord key={job.id} title={job.name || 'Untitled Job'} reason="Ready to invoice" meta={`Updated ${formatRecordDate(job.updated_at)}`} onOpen={() => onOpenJob(job)} />)}
-              </div>
-            </section>
-          ) : null}
-          {invoices.length > 0 ? (
-            <section aria-labelledby="attention-invoices-heading">
-              <h3 id="attention-invoices-heading" className="text-sm font-bold text-slate-950">Invoices <span className="ml-1 text-slate-500">{invoices.length}</span></h3>
-              <p className="mt-1 text-xs text-slate-600">Draft, overdue, or partially paid invoices requiring review.</p>
-              <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                {invoices.map(invoice => <AttentionRecord key={invoice.id} title={invoice.title || `Invoice ${invoice.invoice_number}`} reason={invoice.status === 'partially_paid' ? 'Partially paid' : invoice.status === 'overdue' ? 'Overdue' : 'Draft requires review'} meta={`Invoice ${invoice.invoice_number} · Updated ${formatRecordDate(invoice.updated_at)}`} onOpen={() => onOpenInvoice(invoice)} />)}
               </div>
             </section>
           ) : null}

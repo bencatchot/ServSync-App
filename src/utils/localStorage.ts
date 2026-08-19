@@ -11,6 +11,11 @@ export const STORAGE_KEYS = {
   contractorSelectedHomeowner: 'servsync.contractor.selectedHomeowner',
   contractorHomeownerDetailTab: 'servsync.contractor.homeownerDetailTab',
   contractorHomeownerRequestView: 'servsync.contractor.homeownerRequestView',
+  contractorWorkCustomerFilter: 'servsync.contractor.workCustomerFilter',
+  contractorFinancialsCustomerFilter: 'servsync.contractor.financialsCustomerFilter',
+  contractorWorkView: 'servsync.contractor.workView',
+  contractorFinancialsView: 'servsync.contractor.financialsView',
+  contractorFinancialRecordKind: 'servsync.contractor.financialRecordKind',
   contractorJobsCustomerFilter: 'servsync.contractor.jobsCustomerFilter',
   contractorJobsView: 'servsync.contractor.jobsView',
   contractorProfileSetupSkipped: 'servsync.contractor.profileSetupSkipped',
@@ -23,6 +28,8 @@ export const SIGN_OUT_LOCAL_STORAGE_KEYS = [
   STORAGE_KEYS.homeownerRequestSearch,
   STORAGE_KEYS.contractorHomeownerSearch,
   STORAGE_KEYS.contractorSelectedHomeowner,
+  STORAGE_KEYS.contractorWorkCustomerFilter,
+  STORAGE_KEYS.contractorFinancialsCustomerFilter,
   STORAGE_KEYS.contractorJobsCustomerFilter,
 ] as const;
 

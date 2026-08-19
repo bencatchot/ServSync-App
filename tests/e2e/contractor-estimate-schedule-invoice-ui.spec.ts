@@ -24,7 +24,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     const financialEstimateCards = sourceBetween(
       source,
       'visibleEstimateRecords.map(estimate => {',
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "(contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
     const workspaceEstimateCards = sourceBetween(
       source,
@@ -100,7 +100,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
     const financialEstimateCards = sourceBetween(
       source,
       'visibleEstimateRecords.map(estimate => {',
-      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "(contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
     const scheduleRendererSource = sourceBetween(
       source,

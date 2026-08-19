@@ -35,6 +35,7 @@ test.describe('FB-027 contractor pipeline summary', () => {
 
   test('accepted estimates needing jobs use existing linked-job detection without new statuses', () => {
     const source = appSource();
+    const attentionSource = sourceFile('src/features/work/contractorWorkSelectors.ts');
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
     const workflowOverviewSource = sourceBetween(
       contractorSource,
@@ -43,54 +44,47 @@ test.describe('FB-027 contractor pipeline summary', () => {
     );
     const acceptedEstimateSource = sourceBetween(
       contractorSource,
-      'const jobForEstimate =',
-      'const invoiceAttentionRecords =',
+      'const openAcceptedEstimatesNeedingJobs = () => {',
+      'const openContractorServicePlans = () => {',
     );
 
-    expect(acceptedEstimateSource).toContain("insp.estimate_id === estimate.id || (estimate.inspection_id ? insp.id === estimate.inspection_id : false)");
-    expect(acceptedEstimateSource).toContain("const estimateHasLinkedJob = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => Boolean(jobForEstimate(estimate) || estimate.inspection_id);");
-    expect(acceptedEstimateSource).toContain("const acceptedEstimatesNeedingJobs = estimates.filter(estimate => estimate.status === 'accepted' && !estimateHasLinkedJob(estimate));");
-    expect(contractorSource).toContain("label: 'Estimates / invoices'");
-    expect(contractorSource).toContain('count: acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length');
+    expect(attentionSource).toContain("estimate.status === 'accepted'");
+    expect(attentionSource).toContain('!estimate.inspection_id');
+    expect(attentionSource).toContain('!operationalInspections.some(inspection => inspection.estimate_id === estimate.id)');
+    expect(contractorSource).toContain("label: 'Estimates'");
+    expect(contractorSource).toContain("label: 'Invoice attention'");
     expect(contractorSource).toContain("helper: `${acceptedEstimatesNeedingJobs.length} accepted`");
     expect(workflowOverviewSource).toContain('acceptedEstimatesNeedingJobs.length > 0');
     expect(workflowOverviewSource).toContain('Accepted estimates ready for jobs');
-    expect(workflowOverviewSource).toContain('Create jobs from approved estimates in the existing Jobs workspace.');
+    expect(workflowOverviewSource).toContain('Create Jobs from approved estimates in Work.');
     expect(workflowOverviewSource).toContain('{acceptedEstimatesNeedingJobs.length} need jobs');
     expect(workflowOverviewSource).toContain('onClick={openAcceptedEstimatesNeedingJobs}');
     expect(acceptedEstimateSource).toContain('const openAcceptedEstimatesNeedingJobs = () => {');
-    expect(acceptedEstimateSource).toContain("setContractorTab('inspections')");
-    expect(acceptedEstimateSource).toContain("setContractorFinancialRecordKind('estimates')");
-    expect(acceptedEstimateSource).toContain("setContractorJobsViewAndScroll('open_financial')");
+    expect(acceptedEstimateSource).toContain("setContractorTab('work')");
+    expect(acceptedEstimateSource).toContain("setContractorWorkViewAndScroll('open_estimates')");
     expect(acceptedEstimateSource).toContain("setInspectionView('list')");
     expect(acceptedEstimateSource).toContain('setFocusedEstimateRecordId(null)');
-    expect(acceptedEstimateSource).toContain('setJobsCustomerFilterSubjectId(null)');
+    expect(acceptedEstimateSource).toContain('setWorkCustomerFilterSubjectId(null)');
     expect(acceptedEstimateSource).toContain("setContractorEstimateRecordSearch('')");
     expect(acceptedEstimateSource).toContain("setContractorEstimateRecordStatusFilter('approved')");
     expect(acceptedEstimateSource).toContain("setContractorEstimateRecordSort('updated_newest')");
     expect(workflowOverviewSource).not.toContain('createJobFromAcceptedEstimate');
 
     for (const unapprovedStatus of ['needs_job', 'job_needed', 'ready_for_job', 'follow_up']) {
-      expect(acceptedEstimateSource).not.toContain(unapprovedStatus);
+      expect(attentionSource).not.toContain(unapprovedStatus);
     }
   });
 
   test('invoice attention is status-based and does not invent overdue-by-date automation', () => {
     const source = appSource();
+    const invoiceAttentionSource = sourceFile('src/features/work/contractorWorkSelectors.ts');
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
     const workflowOverviewSource = sourceBetween(
       contractorSource,
       '<Card title="Workflow overview"',
       '<ContractorEntitlementStatusPanel',
     );
-    const invoiceAttentionSource = sourceBetween(
-      contractorSource,
-      'const openInvoiceRecords =',
-      'const onboardingCustomerCount =',
-    );
-
-    expect(invoiceAttentionSource).toContain("const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));");
-    expect(invoiceAttentionSource).toContain("const invoiceAttentionRecords = openInvoiceRecords.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));");
+    expect(invoiceAttentionSource).toContain("return invoices.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));");
     expect(invoiceAttentionSource).not.toContain("['sent', 'viewed'");
     expect(invoiceAttentionSource).not.toContain("['sent', 'viewed', 'overdue', 'partially_paid']");
     expect(contractorSource).toContain("label: 'Invoices'");
@@ -99,7 +93,8 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(workflowOverviewSource).toContain('Invoices need attention');
     expect(workflowOverviewSource).toContain('Review drafts, overdue, or partially paid invoices.');
     expect(workflowOverviewSource).toContain('{invoiceAttentionRecords.length} review');
-    expect(workflowOverviewSource).toContain("setContractorJobsView('open_financial')");
+    expect(workflowOverviewSource).toContain("setContractorTab('financials')");
+    expect(workflowOverviewSource).toContain("setContractorFinancialsView('needs_attention')");
     expect(workflowOverviewSource).not.toContain('sendInvoiceToHomeowner');
     expect(workflowOverviewSource).not.toContain('markInvoicePaid');
     expect(workflowOverviewSource).not.toContain('voidInvoice');
@@ -115,11 +110,12 @@ test.describe('FB-027 contractor pipeline summary', () => {
 
   test('completed jobs ready to invoice use existing linked-invoice and work-item billing rules', () => {
     const source = appSource();
+    const completedJobInvoiceSource = sourceFile('src/features/work/contractorWorkSelectors.ts');
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
-    const completedJobInvoiceSource = sourceBetween(
+    const completedJobNavigationSource = sourceBetween(
       contractorSource,
-      'const linkedNonVoidInvoiceForJob =',
-      'const openFinancialRecords =',
+      'const openCompletedJobsReadyToInvoice = () => {',
+      'const openAcceptedEstimatesNeedingJobs = () => {',
     );
     const workflowOverviewSource = sourceBetween(
       contractorSource,
@@ -133,16 +129,15 @@ test.describe('FB-027 contractor pipeline summary', () => {
     );
     const jobDetailInvoiceActionSource = sourceBetween(
       contractorSource,
-      'const linkedInvoiceForJob = linkedNonVoidInvoiceForJob(activeInspection);',
+      'const linkedInvoiceForJob = contractorWorkLinkedNonVoidInvoiceForJob(activeInspection, invoices);',
       'Standalone scheduling coming soon',
     );
 
     expect(completedJobInvoiceSource).toContain("invoice.status !== 'void'");
     expect(completedJobInvoiceSource).toContain('invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false)');
-    expect(completedJobInvoiceSource).toContain("if (status !== 'completed' && status !== 'closed') return false;");
-    expect(completedJobInvoiceSource).toContain('if (linkedNonVoidInvoiceForJob(job)) return false;');
-    expect(completedJobInvoiceSource).toContain('if (jobWorkItems.length > 0) return jobWorkItems.some(jobWorkItemCanInvoice);');
-    expect(completedJobInvoiceSource).toContain('const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);');
+    expect(completedJobInvoiceSource).toContain('return contractorWorkJobHistoryFrom(inspections).filter(job => {');
+    expect(completedJobInvoiceSource).toContain('if (contractorWorkLinkedNonVoidInvoiceForJob(job, invoices)) return false;');
+    expect(completedJobInvoiceSource).toContain('return jobWorkItems.length === 0 || jobWorkItems.some(jobWorkItemCanInvoice);');
     expect(completedJobInvoiceSource).not.toContain('cancelled');
     expect(completedJobInvoiceSource).not.toContain('due_at');
     expect(completedJobInvoiceSource).not.toContain('Date.now');
@@ -154,7 +149,7 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(workflowOverviewSource).toContain('Review completed jobs. ServSync will guide you to item-based or completed-job invoicing.');
     expect(workflowOverviewSource).toContain('{completedJobsReadyToInvoice.length} ready');
     expect(workflowOverviewSource).toContain('onClick={openCompletedJobsReadyToInvoice}');
-    expect(completedJobInvoiceSource).toContain("setContractorJobsView('closed_jobs')");
+    expect(completedJobNavigationSource).toContain("setContractorWorkView('closed_jobs')");
     expect(workflowOverviewSource).not.toContain('createInvoiceFromJob');
     expect(workflowOverviewSource).not.toContain('openPartialInvoiceReview');
 
@@ -187,10 +182,10 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(contractorSource).toContain('+ contractorFollowUpCount');
     expect(contractorSource).toContain('+ acceptedEstimatesNeedingJobs.length');
     expect(contractorSource).toContain('+ completedJobsReadyToInvoice.length');
-    expect(contractorSource).toContain('+ invoiceAttentionRecords.length');
+    expect(contractorSource).toContain('+ (canManageFinancialActions ? invoiceAttentionRecords.length : 0)');
     expect(contractorSource).toContain('+ (contractorProfileOnboardingComplete ? 0 : 1)');
 
-    for (const label of ['Connections', 'Calendar requests', 'Requests', 'Estimates / invoices', 'Completed jobs', 'Profile setup']) {
+    for (const label of ['Connections', 'Calendar requests', 'Requests', 'Estimates', 'Invoice attention', 'Completed jobs', 'Profile setup']) {
       expect(contractorSource).toContain(`label: '${label}'`);
     }
 
@@ -279,7 +274,7 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(estimateCardSource).toContain("hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'");
     expect(estimateCardSource).toContain('View Job');
     expect(estimateCardSource).toContain('onClick={() => void openLinkedJobForEstimate(estimate)}');
-    expect(estimateCardSource).toContain("mobileButtonClass(estimate.status === 'accepted' || linkedInvoice ? 'secondary' : 'primary')");
+    expect(estimateCardSource).toContain("className={buttonClass('primary')}");
     expect(estimateCardSource.indexOf('data-testid="contractor-create-job-from-accepted-estimate"')).toBeLessThan(estimateCardSource.indexOf('Create invoice from estimate'));
   });
 });
