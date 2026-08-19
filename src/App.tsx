@@ -21503,7 +21503,7 @@ function ContractorDashboard({
 
   useEffect(() => {
     let cancelled = false;
-    if (!sharedDraftComposerEnabled || !supabase) {
+    if (profile.role !== 'contractor' || !contractor?.id || !supabase) {
       setDurableDraftCapabilityLoading(false);
       setDurableDraftCapabilityError('');
       setDurableDraftCapabilities({
@@ -21541,7 +21541,7 @@ function ContractorDashboard({
         if (!cancelled) setDurableDraftCapabilityLoading(false);
       });
     return () => { cancelled = true; };
-  }, [sharedDraftComposerEnabled, profile.id, contractor?.id]);
+  }, [profile.id, profile.role, contractor?.id]);
 
   useEffect(() => {
     if (sharedDraftComposerEnabled) return;

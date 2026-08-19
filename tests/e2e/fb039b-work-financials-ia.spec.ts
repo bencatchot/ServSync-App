@@ -149,6 +149,8 @@ test.describe('FB-039B Work and Financials information architecture', () => {
   test('uses server-resolved billing capability rather than role strings', () => {
     const source = repoFile('src/App.tsx');
     expect(source).toContain('const canManageFinancialActions = financialActionVisibility.canManageBilling;');
+    expect(source).toContain("if (profile.role !== 'contractor' || !contractor?.id || !supabase)");
+    expect(source).not.toContain('if (!sharedDraftComposerEnabled || !supabase)');
     expect(source).toContain('if (!canManageFinancialActions) return;');
     expect(source).not.toContain("currentContractorTeamRole === 'owner' || currentContractorTeamRole === 'admin'");
   });
