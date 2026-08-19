@@ -282,7 +282,7 @@ import {
 } from './features/trade-sections/tradeSectionAvailability';
 import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
-import { contractorJobsNeedsAttentionCount } from './features/work/contractorWorkSelectors';
+import { contractorWorkAttentionFrom, contractorWorkLinkedNonVoidInvoiceForJob } from './features/work/contractorWorkSelectors';
 import {
   contractorFinancialActionVisibility,
   invoiceRecordOpensEditable,
@@ -28814,18 +28814,6 @@ function ContractorDashboard({
     if (label === 'Draft job created from accepted estimate') return 'Draft job';
     return label;
   };
-  const linkedNonVoidInvoiceForJob = (job: Pick<Inspection, 'id' | 'estimate_id'>) => invoices.find(invoice =>
-    invoice.status !== 'void'
-    && (invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false))
-  ) ?? null;
-  const jobReadyForInvoiceFollowUp = (job: Inspection) => {
-    const status = inspectionJobStatus(job);
-    if (status !== 'completed' && status !== 'closed') return false;
-    if (linkedNonVoidInvoiceForJob(job)) return false;
-    const jobWorkItems = workItemsForJob(job.id);
-    if (jobWorkItems.length > 0) return jobWorkItems.some(jobWorkItemCanInvoice);
-    return true;
-  };
   const openCompletedJobsReadyToInvoice = () => {
     setContractorTab('inspections');
     setContractorJobsView('closed_jobs');
@@ -28854,14 +28842,17 @@ function ContractorDashboard({
   };
   const openJobs = operationalInspections.filter(inspectionIsOpenJob);
   const closedJobs = operationalInspections.filter(inspectionIsClosedJob);
-  const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
   const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
   const paidInvoiceRecords = invoices.filter(invoice => invoice.status === 'paid');
-  const acceptedEstimatesNeedingJobs = estimates.filter(estimate => estimate.status === 'accepted' && !estimateHasLinkedJob(estimate));
-  const invoiceAttentionRecords = openInvoiceRecords.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));
+  const {
+    acceptedEstimatesNeedingJobs,
+    completedJobsReadyToInvoice,
+    invoiceAttentionRecords,
+    total: contractorNeedsAttentionCount,
+  } = contractorWorkAttentionFrom({ estimates, inspections, invoices, jobWorkItemsByJobId });
   const contractorJobsHeaderTabForView = (view: ContractorJobsView): ContractorJobsHeaderTab => {
     if (view === 'overview' || view === 'needs_attention' || view === 'drafts') return 'overview';
     if (view === 'open_jobs' || view === 'closed_jobs' || view === 'new_jobs') return 'jobs_reports';
@@ -38536,11 +38527,7 @@ function ContractorDashboard({
                     invoiceCount={invoices.length}
                     openInvoiceCount={openInvoiceRecords.length}
                     paidInvoiceCount={paidInvoiceRecords.length}
-                    needsAttentionCount={contractorJobsNeedsAttentionCount({
-                      acceptedEstimateCount: acceptedEstimatesNeedingJobs.length,
-                      readyToInvoiceJobCount: completedJobsReadyToInvoice.length,
-                      invoiceAttentionCount: invoiceAttentionRecords.length,
-                    })}
+                    needsAttentionCount={contractorNeedsAttentionCount}
                     onViewNeedsAttention={() => setContractorJobsViewAndScroll('needs_attention')}
                     onViewDrafts={() => setContractorJobsViewAndScroll('drafts')}
                     onViewEstimates={() => {
@@ -40505,7 +40492,7 @@ function ContractorDashboard({
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
                           const linkedEstimate = insp.estimate_id ? estimates.find(estimate => estimate.id === insp.estimate_id) ?? null : null;
-                          const linkedInvoice = linkedNonVoidInvoiceForJob(insp);
+                          const linkedInvoice = contractorWorkLinkedNonVoidInvoiceForJob(insp, invoices);
                           const jobWorkItems = workItemsForJob(insp.id);
                           const hasDurableWorkItems = jobWorkItems.length > 0;
                           const hasInvoiceableWorkItems = jobWorkItems.some(jobWorkItemCanInvoice);
@@ -42332,7 +42319,7 @@ function ContractorDashboard({
             const linkedEstimateForJob = activeInspection.estimate_id
               ? estimates.find(estimate => estimate.id === activeInspection.estimate_id) ?? null
               : null;
-            const linkedInvoiceForJob = linkedNonVoidInvoiceForJob(activeInspection);
+            const linkedInvoiceForJob = contractorWorkLinkedNonVoidInvoiceForJob(activeInspection, invoices);
             const activeJobWorkItems = workItemsForJob(activeInspection.id);
             const activeJobHasDurableWorkItems = activeJobWorkItems.length > 0;
             const activeJobHasInvoiceableWorkItems = activeJobWorkItems.some(jobWorkItemCanInvoice);

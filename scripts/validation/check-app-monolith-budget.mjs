@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const APP_TSX_PATH = 'src/App.tsx';
-export const APP_TSX_MAX_LINES = 51_479;
+export const APP_TSX_MAX_LINES = 51_466;
 
 export function countSourceLines(source) {
   if (source.length === 0) return 0;

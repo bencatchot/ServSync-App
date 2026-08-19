@@ -1,10 +1,13 @@
 import { expect, test } from '@playwright/test';
+import type { JobWorkItem } from '../../src/types';
 import { durableDraftPrimaryListCount } from '../../src/features/drafts/durableDraftListSelectors';
 import { isContractorWorkUiEnabled } from '../../src/features/work/contractorWorkAvailability';
 import {
   contractorJobsNeedsAttentionCount,
   contractorWorkAcceptedEstimatesReadyToStartFrom,
   contractorWorkActiveJobsFrom,
+  contractorWorkAttentionFrom,
+  contractorWorkCompletedJobsReadyToInvoiceFrom,
   contractorWorkInvoicesNeedingAttentionFrom,
   contractorWorkJobHistoryFrom,
 } from '../../src/features/work/contractorWorkSelectors';
@@ -78,6 +81,44 @@ test.describe('Jobs overview redesign guardrails', () => {
     expect(ready.map(item => item.id)).toEqual(['ready']);
     expect(attentionInvoices.map(item => item.id)).toEqual(['draft', 'overdue', 'partial']);
     expect(contractorJobsNeedsAttentionCount({ acceptedEstimateCount: ready.length, readyToInvoiceJobCount: 1, invoiceAttentionCount: attentionInvoices.length })).toBe(5);
+  });
+
+  test('keeps completed Job billing attention inside the pure Work domain boundary', () => {
+    const noItems = inspection({ id: 'no-items', status: 'finalized', job_status: 'completed' });
+    const invoiceableItems = inspection({ id: 'invoiceable-items', status: 'finalized', job_status: 'closed' });
+    const blockedItems = inspection({ id: 'blocked-items', status: 'finalized', job_status: 'completed' });
+    const invoiced = inspection({ id: 'invoiced', status: 'finalized', job_status: 'completed' });
+    const estimateInvoiced = inspection({ id: 'estimate-invoiced', estimate_id: 'estimate-linked', status: 'finalized', job_status: 'completed' });
+    const voidInvoice = inspection({ id: 'void-invoice', status: 'finalized', job_status: 'completed' });
+
+    const ready = contractorWorkCompletedJobsReadyToInvoiceFrom({
+      inspections: [noItems, invoiceableItems, blockedItems, invoiced, estimateInvoiced, voidInvoice],
+      invoices: [
+        invoice({ id: 'job-invoice', job_id: 'invoiced', status: 'sent' }),
+        invoice({ id: 'estimate-invoice', estimate_id: 'estimate-linked', status: 'paid' }),
+        invoice({ id: 'voided-job-invoice', job_id: 'void-invoice', status: 'void' }),
+      ],
+      jobWorkItemsByJobId: {
+        'invoiceable-items': [{ completion_status: 'completed', billable: true, billing_status: 'unbilled', unit_price_cents: 12_500 } as unknown as JobWorkItem],
+        'blocked-items': [{ completion_status: 'open', billable: true, billing_status: 'unbilled', unit_price_cents: 12_500 } as unknown as JobWorkItem],
+      },
+    });
+
+    expect(ready.map(item => item.id)).toEqual(['no-items', 'invoiceable-items', 'void-invoice']);
+  });
+
+  test('derives the complete Needs Attention model without App-owned policy', () => {
+    const attention = contractorWorkAttentionFrom({
+      estimates: [estimate({ id: 'ready' }), estimate({ id: 'draft', status: 'draft' })],
+      inspections: [inspection({ id: 'completed', status: 'finalized', job_status: 'completed' })],
+      invoices: [invoice({ id: 'overdue', status: 'overdue' }), invoice({ id: 'sent', status: 'sent' })],
+      jobWorkItemsByJobId: {},
+    });
+
+    expect(attention.acceptedEstimatesNeedingJobs.map(item => item.id)).toEqual(['ready']);
+    expect(attention.completedJobsReadyToInvoice.map(item => item.id)).toEqual(['completed']);
+    expect(attention.invoiceAttentionRecords.map(item => item.id)).toEqual(['overdue']);
+    expect(attention.total).toBe(3);
   });
 
   test('counts the same durable and earlier Draft rows the dedicated list presents', () => {

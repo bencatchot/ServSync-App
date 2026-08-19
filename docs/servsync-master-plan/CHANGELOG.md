@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - Contractor Work attention-domain extraction v1
+
+- Branch: `codex/contractor-work-domain-extraction-v1` from exact main `09e048c9b04e6be5a052b9e11f411d319e4a953b` after the Issue #494-authorized merge of PR #493.
+- Files changed: `src/features/work/contractorWorkSelectors.ts`; `src/App.tsx`; focused Contractor Work contracts; the exact `App.tsx` architecture baseline; and this changelog.
+- Summary: Moves the complete Contractor Work Needs Attention classification boundary out of `App.tsx`: accepted Estimates without Jobs, completed Jobs eligible for invoicing, linked non-void Invoice detection, work-item invoiceability, actionable Invoice statuses, and the exact combined count now resolve through pure Work-domain selectors. Existing Job list/detail billing summaries reuse the same linked-Invoice policy. `App.tsx` falls from 51,479 to 51,466 lines and the checked-in ratchet is lowered in the same change.
+- Reason: Issue #494 authorizes one behavior-preserving Contractor Work pure-domain extraction after the guardrails merge. The attention policy was a coherent boundary split between feature selectors and App-local closures, which made changes harder to reason about and test independently.
+- Validation: Fresh `npm ci --ignore-scripts`; exact App-size and ESLint warning ratchets; architecture contracts; 13 focused Contractor Work contracts including linked Job/Estimate invoices, void invoices, and work-item eligibility; TypeScript; Production build; GitHub pull-request quality checks and normal Preview builds; sensitive-value review; and `git diff --check`.
+- Known risks and follow-ups: This is intentionally one incremental extraction. It preserves routes, test IDs, roles, authorization, database/RLS/RPC/storage/auth contracts, and user-visible behavior; it includes no SQL, environment, provider, production-data, or unrelated cleanup. Further `App.tsx` decomposition remains separately reviewable and must continue lowering the ratchet.
+- Backlog impact: No update needed. This internal architecture slice changes no product capability, status, priority, guardrail, or public/private boundary.
+- Master plan impact: No update needed. Contractor Work ownership and lifecycle definitions remain unchanged.
+
 ## 2026-08-18 - App decomposition tooling guardrails v1
 
 - Branch: `codex/app-decomposition-guardrails-v1` from exact main `178eb7822c3885d14d7ecb17542c559d1e03ab6c`.
