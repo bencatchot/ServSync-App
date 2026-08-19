@@ -121,12 +121,14 @@ test.describe('FB-039B Work and Financials information architecture', () => {
   });
 
   test('keeps Invoice management out of Work and splits attention ownership', () => {
+    const source = repoFile('src/App.tsx');
     const workDashboard = repoFile('src/features/work/ContractorWorkDashboard.tsx');
     const financialsDashboard = repoFile('src/features/financials/ContractorFinancialsDashboard.tsx');
     const selectors = repoFile('src/features/work/contractorWorkSelectors.ts');
     expect(workDashboard).not.toContain('onViewInvoices');
     expect(workDashboard).not.toContain('invoiceCount');
     expect(workDashboard).not.toContain('onOpenInvoice');
+    expect(source).toContain("...(canManageJobOperations && !SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs'");
     expect(financialsDashboard).toContain('Invoice Drafts');
     expect(financialsDashboard).toContain('Open Invoices');
     expect(financialsDashboard).toContain('ContractorFinancialsNeedsAttention');

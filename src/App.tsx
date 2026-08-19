@@ -38185,7 +38185,7 @@ function ContractorDashboard({
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs' as const, label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' }] : []),
+                        ...(canManageJobOperations && !SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs' as const, label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' }] : []),
                         { id: 'open_jobs' as const, label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Scheduled and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
                         { id: 'closed_jobs' as const, label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} />, mobileTileClassName: 'order-3 md:order-none' },
                       ] as Array<{ id: ContractorWorkView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName: string }>).map(item => {
