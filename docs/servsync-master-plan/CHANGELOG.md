@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - Contractor Job workflow-domain extraction v1
+
+- Branch: `codex/issue-496-contractor-work-decomposition` from exact main `857f2c8bfb5de9ac2143570d4f88598f4d6f6591` after PR #495.
+- Files changed: `src/features/work/contractorJobWorkflow.ts`; `src/App.tsx`; focused Contractor Job workflow contracts; the exact `App.tsx` architecture baseline; and this changelog.
+- Summary: Moves one coherent Contractor Job workflow boundary out of `App.tsx`: checklist-versus-service classification, workflow-kind mapping, default finding status, Job labels and helper copy, approved-scope and Work Items room recognition, inspection-like legacy inference, and deterministic scope-to-service-task derivation. `App.tsx` falls by 133 lines from 51,466 to 51,333, and the checked-in ratchet is lowered to the new exact count.
+- Reason: Issue #496 authorizes the next meaningful behavior-preserving Contractor Work extraction. These rules jointly determine how existing Job records and newly started field work are classified and presented, so keeping them behind one typed pure-domain module makes future Work investigation safer without moving component or persistence behavior.
+- Validation: Exact App-size and 80-warning ESLint ratchets; architecture contracts; 23 focused Contractor Work and Job workflow contracts covering explicit and inferred Job types, checklist structure, scope-task normalization, finding defaults, labels, billing attention, Draft filtering, and existing dashboard behavior; TypeScript; Production build; GitHub pull-request quality checks and normal Preview builds; sensitive-value review; and `git diff --check`.
+- Known risks and follow-ups: This is architecture-only and preserves routes, test IDs, copy, role authority, lifecycle semantics, database/RLS/RPC/storage/auth contracts, environment/provider configuration, and Production data. Further `App.tsx` decomposition remains separately reviewable and must continue lowering the exact ratchet.
+- Backlog impact: No update needed. Product scope, status, priority, guardrails, and public/private capability boundaries are unchanged.
+- Master plan impact: No update needed. The established Contractor Work architecture and lifecycle remain unchanged.
+
 ## 2026-08-18 - Contractor Work attention-domain extraction v1
 
 - Branch: `codex/contractor-work-domain-extraction-v1` from exact main `09e048c9b04e6be5a052b9e11f411d319e4a953b` after the Issue #494-authorized merge of PR #493.
