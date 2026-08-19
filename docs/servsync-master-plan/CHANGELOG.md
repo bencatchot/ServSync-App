@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - Work and Financials launch information architecture decision
+
+- Branch: `codex/servsync-product-roadmap-v1` continuing from roadmap commit `33aed47` on current `origin/main` planning base `39bd885f660405b98729a799f2021ba5bd71cca1`.
+- Files changed: Product Information Architecture; Contractor Work Module Product Specification; Product Roadmap; Master Plan; Feature Backlog; and this changelog.
+- Summary: Records the owner-approved contractor launch architecture: `Jobs` transitions to `Work`; Drafts, Estimates, Jobs, visits/scheduling context, checklists, Reports, templates, and Price Book remain in Work; Invoice Drafts, Invoices, deposits, payments, receivables, accounting-ready exports, and financial reporting move to a separate `Financials` destination. Contextual Create invoice actions remain available from Work and preserve source lineage. Payment/accounting provider setup remains in Company -> Integrations.
+- Reason: The original combined Jobs workspace was simpler when the feature surface was smaller. As Invoice, deposit, payment, export, and reporting capabilities mature, separating operational work from billing makes capabilities easier to discover and gives future financial features a stable home before contractors begin using the product.
+- Validation: Planning-source link review; cross-document ownership-term review; active backlog ID uniqueness; `git diff --check`; changed-file credential-shaped secret scan; and protected-scope review.
+- Known risks and follow-ups: Documentation only. Live navigation, routes, permissions, lifecycle behavior, financial authority, SQL/RLS/RPC, providers, environments, deployments, and production data are unchanged. FB-039 implementation must preserve deep links, Request/Estimate/Job/Invoice lineage, mobile role needs, and existing authorization while avoiding duplicate workflow surfaces.
+- Backlog impact: FB-039 now contains the approved Work/Financials ownership boundary and must be completed before the controlled pilot.
+- Master plan impact: The launch-foundation sequence now treats Work/Financials separation as decided rather than an open owner choice.
+
 ## 2026-08-19 - Product roadmap consolidation v1
 
 - Branch: `codex/servsync-product-roadmap-v1` from exact main `39bd885f660405b98729a799f2021ba5bd71cca1`.

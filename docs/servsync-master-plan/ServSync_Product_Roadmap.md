@@ -24,7 +24,7 @@ The long-term advantage is:
 
 ## Roadmap Decisions
 
-1. Complete one bounded launch-foundation release before inviting real contractor workflow users.
+1. Complete one bounded launch-foundation release before inviting real contractor workflow users, including the approved `Work` and `Financials` separation.
 2. Do not perform a visual rebrand or broad cosmetic redesign. Preserve the current visual system and improve hierarchy, navigation, copy density, loading behavior, and next-action clarity.
 3. Once the launch foundation begins external pilot use, treat primary navigation, object names, lifecycle statuses, and the location of core actions as a stable product contract.
 4. Use a controlled pilot before broad public onboarding. Real contractor task completion is the evidence gate, not feature count or internal familiarity.
@@ -64,7 +64,7 @@ Goal: make the existing product feel simpler and more decisive without expanding
 
 | Order | Outcome | Backlog relationship | Acceptance evidence |
 | --- | --- | --- | --- |
-| 0.1 | Freeze the launch information architecture and terminology | FB-039; Product Information Architecture | Contractor and homeowner primary navigation, object names, lifecycle labels, and canonical destinations are documented and implemented consistently on desktop and mobile. |
+| 0.1 | Implement and freeze the launch information architecture and terminology | FB-039; Product Information Architecture | The contractor `Jobs` workspace becomes `Work`; Estimates remain in Work; Invoices, deposits, payments, receivables, exports, and financial reporting move to `Financials`; provider setup stays in Company -> Integrations. Desktop and mobile use consistent object names, lifecycle labels, canonical destinations, and cross-module lineage. |
 | 0.2 | Give every core work state one primary next action | FB-039; FB-003B; FB-010; FB-011A | New Request, Draft Estimate, sent Estimate, accepted Estimate, unscheduled Job, active Job, completed Job, and open Invoice each present one dominant action; secondary actions remain available without equal visual weight. |
 | 0.3 | Simplify dense homeowner surfaces | FB-039; FB-030 | Properties uses progressive sections for Overview, Home Map, Access, and Property Settings. Active financial work is concise; historical artifacts remain in Records/Home History. Future-feature explanations do not dominate working screens. |
 | 0.4 | Stabilize loading, empty, duplicate, and recovery behavior | FB-016 | Related dashboard identity/count data appears atomically or behind stable skeletons; empty states lead to a useful action; retry/error states are actionable; duplicate Home History, document, Estimate, Job, Invoice, and payment transitions are prevented or safely idempotent. |
@@ -226,7 +226,7 @@ Metrics should describe product health, not create fake public proof. Private cu
 
 | Gate | Decision |
 | --- | --- |
-| Before Phase 0 implementation | Approve the final launch navigation labels and whether the existing `Jobs` label transitions to the broader `Work` model now or after the pilot. |
+| During Phase 0 implementation | Validate the approved Work/Financials labels and subnavigation with cold-user tasks; preserve the ownership decision unless evidence exposes a material usability problem. |
 | Before pilot invitation | Confirm pilot cohort, trades, support channel, data/reset policy, and beta limitation copy. |
 | Before operational-beta expansion | Decide whether Production online payments are required for the next cohort and whether practical scheduling depth is sufficient. |
 | Before charging contractors | Approve plans, trial, limits, billing enforcement, cancellation/refund policy, and support promise. |

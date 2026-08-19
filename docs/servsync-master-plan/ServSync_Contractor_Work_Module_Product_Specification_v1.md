@@ -4,6 +4,19 @@
 
 This document defines the contractor-facing Work module for ServSync.
 
+## Launch Information Architecture Amendment — 2026-08-19
+
+The approved launch information architecture now uses `Work` as the contractor operational destination and a separate `Financials` destination for money management.
+
+- Work owns Drafts, Estimates, Jobs, visits/scheduling context, checklists, Reports, templates, and Price Book.
+- Estimates remain in Work because they define proposed scope and lead into Jobs.
+- Financials owns Invoice Drafts, Invoices, deposits, payments, receivables, accounting-ready exports, and financial reporting.
+- Work may present a contextual `Create invoice` action, but the resulting Invoice opens and continues in Financials with preserved Request/Estimate/Job/work-item lineage.
+- Payment/accounting provider configuration belongs in Company -> Integrations; operational results belong in Financials.
+- On mobile, Financials may initially live under `More` for Owner/Admin/Office users rather than consuming a field-critical bottom-navigation position. Existing role and financial-authority boundaries remain authoritative.
+
+This amendment supersedes the document's earlier navigation and module-ownership statements that place Invoice lists or Invoice management inside Work. Historical implementation-state descriptions and direct-Invoice lifecycle requirements remain valid until the launch-foundation migration is implemented. This amendment does not itself rename the live UI, move routes, change authorization, or activate financial capability.
+
 Work is the contractor lifecycle capability that helps a contractor plan, launch, perform, finish, bill, document, and later review customer work. It sits beneath the Product Vision & Philosophy and Product Information Architecture, and above implementation plans, backlog slices, and code-level decisions.
 
 Document hierarchy:

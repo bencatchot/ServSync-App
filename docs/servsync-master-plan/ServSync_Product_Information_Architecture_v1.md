@@ -74,11 +74,12 @@ The contractor portal should help the contractor:
 - Grow the business.
 - Manage the company.
 
-The long-term contractor portal should be organized around five major pillars:
+The launch contractor portal should be organized around six major pillars:
 
 - Business
 - Customers
 - Work
+- Financials
 - Growth
 - Company
 
@@ -99,7 +100,7 @@ Likely capabilities:
 - onboarding or setup prompts
 - lightweight attention queues
 
-Detailed operational work belongs in Work, not Dashboard. Business should summarize and route; it should not become a second copy of Jobs, Estimates, Invoices, Service Requests, or Customers.
+Detailed operational work belongs in Work and detailed money management belongs in Financials, not Dashboard. Business should summarize and route; it should not become a second copy of Jobs, Estimates, Invoices, Service Requests, or Customers.
 
 ### Customers
 
@@ -134,7 +135,7 @@ If future customer relationship management becomes much richer, Customers may ha
 
 Purpose:
 
-Turn customer needs into completed, documented, and billable work.
+Turn customer needs into completed and documented work that can hand off cleanly to billing.
 
 Likely capabilities:
 
@@ -142,7 +143,6 @@ Likely capabilities:
 - Open Jobs
 - Job History
 - Estimates
-- Invoices
 - Reports
 - work templates later
 - scheduling and operational activity where appropriate
@@ -153,11 +153,31 @@ Likely capabilities:
 
 Draft-first Work belongs here. The implemented Work Module Product Specification uses this architecture as its boundary map.
 
-Work owns the transformation from internal contractor planning into customer-facing and operational outcomes. It should not own contractor discovery, company settings, subscription administration, or homeowner property master data.
+Work owns internal planning, Estimates, Jobs, visits, reports, and the transformation of completed work into a billing-ready handoff. It may initiate `Create invoice`, but the resulting Invoice and its financial lifecycle belong to Financials. Work should not own Invoice management, payments, contractor discovery, company settings, subscription administration, or homeowner property master data.
 
 Templates posture:
 
 Templates are an internal, secondary capability within Contractor Work. They should primarily start or prefill a Draft rather than become a competing creation system beside `Start New Draft`. Templates should not become a separate global mobile-navigation destination during the initial Draft-first redesign. Existing Templates may remain available during migration, but they should not dictate the new Work architecture. Template redesign should follow the Draft composer and Work landing experience once those surfaces are stable.
+
+### Financials
+
+Purpose:
+
+Manage what the business is owed, what has been paid, and how financial records leave ServSync.
+
+Likely capabilities:
+
+- Invoices
+- deposits and progress billing
+- offline and online payment records
+- receivables and aging
+- payment status and reconciliation
+- accounting-ready exports
+- financial reporting and job-profitability views when supported
+
+Estimates remain in Work because they define proposed scope and lead into Jobs. Invoices move to Financials because they are billing obligations. Price Book remains a Work tool because it supports estimating and work preparation; Financials may reference private cost and margin data later without taking ownership of Price Book management.
+
+Payment and accounting provider configuration belongs in Company -> Integrations. Invoice, payment, export, and synchronization results belong in Financials.
 
 ### Growth
 
@@ -176,7 +196,7 @@ Likely capabilities:
 - public profile improvements
 - relationship-building prompts
 
-Growth should focus on opportunity creation. Once an opportunity becomes a customer relationship, request, estimate, job, or invoice, the operational follow-through should move to Customers and Work.
+Growth should focus on opportunity creation. Once an opportunity becomes a customer relationship or request, operational follow-through should move to Customers and Work. Once work creates a billing obligation, its Invoice and payment follow-through should move to Financials.
 
 ### Company
 
@@ -376,11 +396,12 @@ References:
 - work counts from Work
 - customer activity from Customers
 - growth/setup status from Growth and Company
-- invoice/payment state from Work
+- invoice/payment state from Financials
 
 May link to:
 
 - Work queues
+- Financials queues
 - Customer profiles
 - Company setup
 - Growth/profile visibility
@@ -426,7 +447,7 @@ May link to:
 Does not own:
 
 - operational work lifecycle
-- invoices as financial workflow owners
+- Invoice/payment management as financial workflow owners
 - contractor profile marketing
 - subscription settings
 - homeowner-owned property master data beyond permitted display or proposals
@@ -442,12 +463,12 @@ Owns:
 - Draft lifecycle
 - operational Job lifecycle
 - Estimate creation and management
-- Invoice creation and management
 - Job History
 - operational reports
 - work-level scheduling
 - work items and scope closeout
 - work templates where they directly support work creation
+- billing-ready handoff into Financials
 
 References:
 
@@ -470,6 +491,44 @@ Does not own:
 - homeowner property master data
 - subscription administration
 - customer acquisition strategy
+- Invoice management, payment recording, receivables, or accounting export
+
+### Contractor Financials
+
+Primary question:
+
+`What am I owed, what has been paid, and what financial action should happen next?`
+
+Owns:
+
+- Invoice Drafts and Invoice lifecycle management
+- deposits, progress billing, and final billing records
+- payment recording and provider payment status
+- receivables, aging, and financial attention queues
+- accounting-ready exports and synchronization status
+- financial reports and job profitability when supported
+
+References:
+
+- Estimate, Job, work-item, and payment-schedule source context from Work
+- Customer and property identity from Customers
+- provider and accounting configuration from Company
+- high-level summaries displayed on Business
+
+May link to:
+
+- originating Estimate, Job, work item, or payment-schedule item
+- Customer profile and property context
+- Company integrations and financial settings
+- Homeowner-visible Invoice delivery and records
+
+Does not own:
+
+- Estimate scope and approval workflow
+- Job execution, checklists, reports, or scheduling
+- Price Book management
+- Customer relationship management
+- provider credentials or company-level integration configuration
 
 ### Contractor Growth
 
@@ -778,6 +837,9 @@ WORK
 - Work
 - Calendar
 
+FINANCIALS
+- Financials
+
 GROWTH
 - Discover
 - Invites & Referrals
@@ -836,11 +898,12 @@ This table maps current navigation and product-area labels to the long-term info
 | Dashboard | Workspace | Contractor Business | Retain | Near-term | Dashboard should summarize business health and next actions. |
 | Business Profile | Workspace | Contractor Company | Relocate later; allow contextual links from Business and Growth | Later navigation redesign | Business Profile is company/profile configuration, not business-health reporting. |
 | Homeowners | Homeowner Work | Contractor Customers | Retain; rename only if future terminology requires it | Near-term | Homeowners/customer records are relationship and property-context management. |
-| Service Requests | Homeowner Work | Contractor Customers while intake is active; Contractor Work after work begins | Retain; hand off linked Work records when planning starts | Near-term, with Work handoff refined during redesign | Requests are intake and unmet-need context until a Draft, Estimate, Job, or Invoice is created from them. |
+| Service Requests | Homeowner Work | Contractor Customers while intake is active; Contractor Work after work begins | Retain; hand off linked Work records when planning starts | Near-term, with Work handoff refined during redesign | Requests are intake and unmet-need context until a Draft, Estimate, or Job is created from them. A direct Invoice handoff belongs in Financials. |
 | Calendar | Homeowner Work | Contractor Work | Relocate later; customer and request screens may still reference appointments | Later navigation redesign | Calendar is operational scheduling, while customer/request surfaces should show related appointment context. |
 | Discover | Growth | Contractor Growth | Retain | Near-term | Discover is profile visibility and relationship generation. |
 | Invites & Referrals | Growth | Contractor Growth | Retain | Near-term | Invites and referrals support contractor acquisition and network growth. |
-| Jobs | Current Jobs workspace | Contractor Work | Evolve into the broader Work module | After Work redesign is approved | Current Jobs is the implementation-era container for estimates, invoices, jobs/reports, templates, and Draft-first work. |
+| Jobs | Current Jobs workspace | Contractor Work | Rename/evolve into the broader Work module during launch foundation | Before controlled contractor pilot | Current Jobs is the implementation-era container for Estimates, Jobs/reports, templates, Draft-first work, and Invoices. Invoice ownership moves to Financials. |
+| Invoices | Current Jobs workspace / Estimates-Invoices destinations | Contractor Financials | Move Invoice lists, detail, deposits, payments, receivables, and financial attention to Financials; keep contextual Create invoice handoffs in Work | Before controlled contractor pilot | Invoices are billing obligations rather than operational work. The split makes capability ownership clear without breaking Estimate/Job lineage. |
 | Trust & Safety | Help | Help / support-account utility | Retain | Near-term | Global trust guidance belongs in Help; user-specific access choices belong in Account/Company settings. |
 | Privacy & Data | Help | Help / support-account utility | Retain | Near-term | Educational privacy/data content belongs in Help; user-specific privacy controls belong in Account or Company. |
 | Support | Help | Help / support utility | Retain | Near-term | Support should remain a global help destination with contextual links from relevant modules. |
@@ -916,7 +979,7 @@ Owned by:
 
 Handoff rules:
 
-A Service Request and a Draft are distinct records. The Service Request remains the customer-intake and source-context record. A Draft, Estimate, Job, or Invoice created from a Service Request becomes a separate Work-owned record, and the source Service Request should remain linked to that resulting Work record. The handoff must reuse the existing homeowner/customer and property identity, must not create duplicate homeowner/customer records, must not create duplicate property records, and must not create a duplicate operational Job when one is already linked. Customers may show summaries or links to related Work, but Contractor Work owns the lifecycle after handoff. Homeowner-facing visibility must remain role-appropriate and permission-aware.
+A Service Request and a Draft are distinct records. The Service Request remains the customer-intake and source-context record. A Draft, Estimate, or Job created from a Service Request becomes a separate Work-owned record. An Invoice created directly or from Work becomes a Financials-owned record. Every resulting record should retain its source Request/Estimate/Job lineage. The handoff must reuse the existing homeowner/customer and property identity, must not create duplicate homeowner/customer records, must not create duplicate property records, and must not create a duplicate operational Job or billing obligation when one is already linked. Customers may show summaries or links to related Work and Financials records, while each owning module controls its lifecycle. Homeowner-facing visibility must remain role-appropriate and permission-aware.
 
 ### Draft-first contractor planning
 
@@ -991,7 +1054,7 @@ Contractor view:
 
 Owned by:
 
-- Contractor Work
+- Contractor Financials
 - Homeowner Service while active
 - Homeowner Records after filing/history
 
@@ -1022,7 +1085,6 @@ The Work module should become the contractor's operational center for:
 - Drafts
 - Estimates
 - Jobs
-- Invoices
 - Reports
 - scheduling and visits
 - work templates
@@ -1033,7 +1095,7 @@ The Draft-first redesign was not treated as a global navigation redesign by itse
 - What is the Work landing page?
 - What belongs in Drafts?
 - What belongs in Active Work?
-- How do Estimates, Jobs, Invoices, and Reports relate inside Work?
+- How do Estimates, Jobs, and Reports relate inside Work, and how do they hand off to Financials?
 - What are the supported Draft outcomes?
 - What is the legacy fallback until direct operational job creation can be retired?
 - Which contextual surfaces may offer Start New Draft?
@@ -1056,7 +1118,8 @@ Rules:
 
 - If the feature helps a contractor understand business health, place it in Business.
 - If it manages customer/property relationships, place it in Customers.
-- If it turns scope into estimates/jobs/invoices/reports, place it in Work.
+- If it turns scope into Estimates, Jobs, visits, checklists, or Reports, place it in Work.
+- If it manages Invoices, deposits, payments, receivables, accounting export, or financial reporting, place it in Financials.
 - If it helps win new relationships, place it in Growth.
 - If it configures the organization, place it in Company.
 - If it helps a homeowner understand the current property, place it in Home.
@@ -1096,8 +1159,8 @@ This table is directional and non-binding planning guidance. It does not add the
 | Expenses | Contractor Business | Work for job-linked expenses, accounting integrations | Business-financial capability | Optional | Excluded | Expenses support business understanding, but ServSync should not become a full accounting system. |
 | Service agreements | Contractor Work | Customers, homeowner Maintenance, billing | Recurring Work capability | Optional | Excluded | Agreements are recurring service commitments that should connect relationship context, future maintenance, and billing without becoming a separate core nav model. |
 | AI assistant | Cross-module contextual capability | Whichever module contains the active workflow | Contextual tool, not necessarily a global module | Potentially tiered or usage-controlled | Excluded from this IA implementation | AI should assist inside workflows rather than create another navigation destination. |
-| Accounting integrations | Contractor Company | Contractor Business and Work billing | Integration | Optional | Excluded | Provider setup belongs in Company; business summaries and billing actions may reference integration status. |
-| Payment integrations | Contractor Company for configuration | Work, Invoices, homeowner payment surfaces | Integration | Optional | Excluded | Payment setup belongs in Company, invoice/payment actions belong in Work, and ServSync does not become the payment processor. |
+| Accounting integrations | Contractor Company | Contractor Financials and Business summaries | Integration | Optional | Excluded | Provider setup belongs in Company; export/sync actions and results belong in Financials, while Business may reference high-level status. |
+| Payment integrations | Contractor Company for configuration | Financials, Work source context, homeowner payment surfaces | Integration | Optional | Excluded | Payment setup belongs in Company, Invoice/payment actions and results belong in Financials, and ServSync does not become the payment processor. |
 | Reviews | Contractor Growth | Completed Work, Connections, contractor profile | Growth/reputation capability | Likely broadly available; packaging undecided | Excluded | Reviews support trust and reputation but should remain tied to eligible completed service context. |
 | Lead management | Contractor Growth | Customers and Work after qualification/acceptance | Growth pipeline capability | Optional | Excluded | Leads are growth opportunities until they become customer relationships or planned Work. |
 | Multiple-property homeowner support | Homeowner Home | Account, Records, Service, Maintenance, Contractors | Homeowner property-management capability | Homeowner packaging undecided | Future | Each property should keep its own records and relationships while Account owns access/ownership settings. |

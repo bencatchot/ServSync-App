@@ -549,7 +549,7 @@ The canonical stage order, exit gates, dependencies, and deferrals now live in t
 
 The current execution order is:
 
-1. Complete a bounded launch-foundation release focused on workflow hierarchy, stable information architecture, homeowner surface simplification, loading/duplicate reliability, field-critical mobile work, repeatable fixtures, and honest guidance.
+1. Complete a bounded launch-foundation release focused on workflow hierarchy, the approved Work/Financials separation, homeowner surface simplification, loading/duplicate reliability, field-critical mobile work, repeatable fixtures, and honest guidance.
 2. Freeze the core product contract and run a 3-5-contractor controlled pilot with task-based onboarding and measurable support/usability evidence.
 3. Use pilot evidence to sequence Production online payments, workflow communication, practical scheduling, accounting export, operational reporting, pricing, and onboarding maturity.
 4. Deepen property-centered differentiation through Home History, Assets & Systems, Home Access, recurring relationships, trusted reviews, Discover, and contextual Help.
@@ -601,7 +601,7 @@ These items need more founder input or beta learning before they can be finalize
 # 20. Immediate Next Steps
 
 1. Use Phase 0 of the Product Roadmap as the next planning boundary; do not begin another broad feature expansion first.
-2. Approve the final launch navigation labels and decide whether `Jobs` transitions to the broader `Work` model before or after the controlled pilot.
+2. Implement the approved launch boundary: rename/evolve the contractor `Jobs` workspace to `Work`, keep Estimates in Work, and move Invoice/payment operations to `Financials` before the controlled pilot.
 3. Break FB-039 Launch Foundation UX & Information Architecture Stabilization into narrow, reviewable implementation outcomes.
 4. Validate the full canonical loop on desktop and field-critical mobile against resettable Sandbox/Demo fixtures.
 5. Freeze the resulting core navigation, terminology, lifecycle statuses, and primary-action placement for the pilot.
