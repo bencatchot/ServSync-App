@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-19
 
-Planning base: `origin/main` at `39bd885f660405b98729a799f2021ba5bd71cca1`
+Planning base: `origin/main` at `3a902abccf99388c5d2431cde467feb9f5e56d26`
 
 ## Purpose
 
@@ -85,12 +85,12 @@ Focus rules:
 | --- | --- |
 | Current release stage | Phase 0 — Launch Foundation |
 | Primary active outcome | FB-039 Launch Foundation UX and Information Architecture Stabilization |
-| Completed control-point evidence | FB-039A audit is complete. FB-039B merged through PR #503 at main commit `3574d2dabb1c962be9eae3d62c5a3ce3689acd09`, establishing coherent Work/Financials ownership. FB-039C merged through PR #505 at main commit `679a948849006afcea7e2701b0df0eee5b58bb7b` after authenticated Demo Preview acceptance across all five contractor roles. FB-039D is implemented on draft PR #507: homeowner Properties now separates Overview, Home Map, Access, and Property Settings; keeps the one-property default direct; confines current service/financial attention to Overview; leaves history in Documents/Home History; and preserves the established Home Map and shared-home authority model. Exact application head `f6fb8e687ef3574e4ca853f4f18fc7f3c89dae42` passed protected Demo Preview desktop/390x844 acceptance, while the same source passed resettable Sandbox owner/member/viewer security and presentation checks. See [the FB-039D acceptance record](../qa/ServSync_Homeowner_Properties_Progressive_Disclosure_Acceptance_2026-08-19.md). |
-| Next recommended assignment | Owner review and explicit merge decision for draft PR #507; do not begin Phase 0.4 before this slice is accepted. |
-| Assignment outcome | Freeze the calmer homeowner Properties hierarchy without changing capabilities: concise Overview by default; established Home Map in its own section; access and privacy management in Access; editing/setup in Property Settings; historical artifacts in Records/Home History; and stable desktop/390x844 behavior for owner and shared roles. |
-| Expected following slice | Phase 0.4: stabilize atomic loading, useful empty states, actionable retry/error handling, and duplicate-safe or idempotent core transitions after the homeowner Properties surface is accepted. |
+| Completed control-point evidence | FB-039A audit is complete. FB-039B merged through PR #503 at main commit `3574d2dabb1c962be9eae3d62c5a3ce3689acd09`, establishing coherent Work/Financials ownership. FB-039C merged through PR #505 at main commit `679a948849006afcea7e2701b0df0eee5b58bb7b` after authenticated Demo Preview acceptance across all five contractor roles. FB-039D merged through PR #507 at main commit `3a902abccf99388c5d2431cde467feb9f5e56d26`, freezing the calmer homeowner Properties hierarchy across Overview, Home Map, Access, and Property Settings while preserving Home History ownership and shared-home authority. The reviewed PR head was `bb6484aae74773816f4c3dbb024ca776b54a07cf`; exact application head `f6fb8e687ef3574e4ca853f4f18fc7f3c89dae42` passed protected Demo Preview desktop/390x844 acceptance, and the same source passed resettable Sandbox owner/member/viewer security and presentation checks. All three automatic post-merge Vercel deployments completed successfully. See [the FB-039D acceptance record](../qa/ServSync_Homeowner_Properties_Progressive_Disclosure_Acceptance_2026-08-19.md). |
+| Next recommended assignment | FB-039E Core-State Reliability Stabilization: inspect and harden Phase 0.4 loading, empty, recovery, and duplicate-safety behavior across the canonical contractor/homeowner loop. |
+| Assignment outcome | Related identity and count data resolves atomically or behind a stable loading treatment; useful empty states lead to the correct next action; failures expose an actionable retry without losing context; and repeated or interrupted Home History, document, Estimate, Job, Invoice, and payment actions are prevented or safely idempotent. Preserve established lifecycle semantics, role authority, Work/Financials ownership, and homeowner record ownership. |
+| Expected following slice | Phase 0.5: lock the field-critical mobile path at 390x844 after the core state and recovery behavior is dependable. |
 | Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
-| Roadmap return point | After each Marketing or other parallel task, return to FB-039D owner review until the progressive-disclosure contract is merged and frozen; then advance to Phase 0.4. |
+| Roadmap return point | After each Marketing or other parallel task, return to FB-039E until Phase 0.4 reliability acceptance is merged; then advance to Phase 0.5. |
 
 ### Completion update protocol
 

@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039D merge verification and FB-039E roadmap handoff
+
+- Branch: `agent/fb039d-merge-roadmap-handoff` from exact `origin/main` merge commit `3a902abccf99388c5d2431cde467feb9f5e56d26`.
+- Files changed: Product Roadmap, Feature Backlog, Master Plan, and this changelog.
+- Summary: Records PR #507 and FB-039D as merged after exact-head desktop/mobile and shared-role acceptance, freezes the Phase 0.3 homeowner Properties hierarchy, and makes FB-039E Core-State Reliability Stabilization the active Launch Roadmap assignment. FB-039E covers atomic related-data loading, useful empty states, actionable retry/recovery, and duplicate-safe or idempotent Home History, document, Estimate, Job, Invoice, and payment transitions while preserving established lifecycle, authorization, Work/Financials, and homeowner-record ownership contracts.
+- Reason: The standing roadmap must reflect the merged application state and move immediately to the next launch-foundation risk rather than continuing to show a completed owner-merge gate.
+- Validation: Verified GitHub PR #507 merged at `3a902abccf99388c5d2431cde467feb9f5e56d26`; verified reviewed PR head `bb6484aae74773816f4c3dbb024ca776b54a07cf` is an ancestor of `origin/main`; verified all three automatic post-merge Vercel deployments succeeded; reviewed the roadmap control point, backlog status, Master Plan immediate steps, Markdown links, changed-file sensitive-value scan, and `git diff --check`.
+- Known risks and follow-ups: Documentation only. This does not begin FB-039E, change loading/error/lifecycle behavior, alter SQL/schema/RLS/RPC/auth/permissions, deploy manually, or modify Production data. Phase 0.5 field-critical mobile acceptance remains the expected following slice.
+- Backlog impact: FB-039 remains Implementation In Progress. FB-039D is merged and complete; FB-039E is now the immediate next assignment.
+- Master plan impact: The immediate launch-foundation sequence advances from FB-039D merge review to Phase 0.4 reliability stabilization.
+
 ## 2026-08-19 - FB-039D homeowner Properties progressive disclosure
 
 - Branch: `codex/fb039d-homeowner-properties-progressive-v1` from exact `origin/main` merge commit `7c4aefb544e430abe4882b3c8215a54cef470947` in an isolated worktree.
