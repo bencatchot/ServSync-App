@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - Product roadmap consolidation v1
+
+- Branch: `codex/servsync-product-roadmap-v1` from exact main `39bd885f660405b98729a799f2021ba5bd71cca1`.
+- Files changed: `docs/servsync-master-plan/ServSync_Product_Roadmap.md`; planning README; Master Plan; Feature Backlog; and this changelog.
+- Summary: Adds one canonical gate-based Product Roadmap that reconciles product vision, information architecture, active backlog, beta operations, competitive/readiness audits, and a signed-in desktop/mobile workflow review. It sequences a bounded launch-foundation release, a 3-5-contractor controlled pilot, evidence-ordered operational table stakes, property-centered differentiation, and evidence-gated long-term options. The Master Plan and planning README now point to the roadmap for execution sequence; FB-039 and FB-040 preserve the two new unfinished launch outcomes in the active backlog.
+- Reason: Existing planning was substantial but fragmented across strategy, feature-state, beta-checklist, and audit documents. The product needs a stable launch sequence that improves core workflow clarity before real users arrive and then limits disruptive structural change after the pilot begins.
+- Validation: Planning-source link review; Markdown heading/link checks; feature-ID uniqueness review; `git diff --check`; changed-file credential-shaped secret scan; and protected-scope review.
+- Known risks and follow-ups: This is documentation-only. It does not implement or activate UI, workflow, SQL, RLS, RPC, storage, auth, permissions, provider, environment, payment, notification, deployment, or production-data changes. Phase 0 still requires an owner decision on final launch navigation labels and whether `Jobs` transitions to `Work` before or after the pilot.
+- Backlog impact: Adds FB-039 Launch Foundation UX and Information Architecture Stabilization and FB-040 Controlled Contractor Pilot and Adoption Evidence; existing feature rollout states and guardrails remain unchanged.
+- Master plan impact: Replaces the stale linear priority list and immediate-next-step list with the new stage-based execution sequence while preserving product vision and existing implementation history.
+
 ## 2026-08-19 - Estimate payment-schedule domain extraction v1
 
 - Branch: `codex/issue-500-app-domain-reassessment` from exact main `032fa3cbad5b2048b7fce2202a2a3f94f3df6b05` after PR #499.

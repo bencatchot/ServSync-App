@@ -14,7 +14,7 @@ Prepared for Ben Catchot | June 15, 2026
 
 # Documentation Hierarchy
 
-The [ServSync Product Vision & Philosophy](ServSync_Product_Vision_and_Philosophy_v1.md) is the authoritative source for product purpose, target users, guiding principles, and long-term direction. The [ServSync Product Information Architecture](ServSync_Product_Information_Architecture_v1.md) translates that vision into platform structure, module ownership, navigation principles, cross-profile workflow boundaries, and expansion rules. The [ServSync Contractor Work Module Product Specification](ServSync_Contractor_Work_Module_Product_Specification_v1.md) defines the target contractor Work experience beneath that architecture. This Master Plan translates those documents into milestones, implementation priorities, rollout state, and future work.
+The [ServSync Product Vision & Philosophy](ServSync_Product_Vision_and_Philosophy_v1.md) is the authoritative source for product purpose, target users, guiding principles, and long-term direction. The [ServSync Product Information Architecture](ServSync_Product_Information_Architecture_v1.md) translates that vision into platform structure, module ownership, navigation principles, cross-profile workflow boundaries, and expansion rules. The [ServSync Contractor Work Module Product Specification](ServSync_Contractor_Work_Module_Product_Specification_v1.md) defines the target contractor Work experience beneath that architecture. The [ServSync Product Roadmap](ServSync_Product_Roadmap.md) is the canonical release-stage and execution-sequencing document. This Master Plan retains broader strategy, implementation context, rollout state, and future work.
 
 Future module specifications, backlog priorities, roadmap decisions, and implementation plans must align with the Product Vision & Philosophy and Product Information Architecture.
 
@@ -24,9 +24,10 @@ Current documentation hierarchy:
 2. [Product Information Architecture](ServSync_Product_Information_Architecture_v1.md)
 3. Module specifications
    - [Contractor Work Module Product Specification](ServSync_Contractor_Work_Module_Product_Specification_v1.md)
-4. Master Plan
-5. Backlog
-6. Changelog
+4. Product Roadmap
+5. Master Plan
+6. Backlog
+7. Changelog
 
 # Version Control and How to Use This Document
 
@@ -35,7 +36,7 @@ Current documentation hierarchy:
 | Document name | ServSync Master Plan v1.0 Updated Draft |
 | Recommended GitHub path | docs/strategy/ServSync_Master_Plan_v1_0.docx |
 | Recommended editable source path | docs/strategy/servsync-master-plan-v1.md or docs/strategy/servsync-master-plan-v1-notes.md |
-| Primary purpose | Execution source of truth for ServSync architecture, roadmap state, implementation priorities, rollout state, and future work |
+| Primary purpose | Broad strategy, implementation context, rollout state, and future-work reference; release sequencing lives in the Product Roadmap |
 | Update method | Update this document whenever major product, pricing, roadmap, beta, or messaging decisions change |
 | Important guardrail | Do not let Codex make product changes from this document without a separate, narrow implementation prompt and explicit approval |
 
@@ -544,21 +545,15 @@ Current beta-readiness notes:
 
 # 16. Roadmap Priorities
 
-The roadmap should stay disciplined. The app already has many features. Recent cleanup work made the core loop clearer and shipped v1 Home History, invoice-to-Home-History filing, homeowner manual reminders, SQL provenance cleanup, calendar event details, and terminology improvements. The next work should harden beta readiness, improve test coverage, and add marketplace/connection differentiators in small audited branches.
+The canonical stage order, exit gates, dependencies, and deferrals now live in the [ServSync Product Roadmap](ServSync_Product_Roadmap.md). The active Feature Backlog remains authoritative for individual unfinished outcomes and rollout boundaries.
 
-| Priority | Workstream | Why it matters |
-| --- | --- | --- |
-| 1 | FB-020 security, records reliability, backup/restore, storage, and scale readiness | Keeps privacy, data durability, recoverability, dependency security, and 1,000-user readiness ahead of broader beta/public go-live claims. |
-| 2 | Beta readiness and release checklist | Confirms the cleaned-up core loop is dependable enough for friendly beta users. |
-| 3 | Full E2E core-loop coverage | Protects request -> estimate -> approval -> job -> invoice -> Home History -> reminder behavior. |
-| 4 | Mobile core-loop QA | Contractors will use this in the field, and recent cards/actions need real viewport review. |
-| 5 | Production smoke account and record plan | Maintains safe authenticated production smoke without using personal or fragile accounts, and leaves optional role credentials/stable smoke records as separately approved follow-ups. |
-| 6 | Contextual connection request with message, selected properties, and per-property permissions | This strengthens the main differentiator. Photos/media should follow later after storage/RLS design. |
-| 7 | General connection-level messaging | Allows questions without forcing service requests. |
-| 8 | Discover feed strategy audit | Keeps marketplace work grounded in real contractor posts/photos and homeowner discovery needs. |
-| 9 | Dashboard and notification accuracy | Builds trust and reduces confusion. Notification automation remains future-facing. |
-| 10 | Beta onboarding and feedback capture | Turns early users into product direction. |
-| 11 | Payments/Stripe, QuickBooks, push/email/text automation, native mobile apps, and full calendar sync later | Important, but after the core loop and beta operations are reliable. Estimate payment schedules should stay provider-neutral; future QuickBooks IDs should live in an external accounting mapping layer rather than core estimate schedule rows. |
+The current execution order is:
+
+1. Complete a bounded launch-foundation release focused on workflow hierarchy, stable information architecture, homeowner surface simplification, loading/duplicate reliability, field-critical mobile work, repeatable fixtures, and honest guidance.
+2. Freeze the core product contract and run a 3-5-contractor controlled pilot with task-based onboarding and measurable support/usability evidence.
+3. Use pilot evidence to sequence Production online payments, workflow communication, practical scheduling, accounting export, operational reporting, pricing, and onboarding maturity.
+4. Deepen property-centered differentiation through Home History, Assets & Systems, Home Access, recurring relationships, trusted reviews, Discover, and contextual Help.
+5. Keep enterprise operations, native/offline applications, Project Collaboration, advanced marketplace ranking, and autonomous AI evidence-gated and long-term.
 
 SQL provenance note: tracked replacements for estimate-to-job support and home-specific inspection templates are now in main. If old loose SQL files such as `servsync-estimate-to-job.sql` or `servsync-home-specific-templates.sql` are encountered outside the repo, do not apply them directly; use the reviewed tracked SQL patches instead.
 
@@ -581,7 +576,7 @@ The master plan should be stored in GitHub so it stays near the code and can be 
 | --- | --- | --- |
 | ServSync_Master_Plan_v1_0.docx | docs/strategy/ServSync_Master_Plan_v1_0.docx | Human-readable formatted plan. |
 | servsync-master-plan-v1.md | docs/strategy/servsync-master-plan-v1.md | AI/Codex-readable text version. |
-| roadmap.md | docs/strategy/roadmap.md | Short task roadmap for active work. |
+| ServSync_Product_Roadmap.md | docs/servsync-master-plan/ServSync_Product_Roadmap.md | Canonical release-stage sequence, gates, dependencies, and deferrals. |
 | beta-test-plan.md | docs/beta/beta-test-plan.md | Manual beta testing checklist. |
 | codex-prompts/ | docs/prompts/ | Approved implementation/audit prompts. |
 
@@ -605,14 +600,14 @@ These items need more founder input or beta learning before they can be finalize
 
 # 20. Immediate Next Steps
 
-1. Treat PRs #1-#11 as the current shipped cleanup baseline for the core MVP loop.
-2. Use FB-020 as the umbrella readiness workstream for security, records reliability, backup/restore, storage, dependency security, and scale hardening before broader beta/public go-live.
-3. Run a focused beta-readiness/release-checklist audit before starting another major feature.
-4. Use the unauthenticated production public smoke check after production deploys, keep authenticated production smoke read-only and limited to dedicated approved smoke accounts, and add optional role credentials or stable smoke records only after separate approval.
-5. Use the approved contextual connection request direction in Sections 11 and 13 as the product/spec baseline.
-6. Implement contextual connection requests in small reviewed PRs: SQL/RLS/RPC foundation, homeowner request UI without photos, contractor pending request review UI, active connection per-property sharing editor, contractor workspace routing polish, and optional media/photo support later.
-7. Do not ask Codex to implement photos/media, general messaging, or new permission categories until those are separately audited and approved.
-8. Keep QuickBooks, payments/Stripe, push/email/text automation, native mobile apps, full calendar sync, and contractor call tracking future-facing until the beta loop is stable.
+1. Use Phase 0 of the Product Roadmap as the next planning boundary; do not begin another broad feature expansion first.
+2. Approve the final launch navigation labels and decide whether `Jobs` transitions to the broader `Work` model before or after the controlled pilot.
+3. Break FB-039 Launch Foundation UX & Information Architecture Stabilization into narrow, reviewable implementation outcomes.
+4. Validate the full canonical loop on desktop and field-critical mobile against resettable Sandbox/Demo fixtures.
+5. Freeze the resulting core navigation, terminology, lifecycle statuses, and primary-action placement for the pilot.
+6. Recruit the FB-040 pilot cohort only after the Phase 0 exit gate passes.
+7. Use pilot evidence to make the explicit online-payment and scheduling boundary decision before operational-beta expansion.
+8. Keep advanced dispatch, native/offline applications, broad marketplace ranking, inventory/payroll, and autonomous AI outside the near-term launch commitment.
 
 # Appendix A: Contextual Connection Implementation Breakdown
 
