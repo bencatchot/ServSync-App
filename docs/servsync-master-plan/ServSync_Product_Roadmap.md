@@ -56,6 +56,52 @@ This roadmap consolidates the following sources:
 
 Dates are estimates, not commitments. Evidence gates control movement between stages.
 
+## Roadmap Management Operating Model
+
+The roadmap is a standing product compass, not a restriction against valuable work that appears outside the current phase.
+
+ServSync uses two visible work lanes:
+
+| Lane | Purpose | Operating rule |
+| --- | --- | --- |
+| Launch Roadmap | Move the current release stage toward its exit gate | Always keep one clearly named next outcome. Do not let this lane become idle because another feature is interesting or useful. |
+| Strategic Investment | Continue valuable owner-led work that benefits ServSync or future contractors but is not the current launch-stage blocker | May proceed in parallel when its value is explicit, its scope is bounded, and it does not silently replace the Launch Roadmap priority. |
+
+FB-037 Marketing is an approved Strategic Investment lane. It benefits ServSync's own growth operations and may later benefit contractors, so it may continue while Phase 0 advances. Its provider, publication, tenant, cost, and rollout guardrails remain unchanged. Marketing work does not count as completing a Phase 0 launch-foundation gate unless it directly satisfies a listed Phase 0 acceptance criterion.
+
+Focus rules:
+
+- Keep at least one Launch Roadmap task ready or active while Strategic Investment work continues.
+- After any completed task, identify whether it advanced the current roadmap gate, a later roadmap outcome, a strategic investment, or unrelated maintenance.
+- Reconcile the Product Roadmap and Feature Backlog whenever status, priority, remaining scope, dependency, guardrail, or next step changes.
+- Do not update roadmap status merely because source exists; use precise rollout and validation language.
+- Return the next recommended Launch Roadmap assignment after every completed task, even when the completed task was in the Strategic Investment lane.
+- Surface an owner decision only when it materially changes product experience, launch scope, protected systems, or sequencing.
+- Allow urgent security, privacy, data-integrity, production-reliability, and blocker work to interrupt both lanes; record the interruption and the return point.
+
+### Current roadmap control point
+
+| Field | Current direction |
+| --- | --- |
+| Current release stage | Phase 0 — Launch Foundation |
+| Primary active outcome | FB-039 Launch Foundation UX and Information Architecture Stabilization |
+| Next recommended assignment | FB-039A Work/Financials Navigation and Workflow Ownership Audit |
+| Assignment outcome | Produce an implementation-ready map of current routes, state, role visibility, desktop/mobile navigation, deep links, and contextual Invoice handoffs required to implement the approved Work/Financials split without changing backend lifecycle or authority. |
+| Expected following slice | FB-039B Work/Financials navigation shell and route-preserving presentation implementation, refined by the FB-039A audit. |
+| Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
+| Roadmap return point | After each Marketing or other parallel task, reassess FB-039A/FB-039B progress and recommend the next unfinished Phase 0 item. |
+
+### Completion update protocol
+
+When work is reported complete:
+
+1. Confirm the exact branch/PR/commit and deployed or gated state when relevant.
+2. Classify the result against the current roadmap phase and backlog entry.
+3. Update the roadmap control point if the next assignment or dependency changed.
+4. Update the Feature Backlog when status, remaining scope, priority, guardrail, or next step changed.
+5. Keep implementation history in the Changelog rather than expanding roadmap task descriptions into diaries.
+6. Return one primary next Codex assignment, plus an optional parallel assignment only when maintaining both lanes is useful.
+
 ## Phase 0 — Launch Foundation
 
 Target horizon: 3-4 weeks before real contractor workflow onboarding.

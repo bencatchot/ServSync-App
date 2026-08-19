@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - Roadmap management and parallel-work operating model
+
+- Branch: `codex/servsync-product-roadmap-v1` continuing from Work/Financials decision commit `4f5aa78`.
+- Files changed: Product Roadmap; Feature Backlog; and this changelog.
+- Summary: Establishes the roadmap as the standing product compass with two visible lanes: a Launch Roadmap lane that must always retain a clear next outcome and a Strategic Investment lane for valuable bounded work that should not silently displace launch progress. FB-037 Marketing is explicitly approved to continue in the parallel strategic lane. The current control point is Phase 0 / FB-039, with FB-039A Work/Financials Navigation and Workflow Ownership Audit as the next recommended assignment and FB-039B implementation as the expected follow-up.
+- Reason: ServSync needs sustained launch-foundation progress while preserving room for valuable owner-led work such as the Marketing feature. The operating model is designed to maintain focus without prohibiting beneficial parallel development.
+- Validation: Roadmap/backlog cross-reference review; active backlog ID uniqueness; local Markdown-link validation; `git diff --check`; and changed-file credential-shaped secret scan.
+- Known risks and follow-ups: Documentation only. This does not start FB-039A, implement the Work/Financials UI, change Marketing rollout/provider/publication authority, alter SQL/RLS/RPC/auth/permissions/env, deploy, or mutate production data. The roadmap control point must be updated as work completes rather than becoming a static planning statement.
+- Backlog impact: FB-039 moves from generic Backlog to Ready for Audit / Planning and records FB-039A as the next step. FB-037 status and guardrails are unchanged.
+- Master plan impact: No update needed. The stage sequence and approved Work/Financials product direction are unchanged; this update defines roadmap management practice and the current execution control point.
+
 ## 2026-08-19 - Work and Financials launch information architecture decision
 
 - Branch: `codex/servsync-product-roadmap-v1` continuing from roadmap commit `33aed47` on current `origin/main` planning base `39bd885f660405b98729a799f2021ba5bd71cca1`.
