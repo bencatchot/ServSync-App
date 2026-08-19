@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039A Work / Financials information architecture audit
+
+- Branch: `codex/servsync-product-roadmap-v1` from exact main `39bd885f660405b98729a799f2021ba5bd71cca1`.
+- Files changed: `docs/qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md`; Product Roadmap; Feature Backlog; and this changelog.
+- Summary: Completes the read-only FB-039A implementation audit and maps the current contractor Jobs workspace, shared Estimate/Invoice state, desktop/mobile navigation, role visibility, saved browser state, route limitations, Dashboard/notification/Customer/Draft/Estimate/Job/Invoice handoffs, and migration risks. It defines the approved end-state ownership, capability-based role/device contract, deterministic legacy-state compatibility, required cross-module handoffs, and one coherent FB-039B implementation sequence and acceptance set.
+- Reason: The visible Jobs workspace is one shared state machine rather than a label. Implementing the approved Work/Financials split safely requires central destination helpers, separate Estimate/Invoice state ownership, legacy browser-state handling, and exhaustive contextual navigation coverage so users do not encounter duplicate or conflicting workflow locations.
+- Validation: Focused source tracing against the exact audited application base; route and local-storage review; role-capability and existing test-contract review; cross-document link and status review; `git diff --check`; changed-file credential-shaped secret scan; and protected-scope review.
+- Known risks and follow-ups: Documentation only. The app still presents Jobs with combined Estimates/Invoices until FB-039B is implemented. No UI, lifecycle, permission, database, provider, environment, deployment, or Production-data behavior changed. FB-039B must not ship an intermediate duplicate-ownership state and must preserve homeowner behavior and existing server authority.
+- Backlog impact: FB-039 advances from Ready for Audit / Planning to Implementation Ready. FB-039B is now the next Launch Roadmap assignment; FB-039C is the expected following one-primary-action hierarchy slice.
+- Master plan impact: No product-direction change. The previously approved Work/Financials decision is now implementation-ready.
+
 ## 2026-08-19 - Roadmap management and parallel-work operating model
 
 - Branch: `codex/servsync-product-roadmap-v1` continuing from Work/Financials decision commit `4f5aa78`.

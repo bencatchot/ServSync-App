@@ -85,11 +85,12 @@ Focus rules:
 | --- | --- |
 | Current release stage | Phase 0 — Launch Foundation |
 | Primary active outcome | FB-039 Launch Foundation UX and Information Architecture Stabilization |
-| Next recommended assignment | FB-039A Work/Financials Navigation and Workflow Ownership Audit |
-| Assignment outcome | Produce an implementation-ready map of current routes, state, role visibility, desktop/mobile navigation, deep links, and contextual Invoice handoffs required to implement the approved Work/Financials split without changing backend lifecycle or authority. |
-| Expected following slice | FB-039B Work/Financials navigation shell and route-preserving presentation implementation, refined by the FB-039A audit. |
+| Completed control-point evidence | FB-039A Work/Financials Navigation and Workflow Ownership Audit is complete. See [the implementation-ready audit](../qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md). |
+| Next recommended assignment | FB-039B Work/Financials Navigation, Ownership, and Compatibility Implementation |
+| Assignment outcome | Deliver one coherent contractor presentation migration: visible Work and role-aware Financials destinations, separate Estimate/Invoice state ownership, legacy saved-state compatibility, centralized contextual handoffs, and desktop/mobile evidence without changing backend lifecycle or authority. |
+| Expected following slice | FB-039C one-primary-action hierarchy across Request, Draft, Estimate, Job, and Invoice states after the new destinations are stable. |
 | Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
-| Roadmap return point | After each Marketing or other parallel task, reassess FB-039A/FB-039B progress and recommend the next unfinished Phase 0 item. |
+| Roadmap return point | After each Marketing or other parallel task, reassess FB-039B progress and recommend the next unfinished Phase 0 item. |
 
 ### Completion update protocol
 
