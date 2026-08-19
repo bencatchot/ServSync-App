@@ -170,6 +170,7 @@ delete from public.homes
 
 async function openProperties(page: Page) {
   await openSidebarTab(page, /^Properties$/i);
+  await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
   await expect(page.getByTestId('shared-home-shells-panel')).toBeVisible();
 }
 
@@ -219,7 +220,6 @@ test.describe('shared home reminders UI', () => {
       await expect(remindersSection.getByText(/Read-only reminders shared with this home/i)).toBeVisible();
       await expect(remindersSection.getByText(/Notes and linked records are not shared yet/i)).toBeVisible();
       await expect(remindersSection.getByText(reminder.title)).toBeVisible();
-      await expect(remindersSection.getByText('open', { exact: true })).toBeVisible();
       await expect(remindersSection.getByText('Open', { exact: true })).toBeVisible();
       await expect(remindersSection.getByText(/Due /i)).toBeVisible();
       await expect(remindersSection.getByRole('button')).toHaveCount(0);

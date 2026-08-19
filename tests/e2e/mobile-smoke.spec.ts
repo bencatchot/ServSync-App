@@ -141,7 +141,8 @@ test.describe('iPhone SE homeowner properties mobile layout', () => {
     await loginMobile(page, 'homeowner');
 
     await openMobileTab(page, /^Properties\b/i, 'Properties', false);
-    await expect(main.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i })).toBeVisible();
+    await expect(main.getByTestId('property-overview-section')).toBeVisible();
+    await main.getByRole('tab', { name: /^Access$/i }).click();
     await expect(main.getByTestId('shared-home-shells-panel')).toBeVisible();
     await expect(main.getByTestId('home-access-panel')).toBeVisible();
     await page.waitForTimeout(1_000);

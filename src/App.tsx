@@ -241,6 +241,10 @@ import {
 } from './features/work-composer/workComposerDrafts';
 import { homeMapDraftStatusPresentation } from './features/homeMap/statusPresentation';
 import {
+  HomeownerPropertiesWorkspace,
+  type HomeownerPropertySection,
+} from './features/homeowner/HomeownerPropertiesWorkspace';
+import {
   serviceAgreementOfferStatusPresentation,
   serviceAgreementStatusPresentation,
   serviceAgreementTemplateStatusPresentation,
@@ -9573,6 +9577,7 @@ function MissingProfile({
 
 function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
   const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'trust', 'privacy', 'support'] as const, 'overview'));
+  const [homeownerPropertySection, setHomeownerPropertySection] = useState<HomeownerPropertySection>(() => storedTab(STORAGE_KEYS.homeownerPropertySection, ['overview', 'map', 'access', 'settings'] as const, 'overview'));
   const [homeowner, setHomeowner] = useState<HomeownerProfile | null>(null);
   const [homes, setHomes] = useState<HomeProfile[]>([]);
   const [home, setHome] = useState<HomeProfile | null>(null);
@@ -9801,6 +9806,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.homeownerTab, homeownerTab);
   }, [homeownerTab]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.homeownerPropertySection, homeownerPropertySection);
+  }, [homeownerPropertySection]);
 
   useEffect(() => {
     if (selectedHomeId) {
@@ -11984,6 +11993,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setSelectedHomeId('');
     setHome(createEmptyHomeDraft());
     setHomePhotoUrl('');
+    setHomeownerPropertySection('settings');
     setHomeownerTab('home');
   };
 
@@ -13329,7 +13339,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       complete: selectedHomeRoomLayouts.length > 0,
     },
   ];
-  const showInitialHomeSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE && !loading && homes.length === 0 && !homeSetupSkipped;
+  const showInitialHomeSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE && !loading && homes.length === 0 && !homeSetupSkipped && homeownerTab !== 'home';
   const homeownerOnboardingItems: Array<{
     label: string;
     helper: string;
@@ -13344,7 +13354,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       actionLabel: homes.length > 0 ? 'View property' : 'Add property',
       onAction: () => {
         if (homes.length === 0) startAddProperty();
-        else setHomeownerTab('home');
+        else {
+          setHomeownerPropertySection('overview');
+          setHomeownerTab('home');
+        }
       },
     },
     {
@@ -16076,16 +16089,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const renderHomeMapEntryCard = (homeId: string, label: string) => {
     const layouts = (homeRoomLayoutsByHomeId[homeId] || []).filter(layout => !layout.archived_at);
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    const assets = homeAssetsByHomeId[homeId] || [];
     const hasMap = layouts.length > 0;
     return (
       <Card title="Home Map" icon={<MapPin size={18} />}>
         <div className="space-y-4" data-testid="home-map-entry-card">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-sm font-semibold text-slate-950">Build a simple map of your home, then attach rooms, systems, documents, and reminders.</p>
+              <p className="text-sm font-semibold text-slate-950">See and organize the rooms, assets, and systems in this home.</p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                Rooms and hallways are the map objects. Use the builder to add spaces, drag or resize boxes, and manage each room from one selected-room panel.
+                Open the builder when you want to add a space, arrange the map, or manage room details.
               </p>
             </div>
             <button type="button" className={buttonClass('primary')} onClick={() => setHomeMapBuilderHomeId(homeId)} data-testid="home-map-entry-open">
@@ -16093,23 +16108,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               {hasMap ? 'Open Home Map' : 'Build Home Map'}
             </button>
           </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Rooms</p>
-              <p className="mt-1 text-xs leading-5 text-blue-900">Create and manage rooms directly on the map.</p>
-            </div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Systems</p>
-              <p className="mt-1 text-xs leading-5 text-emerald-900">Keep assets and systems tied to the room they belong in.</p>
-            </div>
-            <div className="rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-700">Records</p>
-              <p className="mt-1 text-xs leading-5 text-violet-900">See room-linked documents and reminders where already permitted.</p>
-            </div>
+          <div className="grid grid-cols-3 gap-2" data-testid="home-map-entry-summary">
+            {[
+              ['Rooms', rooms.length],
+              ['Mapped', layouts.length],
+              ['Systems', assets.length],
+            ].map(([summaryLabel, value]) => (
+              <div key={summaryLabel} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-xs font-semibold text-slate-500">{summaryLabel}</p>
+                <p className="mt-0.5 text-lg font-bold text-slate-950">{value}</p>
+              </div>
+            ))}
           </div>
-          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
-            This is a rough organizer, not CAD, a permit drawing, a floor-plan upload, LiDAR, scanning, AI floor-plan recreation, or 3D.
-          </p>
+          <p className="text-xs leading-5 text-slate-500">Home Map is a rough organizer, not a measured floor plan.</p>
         </div>
       </Card>
     );
@@ -16370,7 +16381,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div>
               <p className="text-sm font-bold text-slate-950">Limited shared home shell</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                Shared home records are limited. Room basics may appear below; shared admins can manage rooms, while member and viewer roles are read-only. Requests, estimates, invoices, jobs, documents, messages, notifications, storage, contractor connections, and Home History remain private until sharing is expanded. Open reminder shells may appear below as read-only titles and due dates; notes and linked records are not shared.
+                Shared homes show only access-approved basics. Members and viewers are read-only; shared admins can manage rooms. Service records, private files, and Home History stay private.
               </p>
             </div>
             <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
@@ -16509,7 +16520,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div>
                 <p className="text-sm font-bold text-slate-950">Household access for {selectedHome ? homeProfileDisplayLabel(selectedHome) : 'your selected home'}</p>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                  Invite trusted people to this home by email. Email delivery is not enabled yet during this beta step, and accepted members do not receive shared dashboard access to requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, or contractor connections yet.
+                  Invite trusted people by email. Shared access currently covers this home's basic profile and rooms; service, financial, and private record areas stay private.
                 </p>
               </div>
               <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">
@@ -16795,7 +16806,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'support',      label: 'Support',           icon: <MessageSquare size={17} />, badge: homeownerSupportBadgeCount, group: 'Help' },
       ]}
       activeTab={homeownerTab}
-      onChange={tab => setHomeownerTab(tab as typeof homeownerTab)}
+      onChange={tab => {
+        const nextTab = tab as typeof homeownerTab;
+        if (nextTab === 'home') setHomeownerPropertySection('overview');
+        setHomeownerTab(nextTab);
+      }}
       mobileNavItems={homeownerMobileNavItems}
       actions={SERVSYNC_DEMO_PRESENTATION_MODE ? undefined : <NotificationBell
         notifications={notifications}
@@ -17066,7 +17081,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </section>
       )}
 
-      {homes.length !== 1 && !['requests', 'discover'].includes(homeownerTab) && (
+      {homes.length !== 1 && !['home', 'requests', 'discover'].includes(homeownerTab) && (
         <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
           {homes.length > 1 ? (
             <>
@@ -17145,7 +17160,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div className="grid grid-cols-2 gap-2">
                   <MetricButton label="Open requests" value={String(openServiceRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerTab('requests'); }} />
                   <MetricButton label="Connected pros" value={String(activeConnections.length)} onClick={() => setHomeownerTab('contractors')} />
-                  <MetricButton label="Home profile" value={`${homeProfileScore}%`} onClick={() => setHomeownerTab('home')} />
+                  <MetricButton label="Home profile" value={`${homeProfileScore}%`} onClick={() => { setHomeownerPropertySection('settings'); setHomeownerTab('home'); }} />
                   <MetricButton label="Documents" value={String(dashboardHomeDocuments.length)} onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} />
                   <MetricButton label="Support" value={waitingOnHomeownerSupportCount > 0 ? `${waitingOnHomeownerSupportCount} reply` : String(openSupportInquiryCount)} onClick={() => setHomeownerTab('support')} />
                 </div>
@@ -17595,110 +17610,70 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           {renderHomeMapBuilderView(selectedHome.id, homeProfileDisplayLabel(selectedHome))}
         </div>
       ) : homeownerTab === 'home' && (
-        <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="min-w-0 max-w-full space-y-4 lg:col-span-2">
-          <Card title="Home / Properties" icon={<Home size={18} />}>
-            <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-950">Manage the homes connected to your account.</p>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Pick the property you want to view or edit. Existing requests, estimates, invoices, documents, and home history remain account-level in this PR.
-                </p>
-              </div>
-              <button type="button" onClick={startAddProperty} className={mobileButtonClass('primary')}>
-                <Plus size={16} />
-                Add property
-              </button>
-            </div>
-            {homes.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">No saved properties yet.</p>
-                <p className="mt-1 text-sm text-slate-500">Use the property editor below to add your first home record.</p>
-              </div>
+        <HomeownerPropertiesWorkspace
+          activeSection={homeownerPropertySection}
+          onSectionChange={setHomeownerPropertySection}
+          properties={homes.map(candidate => ({
+            id: candidate.id,
+            label: candidate.nickname || candidate.address_line1 || 'Unnamed property',
+            address: [candidate.address_line1, [candidate.city, candidate.state, candidate.zip_code].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+          }))}
+          selectedPropertyId={selectedHome?.id || ''}
+          selectedPropertyLabel={selectedHome?.nickname || selectedHome?.address_line1 || 'Unnamed property'}
+          selectedPropertyAddress={selectedHome ? [selectedHome.address_line1, [selectedHome.city, selectedHome.state, selectedHome.zip_code].filter(Boolean).join(' ')].filter(Boolean).join(', ') : ''}
+          selectedPropertyDetail={selectedHome ? [selectedHome.home_type, selectedHome.year_built ? `Built ${selectedHome.year_built}` : '', selectedHome.square_feet ? `${selectedHome.square_feet} sq ft` : ''].filter(Boolean).join(' · ') : ''}
+          homePhotoUrl={homePhotoUrl}
+          roomCount={selectedHomeRooms.length}
+          assetCount={selectedHomeAssets.length}
+          openRequestCount={openServiceRequestCount}
+          estimateReviewCount={pendingEstimateCount}
+          openInvoiceCount={openHomeownerInvoiceCount}
+          setupItems={homeSetupGuideItems}
+          onSelectProperty={propertyId => void selectHome(propertyId)}
+          onAddProperty={startAddProperty}
+          onRequestService={() => {
+            setHomeownerRequestPropertyScope('selected');
+            setRequestingConnectionId(null);
+            setServiceRequestDraft(current => ({ ...current, home_id: selectedHome?.id || selectedHomeId || current.home_id }));
+            setRequestComposerOpen(true);
+            setHomeownerTab('requests');
+          }}
+          onOpenRequests={() => {
+            setHomeownerRequestPropertyScope('selected');
+            setHomeownerRequestView('open_pending');
+            setHomeownerTab('requests');
+          }}
+          onOpenFinancialRecords={() => {
+            setHomeownerRecordPropertyScope('selected');
+            setHomeownerRecordSection(pendingEstimateCount > 0 ? 'needs_review' : 'open_invoices');
+            setHomeownerTab('estimates');
+          }}
+          onOpenHistory={() => {
+            setHomeownerMaintenancePropertyScope('selected');
+            setHomeownerTab('log');
+          }}
+          children={{
+            map: selectedHome?.id ? (
+              renderHomeMapEntryCard(selectedHome.id, homeProfileDisplayLabel(selectedHome))
             ) : (
-              <div className="mt-4 grid min-w-0 max-w-full gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {homes.map(candidate => {
-                  const isSelected = selectedHome?.id === candidate.id;
-                  const address = [candidate.address_line1, candidate.city, candidate.state].filter(Boolean).join(', ');
-                  return (
-                    <button
-                      key={candidate.id}
-                      type="button"
-                      onClick={() => void selectHome(candidate.id)}
-                      className={`min-w-0 w-full max-w-full rounded-xl border p-3 text-left transition ${
-                        isSelected
-                          ? 'border-blue-300 bg-blue-50 shadow-sm ring-2 ring-blue-100'
-                          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
-                      }`}
-                    >
-                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-slate-950">{candidate.nickname || 'Unnamed property'}</p>
-                          <p className="mt-1 truncate text-xs text-slate-500">{address || 'No address added yet'}</p>
-                        </div>
-                        {isSelected && <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">Viewing</span>}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-              Property-specific filtering will expand as requests, documents, estimates, invoices, jobs, reports, and Home History records are linked to individual homes.
-            </p>
-          </Card>
-          <Card title="Home Setup" icon={<ClipboardCheck size={18} />}>
-            <div className="space-y-4" data-testid="home-setup-guide">
-              <div>
-                <p className="text-sm font-semibold text-slate-950">
-                  Start with the basics: property details, rooms, assets, photos, documents, reminders, and notes.
-                </p>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Home Map Builder is available now as one room-centered place to map rooms and hallways, organize systems, and keep related documents and reminders together. Key Home Locations and true Home Setup Templates remain future tools.
-                </p>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {homeSetupGuideItems.map(item => (
-                  <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-start gap-2">
-                      <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {item.complete ? <CheckCircle2 size={14} /> : <span className="h-2 w-2 rounded-full bg-current" />}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-950">{item.label}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.helper}</p>
-                      </div>
-                    </div>
+              <Card title="Home Map" icon={<MapPin size={18} />}>
+                <p className="text-sm text-slate-500">Save a property before mapping rooms or adding assets and systems.</p>
+              </Card>
+            ),
+            access: <>{renderHomeAccessPanel()}{renderSharedHomeShellsPanel()}</>,
+            settings: (
+              <>
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-950">Property and account details</h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Edit details only when something changes. Setup items are optional.</p>
                   </div>
-                ))}
-              </div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                  <p className="text-sm font-bold text-blue-950">Home Map Builder</p>
-                  <p className="mt-1 text-xs leading-5 text-blue-800">
-                    The builder uses simple not-to-scale room and hallway boxes plus room-linked assets, documents, and reminders. It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
-                  </p>
+                  <button type="button" onClick={startAddProperty} className={mobileButtonClass('secondary')}>
+                    <Plus size={16} />
+                    Add property
+                  </button>
                 </div>
-                <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
-                  <p className="text-sm font-bold text-amber-950">Inspection checklist boundary</p>
-                  <p className="mt-1 text-xs leading-5 text-amber-800">
-                    Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-          {selectedHome?.id ? (
-            renderHomeMapEntryCard(selectedHome.id, homeProfileDisplayLabel(selectedHome))
-          ) : (
-            <Card title="Home Map" icon={<MapPin size={18} />}>
-              <p className="text-sm text-slate-500">Save a property before mapping rooms or adding assets and systems.</p>
-            </Card>
-          )}
-          {renderSharedHomeShellsPanel()}
-          {renderHomeAccessPanel()}
-        </div>
-
+                <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Card title="My profile" icon={<UserRound size={18} />}>
           <PhotoUploadPanel
             title="Profile photo"
@@ -17799,7 +17774,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <EmailNotificationsToggle initialEnabled={profile.email_notifications_enabled ?? true} />
           </div>
         </Card>
-      </div>
+                </div>
+              </>
+            ),
+          }}
+        />
       )}
 
       {homeownerTab === 'contractors' && (

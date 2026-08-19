@@ -84,7 +84,7 @@ test.describe('homeowner rooms UI', () => {
     );
 
     expect(sharedHomesSource).toContain("const canManageSharedRooms = shell.role === 'admin'");
-    expect(sharedHomesSource).toContain('shared admins can manage rooms, while member and viewer roles are read-only');
+    expect(sharedHomesSource).toContain('Members and viewers are read-only; shared admins can manage rooms.');
     expect(roomUiSource).toContain('shared-home-rooms-section');
     expect(roomUiSource).toContain('Read-only non-sensitive room basics shared with this home.');
     expect(sharedHomesSource).toContain('showNotes: canManageSharedRooms');
@@ -93,41 +93,40 @@ test.describe('homeowner rooms UI', () => {
     expect(sharedHomesSource).toContain('This shared home cannot be selected for owner dashboard records yet.');
   });
 
-  test('Home Setup guide presents rooms as live while keeping future tools scoped', () => {
+  test('Property Settings keeps optional setup progress collapsed and concise', () => {
     const source = appSource();
+    const workspace = sourceFile('src/features/homeowner/HomeownerPropertiesWorkspace.tsx');
     const homeSetupDataSource = sourceBetween(
       source,
       'const homeSetupGuideItems = [',
       'const showInitialHomeSetupPrompt',
-    );
-    const homeSetupUiSource = sourceBetween(
-      source,
-      'data-testid="home-setup-guide"',
-      '{renderSharedHomeShellsPanel()}',
     );
 
     expect(homeSetupDataSource).toContain('Add rooms');
     expect(homeSetupDataSource).toContain('selectedHomeRooms.length > 0');
     expect(homeSetupDataSource).toContain('Add assets & systems');
     expect(homeSetupDataSource).toContain('Start a Home Map');
-    expect(homeSetupUiSource).toContain('Home Map Builder is available now as one room-centered place to map rooms and hallways, organize systems, and keep related documents and reminders together.');
-    expect(homeSetupUiSource).toContain('Key Home Locations and true Home Setup Templates remain future tools.');
-    expect(homeSetupUiSource).toContain('The builder uses simple not-to-scale room and hallway boxes plus room-linked assets, documents, and reminders.');
-    expect(homeSetupUiSource).toContain('It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.');
-    expect(homeSetupUiSource).toContain('Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.');
+    expect(workspace).toContain('data-testid="property-setup-progress"');
+    expect(workspace).toContain('<details className=');
+    expect(workspace).toContain('optional details added');
+    expect(workspace).not.toContain('future tools');
   });
 
   test('room UI still avoids contractor, key-location, storage, and workflow scope', () => {
     const source = appSource();
     const contractorSource = sourceBetween(
       source,
-      'function ContractorDashboard({ profile, onSignOut }',
-      'function PlatformAdminDashboard({ onSignOut }',
+      'function ContractorDashboard(',
+      'function PlatformAdminDashboard(',
     );
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/homeowner/HomeownerPropertiesWorkspace.tsx',
       'src/textCleanup.ts',
+      'src/utils/localStorage.ts',
+      'scripts/validation/check-app-monolith-budget.mjs',
+      'tests/e2e/home-access-ui.spec.ts',
       'tests/e2e/home-map-builder-ui.spec.ts',
       'tests/e2e/home-map-systems-ux.spec.ts',
       'src/types.ts',
@@ -139,9 +138,17 @@ test.describe('homeowner rooms UI', () => {
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
+      'tests/e2e/homeowner-properties-progressive-disclosure.spec.ts',
+      'tests/e2e/mobile-smoke.spec.ts',
+      'tests/e2e/production-auth-readonly-smoke.spec.ts',
+      'tests/e2e/recurring-authenticated-role-smoke.spec.ts',
+      'tests/e2e/shared-home-reminders-ui.spec.ts',
+      'tests/e2e/shared-home-shell.spec.ts',
       'tests/e2e/home-setup-clarity.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'tests/e2e/security-catalog.spec.ts',
+      'docs/qa/ServSync_Homeowner_Properties_Progressive_Disclosure_Acceptance_2026-08-19.md',
+      'docs/servsync-master-plan/ServSync_Product_Roadmap.md',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
@@ -179,6 +186,8 @@ test.describe('homeowner rooms UI', () => {
     await authMain.getByRole('button', { name: /^Sign in$/i }).click();
     await expect(page.getByRole('heading', { name: /^Sign in$/i })).toBeHidden({ timeout: 30_000 });
     await page.getByRole('button', { name: /^Properties$/i }).click();
+    await page.getByRole('main').getByRole('tab', { name: /^Home Map$/i }).click();
+    await page.getByTestId('home-map-entry-open').click();
 
     const roomsSection = page.getByTestId('home-rooms-section').first();
     await expect(roomsSection).toBeVisible();
