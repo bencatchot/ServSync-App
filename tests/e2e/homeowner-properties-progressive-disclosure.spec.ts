@@ -57,6 +57,10 @@ test.describe('FB-039D homeowner Properties progressive disclosure', () => {
     await expect(main.getByTestId('property-map-section')).toBeVisible();
     await expect(main.getByTestId('home-map-entry-card')).toBeVisible();
     await expect(main.getByTestId('home-access-panel')).toHaveCount(0);
+    await main.getByTestId('home-map-entry-open').click();
+    await expect(main.getByTestId('home-map-builder-workspace')).toBeVisible();
+    await main.getByTestId('home-map-builder-side-toolbar').getByRole('button', { name: /^Done$/i }).click();
+    await expect(main.getByTestId('property-map-section')).toBeVisible();
 
     await main.getByRole('tab', { name: /^Access$/i }).click();
     await expect(main.getByTestId('property-access-section')).toBeVisible();
@@ -69,6 +73,14 @@ test.describe('FB-039D homeowner Properties progressive disclosure', () => {
     await expect(main.getByRole('button', { name: /^Add another property$/i })).toBeVisible();
     await expect(main.getByRole('heading', { name: /^My profile$/i })).toBeVisible();
     await expect(main.getByTestId('property-setup-progress')).not.toHaveAttribute('open', '');
+    await page.reload();
+    await expect(main.getByTestId('property-settings-section')).toBeVisible();
+
+    await main.getByRole('tab', { name: /^Overview$/i }).click();
+    await main.getByRole('button', { name: /^Home History$/i }).click();
+    await expect(main.getByRole('heading', { level: 1, name: /^Home History$/i })).toBeVisible();
+    await openSidebarTab(page, /^Properties$/i);
+    await expect(main.getByTestId('property-overview-section')).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await consoleErrors.assertClean(testInfo);
   });
