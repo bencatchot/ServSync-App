@@ -601,8 +601,8 @@ These items need more founder input or beta learning before they can be finalize
 # 20. Immediate Next Steps
 
 1. Use Phase 0 of the Product Roadmap as the next planning boundary; do not begin another broad feature expansion first.
-2. Complete owner review and merge approval for the Preview-accepted FB-039B contractor `Work` and `Financials` ownership split before the controlled pilot.
-3. Continue FB-039 Launch Foundation UX & Information Architecture Stabilization through narrow, reviewable outcomes, beginning with FB-039C one-primary-action hierarchy after FB-039B acceptance.
+2. Treat the merged and Preview-accepted FB-039B contractor `Work` and `Financials` ownership split as the frozen Phase 0.1 information architecture baseline.
+3. Continue FB-039 Launch Foundation UX & Information Architecture Stabilization through narrow, reviewable outcomes, beginning with FB-039C one-primary-action hierarchy across the core Request, Draft, Estimate, Job, and Invoice lifecycle states.
 4. Validate the full canonical loop on desktop and field-critical mobile against resettable Sandbox/Demo fixtures.
 5. Freeze the resulting core navigation, terminology, lifecycle statuses, and primary-action placement for the pilot.
 6. Recruit the FB-040 pilot cohort only after the Phase 0 exit gate passes.

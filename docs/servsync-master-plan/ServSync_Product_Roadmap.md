@@ -85,12 +85,12 @@ Focus rules:
 | --- | --- |
 | Current release stage | Phase 0 — Launch Foundation |
 | Primary active outcome | FB-039 Launch Foundation UX and Information Architecture Stabilization |
-| Completed control-point evidence | FB-039A audit is complete. FB-039B implements the coherent Work/Financials ownership split, separate saved state, deterministic legacy compatibility, capability-based Financials visibility, and contextual Invoice handoffs on its focused Preview branch. Exact-head authenticated Preview acceptance passed for Owner, Admin, Office, Field Technician, and Viewer on desktop and `390x844`. See [the implementation-ready audit](../qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md). |
-| Next recommended assignment | Complete owner review and merge approval for FB-039B; then begin FB-039C one-primary-action hierarchy. |
-| Assignment outcome | Validate the complete contractor Work/Financials split across desktop, 390x844 mobile, Owner/Admin/Office billing authority, Field Technician operational access, Viewer read-only access, saved-state migration, and Estimate/Job-to-Invoice handoffs without changing backend lifecycle or authority. |
-| Expected following slice | FB-039C one-primary-action hierarchy across Request, Draft, Estimate, Job, and Invoice states after FB-039B is accepted. |
+| Completed control-point evidence | FB-039A audit is complete. FB-039B merged through PR #503 at main commit `3574d2dabb1c962be9eae3d62c5a3ce3689acd09` after exact-head authenticated Preview acceptance passed for Owner, Admin, Office, Field Technician, and Viewer on desktop and `390x844`. Work and Financials now have coherent ownership, separate saved state, deterministic legacy compatibility, capability-based visibility, and contextual Invoice handoffs. See [the implementation-ready audit](../qa/ServSync_Work_Financials_IA_Audit_2026-08-19.md). |
+| Next recommended assignment | FB-039C Core Lifecycle One-Primary-Action Hierarchy |
+| Assignment outcome | Audit and implement one visually dominant, state-appropriate next action for New Request, Draft Estimate, sent Estimate, accepted Estimate, unscheduled Job, active Job, completed Job, and open Invoice across desktop and `390x844`. Keep secondary actions available without equal visual weight; preserve capability/role restrictions, lineage, current backend lifecycle, and the Work/Financials ownership boundary; do not add new lifecycle behavior or perform a visual rebrand. |
+| Expected following slice | Phase 0.3: simplify dense homeowner surfaces, beginning with Properties progressive disclosure, after the primary-action placement is accepted and frozen. |
 | Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
-| Roadmap return point | After each Marketing or other parallel task, finish FB-039B owner merge review if still open; otherwise return to FB-039C. |
+| Roadmap return point | After each Marketing or other parallel task, return to the next unfinished FB-039C lifecycle state until the one-primary-action hierarchy is accepted and frozen. |
 
 ### Completion update protocol
 

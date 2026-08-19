@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039B merge verification and FB-039C roadmap handoff
+
+- Branch: `codex/fb039b-merge-roadmap-handoff` from exact `origin/main` merge commit `3574d2dabb1c962be9eae3d62c5a3ce3689acd09`.
+- Files changed: Product Roadmap, Feature Backlog, Master Plan, and this changelog.
+- Summary: Records PR #503 as merged after its exact-head automated and authenticated role/mobile acceptance, closes the FB-039B owner-merge gate, and makes FB-039C Core Lifecycle One-Primary-Action Hierarchy the active Launch Roadmap assignment. FB-039C covers New Request, Draft Estimate, sent Estimate, accepted Estimate, unscheduled Job, active Job, completed Job, and open Invoice while preserving secondary actions, role/capability authority, lifecycle semantics, lineage, and the Work/Financials ownership boundary.
+- Reason: The standing roadmap must reflect the merged application state and provide the next bounded assignment rather than continuing to show a completed approval gate.
+- Validation: Verified GitHub PR #503 merged at `3574d2dabb1c962be9eae3d62c5a3ce3689acd09`; verified the validated PR head is an ancestor of `origin/main`; reviewed the updated roadmap control point, backlog status, Master Plan immediate steps, Markdown links, changed-file secret scan, and `git diff --check`.
+- Known risks and follow-ups: Documentation only. This does not begin FB-039C, change application behavior, alter backend lifecycle or permissions, deploy, or modify Production data. Phase 0.3 homeowner Properties simplification remains the expected following slice after FB-039C acceptance.
+- Backlog impact: FB-039 remains Implementation In Progress. FB-039B is merged and complete; FB-039C is now the immediate next assignment.
+- Master plan impact: The immediate launch-foundation sequence advances from FB-039B merge review to FB-039C execution.
+
 ## 2026-08-19 - FB-039B Work / Financials navigation, ownership, and compatibility
 
 - Branch: `codex/fb039b-work-financials-ia-v1` from exact `origin/main` `df6d8ade7d3babbf8d2d855d928fc043e1834328`.
