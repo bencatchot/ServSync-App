@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039C merge verification and FB-039D roadmap handoff
+
+- Branch: `codex/fb039c-merge-roadmap-handoff` from exact `origin/main` merge commit `679a948849006afcea7e2701b0df0eee5b58bb7b`.
+- Files changed: Product Roadmap, Feature Backlog, Master Plan, and this changelog.
+- Summary: Records PR #505 and FB-039C as merged after exact-head automated and authenticated role/mobile acceptance, freezes the Phase 0.2 core lifecycle-action hierarchy, and makes FB-039D Homeowner Properties Progressive Disclosure the active Launch Roadmap assignment. FB-039D is bounded to organizing the existing homeowner Properties experience into Overview, Home Map, Access, and Property Settings while keeping the one-property default simple, active context concise, and historical artifacts in Records/Home History.
+- Reason: The standing roadmap must reflect the merged application state and keep Phase 0 moving to the next unfinished usability outcome rather than continuing to show a completed merge gate.
+- Validation: Verified GitHub PR #505 merged at `679a948849006afcea7e2701b0df0eee5b58bb7b`; verified the validated PR head is an ancestor of `origin/main`; reviewed the updated roadmap control point, backlog status, Master Plan immediate steps, Markdown links, changed-file sensitive-value scan, and `git diff --check`.
+- Known risks and follow-ups: Documentation only. This does not begin FB-039D, change homeowner behavior, alter Home Map/access/privacy/role/property authority, deploy, or modify Production data. Phase 0.4 loading, empty, error/retry, and duplicate-safety stabilization remains the expected following slice.
+- Backlog impact: FB-039 remains Implementation In Progress. FB-039C is merged and complete; FB-039D is now the immediate next assignment.
+- Master plan impact: The immediate launch-foundation sequence advances from FB-039C merge review to FB-039D execution.
+
 ## 2026-08-19 - FB-039C core lifecycle one-primary-action hierarchy
 
 - Branch: `codex/fb039c-primary-action-hierarchy-v1` from exact `origin/main` merge commit `253c4624e2099502c40a8d31e66375d6ea06ea8a` in an isolated worktree.
