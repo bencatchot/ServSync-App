@@ -17,6 +17,7 @@ const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 
 const appSource = () => sourceFile('src/App.tsx');
 const pdfDocumentsSource = () => sourceFile('src/utils/pdfDocuments.ts');
 const workComposerLineItemRowSource = () => sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
+const paymentScheduleSource = () => sourceFile('src/features/estimates/paymentSchedule.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -89,6 +90,7 @@ test.describe('contractor estimate creation UI structure', () => {
   test('contractor draft estimates include a structured payment schedule editor with draft-invoice clarity', () => {
     const source = appSource();
     const pdfSource = pdfDocumentsSource();
+    const scheduleDomainSource = paymentScheduleSource();
     const scheduleSource = sourceBetween(source, 'const renderEstimatePaymentScheduleEditor =', 'const renderInvoiceDraftTotals =');
     const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
     const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (');
@@ -100,25 +102,27 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(scheduleSource).toContain('Deposit + final');
     expect(scheduleSource).toContain('Custom schedule');
     expect(scheduleSource).toContain('No payment schedule rows are saved unless you choose Deposit + final or Custom schedule.');
-    expect(source).toContain('Payment schedule total does not match the estimate total. Review before sending.');
-    expect(source).toContain('Payment schedule is above the estimate total. Review before saving or sending.');
+    expect(scheduleDomainSource).toContain('Payment schedule total does not match the estimate total. Review before sending.');
+    expect(scheduleDomainSource).toContain('Payment schedule is above the estimate total. Review before saving or sending.');
     expect(scheduleSource).toContain('Add payment');
     expect(source).toContain('Payment schedule label');
     expect(source).toContain('Payment schedule due trigger');
     expect(scheduleSource).toContain('estimate-payment-schedule-section');
     expect(scheduleSource).not.toContain('linked_invoice_id');
 
-    expect(source).toContain("type EstimatePaymentScheduleMode = 'default' | 'deposit_final' | 'custom';");
-    expect(source).toContain('function estimatePaymentScheduleCalculatedCents');
-    expect(source).toContain("row.amount_type === 'percentage'");
-    expect(source).toContain("invoice_type: 'deposit'");
-    expect(source).toContain("invoice_type: 'final'");
-    expect(source).toContain('Math.max(0, estimateTotalCents - depositCents)');
-    expect(source).toContain('ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS');
-    expect(source).toContain("total: {\n    label: 'Full payment',\n    dueTrigger: 'Due on completion'");
-    expect(source).toContain("deposit: {\n    label: 'Deposit',\n    dueTrigger: 'Due on approval'");
-    expect(source).toContain("progress: {\n    label: 'Progress payment',\n    dueTrigger: 'Due at milestone'");
-    expect(source).toContain("final: {\n    label: 'Final payment',\n    dueTrigger: 'Due on completion'");
+    expect(source).toContain("from './features/estimates/paymentSchedule'");
+    expect(source).not.toContain("type EstimatePaymentScheduleMode = 'default' | 'deposit_final' | 'custom';");
+    expect(scheduleDomainSource).toContain("export type EstimatePaymentScheduleMode = 'default' | 'deposit_final' | 'custom';");
+    expect(scheduleDomainSource).toContain('export function estimatePaymentScheduleCalculatedCents');
+    expect(scheduleDomainSource).toContain("row.amount_type === 'percentage'");
+    expect(scheduleDomainSource).toContain("invoice_type: 'deposit'");
+    expect(scheduleDomainSource).toContain("invoice_type: 'final'");
+    expect(scheduleDomainSource).toContain('Math.max(0, estimateTotalCents - depositCents)');
+    expect(scheduleDomainSource).toContain('ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS');
+    expect(scheduleDomainSource).toContain("total: {\n    label: 'Full payment',\n    dueTrigger: 'Due on completion'");
+    expect(scheduleDomainSource).toContain("deposit: {\n    label: 'Deposit',\n    dueTrigger: 'Due on approval'");
+    expect(scheduleDomainSource).toContain("progress: {\n    label: 'Progress payment',\n    dueTrigger: 'Due at milestone'");
+    expect(scheduleDomainSource).toContain("final: {\n    label: 'Final payment',\n    dueTrigger: 'Due on completion'");
     expect(source).toContain('const updateEstimatePaymentScheduleRowType =');
     expect(source).toContain('label: defaults.label');
     expect(source).toContain('due_trigger: defaults.dueTrigger');
@@ -127,11 +131,11 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRow(row.id, { due_trigger: event.target.value })}');
     expect(source).toContain('estimatePaymentScheduleDraftFromEstimate(estimate)');
 
-    expect(source).toContain("if (!estimatePaymentScheduleDraft.explicit) return { rows: [], error: '' };");
+    expect(scheduleDomainSource).toContain("if (!draft.explicit) return { rows: [], error: '' };");
     expect(saveSource).toContain(".from('estimate_payment_schedule_items')");
     expect(saveSource).toContain('.delete()');
     expect(saveSource).toContain('.insert(scheduleForSave.rows.map(row => ({');
-    expect(source).toContain('linked_invoice_id: null');
+    expect(scheduleDomainSource).toContain('linked_invoice_id: null');
     expect(saveSource).not.toContain('servsync_create_invoice_from_estimate');
     expect(saveSource).not.toContain('beginInvoiceDraftFromEstimate');
 

@@ -78,11 +78,7 @@ test.describe('contractor estimate schedule invoice UI source checks', () => {
       'const renderContractorEstimatePaymentScheduleSection = (',
       'const createInvoiceFromJob = async',
     );
-    const summaryHelperSource = sourceBetween(
-      source,
-      'function estimatePaymentScheduleLinkedInvoiceSummary',
-      'function createBlankContractorPriceBookItemDraft',
-    );
+    const summaryHelperSource = sourceFile('src/features/estimates/paymentSchedule.ts');
 
     expect(scheduleRendererSource).toContain('data-testid="contractor-estimate-payment-schedule-summary"');
     expect(scheduleRendererSource).toContain('Estimate billing');
