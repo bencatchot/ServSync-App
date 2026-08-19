@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-18 - App decomposition tooling guardrails v1
+
+- Branch: `codex/app-decomposition-guardrails-v1` from exact main `178eb7822c3885d14d7ecb17542c559d1e03ab6c`.
+- Files changed: ESLint and package dependency configuration; exact warning-baseline validation; pull-request quality workflow; ratcheting `src/App.tsx` line baseline and architecture tests; shared source-contract test helper and first Contractor Work adoption; and this changelog.
+- Summary: Repairs the inherited ESLint 9 / typescript-eslint startup incompatibility, exposes the existing repository findings as a finite 80-warning baseline with zero lint errors, and runs lint, the exact `App.tsx` architecture ratchet, architecture contracts, TypeScript, and the Production build on pull requests. `App.tsx` is locked at 51,479 lines: growth fails, and any reduction must lower the checked-in baseline in the same change. The shared source-contract helper lets future decomposition tests read one or more owning modules without duplicating repository-path and source-slicing logic.
+- Reason: The approved maintainability audit found that the 51,479-line `App.tsx`, broken lint startup, and duplicated source-text test helpers materially increase feature investigation and refactoring time. This tooling-only slice establishes enforceable non-regression boundaries before behavior-preserving Work extraction begins.
+- Validation: Fresh `npm ci --ignore-scripts`; repository-wide ESLint with zero errors and the exact 80-warning inherited ceiling; architecture baseline and helper tests; focused Contractor Work source/selector contracts; TypeScript; Production build; workflow/package review; sensitive-value scan; and `git diff --check`.
+- Known risks and follow-ups: The 80 inherited warnings remain visible and are not silently treated as fixed. Lint now fails both above and below that baseline, requiring later slices to lower the checked-in baseline in the same change whenever warnings are removed. This slice does not decompose `App.tsx`, change runtime behavior, alter routes/test IDs, add SQL, change schema/RLS/RPC/storage/auth/permissions/env/provider settings, touch production data, or authorize merge/deployment. The next approved architecture slice is Contractor Work pure-domain extraction.
+- Backlog impact: No update needed. The active backlog is limited to unfinished product outcomes; this tooling foundation changes neither feature status nor product priority, while follow-up sequencing is recorded here.
+- Master plan impact: No update needed. The established Product Information Architecture and Contractor Work ownership boundaries are unchanged.
+
 ## 2026-08-18 - FB-038A1 Help Studio recording workflow and human-paced recorder integration
 
 - Branch: `codex/fb038a1-help-recorder-v1` from exact main `ae0323877cfe44d55a7de2ca4110b6e9858e8c74`.

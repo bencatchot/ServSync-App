@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "node scripts/validation/check-eslint-warning-budget.mjs",
+    "check:app-size": "node scripts/validation/check-app-monolith-budget.mjs",
+    "test:architecture": "node --test tests/architecture/*.test.mjs",
     "preview": "vite preview",
     "demo:seed": "node scripts/demo/seed-demo-scenario.mjs seed water_heater_core_loop",
     "demo:reset": "node scripts/demo/seed-demo-scenario.mjs reset water_heater_core_loop",
@@ -99,14 +101,14 @@
     "stripe": "^22.4.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.9.1",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.60.0",
     "@types/node": "24.5.2",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.4.18",
-    "eslint": "^9.9.1",
+    "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
@@ -114,7 +116,7 @@
     "tailwindcss": "^3.4.1",
     "tsx": "^4.23.12",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^8.3.0",
+    "typescript-eslint": "^8.67.0",
     "vite": "^8.0.16",
     "write-excel-file": "^4.1.1"
   }
