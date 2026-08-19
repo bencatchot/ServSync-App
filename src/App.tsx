@@ -24430,7 +24430,7 @@ function ContractorDashboard({
                         onClick={() => void createInvoiceFromEstimateScheduleItem(estimate, row.id)}
                         disabled={creatingInvoiceSourceId === scheduleActionKey || createInvoiceCapability.disabled}
                         data-testid="contractor-create-schedule-invoice"
-                        className={scheduleButtonClass('primary')}
+                        className={scheduleButtonClass('secondary')}
                       >
                         <Receipt size={15} />
                         {creatingInvoiceSourceId === scheduleActionKey

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -44,4 +45,13 @@ test('invoice next steps avoid local-recipient and read-only dead ends', () => {
   assert.equal(invoiceLifecycleNextStep({ status: 'sent', canManageFinancialActions: false, canRecordPayment: false, hasConnectedHomeowner: true }).id, 'review_record');
   assert.equal(invoiceLifecycleNextStep({ status: 'paid', canManageFinancialActions: true, canRecordPayment: true, hasConnectedHomeowner: true }).id, 'review_record');
   assert.equal(invoiceLifecycleNextStep({ status: 'void', canManageFinancialActions: true, canRecordPayment: true, hasConnectedHomeowner: true }).id, 'review_record');
+});
+
+test('accepted Estimate billing options remain secondary to the Job handoff', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  const actionStart = source.indexOf('data-testid="contractor-create-schedule-invoice"');
+  assert.notEqual(actionStart, -1);
+  const actionMarkup = source.slice(actionStart, actionStart + 300);
+  assert.match(actionMarkup, /scheduleButtonClass\('secondary'\)/);
+  assert.doesNotMatch(actionMarkup, /scheduleButtonClass\('primary'\)/);
 });
