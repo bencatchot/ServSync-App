@@ -423,6 +423,7 @@ test.describe('shared home shell', () => {
 
       await loginAsHomeownerB(page);
       await openSidebarTab(page, /^Properties$/i);
+      await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
 
       const panel = page.getByTestId('shared-home-shells-panel');
       await expect(panel).toBeVisible();
@@ -484,11 +485,12 @@ test.describe('shared home shell', () => {
 
       await loginAsHomeownerB(page);
       await openSidebarTab(page, /^Properties$/i);
+      await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
 
       const panel = page.getByTestId('shared-home-shells-panel');
       await expect(page.getByText(/Homes shared with me/i)).toBeVisible();
-      await expect(panel.getByText(/Shared home records are limited/i)).toBeVisible();
-      await expect(panel.getByText(/contractor connections, and Home History remain private/i)).toBeVisible();
+      await expect(panel.getByText(/Shared homes show only access-approved basics/i)).toBeVisible();
+      await expect(panel.getByText(/Service records, private files, and Home History stay private/i)).toBeVisible();
 
       const card = panel.getByTestId('shared-home-shell-card').filter({ hasText: expectedLabel }).first();
       await expect(card).toBeVisible();
@@ -528,6 +530,7 @@ test.describe('shared home shell', () => {
 
       await loginAsHomeownerB(page);
       await openSidebarTab(page, /^Properties$/i);
+      await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
 
       const panel = page.getByTestId('shared-home-shells-panel');
       const card = panel.getByTestId('shared-home-shell-card').filter({ hasText: expectedLabel }).first();

@@ -151,7 +151,7 @@ test.describe('FB-016 recurring authenticated role browser smoke', () => {
         await expect(page.getByRole('main').getByText(/^Jobs workspace$/i)).toBeVisible();
       } else {
         await signInHomeowner(page);
-        await openMobileTab(page, /^Properties\b/i, /^Home \/ Properties$/i);
+        await openMobileTab(page, /^Properties\b/i, /^Properties$/i);
       }
       expect(await page.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
       assertClean();

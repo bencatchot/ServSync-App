@@ -163,11 +163,13 @@ test.describe('home access UI shell', () => {
 
       await loginAs(page, 'homeowner');
       await openSidebarTab(page, /^Properties$/i);
+      await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
 
       const panel = page.getByTestId('home-access-panel');
       await expect(page.getByRole('heading', { name: /^Home Access$/i })).toBeVisible();
-      await expect(panel.getByText(/Email delivery is not enabled yet during this beta step/i).first()).toBeVisible();
-      await expect(panel.getByText(/do not receive shared dashboard access/i)).toBeVisible();
+      await expect(panel.getByText(/Shared access currently covers this home's basic profile and rooms/i)).toBeVisible();
+      await expect(panel.getByText(/service, financial, and private record areas stay private/i)).toBeVisible();
+      await expect(panel.getByText(/Email delivery is still disabled in this beta step/i)).toBeVisible();
       await expect(panel.getByPlaceholder('person@example.com')).toBeVisible();
 
       const roleSelect = panel.locator('select').first();
@@ -236,6 +238,7 @@ test.describe('home access UI shell', () => {
 
       await loginAsHomeownerB(page);
       await openSidebarTab(page, /^Properties$/i);
+      await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
 
       const invitationsPanel = page.getByTestId('home-invitations-panel');
       await expect(invitationsPanel.getByText(/Home invitations for you/i)).toBeVisible();
@@ -249,6 +252,7 @@ test.describe('home access UI shell', () => {
       await createEmailInvite(owner, homeId, invitedHomeowner.email, 'member');
       await page.reload();
       await openSidebarTab(page, /^Properties$/i);
+      await page.getByRole('main').getByRole('tab', { name: /^Access$/i }).click();
 
       await expect(invitationsPanel.getByText(/Home invitations for you/i)).toBeVisible();
       await invitationsPanel.getByRole('button', { name: /^Decline$/i }).click();

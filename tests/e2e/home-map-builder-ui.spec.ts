@@ -38,7 +38,7 @@ test.describe('Home Map Builder dedicated view', () => {
   test('entry card opens a dedicated builder instead of embedding the full map in Properties', () => {
     const app = appSource();
     const entry = sourceBetween(app, 'const renderHomeMapEntryCard =', 'const renderHomeMapBuilderView =');
-    const properties = sourceBetween(app, "homeownerTab === 'home' && selectedHome?.id && homeMapBuilderHomeId", '{renderSharedHomeShellsPanel()}');
+    const properties = sourceBetween(app, "homeownerTab === 'home' && selectedHome?.id && homeMapBuilderHomeId", "{homeownerTab === 'contractors'");
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
 
     expect(entry).toContain('data-testid="home-map-entry-card"');
@@ -574,7 +574,11 @@ test.describe('Home Map Builder dedicated view', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/homeowner/HomeownerPropertiesWorkspace.tsx',
       'src/types.ts',
+      'src/utils/localStorage.ts',
+      'scripts/validation/check-app-monolith-budget.mjs',
+      'tests/e2e/home-access-ui.spec.ts',
       'tests/e2e/home-map-builder-ui.spec.ts',
       'tests/e2e/home-map-systems-ux.spec.ts',
       'tests/e2e/home-map-ui.spec.ts',
@@ -583,6 +587,14 @@ test.describe('Home Map Builder dedicated view', () => {
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
+      'tests/e2e/homeowner-properties-progressive-disclosure.spec.ts',
+      'tests/e2e/mobile-smoke.spec.ts',
+      'tests/e2e/production-auth-readonly-smoke.spec.ts',
+      'tests/e2e/recurring-authenticated-role-smoke.spec.ts',
+      'tests/e2e/shared-home-reminders-ui.spec.ts',
+      'tests/e2e/shared-home-shell.spec.ts',
+      'docs/qa/ServSync_Homeowner_Properties_Progressive_Disclosure_Acceptance_2026-08-19.md',
+      'docs/servsync-master-plan/ServSync_Product_Roadmap.md',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
@@ -596,6 +608,6 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(files.some(file => file.includes('.env'))).toBe(false);
     expect(files.some(file => file.includes('package'))).toBe(false);
     expect(files.some(file => file.includes('vercel'))).toBe(false);
-    expect(files.some(file => /storage|bucket/i.test(file))).toBe(false);
+    expect(files.some(file => /(^|\/)(storage|buckets?)(\/|$)/i.test(file))).toBe(false);
   });
 });

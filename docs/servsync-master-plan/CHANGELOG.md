@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-19 - FB-039D homeowner Properties progressive disclosure
+
+- Branch: `codex/fb039d-homeowner-properties-progressive-v1` from exact `origin/main` merge commit `7c4aefb544e430abe4882b3c8215a54cef470947` in an isolated worktree.
+- Files changed: homeowner Properties workspace feature module; homeowner navigation and section-state integration; presentation-only local-storage key; focused Properties, Home Map, Home Access, shared-home, role-smoke, and mobile tests; App-size architecture baseline; Product Roadmap; Feature Backlog; Master Plan; FB-039D acceptance evidence; and this changelog.
+- Summary: Replaces the single dense homeowner Properties page with progressive Overview, Home Map, Access, and Property Settings sections. Overview now provides concise selected-property orientation, current service/financial attention, and useful handoffs; one-property users no longer receive an unnecessary collection chooser; Home Map retains the established builder; Home Access and privacy-limited shared shells remain together; profile/property editing and optional setup progress move to Property Settings; and future-feature/setup explanations no longer dominate the working screen.
+- Reason: The existing page displayed setup guidance, map entry, shared-home privacy shells, access management, profile editing, and property editing simultaneously, making an established property feel permanently unfinished and obscuring the homeowner's likely next need.
+- Validation: Focused Properties/Home Map contracts 33/33; homeowner 390x844 Properties smoke 1/1; resettable Sandbox Home Access flows 2/2; shared-home security/UI 6/6; shared-reminder UI 2/2; authenticated fictional Demo homeowner desktop/mobile full-frame review with zero overflow and zero browser/page errors; TypeScript; Production build; ESLint warning budget; App monolith baseline reduced from 50,934 to 50,913 lines. Exact-head Vercel Preview acceptance remains to be recorded on the draft PR.
+- Known risks and follow-ups: Presentation and browser-state organization only. No SQL, schema, RLS, RPC, authentication, permission, storage, provider, environment, deployment-setting, or Production-data change is included. The draft PR must remain unmerged pending owner review. Phase 0.4 loading/empty/recovery and duplicate-safety stabilization follows only after FB-039D merge acceptance.
+- Backlog impact: FB-039 remains Implementation In Progress. FB-039D implementation and local/non-production acceptance are complete; exact-head Preview acceptance and owner review remain.
+- Master plan impact: The immediate launch sequence advances from FB-039D implementation to exact-head Preview acceptance and owner review, then Phase 0.4.
+
 ## 2026-08-19 - FB-039C merge verification and FB-039D roadmap handoff
 
 - Branch: `codex/fb039c-merge-roadmap-handoff` from exact `origin/main` merge commit `679a948849006afcea7e2701b0df0eee5b58bb7b`.

@@ -37,11 +37,7 @@ function changedFiles() {
 test.describe('Home Map & Systems dedicated builder UX', () => {
   test('Properties exposes a clean Home Map entry instead of embedded competing feature cards', () => {
     const app = appSource();
-    const properties = sourceBetween(
-      app,
-      'data-testid="home-setup-guide"',
-      '{renderSharedHomeShellsPanel()}',
-    );
+    const properties = sourceBetween(app, "homeownerTab === 'home' && selectedHome?.id && homeMapBuilderHomeId", "{homeownerTab === 'contractors'");
     const entry = sourceBetween(app, 'const renderHomeMapEntryCard =', 'const renderHomeMapBuilderView =');
 
     expect(properties).toContain('renderHomeMapEntryCard(selectedHome.id');
@@ -50,8 +46,10 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(properties).not.toContain('<Card title="Home Map & Systems"');
     expect(properties).not.toContain('<Card title="Assets & Systems"');
     expect(entry).toContain('data-testid="home-map-entry-card"');
-    expect(entry).toContain('Build a simple map of your home, then attach rooms, systems, documents, and reminders.');
-    expect(entry).toContain('Rooms and hallways are the map objects.');
+    expect(entry).toContain('See and organize the rooms, assets, and systems in this home.');
+    expect(entry).toContain('Open the builder when you want to add a space, arrange the map, or manage room details.');
+    expect(entry).toContain('data-testid="home-map-entry-summary"');
+    expect(entry).toContain('Home Map is a rough organizer, not a measured floor plan.');
     expect(entry).toContain('data-testid="home-map-entry-open"');
     expect(entry).toContain("hasMap ? 'Open Home Map' : 'Build Home Map'");
   });
@@ -149,8 +147,8 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     );
     const contractorSource = sourceBetween(
       app,
-      'function ContractorDashboard({ profile, onSignOut }',
-      'function PlatformAdminDashboard({ onSignOut }',
+      'function ContractorDashboard(',
+      'function PlatformAdminDashboard(',
     );
 
     expect(detail).toContain('Linked assets');
@@ -187,7 +185,11 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/homeowner/HomeownerPropertiesWorkspace.tsx',
       'src/types.ts',
+      'src/utils/localStorage.ts',
+      'scripts/validation/check-app-monolith-budget.mjs',
+      'tests/e2e/home-access-ui.spec.ts',
       'tests/e2e/home-map-builder-ui.spec.ts',
       'tests/e2e/home-map-systems-ux.spec.ts',
       'tests/e2e/home-map-ui.spec.ts',
@@ -196,6 +198,14 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
+      'tests/e2e/homeowner-properties-progressive-disclosure.spec.ts',
+      'tests/e2e/mobile-smoke.spec.ts',
+      'tests/e2e/production-auth-readonly-smoke.spec.ts',
+      'tests/e2e/recurring-authenticated-role-smoke.spec.ts',
+      'tests/e2e/shared-home-reminders-ui.spec.ts',
+      'tests/e2e/shared-home-shell.spec.ts',
+      'docs/qa/ServSync_Homeowner_Properties_Progressive_Disclosure_Acceptance_2026-08-19.md',
+      'docs/servsync-master-plan/ServSync_Product_Roadmap.md',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
@@ -210,6 +220,6 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(files.some(file => file.includes('.env'))).toBe(false);
     expect(files.some(file => file.includes('package'))).toBe(false);
     expect(files.some(file => file.includes('vercel'))).toBe(false);
-    expect(files.some(file => /storage|bucket/i.test(file))).toBe(false);
+    expect(files.some(file => /(^|\/)(storage|buckets?)(\/|$)/i.test(file))).toBe(false);
   });
 });

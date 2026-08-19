@@ -171,7 +171,7 @@ test.describe('production authenticated read-only smoke', () => {
 
       await openSidebarTab(page, /^Properties\b/i);
       await expectActiveHeading(page, /^Properties$/i);
-      await expect(main.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i })).toBeVisible();
+      await expect(main.getByTestId('property-overview-section')).toBeVisible();
 
       await openSidebarTab(page, /^Contractors\b/i);
       await expectActiveHeading(page, /^Contractors$/i);

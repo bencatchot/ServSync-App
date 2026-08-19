@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   homeownerTab: 'servsync.homeowner.activeTab',
   homeownerSelectedHome: 'servsync.homeowner.selectedHome',
+  homeownerPropertySection: 'servsync.homeowner.propertySection',
   homeownerRequestView: 'servsync.homeowner.requestView',
   homeownerRequestSearch: 'servsync.homeowner.requestSearch',
   homeownerExpandedRequests: 'servsync.homeowner.expandedRequests',
