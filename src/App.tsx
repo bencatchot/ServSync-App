@@ -317,6 +317,14 @@ import {
   invoiceRecordOpensEditable,
 } from './features/work/financialActionVisibility';
 import { contractorJobActionVisibility } from './features/work/jobActionVisibility';
+import { EstimateLifecycleActions } from './features/work/EstimateLifecycleActions';
+import { LifecycleNextStep } from './features/work/LifecycleNextStep';
+import {
+  estimateLifecycleNextStep,
+  invoiceLifecycleNextStep,
+  jobLifecycleNextStep,
+  requestLifecycleNextStep,
+} from './features/work/lifecyclePrimaryAction';
 import {
   ContractorPriceBookWorkspace,
   type ContractorPriceBookBulkChanges,
@@ -33354,6 +33362,11 @@ function ContractorDashboard({
                 || connection.homeowner_user_id === request.homeowner_user_id
               );
               const activeRequestVisit = activeServiceVisitForRequest(request.id);
+              const requestNextStep = requestLifecycleNextStep({
+                canRespond: contractorCanSendWorkflowMessages,
+                canManageJobOperations,
+                hasServiceVisit: Boolean(activeRequestVisit),
+              });
               const linkedRequestEstimate = estimates.find(estimate =>
                 estimate.service_request_id === request.id
                 && estimateDocumentLabel(estimate) !== 'Invoice'
@@ -33441,16 +33454,23 @@ function ContractorDashboard({
                     </div>
                   </button>
 
+                  {!isClosedCard && (
+                    <div className="border-t border-slate-100 px-3 sm:px-4">
+                      <LifecycleNextStep step={requestNextStep} state="new-request" />
+                    </div>
+                  )}
+
                   {requestConnection && !['closed', 'declined'].includes(request.status) && (
                     <div className={`${mobileActionRowClass()} border-t border-slate-200 bg-slate-50 px-3 py-3 sm:px-4`}>
                       <button
                         type="button"
                         onClick={toggleInlineRequest}
-                        className={mobileButtonClass('secondary')}
+                        className={mobileButtonClass(['respond_to_request', 'review_request'].includes(requestNextStep.id) ? 'primary' : 'secondary')}
+                        data-lifecycle-primary-action={['respond_to_request', 'review_request'].includes(requestNextStep.id) ? 'true' : undefined}
                       >
-                        Review / respond
+                        {contractorCanSendWorkflowMessages ? 'Review / respond' : 'Review Request'}
                       </button>
-                      <button
+                      {effectiveDurableDraftCapabilities.canLaunchEstimate && <button
                         type="button"
                         onClick={() => {
                           setWorkCustomerFilterSubjectId(requestConnection.connection_id);
@@ -33465,12 +33485,12 @@ function ContractorDashboard({
                         }}
                         data-testid={linkedRequestEstimate ? 'contractor-open-estimate-from-request' : 'contractor-create-estimate-from-request'}
                         aria-label={`${linkedRequestEstimate ? 'Open estimate' : 'Create estimate'} for ${request.title}`}
-                        className={mobileButtonClass('primary')}
+                        className={mobileButtonClass('secondary')}
                       >
                         <FileText size={15} />
                         {linkedRequestEstimate ? 'Open Estimate' : 'Create Estimate'}
-                      </button>
-                      <button
+                      </button>}
+                      {canManageJobOperations && <button
                         type="button"
                         onClick={() => {
                           if (activeRequestVisit) {
@@ -33485,16 +33505,17 @@ function ContractorDashboard({
                             templateSource: 'blank',
                           });
                         }}
-                        className={mobileButtonClass('secondary')}
+                        className={mobileButtonClass(['start_service_visit', 'open_service_visit'].includes(requestNextStep.id) ? 'primary' : 'secondary')}
+                        data-lifecycle-primary-action={['start_service_visit', 'open_service_visit'].includes(requestNextStep.id) ? 'true' : undefined}
                       >
                         <ClipboardCheck size={15} />
                         {activeRequestVisit ? 'View service visit' : 'Create service visit'}
-                      </button>
-                      {request.home_id && (
+                      </button>}
+                      {canManageJobOperations && request.home_id && (
                         <button
                           type="button"
                           onClick={toggleInlineRequest}
-                          className={mobileButtonClass(homeMapDraft ? 'secondary' : 'primary')}
+                          className={mobileButtonClass('secondary')}
                           data-testid="contractor-home-map-draft-open"
                         >
                           <MapPin size={15} />
@@ -33554,7 +33575,7 @@ function ContractorDashboard({
                           />
                         </div>
                       )}
-                      {canProposeAppointmentWindows && (
+                      {contractorCanSendWorkflowMessages && canProposeAppointmentWindows && (
                         <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3" data-testid="contractor-appointment-window-proposal">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -33703,7 +33724,7 @@ function ContractorDashboard({
                           )}
                         </div>
                       )}
-                      {!['closed', 'declined'].includes(request.status) && (
+                      {contractorCanSendWorkflowMessages && !['closed', 'declined'].includes(request.status) && (
                         <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
                           {request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'homeowner' && (
                             <>
@@ -37482,6 +37503,13 @@ function ContractorDashboard({
                                       const propertyLabel = recordPropertyLabelForContractor(estimate);
                                       const canCreateInvoiceDraftFromEstimate = estimateCanCreateInvoice(estimate.status);
                                       const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate)) && !hasPaymentScheduleRows;
+                                      const estimateNextStep = estimateLifecycleNextStep({
+                                        status: estimate.status,
+                                        canManageEstimate: effectiveDurableDraftCapabilities.canLaunchEstimate,
+                                        hasConnectedHomeowner: Boolean(estimate.homeowner_user_id),
+                                        canCreateJob: financialActionVisibility.canCreateJobFromEstimate,
+                                        hasLinkedJob,
+                                      });
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -37495,14 +37523,6 @@ function ContractorDashboard({
                                               </p>
                                               {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                               {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
-                                              {estimate.status === 'accepted' && (
-                                                <div data-testid="accepted-estimate-job-handoff" className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-                                                  <p className="text-xs font-bold text-emerald-900">{hasLinkedJob ? 'Job created' : 'Ready for job'}</p>
-                                                  <p className="mt-0.5 text-xs font-medium leading-5 text-emerald-800">
-                                                    {hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'}
-                                                  </p>
-                                                </div>
-                                              )}
                                               {linkedInvoice && !hasPaymentScheduleRows && (
                                                 <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                                   Invoice created
@@ -37511,6 +37531,7 @@ function ContractorDashboard({
                                             </div>
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                                           </div>
+                                          {!isInvoiceWorkspaceTab && <LifecycleNextStep step={estimateNextStep} state={`${estimate.status}-estimate`} />}
                                           {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows)}
                                           {!SERVSYNC_DEMO_PRESENTATION_MODE
                                             && supabase
@@ -37528,34 +37549,6 @@ function ContractorDashboard({
                                               />
                                             )}
                                           <div className="mt-3 flex flex-wrap gap-2">
-                                            {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
-                                              <>
-                                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && financialActionVisibility.canCreateJobFromEstimate && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => void createJobFromAcceptedEstimate(estimate)}
-                                                    disabled={convertingEstimateId === estimate.id}
-                                                    data-testid="contractor-create-job-from-accepted-estimate"
-                                                    aria-label={`Create job from accepted estimate ${estimate.title}`}
-                                                    className={buttonClass('primary')}
-                                                  >
-                                                    <ClipboardCheck size={15} />
-                                                    {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
-                                                  </button>
-                                                )}
-                                                {hasLinkedJob && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => void openLinkedJobForEstimate(estimate)}
-                                                    disabled={convertingEstimateId === estimate.id}
-                                                    className={buttonClass('primary')}
-                                                  >
-                                                    <ClipboardCheck size={15} />
-                                                    View Job
-                                                  </button>
-                                                )}
-                                              </>
-                                            )}
                                             {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                                               <>
                                                 <button
@@ -37593,48 +37586,22 @@ function ContractorDashboard({
                                                   <Receipt size={15} />
                                                   {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
                                                 </button>}
-                                                {estimate.status === 'draft' && effectiveDurableDraftCapabilities.canLaunchEstimate && (
-                                                  <>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => {
-                                                        setEditingEstimateId(estimate.id);
-                                                        setEstimateDraft(estimateDraftFromEstimate(estimate));
-                                                        setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
-                                                        setEstimateAssistantText('');
-                                                        setEstimateDraftBuilderTrade('Other');
-                                                        setEstimateDraftBuilderJobType('repair');
-                                                        setEstimateDraftBuilderLaborMode('job_total');
-                                                        setEstimateDraftBuilderLastOutput(null);
-                                                        setEstimateStartMode('draft');
-                                                        setEstimateGuidedBuilderActive(false);
-                                                        setEstimateLineSourcePanel(null);
-                                                        setEstimateAssistantNotice('');
-                                                        setEstimateTemplateStartNotice('');
-                                                        setEstimateHelperNotice('');
-                                                        setEstimateHelperExpanded(false);
-                                                        setEstimateSavedItemNotice('');
-                                                        setEstimateComposerOpen(true);
-                                                      }}
-                                                      className={buttonClass('secondary')}
-                                                    >
-                                                      Edit draft
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => void sendEstimateToHomeowner(estimate)}
-                                                      disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
-                                                      data-testid="contractor-send-estimate"
-                                                      aria-label={`Send estimate ${estimate.title} to homeowner`}
-                                                      className={buttonClass('primary')}
-                                                    >
-                                                      <Send size={15} />
-                                                      {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
-                                                    </button>
-                                                  </>
-                                                )}
                                               </>
                                             )}
+                                            {!isInvoiceWorkspaceTab && <EstimateLifecycleActions
+                                              estimate={estimate}
+                                              nextStep={estimateNextStep}
+                                              canManageEstimate={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canLaunchEstimate}
+                                              canCreateJob={!SERVSYNC_DEMO_PRESENTATION_MODE && financialActionVisibility.canCreateJobFromEstimate}
+                                              hasLinkedJob={hasLinkedJob}
+                                              converting={convertingEstimateId === estimate.id}
+                                              sending={sendingEstimateId === estimate.id}
+                                              classForTone={buttonClass}
+                                              onCreateJob={() => void createJobFromAcceptedEstimate(estimate)}
+                                              onOpenJob={() => void openLinkedJobForEstimate(estimate)}
+                                              onEdit={() => openEstimateRecord(estimate)}
+                                              onSend={() => void sendEstimateToHomeowner(estimate)}
+                                            />}
                                             {!SERVSYNC_DEMO_PRESENTATION_MODE && canUseGenericEstimateInvoiceAction && !isInvoiceWorkspaceTab && (
                                               <button
                                                 type="button"
@@ -39457,6 +39424,12 @@ function ContractorDashboard({
                                 const customerServiceLabel = connection?.home?.nickname || local?.homes?.[0]?.nickname || customerAddress;
                                 const lineCount = invoice.line_items?.length ?? 0;
                                 const propertyLabel = recordPropertyLabelForContractor(invoice);
+                                const invoiceNextStep = invoiceLifecycleNextStep({
+                                  status: invoice.status,
+                                  canManageFinancialActions,
+                                  canRecordPayment: canManageInvoicePayments,
+                                  hasConnectedHomeowner: Boolean(invoice.homeowner_user_id),
+                                });
                                 return (
                                   <div
                                     key={invoice.id}
@@ -39490,6 +39463,7 @@ function ContractorDashboard({
                                       </div>
                                     )}
                                     <InvoicePaymentSummary invoice={invoice} variant="detail" showStatus className="mt-3" />
+                                    <LifecycleNextStep step={invoiceNextStep} state={`${invoice.status}-invoice`} />
                                     {supabase && local && invoice.local_home_id && canManageLocalInvoiceDelivery && (
                                       <LocalInvoiceDeliveryPanel
                                         client={supabase}
@@ -39513,7 +39487,8 @@ function ContractorDashboard({
                                           customerAddress,
                                           serviceLabel: customerServiceLabel,
                                         }).catch(err => setError(readableError(err, 'Unable to preview invoice PDF.')))}
-                                        className={mobileButtonClass('secondary')}
+                                        className={mobileButtonClass(invoiceNextStep.id === 'review_record' ? 'primary' : 'secondary')}
+                                        data-lifecycle-primary-action={invoiceNextStep.id === 'review_record' ? 'true' : undefined}
                                       >
                                         <FileText size={15} />
                                         Preview PDF
@@ -39544,17 +39519,18 @@ function ContractorDashboard({
                                           </p>
                                         )}
                                         <div className={mobileActionRowClass()}>
-                                          <button
+                                          {invoice.homeowner_user_id && <button
                                             type="button"
                                             onClick={() => void sendInvoiceToHomeowner(invoice)}
                                             disabled={updatingInvoiceId === invoice.id || !invoice.homeowner_user_id}
                                             data-testid="contractor-send-invoice"
                                             aria-label={`Send invoice ${invoice.title || 'Invoice draft'} to homeowner`}
                                             className={mobileButtonClass('primary')}
+                                            data-lifecycle-primary-action="true"
                                           >
                                             <Send size={15} />
                                             {updatingInvoiceId === invoice.id ? 'Sending...' : invoice.homeowner_user_id ? 'Send Invoice' : 'Connect homeowner to send'}
-                                          </button>
+                                          </button>}
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -39565,7 +39541,8 @@ function ContractorDashboard({
                                               setEstimateComposerOpen(false);
                                               setContractorFinancialsView('new_invoices');
                                             }}
-                                            className={mobileButtonClass('secondary')}
+                                            className={mobileButtonClass(invoiceNextStep.id === 'edit_invoice' ? 'primary' : 'secondary')}
+                                            data-lifecycle-primary-action={invoiceNextStep.id === 'edit_invoice' ? 'true' : undefined}
                                           >
                                             Edit draft
                                           </button>
@@ -39588,7 +39565,8 @@ function ContractorDashboard({
                                           onClick={() => openRecordInvoicePayment(invoice)}
                                           disabled={recordingInvoicePayment}
                                           data-testid="contractor-record-invoice-payment"
-                                          className={mobileButtonClass('primary')}
+                                          className={mobileButtonClass(invoiceNextStep.id === 'record_payment' ? 'primary' : 'secondary')}
+                                          data-lifecycle-primary-action={invoiceNextStep.id === 'record_payment' ? 'true' : undefined}
                                         >
                                           <CheckCircle2 size={15} />
                                           {invoice.status === 'paid' ? 'Payment history' : invoice.status === 'draft' ? 'Mark Paid' : 'Record payment'}
@@ -39628,6 +39606,13 @@ function ContractorDashboard({
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
                           const canCreateInvoiceDraftFromEstimate = !isInvoice && estimateCanCreateInvoice(estimate.status);
                           const canUseGenericEstimateInvoiceAction = Boolean(linkedInvoice || (canManageFinancialActions && canCreateInvoiceDraftFromEstimate)) && !hasPaymentScheduleRows;
+                          const estimateNextStep = estimateLifecycleNextStep({
+                            status: estimate.status,
+                            canManageEstimate: effectiveDurableDraftCapabilities.canLaunchEstimate,
+                            hasConnectedHomeowner: Boolean(estimate.homeowner_user_id),
+                            canCreateJob: financialActionVisibility.canCreateJobFromEstimate,
+                            hasLinkedJob,
+                          });
                           return (
                             <div
                               key={estimate.id}
@@ -39657,14 +39642,6 @@ function ContractorDashboard({
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
                                   {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                   {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
-                                  {estimate.status === 'accepted' && (
-                                    <div data-testid="accepted-estimate-job-handoff" className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
-                                      <p className="text-xs font-bold text-emerald-900">{hasLinkedJob ? 'Job created' : 'Ready for job'}</p>
-                                      <p className="mt-0.5 text-xs font-medium leading-5 text-emerald-800">
-                                        {hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'}
-                                      </p>
-                                    </div>
-                                  )}
                                   {linkedInvoice && !hasPaymentScheduleRows && (
                                     <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                       Invoice created
@@ -39673,6 +39650,7 @@ function ContractorDashboard({
                                 </div>
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                               </div>
+                              {!isInvoice && <LifecycleNextStep step={estimateNextStep} state={`${estimate.status}-estimate`} />}
                               {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows, { mobile: true })}
                               {!SERVSYNC_DEMO_PRESENTATION_MODE
                                 && supabase
@@ -39690,34 +39668,6 @@ function ContractorDashboard({
                                   />
                                 )}
                               <div className="mt-3 flex flex-wrap gap-2">
-                                {estimate.status === 'accepted' && !isInvoice && (
-                                  <>
-                                    {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && financialActionVisibility.canCreateJobFromEstimate && (
-                                      <button
-                                        type="button"
-                                        onClick={() => void createJobFromAcceptedEstimate(estimate)}
-                                        disabled={convertingEstimateId === estimate.id}
-                                        data-testid="contractor-create-job-from-accepted-estimate"
-                                        aria-label={`Create job from accepted estimate ${estimate.title}`}
-                                        className={mobileButtonClass('primary')}
-                                      >
-                                        <ClipboardCheck size={15} />
-                                        {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
-                                      </button>
-                                    )}
-                                    {hasLinkedJob && (
-                                      <button
-                                        type="button"
-                                        onClick={() => void openLinkedJobForEstimate(estimate)}
-                                        disabled={convertingEstimateId === estimate.id}
-                                        className={mobileButtonClass('primary')}
-                                      >
-                                        <ClipboardCheck size={15} />
-                                        View Job
-                                      </button>
-                                    )}
-                                  </>
-                                )}
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                                   <>
                                     <button
@@ -39750,50 +39700,22 @@ function ContractorDashboard({
                                       <Receipt size={15} />
                                       {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
                                     </button>}
-                                    {estimate.status === 'draft' && effectiveDurableDraftCapabilities.canLaunchEstimate && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-                                            setEditingEstimateId(estimate.id);
-                                            setEstimateDraft(estimateDraftFromEstimate(estimate));
-                                            setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
-                                            setEstimateAssistantText('');
-                                            setEstimateDraftBuilderTrade('Other');
-                                            setEstimateDraftBuilderJobType('repair');
-                                            setEstimateDraftBuilderLaborMode('job_total');
-                                            setEstimateDraftBuilderLastOutput(null);
-                                            setEstimateStartMode('draft');
-                                            setEstimateGuidedBuilderActive(false);
-                                            setEstimateLineSourcePanel(null);
-                                            setEstimateAssistantNotice('');
-                                            setEstimateTemplateStartNotice('');
-                                            setEstimateHelperNotice('');
-                                            setEstimateHelperExpanded(false);
-                                            setEstimateSavedItemNotice('');
-                                            setEstimateComposerOpen(true);
-                                            setContractorWorkView('new_estimates');
-                                          }}
-                                          className={mobileButtonClass('secondary')}
-                                        >
-                                          Edit draft
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => void sendEstimateToHomeowner(estimate)}
-                                          disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
-                                          data-testid="contractor-send-estimate"
-                                          aria-label={`Send estimate ${estimate.title} to homeowner`}
-                                          className={mobileButtonClass('primary')}
-                                        >
-                                          <Send size={15} />
-                                          {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
-                                        </button>
-                                      </>
-                                    )}
                                   </>
                                 )}
+                                {!isInvoice && <EstimateLifecycleActions
+                                  estimate={estimate}
+                                  nextStep={estimateNextStep}
+                                  canManageEstimate={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canLaunchEstimate}
+                                  canCreateJob={!SERVSYNC_DEMO_PRESENTATION_MODE && financialActionVisibility.canCreateJobFromEstimate}
+                                  hasLinkedJob={hasLinkedJob}
+                                  converting={convertingEstimateId === estimate.id}
+                                  sending={sendingEstimateId === estimate.id}
+                                  classForTone={mobileButtonClass}
+                                  onCreateJob={() => void createJobFromAcceptedEstimate(estimate)}
+                                  onOpenJob={() => void openLinkedJobForEstimate(estimate)}
+                                  onEdit={() => openEstimateRecord(estimate)}
+                                  onSend={() => void sendEstimateToHomeowner(estimate)}
+                                />}
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && canUseGenericEstimateInvoiceAction && (
                                   <button
                                     type="button"
@@ -40022,6 +39944,14 @@ function ContractorDashboard({
                           const workItemSummary = getJobWorkItemSummary(jobWorkItems, linkedInvoice);
                           const primaryWorkItemBadge = getJobWorkItemSummaryBadges(workItemSummary)[0] ?? null;
                           const showJobInvoiceAction = inspectionIsClosedJob(insp) && Boolean(linkedInvoice || canManageFinancialActions);
+                          const jobStatus = inspectionJobStatus(insp);
+                          const jobNextStep = jobLifecycleNextStep({
+                            status: jobStatus,
+                            canManageJobOperations,
+                            canManageFinancialActions,
+                            hasLinkedInvoice: Boolean(linkedInvoice),
+                            hasDurableWorkItems,
+                          });
                           const messageIndicator = workflowJobMessageIndicators[insp.id];
                           return (
                             <div
@@ -40084,6 +40014,7 @@ function ContractorDashboard({
                                       Invoice status: {invoiceStatusLabel(linkedInvoice.status)}
                                     </p>
                                   )}
+                                  <LifecycleNextStep step={jobNextStep} state={`${jobStatus}-job`} />
                                 </div>
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                                   <button
@@ -40095,13 +40026,18 @@ function ContractorDashboard({
                                     {deletingInspectionId === insp.id ? 'Deleting...' : 'Delete'}
                                   </button>
                                 )}
-                                <button type="button" onClick={() => openInspection(insp)} className={mobileButtonClass('secondary')}>
+                                <button
+                                  type="button"
+                                  onClick={() => openInspection(insp)}
+                                  className={mobileButtonClass(['start_work', 'continue_work', 'review_record'].includes(jobNextStep.id) ? 'primary' : 'secondary')}
+                                  data-lifecycle-primary-action={['start_work', 'continue_work', 'review_record'].includes(jobNextStep.id) ? 'true' : undefined}
+                                >
                                   {SERVSYNC_DEMO_PRESENTATION_MODE
                                     ? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'
-                                    : !canManageJobOperations ? 'View Job' : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
+                                    : !canManageJobOperations ? 'View Job' : checklistStyle ? (insp.status === 'draft' ? jobStatus === 'draft' ? 'Start Work' : 'Continue Work' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : jobStatus === 'draft' ? 'Start Work' : 'Continue Work'}
                                 </button>
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && !checklistStyle && inspectionIsOpenJob(insp) && (
-                                  <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={mobileButtonClass('primary')}>
+                                  <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={mobileButtonClass('secondary')}>
                                     <CheckCircle2 size={15} />
                                     Complete Job
                                   </button>
@@ -40112,6 +40048,7 @@ function ContractorDashboard({
                                     onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)}
                                     disabled={!linkedInvoice && !hasDurableWorkItems && creatingInvoiceSourceId === `job:${insp.id}`}
                                     className={mobileButtonClass('primary')}
+                                    data-lifecycle-primary-action="true"
                                   >
                                     <Receipt size={15} />
                                     {creatingInvoiceSourceId === `job:${insp.id}` && !hasDurableWorkItems
@@ -41848,6 +41785,13 @@ function ContractorDashboard({
             const activeJobHasInvoiceableWorkItems = activeJobWorkItems.some(jobWorkItemCanInvoice);
             const activeJobWorkItemSummary = getJobWorkItemSummary(activeJobWorkItems, linkedInvoiceForJob);
             const activeJobWorkItemBadge = getJobWorkItemSummaryBadges(activeJobWorkItemSummary)[0] ?? null;
+            const activeJobNextStep = jobLifecycleNextStep({
+              status: inspectionJobStatus(activeInspection),
+              canManageJobOperations,
+              canManageFinancialActions,
+              hasLinkedInvoice: Boolean(linkedInvoiceForJob),
+              hasDurableWorkItems: activeJobHasDurableWorkItems,
+            });
             const linkedVisitEventForJob = contractorVisitEvents.find(event =>
               event.inspection_id === activeInspection.id && event.status !== 'cancelled'
             ) ?? null;
@@ -41951,6 +41895,7 @@ function ContractorDashboard({
                       <InvoicePaymentSummary invoice={linkedInvoiceForJob} className="mt-1 text-emerald-800" />
                     </div>
                   )}
+                  <LifecycleNextStep step={activeJobNextStep} state={`${inspectionJobStatus(activeInspection)}-job-detail`} />
                 </div>
               </div>
             );
