@@ -374,7 +374,7 @@ test.describe('contractor-created local Customer lifecycle', () => {
     await invoiceCard.getByRole('button', { name: /^Edit draft$/i }).click();
     await main.getByRole('textbox', { name: /^Invoice title$/i }).fill(invoiceTitle);
     const saveInvoiceResponse = contractorPage.waitForResponse(
-      response => response.url().includes('/rest/v1/invoices') && ['PATCH', 'POST'].includes(response.request().method()),
+      response => response.url().includes('/rpc/servsync_save_invoice_draft_idempotent'),
       { timeout: 30_000 },
     );
     await main.getByRole('button', { name: /^Update draft invoice$/i }).click();

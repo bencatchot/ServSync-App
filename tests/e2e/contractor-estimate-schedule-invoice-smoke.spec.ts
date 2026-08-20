@@ -152,12 +152,12 @@ async function createHomeownerServiceRequest(page: Page, requestTitle: string): 
   await main(page).getByLabel(/Message to contractor/i).fill('E2E sandbox-only schedule invoice smoke request.');
 
   const createRequest = page.waitForResponse((response) =>
-    response.url().includes('/rpc/servsync_create_service_request'),
+    response.url().includes('/rpc/servsync_commit_service_request_creation'),
   );
   await main(page).getByRole('button', { name: /Send Request/i }).click();
   const response = await createRequest;
   expect(response.ok(), 'service request creation RPC should succeed').toBeTruthy();
-  await expect(main(page).getByText(/Service request sent/i)).toBeVisible({ timeout: 30_000 });
+  await expect(main(page).getByText(/Service request submitted/i)).toBeVisible({ timeout: 30_000 });
 
   const openPendingRequests = main(page).getByRole('button', { name: /Open \/ Pending Requests/i }).first();
   if (await isVisible(openPendingRequests, 2_000)) {
@@ -275,8 +275,7 @@ async function createAndSendScheduledEstimateFromRequest(
   );
 
   const saveEstimate = page.waitForResponse((response) => {
-    const url = response.url();
-    return url.includes('/rest/v1/estimates') && ['POST', 'PATCH'].includes(response.request().method());
+    return response.url().includes('/rpc/servsync_save_estimate_draft_idempotent');
   });
   await main(page).getByRole('button', { name: /Save estimate draft/i }).click();
   const saveResponse = await saveEstimate;
