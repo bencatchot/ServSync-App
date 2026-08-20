@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-20 - FB-039E core-state application reliability candidate
+
+- Branch: `codex/fb039e-core-state-reliability-v1` from exact `origin/main` `0b73ce7073bf76ce1f328ae6698cbf6b0fec3f4b` in an isolated worktree.
+- Files changed: shared reliability helpers; contractor and homeowner canonical loading/retry integration; guarded Request, Home History, Estimate, Job, Invoice, report, and payment actions; retryable Invoice payment history; focused reliability contracts; Product Roadmap; Feature Backlog; Master Plan; FB-039E acceptance evidence; and this changelog.
+- Summary: Keeps related contractor/homeowner identity, lifecycle records, and counts behind a stable loading treatment; avoids false-empty partial workspaces; preserves selected destination and record context across retry; suppresses ordinary-user RPC/SQL/stack detail; adds synchronous repeated-action protection and pending feedback to high-risk core actions; reconciles an already-finalized Job report before another file generation/upload; and retains existing useful empty states and durable backend idempotency contracts.
+- Reason: The established core loop could briefly show mixed identity/count state, render query failures as legitimate zero counts, expose technical errors, and allow rapid repeated actions before React disabled-state rendering completed.
+- Validation: Core-state reliability contract 8/8; resettable Sandbox core loop 2/2 with matching save responses, post-reload Job state, durable partial/final payment reads, PDF and homeowner Home History/reminder continuation; focused lifecycle/payment/report/role/mobile regressions 60 passed with 11 local credential-gated cases reserved for Preview; TypeScript; Production build; ESLint at the exact 80-warning baseline; App baseline reduced from 50,913 to 50,880 lines; architecture 10/10; backend parity 16/16; changed Markdown links; sensitive-value scan; and `git diff --check`. Exact-head authenticated Preview evidence remains pending in the acceptance record.
+- Known risks and follow-ups: No SQL/RLS/RPC/auth/permission/environment/provider/Production-data change is included. Client action guards are not server idempotency. Full Phase 0.4 acceptance still requires separately authorized durable operation identities for Request creation, direct Estimate/Invoice saves, finalized-report document registration, and manual Home History/document creation, followed by concurrency/lost-response and cross-tenant rollout validation.
+- Backlog impact: FB-039 remains Implementation In Progress. The application candidate is reviewable, but FB-039E remains open at a protected backend gate; Phase 0.5 must not start as though Phase 0.4 were complete.
+- Master plan impact: The immediate sequence advances to candidate review and the bounded backend idempotency authorization decision, not yet to Phase 0.5.
+
 ## 2026-08-19 - FB-039D merge verification and FB-039E roadmap handoff
 
 - Branch: `agent/fb039d-merge-roadmap-handoff` from exact `origin/main` merge commit `3a902abccf99388c5d2431cde467feb9f5e56d26`.

@@ -113,7 +113,7 @@ test.describe('FB-035 Viewer Job lifecycle visibility', () => {
   test('prevents cached edits, autosave, uploads, lifecycle handlers, and direct stale UI calls', () => {
     const source = appSource();
     expect(source).toContain("const storedDraft = canManageJobOperations && insp.status === 'draft'");
-    expect(source).toContain('if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;');
+    expect(source).toContain("if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection || completingInspectionId === activeInspection.id) return;");
     for (const marker of [
       'const persistInspectionRooms = async',
       'const startNewInspection = async',

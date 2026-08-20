@@ -18,6 +18,7 @@ interface RecordInvoicePaymentDialogProps {
   loadingHistory: boolean;
   submitting: boolean;
   historyError?: string;
+  onRetryHistory: () => void;
   onClose: () => void;
   onSubmit: (submission: OfflinePaymentSubmission) => Promise<void>;
 }
@@ -29,6 +30,7 @@ export function RecordInvoicePaymentDialog({
   loadingHistory,
   submitting,
   historyError = '',
+  onRetryHistory,
   onClose,
   onSubmit,
 }: RecordInvoicePaymentDialogProps) {
@@ -122,7 +124,14 @@ export function RecordInvoicePaymentDialog({
           <section aria-labelledby="invoice-payment-history-title" className={canRecord ? 'border-t border-slate-200 pt-5' : ''}>
             <h3 id="invoice-payment-history-title" className="text-sm font-bold text-slate-950">Payment history</h3>
             {loadingHistory && <p className="mt-2 text-sm text-slate-500">Loading payment history...</p>}
-            {!loadingHistory && historyError && <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{historyError}</p>}
+            {!loadingHistory && historyError && (
+              <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-800">
+                <p>{historyError}</p>
+                <button type="button" onClick={onRetryHistory} className="mt-3 inline-flex min-h-10 items-center rounded-md border border-red-300 bg-white px-3 py-2 font-bold hover:bg-red-100">
+                  Try again
+                </button>
+              </div>
+            )}
             {!loadingHistory && !historyError && payments.length === 0 && onlinePayments.length === 0 && <p className="mt-2 text-sm text-slate-500">No payments recorded.</p>}
             {!loadingHistory && !historyError && onlinePayments.length > 0 && (
               <div className="mt-3 space-y-2">

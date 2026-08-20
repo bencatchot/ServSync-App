@@ -7,10 +7,7 @@ import {
   revokeFinalizedReportDeliveryLink,
   sendFinalizedReportEmail,
 } from './finalizedReportDelivery';
-
-function readableError(error: unknown, fallback: string) {
-  return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : fallback;
-}
+import { userFacingError as readableError } from '../reliability/userFacingError';
 
 function dateTime(value: string | null) {
   if (!value) return 'Not yet';

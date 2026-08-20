@@ -150,7 +150,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     const shellSource = sourceBetween(
       appSource,
       'function SidebarLayout({',
-      'function PhotoUploadPanel({',
+      'function AutocompleteInput({',
     );
 
     expect(shellSource).toContain('mobileNavItems = []');
@@ -189,7 +189,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
       sourceBetween(appSource, 'type MobileNavItem = {', 'type PrivacyRequestKind'),
       sourceBetween(appSource, 'const homeownerMobileNavItems: MobileNavItem[] = [', '  return (\n    <SidebarLayout\n      brand={{ name: \'ServSync\''),
       sourceBetween(appSource, 'const contractorMobileNavItems: MobileNavItem[] = [', '  return (\n    <SidebarLayout\n      brand={{ name: contractorDraft.business_name'),
-      sourceBetween(appSource, 'function SidebarLayout({', 'function PhotoUploadPanel({'),
+      sourceBetween(appSource, 'function SidebarLayout({', 'function AutocompleteInput({'),
     ].join('\n').toLowerCase();
 
     expect(navRelatedSource).not.toContain('supabase.rpc');

@@ -115,7 +115,16 @@ import {
   type CustomerConnectionStatus,
   type StatusPresentation,
 } from './features/status/statusPresentation';
-import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from './features/feedback/ActionFeedback';
+import {
+  Card,
+  Field,
+  Notice,
+  OverviewCard,
+  PhotoUploadPanel,
+  type NoticeContent,
+} from './features/presentation/CorePresentation';
+import { actionFeedbackMessage } from './features/presentation/presentationFeedback';
+import type { ActionFeedbackMessage, ActionFeedbackTone } from './features/feedback/ActionFeedback';
 import {
   FINDING_STATUS_ORDER,
   UNANSWERED_FINDING_STATUS,
@@ -323,6 +332,12 @@ import {
 import { contractorJobActionVisibility } from './features/work/jobActionVisibility';
 import { EstimateLifecycleActions } from './features/work/EstimateLifecycleActions';
 import { LifecycleNextStep } from './features/work/LifecycleNextStep';
+import { createActionGuard } from './features/reliability/actionGuard';
+import { userFacingError } from './features/reliability/userFacingError';
+import {
+  WorkspaceLoadBoundary,
+  type WorkspaceLoadPhase,
+} from './features/reliability/WorkspaceLoadBoundary';
 import {
   estimateLifecycleNextStep,
   invoiceLifecycleNextStep,
@@ -6805,17 +6820,7 @@ function groupConnectionHistory(events: ConnectionAuditEvent[]) {
 }
 
 function readableError(err: unknown, fallback: string) {
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === 'object') {
-    const possible = err as { message?: string; details?: string; hint?: string; code?: string };
-    return JSON.stringify({
-      message: possible.message || fallback,
-      details: possible.details || '',
-      hint: possible.hint || '',
-      code: possible.code || '',
-    });
-  }
-  return fallback;
+  return userFacingError(err, fallback);
 }
 
 function inputClass() {
@@ -6870,7 +6875,7 @@ function AppContent() {
       .maybeSingle();
 
     if (error) {
-      setAuthMessage(error.message);
+      setAuthMessage(userFacingError(error, 'ServSync could not load your account. Please try signing in again.'));
       setProfile(null);
       return;
     }
@@ -9783,6 +9788,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [notice, setNotice] = useState<NoticeContent | ''>('');
   const [error, setError] = useState<NoticeContent | ''>('');
   const [loading, setLoading] = useState(true);
+  const [workspaceLoadPhase, setWorkspaceLoadPhase] = useState<WorkspaceLoadPhase>('initial');
+  const homeownerActionGuard = useRef(createActionGuard()).current;
   const [workflowJobMessageIndicators, setWorkflowJobMessageIndicators] = useState<Record<string, WorkflowJobMessageIndicator>>({});
 
   const clearWorkflowJobMessageIndicator = useCallback((inspectionId: string) => {
@@ -10931,6 +10938,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const loadHomeowner = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
+    setWorkspaceLoadPhase('initial');
     setError('');
     try {
       const [profileRes, homeRes, connectionsRes, directoryRes, inviteLeadsRes, serviceRequestsRes, estimatesRes, invoicesRes, serviceAgreementOffersRes, serviceAgreementsRes, notifRes, logRes, remindersRes, docsRes, supportRes] = await Promise.all([
@@ -10956,6 +10964,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (connectionsRes.error) throw connectionsRes.error;
       if (inviteLeadsRes.error) throw inviteLeadsRes.error;
       if (serviceRequestsRes.error) throw serviceRequestsRes.error;
+      if (estimatesRes.error) throw estimatesRes.error;
+      if (invoicesRes.error) throw invoicesRes.error;
+      if (logRes.error) throw logRes.error;
+      if (docsRes.error) throw docsRes.error;
 
       const loadedHomeowner = (profileRes.data as HomeownerProfile | null) || null;
       const loadedHomes = (homeRes.data || []) as HomeProfile[];
@@ -11012,8 +11024,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (!remindersRes.error) setHomeReminders((remindersRes.data || []) as HomeReminder[]);
       if (!docsRes.error) setHomeDocuments((docsRes.data || []) as HomeDocument[]);
       if (!supportRes.error) setSupportInquiries((supportRes.data || []) as SupportInquiry[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load homeowner dashboard.');
+      setWorkspaceLoadPhase('ready');
+    } catch {
+      setWorkspaceLoadPhase('error');
     } finally {
       setLoading(false);
     }
@@ -11473,6 +11486,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!supabase) return;
     if (!logDraft.title.trim()) { setError('Add a title before saving.'); return; }
     if (!logDraft.performed_at) { setError('Add a date before saving.'); return; }
+    const actionKey = 'home-history:create';
+    if (!homeownerActionGuard.begin(actionKey)) return;
     setError('');
     setNotice('');
     setSavingLogEntry(true);
@@ -11529,6 +11544,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to save Home History entry.'));
     } finally {
       setSavingLogEntry(false);
+      homeownerActionGuard.end(actionKey);
     }
   };
 
@@ -12438,6 +12454,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const createServiceRequest = async () => {
     if (!supabase) return;
+    const actionKey = 'service-request:create';
+    if (!homeownerActionGuard.begin(actionKey)) return;
     setNotice('');
     setError('');
     setSavingServiceRequest(true);
@@ -12505,6 +12523,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       ));
     } finally {
       setSavingServiceRequest(false);
+      homeownerActionGuard.end(actionKey);
     }
   };
 
@@ -12567,6 +12586,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const respondToEstimate = async (estimate: Estimate, action: 'accept' | 'decline') => {
     if (!supabase) return;
+    const actionKey = `estimate-response:${estimate.id}`;
+    if (!homeownerActionGuard.begin(actionKey)) return;
     setNotice('');
     setError('');
     setUpdatingEstimateId(estimate.id);
@@ -12589,6 +12610,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       ));
     } finally {
       setUpdatingEstimateId(null);
+      homeownerActionGuard.end(actionKey);
     }
   };
 
@@ -12649,6 +12671,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setNotice('This estimate is already filed in Home History.');
       return;
     }
+    const actionKey = `estimate-file:${estimate.id}`;
+    if (!homeownerActionGuard.begin(actionKey)) return;
 
     setNotice('');
     setError('');
@@ -12705,6 +12729,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to file estimate to your home records.'));
     } finally {
       setFilingEstimateId(null);
+      homeownerActionGuard.end(actionKey);
     }
   };
 
@@ -12721,6 +12746,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setNotice(`This ${recordLabel} is already filed in Home History.`);
       return;
     }
+    const actionKey = `invoice-file:${invoice.id}`;
+    if (!homeownerActionGuard.begin(actionKey)) return;
 
     setNotice('');
     setError('');
@@ -12742,6 +12769,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to file invoice to Home History.'));
     } finally {
       setFilingInvoiceId(null);
+      homeownerActionGuard.end(actionKey);
     }
   };
 
@@ -16847,9 +16875,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       profileLogoFit="cover"
       onSignOut={onSignOut}
     >
-      {loading && <Notice tone="info" text="Loading homeowner profile..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+      <WorkspaceLoadBoundary
+        phase={workspaceLoadPhase}
+        label="homeowner workspace"
+        error="ServSync could not load this homeowner workspace. Your selected destination is unchanged."
+        onRetry={() => void loadHomeowner()}
+      />
+
+      <div className={workspaceLoadPhase === 'ready' ? 'contents' : 'hidden'} aria-hidden={workspaceLoadPhase !== 'ready'}>
 
       {contractorInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="contractor-invite-title">
@@ -21118,6 +21153,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         />
       )}
 
+      </div>
+
     </SidebarLayout>
   );
 }
@@ -21433,6 +21470,8 @@ function ContractorDashboard({
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [workspaceLoadPhase, setWorkspaceLoadPhase] = useState<WorkspaceLoadPhase>('initial');
+  const contractorActionGuard = useRef(createActionGuard()).current;
   const durableDraftComposerRequested = SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED && DRAFT_JOB_UI_ENABLED;
   const globalDurableDraftMasterEnabled = isGlobalDurableDraftMasterEnabled({
     sharedDraftComposerEnabled: SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED,
@@ -21582,6 +21621,7 @@ function ContractorDashboard({
   const [includeReportValueAdd, setIncludeReportValueAdd] = useState(true);
   const [reportValueAddText, setReportValueAddText] = useState('');
   const [savingInspection, setSavingInspection] = useState(false);
+  const [completingInspectionId, setCompletingInspectionId] = useState<string | null>(null);
   const [deletingInspectionId, setDeletingInspectionId] = useState<string | null>(null);
   const [finalizingInspection, setFinalizingInspection] = useState(false);
   const [sendingInspectionReportId, setSendingInspectionReportId] = useState<string | null>(null);
@@ -21758,8 +21798,6 @@ function ContractorDashboard({
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorTab, contractorTab);
   }, [contractorTab]);
-
-
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorHomeownerFilter, homeownerFilter);
   }, [homeownerFilter]);
@@ -22087,6 +22125,7 @@ function ContractorDashboard({
     setLocalCustomerManagementDetailState('idle');
     setLocalCustomerManagementDetailError('');
     setLoading(true);
+    setWorkspaceLoadPhase('initial');
     setError('');
     setContractorPriceBookLoadState('loading');
     setContractorPriceBookLoadError('');
@@ -22249,6 +22288,10 @@ function ContractorDashboard({
             ? supabase.rpc('servsync_list_price_book_internal_costs')
             : Promise.resolve({ data: [], error: null }),
         ]);
+        if (inspRes.error) throw inspRes.error;
+        if (jobWorkItemsRes.error) throw jobWorkItemsRes.error;
+        if (estimatesRes.error) throw estimatesRes.error;
+        if (invoicesRes.error) throw invoicesRes.error;
         if (!tplRes.error) setInspectionTemplates((tplRes.data || []) as InspectionTemplate[]);
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
         if (!jobWorkItemsRes.error) {
@@ -22356,7 +22399,8 @@ function ContractorDashboard({
         setServiceAgreementOffers([]);
         setJobWorkItemsByJobId({});
       }
-    } catch (err) {
+      setWorkspaceLoadPhase('ready');
+    } catch {
       if (localCustomerDirectoryRequestId === localCustomerDirectoryRequestIdRef.current) {
         setLocalContacts([]);
         setArchivedLocalContacts([]);
@@ -22364,7 +22408,7 @@ function ContractorDashboard({
         setLocalCustomerDirectoryLoadState('error');
         setLocalCustomerDirectoryLoadError('The contractor workspace did not finish loading. Try again.');
       }
-      setError(readableError(err, 'Unable to load contractor workspace.'));
+      setWorkspaceLoadPhase('error');
       setContractorPriceBookLoadState('error');
       setContractorPriceBookLoadError('The contractor workspace did not finish loading. Try again.');
     } finally {
@@ -23730,6 +23774,8 @@ function ContractorDashboard({
       setError(scheduleForSave.error);
       return;
     }
+    const actionKey = `estimate-save:${editingEstimateId ?? estimateDraftSessionId}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setSavingEstimate(true);
     const currentEditingEstimateId = editingEstimateId;
     try {
@@ -23847,6 +23893,7 @@ function ContractorDashboard({
       ));
     } finally {
       setSavingEstimate(false);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -23887,6 +23934,8 @@ function ContractorDashboard({
       const confirmed = window.confirm('This invoice has labor hours but no labor rate. Labor hours will be saved, but labor price will be excluded from totals until a labor rate is added.\n\nChoose OK to continue anyway, or Cancel to add a labor rate.');
       if (!confirmed) return null;
     }
+    const actionKey = `invoice-save:${editingInvoiceId ?? 'new'}`;
+    if (!contractorActionGuard.begin(actionKey)) return null;
     setSavingInvoice(true);
     try {
       const totals = draftFinancialBreakdown(draftForTotals);
@@ -23992,6 +24041,7 @@ function ContractorDashboard({
       return null;
     } finally {
       setSavingInvoice(false);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -24007,6 +24057,8 @@ function ContractorDashboard({
       setError('This invoice cannot be sent through the customer portal yet. Connect this customer before sending.');
       return false;
     }
+    const actionKey = `invoice-send:${invoice.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return false;
     setUpdatingInvoiceId(invoice.id);
     try {
       const { error: sendError } = await supabase.rpc('servsync_send_invoice', {
@@ -24029,6 +24081,7 @@ function ContractorDashboard({
       return false;
     } finally {
       setUpdatingInvoiceId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -24067,6 +24120,8 @@ function ContractorDashboard({
 
   const recordOfflineInvoicePayment = async (submission: OfflinePaymentSubmission) => {
     if (!supabase || !recordPaymentInvoice) return;
+    const actionKey = `invoice-payment:${recordPaymentInvoice.id}:${submission.idempotencyKey}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setNotice('');
     setError('');
     setRecordingInvoicePayment(true);
@@ -24101,6 +24156,7 @@ function ContractorDashboard({
       throw new Error(paymentMessage);
     } finally {
       setRecordingInvoicePayment(false);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -24111,6 +24167,8 @@ function ContractorDashboard({
       return;
     }
     if (!window.confirm('Void this invoice? This will remove it from active billing lists.')) return;
+    const actionKey = `invoice-void:${invoice.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setNotice('');
     setError('');
     setUpdatingInvoiceId(invoice.id);
@@ -24133,6 +24191,7 @@ function ContractorDashboard({
       ));
     } finally {
       setUpdatingInvoiceId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -24478,6 +24537,8 @@ function ContractorDashboard({
       setError(createInvoiceCapability.reason);
       return;
     }
+    const actionKey = `invoice-from-job:${job.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setCreatingInvoiceSourceId(`job:${job.id}`);
     try {
       const requestWillClose = Boolean(job.service_request_id && inspectionIsClosedJob(job));
@@ -24501,6 +24562,7 @@ function ContractorDashboard({
       setError(readableError(err, 'Unable to create invoice from job. Make sure the invoice-from-source SQL has been applied.'));
     } finally {
       setCreatingInvoiceSourceId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -24543,6 +24605,8 @@ function ContractorDashboard({
       setError('Select at least one completed, priced work item before creating a partial invoice.');
       return;
     }
+    const actionKey = `invoice-from-job-items:${partialInvoiceJob.id}:${selectedIds.slice().sort().join(',')}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setCreatingPartialInvoice(true);
     setCreatingInvoiceSourceId(`partial-job:${partialInvoiceJob.id}`);
     setNotice('');
@@ -24566,6 +24630,7 @@ function ContractorDashboard({
     } finally {
       setCreatingPartialInvoice(false);
       setCreatingInvoiceSourceId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -24826,6 +24891,8 @@ function ContractorDashboard({
       const confirmed = window.confirm('This estimate has labor hours but no labor rate. Labor price is excluded from totals until a labor rate is added.\n\nChoose OK to send anyway, or Cancel to go back and edit pricing.');
       if (!confirmed) return;
     }
+    const actionKey = `estimate-send:${estimate.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setSendingEstimateId(estimate.id);
     try {
       const { error: rpcError } = await supabase.rpc('servsync_send_estimate', {
@@ -24854,6 +24921,7 @@ function ContractorDashboard({
       ));
     } finally {
       setSendingEstimateId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -29953,7 +30021,6 @@ function ContractorDashboard({
     }
     if (!options?.silent) setNotice('Progress saved.');
   };
-
   const persistFieldWorkState = (next?: Partial<{ inspectionId: string | null; view: InspectionView; subTab: InspectionSubTab; selectedRoom: string | null }>) => {
     const current = (() => {
       try {
@@ -30227,20 +30294,25 @@ function ContractorDashboard({
       setSavingInspection(false);
     }
   };
-
   const saveInspectionProgress = async (insp: Inspection, options?: { silent?: boolean }) => {
     if (!supabase) return;
     if (!canManageJobOperations) {
       if (!options?.silent) setError('This Job is read-only for your role.');
       return;
     }
-    if (!options?.silent) setSavingInspection(true);
+    const actionKey = `job-save:${insp.id}`;
+    if (!contractorActionGuard.begin(actionKey)) {
+      if (!options?.silent) setNotice('Progress is already saving.');
+      return;
+    }
+    setSavingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
       await persistInspectionRooms(insp, updatedRooms, inspectionSummary, options);
       return updatedRooms;
     } finally {
-      if (!options?.silent) setSavingInspection(false);
+      setSavingInspection(false);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -30263,8 +30335,25 @@ function ContractorDashboard({
       if (!confirmed) return;
     }
     if (!options?.skipHomeTemplatePrompt && maybeOpenHomeTemplatePrompt(insp, 'finalize')) return;
+    const actionKey = `job-finalize:${insp.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setFinalizingInspection(true);
     try {
+      const { data: currentJob, error: currentJobError } = await supabase
+        .from('inspections')
+        .select('id, status, job_status, report_storage_path, report_file_name')
+        .eq('id', insp.id)
+        .single();
+      if (currentJobError) throw currentJobError;
+      if (currentJob?.status === 'finalized' && currentJob.report_storage_path) {
+        await loadContractor();
+        setNotice(actionFeedbackMessage(
+          'Report already finalized',
+          'ServSync found the finalized report and refreshed this Job without creating another record.',
+          'contractor-report-finalize-reconciled',
+        ));
+        return;
+      }
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
       if (!isSimpleServiceJob(insp) && inspectionHasUnansweredPrompts(updatedRooms)) {
         setError('Complete each checklist prompt before finalizing the report.');
@@ -30353,6 +30442,7 @@ function ContractorDashboard({
       ));
     } finally {
       setFinalizingInspection(false);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -30395,6 +30485,8 @@ function ContractorDashboard({
       return;
     }
     if (!options?.skipHomeTemplatePrompt && maybeOpenHomeTemplatePrompt(insp, 'send')) return;
+    const actionKey = `job-report-send:${insp.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
     setSendingInspectionReportId(insp.id);
     try {
       const { error: notifyError } = await supabase.rpc('servsync_notify_field_work_report', {
@@ -30434,6 +30526,7 @@ function ContractorDashboard({
       ));
     } finally {
       setSendingInspectionReportId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -30445,6 +30538,9 @@ function ContractorDashboard({
       setError('This Job is read-only for your role.');
       return;
     }
+    const actionKey = `job-complete:${insp.id}`;
+    if (!contractorActionGuard.begin(actionKey)) return;
+    setCompletingInspectionId(insp.id);
     const completedAt = new Date().toISOString();
     const summaryText = inspectionSummary.trim()
       ? cleanHumanWrittenText(inspectionSummary)
@@ -30506,6 +30602,9 @@ function ContractorDashboard({
         readableError(err, 'The job was not completed. Review the work items and try again.'),
         'contractor-complete-job-error',
       ));
+    } finally {
+      setCompletingInspectionId(null);
+      contractorActionGuard.end(actionKey);
     }
   };
 
@@ -30789,7 +30888,7 @@ function ContractorDashboard({
   }, [contractorTab, contractorWorkView, inspectionView, loading, inspections, activeInspection]);
 
   useEffect(() => {
-    if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;
+    if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection || completingInspectionId === activeInspection.id) return;
     const signature = JSON.stringify({
       id: activeInspection.id,
       rooms: activeRooms,
@@ -30806,7 +30905,7 @@ function ContractorDashboard({
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection, canManageJobOperations]);
+  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection, completingInspectionId, canManageJobOperations]);
 
   const handleInspectionPhotoUpload = async (key: string, file: File) => {
     if (!supabase || !contractor || !activeInspection) return;
@@ -32166,13 +32265,20 @@ function ContractorDashboard({
       profile={profile}
       profileLogoUrl={contractorLogoUrl(contractorDraft.logo_url)}
       profileLogoFit="contain"
-      accountName={contractorAccountName}
-      accountSubtitle={contractorAccountSubtitle}
+      accountName={workspaceLoadPhase === 'ready' ? contractorAccountName : 'Loading account...'}
+      accountSubtitle={workspaceLoadPhase === 'ready' ? contractorAccountSubtitle : 'Confirming workspace'}
       onSignOut={onSignOut}
     >
-      {loading && <Notice tone="info" text="Loading contractor workspace..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+      <WorkspaceLoadBoundary
+        phase={workspaceLoadPhase}
+        label="contractor workspace"
+        error="ServSync could not load this contractor workspace. Your selected destination is unchanged."
+        onRetry={() => void loadContractor()}
+      />
+
+      <div className={workspaceLoadPhase === 'ready' ? 'contents' : 'hidden'} aria-hidden={workspaceLoadPhase !== 'ready'}>
       {localArchiveDialog && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4"
@@ -42330,9 +42436,9 @@ function ContractorDashboard({
                           {savingInspection ? 'Saving...' : 'Save'}
                         </button>
                         {inspectionIsOpenJob(activeInspection) && (
-                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} disabled={savingInspection} data-testid="contractor-complete-job" className={mobileButtonClass('primary')}>
+                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} disabled={savingInspection || completingInspectionId === activeInspection.id} data-testid="contractor-complete-job" className={mobileButtonClass('primary')}>
                             <CheckCircle2 size={15} />
-                            Complete Job
+                            {completingInspectionId === activeInspection.id ? 'Completing...' : 'Complete Job'}
                           </button>
                         )}
                         {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
@@ -44058,6 +44164,7 @@ function ContractorDashboard({
           loadingHistory={recordPaymentHistoryLoading}
           historyError={recordPaymentHistoryError}
           submitting={recordingInvoicePayment}
+          onRetryHistory={() => void loadInvoiceOfflinePaymentHistory(recordPaymentInvoice)}
           onClose={() => {
             if (recordingInvoicePayment) return;
             setRecordPaymentInvoice(null);
@@ -44419,6 +44526,8 @@ function ContractorDashboard({
           </div>
         </div>
       )}
+
+      </div>
 
     </SidebarLayout>
   );
@@ -49658,109 +49767,6 @@ function SidebarLayout({
 }
 
 
-function PhotoUploadPanel({
-  title,
-  helper,
-  imageUrl,
-  fallback,
-  uploading,
-  buttonLabel,
-  footer,
-  onUpload,
-}: {
-  title: string;
-  helper: string;
-  imageUrl: string;
-  fallback: React.ReactNode;
-  uploading: boolean;
-  buttonLabel: string;
-  footer?: string;
-  onUpload: (file: File | null) => void;
-}) {
-  return (
-    <div className="mb-4 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] p-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#E1E3E7] bg-white">
-            {imageUrl ? (
-              <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
-            ) : (
-              fallback
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-[#02132D]">{title}</p>
-            <p className="mt-0.5 max-w-xl text-xs leading-5 text-[#223D67]">{helper}</p>
-          </div>
-        </div>
-        <label className={`${buttonClass('secondary')} cursor-pointer`}>
-          <Upload size={15} />
-          {uploading ? 'Uploading...' : buttonLabel}
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="sr-only"
-            disabled={uploading}
-            onChange={event => {
-              const file = event.target.files?.[0] || null;
-              event.currentTarget.value = '';
-              onUpload(file);
-            }}
-          />
-        </label>
-      </div>
-      {footer && <p className="mt-2 text-xs font-medium text-amber-700">{footer}</p>}
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        Only upload photos you have the right to use. Home photos may contain sensitive information, so be careful before sending or sharing copies outside your account.
-      </p>
-    </div>
-  );
-}
-
-
-function OverviewCard({
-  icon,
-  label,
-  value,
-  helper,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  helper: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-xl border border-[#E1E3E7] bg-white p-3.5 text-left shadow-sm transition hover:border-[#1B85FB] hover:shadow-md"
-    >
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0078FF]/10 text-[#0078FF]">
-        {icon}
-      </div>
-      <p className="mt-3 text-xl font-bold text-[#02132D]">{value}</p>
-      <p className="mt-0.5 text-sm font-semibold text-[#223D67]">{label}</p>
-      <p className="mt-0.5 text-xs leading-4 text-[#223D67]/70">{helper}</p>
-    </button>
-  );
-}
-
-
-function Card({ title, icon, children, action }: { title: string; icon: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <section className="min-w-0 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
-      <div className="mb-3 flex min-w-0 items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
-        <h2 className="min-w-0 text-sm font-bold text-[#02132D]">{title}</h2>
-        {action && <div className="ml-auto">{action}</div>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function AutocompleteInput({
   id,
   value,
@@ -49870,45 +49876,6 @@ function ServiceCategorySelector({
         </button>
       </div>
     </div>
-  );
-}
-
-function Field({ label, children, labelClassName = 'text-[#223D67]/75' }: { label: string; children: React.ReactNode; labelClassName?: string }) {
-  return (
-    <label className="block">
-      <span className={`mb-1 block text-xs font-semibold uppercase tracking-[0.12em] ${labelClassName}`}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-type NoticeContent = string | ActionFeedbackMessage;
-
-function actionFeedbackMessage(title: string, body?: string, testId?: string): ActionFeedbackMessage {
-  return { title, body, testId };
-}
-
-function noticeContentTitle(text: NoticeContent) {
-  return typeof text === 'string' ? text : text.title;
-}
-
-function noticeContentBody(text: NoticeContent) {
-  return typeof text === 'string' ? undefined : text.body;
-}
-
-function noticeContentTestId(text: NoticeContent) {
-  return typeof text === 'string' ? undefined : text.testId;
-}
-
-function Notice({ tone, text }: { tone: ActionFeedbackTone; text: NoticeContent }) {
-  return (
-    <ActionFeedback
-      tone={tone}
-      title={noticeContentTitle(text)}
-      body={noticeContentBody(text)}
-      testId={noticeContentTestId(text)}
-      compact
-    />
   );
 }
 
