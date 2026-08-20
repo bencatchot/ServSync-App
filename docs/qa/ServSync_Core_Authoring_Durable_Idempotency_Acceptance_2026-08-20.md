@@ -6,6 +6,8 @@ FB-039E1 is the protected Phase 0.4 backend slice for homeowner service Request 
 
 Branch: `codex/fb039e1-core-authoring-idempotency-v1`
 
+Draft PR: [#510](https://github.com/bencatchot/ServSync-App/pull/510), initial implementation head `e1ef6e51734aef37677ffd16fba81fff8aeeaa44`.
+
 Migration: `servsync-core-authoring-durable-idempotency.sql`
 
 Migration SHA-256: `5a364e95d2e791f0adc4712bc71502ebc732f3285e79c690220020e83b9f77f6`
