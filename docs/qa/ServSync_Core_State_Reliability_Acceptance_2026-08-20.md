@@ -70,10 +70,13 @@ Automated source and contract evidence:
 
 Authenticated Preview evidence:
 
-- Desktop role/lifecycle matrix: pending.
-- `390x844` role/lifecycle matrix: pending.
-- Loading, retry, refresh, interrupted-transition, overflow, browser/page/`5xx`, and fixture cleanup evidence: pending.
+- Exact application commit: `36add537e7ad21a100c21e5b3bb47e1c748c9b21` at [the protected Vercel Preview](https://serv-sync-app-refresh-36l6198j6-bencatchots-projects.vercel.app).
+- Recurring authenticated role smoke: 8/8 passed. Owner, Admin, Office, Field Technician, Viewer, and homeowner core read surfaces loaded without captured browser-console or HTTP errors; contractor and homeowner `390x844` navigation had no horizontal overflow.
+- Financial role presentation: 13/13 passed. Owner/Admin/Office retained Draft Invoice entry; Field Technician and Viewer had no Financials or financial-authoring entry on desktop or `390x844`; Field Technician retained Job Draft entry and Viewer did not.
+- Job role presentation: 8 passed and 2 fixture-dependent checks skipped. Viewer opened an existing Job read-only on desktop and `390x844`; the approved Field Technician fixture had no mutable Job card, while its operational Job Draft entry was proven in the financial-role matrix.
+- The Preview homeowner owner account loaded Properties, Contractors, Estimates/Invoices, and Home History on desktop and Properties on `390x844`. A separate resettable shared-home member/viewer fixture run remains unavailable because the approved validation credential target does not align with the direct Sandbox client required by that fixture harness; no Auth fixture or product permission was changed in this unprotected application slice.
+- The resettable exact-head Sandbox loop remains the transition authority for loading, save response, reload persistence, interrupted-payment recovery, homeowner Home History continuation, and prefix-scoped cleanup. The Preview checks are read-only and therefore did not repeat those mutations against another environment.
 
 ## Status
 
-Application candidate validated locally and awaiting exact-head Preview acceptance. The presentation and browser-side reliability work may be reviewed independently, but FB-039E Phase 0.4 must not be marked fully complete until the protected backend operation contracts above are approved, implemented, and validated.
+Application candidate validated locally and against the exact deployed application commit. The presentation and browser-side reliability work may be reviewed independently, but FB-039E Phase 0.4 must not be marked fully complete until the protected backend operation contracts above are approved, implemented, and validated. An approved target-aligned shared-home member/viewer fixture is also required to repeat that distinct authenticated role pair; existing authority tests and application behavior were not weakened to manufacture the evidence.

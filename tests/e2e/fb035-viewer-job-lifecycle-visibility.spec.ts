@@ -50,10 +50,17 @@ async function openJobsAs(page: Page, role: OperationalRole | 'viewer') {
   await main.getByLabel(/^Password$/i).fill(roleCredential(ROLE_ENV[role].password));
   await main.getByRole('button', { name: /^Sign in$/i }).click();
   await expect(page.getByText(/Contractor command center/i)).toBeVisible({ timeout: 30_000 });
-  if (!(await main.getByText(/^Jobs workspace$/i).isVisible())) {
-    await page.getByRole('button', { name: /^Jobs(?:\s+\d+)?$/i }).last().click();
+  const workWorkspace = main.getByText(/^Work workspace$/i);
+  if (!(await workWorkspace.isVisible())) {
+    await page.getByRole('button', { name: /^Work(?:\s+\d+)?$/i }).last().click();
   }
+  await expect(workWorkspace).toBeVisible();
   await expect(main.getByText(/Loading contractor workspace/i)).toBeHidden({ timeout: 30_000 });
+  const openJobsHeading = main.getByRole('heading', { level: 2, name: /^Open jobs$/i });
+  if (!(await openJobsHeading.isVisible())) {
+    await main.getByRole('button', { name: /Active Jobs/i }).first().click();
+  }
+  await expect(openJobsHeading).toBeVisible();
   return main;
 }
 
