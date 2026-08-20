@@ -333,6 +333,12 @@ import { contractorJobActionVisibility } from './features/work/jobActionVisibili
 import { EstimateLifecycleActions } from './features/work/EstimateLifecycleActions';
 import { LifecycleNextStep } from './features/work/LifecycleNextStep';
 import { createActionGuard } from './features/reliability/actionGuard';
+import {
+  completeDurableOperation,
+  durableFileSha256,
+  durableOperationKey, requestMediaContentType,
+  saveServiceRequestDurably,
+} from './features/reliability/durableOperation';
 import { userFacingError } from './features/reliability/userFacingError';
 import {
   WorkspaceLoadBoundary,
@@ -1262,12 +1268,12 @@ function draftLineHasContent(line: EstimateLineDraft) {
   return Boolean(draftLineTitle(line) || line.customer_description.trim());
 }
 
-function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate_id' | 'invoice_id', ownerId: string, index: number) {
+function persistedLineFieldsFromDraft(line: EstimateLineDraft, index: number) {
   const lineTitle = draftLineTitle(line);
   const legacyDescription = draftLineLegacyDescription(line);
   const laborHours = draftLineCanTrackLaborHours(line) ? parseLaborHoursValue(line.labor_hours) : null;
-  const persisted = {
-    [ownerIdField]: ownerId,
+  return {
+    job_work_item_id: line.job_work_item_id || null,
     line_type: normalizeEstimateLineType(line.line_type),
     description: legacyDescription,
     line_title: lineTitle || legacyDescription || null,
@@ -1280,10 +1286,6 @@ function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate
     labor_hours: laborHours,
     sort_order: index,
   };
-  if (ownerIdField === 'invoice_id' && line.job_work_item_id) {
-    return { ...persisted, job_work_item_id: line.job_work_item_id };
-  }
-  return persisted;
 }
 type InvoiceDraftForm = {
   invoice_number: string;
@@ -11288,7 +11290,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       attachments.push({
         storage_path: storagePath,
         file_name: file.name,
-        content_type: file.type,
+        content_type: file.type || 'application/octet-stream',
         file_size_bytes: file.size,
       });
     }
@@ -12481,19 +12483,29 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         return;
       }
 
-      const { data: createData, error: requestError } = await supabase.rpc('servsync_create_service_request', {
-        p_connection_id: serviceRequestDraft.connection_id,
-        p_category: serviceRequestDraft.category,
-        p_urgency: serviceRequestDraft.urgency,
-        p_title: serviceRequestDraft.title,
-        p_description: cleanHumanWrittenText(serviceRequestDraft.description),
-        p_home_id: serviceRequestDraft.home_id || selectedHome?.id || null,
-      });
-      if (requestError) throw requestError;
-
-      if (newRequestFiles.length > 0 && createData?.request_id) {
-        await uploadMediaFiles(newRequestFiles, createData.request_id as string, null);
+      const media = await Promise.all(newRequestFiles.map(async file => ({
+        file_name: file.name,
+        content_type: requestMediaContentType(file),
+        file_size_bytes: file.size,
+        extension: file.name.split('.').pop()?.toLowerCase() ?? '',
+        sha256: await durableFileSha256(file),
+      })));
+      const requestPayload = {
+        connection_id: serviceRequestDraft.connection_id,
+        category: serviceRequestDraft.category,
+        urgency: serviceRequestDraft.urgency,
+        title: serviceRequestDraft.title,
+        description: cleanHumanWrittenText(serviceRequestDraft.description),
+        home_id: serviceRequestDraft.home_id || selectedHome?.id || null,
+        media,
+      };
+      const operationScope = `homeowner:${profile.id}:service-request:create`;
+      const operationKey = await durableOperationKey(operationScope, requestPayload);
+      const createData = await saveServiceRequestDurably(supabase, newRequestFiles, operationKey, requestPayload);
+      if (!createData?.request_id) {
+        throw new Error('ServSync could not confirm the saved request. Retry this request without changing its details.');
       }
+      await completeDurableOperation(operationScope, operationKey, requestPayload);
 
       setServiceRequestDraft({
         connection_id: '',
@@ -23783,7 +23795,6 @@ function ContractorDashboard({
       const taxCents = 0;
       const property = estimateSourceProperty(estimateDraft);
       const estimatePayload = {
-        contractor_id: contractor.id,
         homeowner_user_id: subject.homeownerUserId || null,
         local_contact_id: subject.localContactId || null,
         service_request_id: estimateDraft.service_request_id || null,
@@ -23794,7 +23805,6 @@ function ContractorDashboard({
         scope: cleanHumanWrittenText(estimateDraft.scope),
         notes: cleanHumanWrittenText(estimateDraft.notes),
         terms: cleanHumanWrittenText(estimateDraft.terms),
-        status: 'draft',
         subtotal_cents: totals.subtotalCents,
         total_cents: totals.subtotalCents + taxCents,
         labor_mode: estimateDraft.labor_mode,
@@ -23806,58 +23816,22 @@ function ContractorDashboard({
         other_total_cents: totals.otherTotalCents,
         tax_rate_percent: null,
         tax_cents: taxCents,
+        line_items: usableLines.map((line, index) => persistedLineFieldsFromDraft(line, index)),
+        payment_schedule_items: scheduleForSave.rows,
       };
-      const { data: estimateData, error: estimateError } = currentEditingEstimateId
-        ? await supabase
-            .from('estimates')
-            .update(estimatePayload)
-            .eq('id', currentEditingEstimateId)
-            .select('*')
-            .single()
-        : await supabase
-            .from('estimates')
-            .insert(estimatePayload)
-            .select('*')
-            .single();
+      const operationScope = `contractor:${contractor.id}:estimate:${currentEditingEstimateId ?? 'new'}`;
+      const operationKey = await durableOperationKey(operationScope, estimatePayload);
+      const { data: estimateData, error: estimateError } = await supabase.rpc('servsync_save_estimate_draft_idempotent', {
+        p_operation_key: operationKey,
+        p_estimate_id: currentEditingEstimateId,
+        p_payload: estimatePayload,
+      });
       if (estimateError) throw estimateError;
-
-      const estimateId = (estimateData as Estimate).id;
-      if (currentEditingEstimateId) {
-        const { error: deleteLinesError } = await supabase
-          .from('estimate_line_items')
-          .delete()
-          .eq('estimate_id', estimateId);
-        if (deleteLinesError) throw deleteLinesError;
+      const savedEstimate = (estimateData as { estimate?: Estimate } | null)?.estimate;
+      if (!savedEstimate?.id) {
+        throw new Error('ServSync could not confirm the saved Estimate Draft. Retry without changing the draft.');
       }
-      const { error: linesError } = await supabase
-        .from('estimate_line_items')
-        .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'estimate_id', estimateId, index)));
-      if (linesError) throw linesError;
-
-      if (estimatePaymentScheduleDraft.explicit) {
-        const { error: deleteScheduleError } = await supabase
-          .from('estimate_payment_schedule_items')
-          .delete()
-          .eq('estimate_id', estimateId);
-        if (deleteScheduleError) throw deleteScheduleError;
-        if (scheduleForSave.rows.length > 0) {
-          const { error: scheduleError } = await supabase
-            .from('estimate_payment_schedule_items')
-            .insert(scheduleForSave.rows.map(row => ({
-              ...row,
-              estimate_id: estimateId,
-            })));
-          if (scheduleError) throw scheduleError;
-        }
-      }
-
-      const { data: savedEstimateData, error: savedEstimateError } = await supabase
-        .from('estimates')
-        .select(ESTIMATE_WITH_LINES_SELECT)
-        .eq('id', estimateId)
-        .single();
-      if (savedEstimateError) throw savedEstimateError;
-      const savedEstimate = savedEstimateData as Estimate;
+      await completeDurableOperation(operationScope, operationKey, estimatePayload);
       setEstimates(prev => [savedEstimate, ...prev.filter(item => item.id !== savedEstimate.id)]);
       setNotice(actionFeedbackMessage(
         currentEditingEstimateId ? 'Draft estimate updated' : 'Draft estimate saved',
@@ -23950,7 +23924,6 @@ function ContractorDashboard({
         ? parsePercentValue(invoiceDraft.discount)
         : dollarsToCents(invoiceDraft.discount) / 100;
       const invoicePayload = {
-        contractor_id: contractor.id,
         homeowner_user_id: subject.homeownerUserId || currentInvoice?.homeowner_user_id || null,
         local_contact_id: subject.localContactId || currentInvoice?.local_contact_id || null,
         service_request_id: invoiceDraft.service_request_id || null,
@@ -23963,7 +23936,6 @@ function ContractorDashboard({
         scope: cleanHumanWrittenText(invoiceDraft.scope),
         notes: cleanHumanWrittenText(invoiceDraft.notes),
         terms: cleanHumanWrittenText(invoiceDraft.terms),
-        status: 'draft',
         subtotal_cents: subtotalCents,
         labor_mode: invoiceDraft.labor_mode,
         labor_rate_cents: priceInputIsBlank(invoiceDraft.labor_rate) ? null : dollarsToCents(invoiceDraft.labor_rate),
@@ -23979,38 +23951,23 @@ function ContractorDashboard({
         discount_value: discountValue,
         discount_reason: cleanHumanWrittenText(invoiceDraft.discount_reason),
         total_cents: totalCents,
-        amount_paid_cents: 0,
         due_at: invoiceDraft.due_at ? `${invoiceDraft.due_at}T12:00:00.000Z` : null,
+        line_items: usableLines.map((line, index) => persistedLineFieldsFromDraft(line, index)),
       };
-      const { data: invoiceData, error: invoiceError } = editingInvoiceId
-        ? await supabase
-            .from('invoices')
-            .update(invoicePayload)
-            .eq('id', editingInvoiceId)
-            .eq('status', 'draft')
-            .select('*')
-            .single()
-        : await supabase
-            .from('invoices')
-            .insert(invoicePayload)
-            .select('*')
-            .single();
+      const operationScope = `contractor:${contractor.id}:invoice:${editingInvoiceId ?? 'new'}`;
+      const operationKey = await durableOperationKey(operationScope, invoicePayload);
+      const { data: invoiceData, error: invoiceError } = await supabase.rpc('servsync_save_invoice_draft_idempotent', {
+        p_operation_key: operationKey,
+        p_invoice_id: editingInvoiceId,
+        p_payload: invoicePayload,
+      });
       if (invoiceError) throw invoiceError;
-
-      const invoiceId = (invoiceData as Invoice).id;
-      if (editingInvoiceId) {
-        const { error: deleteLinesError } = await supabase
-          .from('invoice_line_items')
-          .delete()
-          .eq('invoice_id', invoiceId);
-        if (deleteLinesError) throw deleteLinesError;
+      const savedInvoice = (invoiceData as { invoice?: Invoice } | null)?.invoice;
+      if (!savedInvoice?.id) {
+        throw new Error('ServSync could not confirm the saved Invoice Draft. Retry without changing the draft.');
       }
-      const { error: linesError } = await supabase
-        .from('invoice_line_items')
-        .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'invoice_id', invoiceId, index)));
-      if (linesError) throw linesError;
-
-      const savedInvoice = await loadInvoiceById(invoiceId);
+      const invoiceId = savedInvoice.id;
+      await completeDurableOperation(operationScope, operationKey, invoicePayload);
       setNotice(actionFeedbackMessage(
         editingInvoiceId ? 'Draft invoice updated' : 'Draft invoice saved',
         'It remains private until you send it to the homeowner. Preview or download the PDF from the saved invoice actions now.',

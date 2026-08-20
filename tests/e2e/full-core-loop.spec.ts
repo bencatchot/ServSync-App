@@ -289,7 +289,7 @@ async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
   await main.getByRole('textbox', { name: /^Message to contractor$/i }).fill(requestDescription);
 
   const createRequestResponse = page.waitForResponse(
-    response => response.url().includes('/rpc/servsync_create_service_request'),
+    response => response.url().includes('/rpc/servsync_commit_service_request_creation'),
     { timeout: 30_000 },
   );
   await main.getByRole('button', { name: /^Send Request$/i }).click();
@@ -459,7 +459,7 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   await main.getByRole('textbox', { name: /^Invoice title$/i }).fill(invoiceTitle);
 
   const saveInvoiceResponse = page.waitForResponse(
-    response => response.url().includes('/rest/v1/invoices') && ['PATCH', 'POST'].includes(response.request().method()),
+    response => response.url().includes('/rpc/servsync_save_invoice_draft_idempotent'),
     { timeout: 30_000 },
   );
   const sendInvoiceResponse = page.waitForResponse(

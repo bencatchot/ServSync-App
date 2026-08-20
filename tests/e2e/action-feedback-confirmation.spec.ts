@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 
 const appPath = resolve(process.cwd(), 'src/App.tsx');
 const actionFeedbackPath = resolve(process.cwd(), 'src/features/feedback/ActionFeedback.tsx');
+const corePresentationPath = resolve(process.cwd(), 'src/features/presentation/CorePresentation.tsx');
+const presentationFeedbackPath = resolve(process.cwd(), 'src/features/presentation/presentationFeedback.ts');
 
 function read(path: string) {
   return readFileSync(path, 'utf8');
@@ -38,13 +40,14 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
 
   test('App Notice delegates to ActionFeedback without creating a global toast manager', () => {
     const app = read(appPath);
-    const noticeSource = sourceBetween(app, 'type NoticeContent = string | ActionFeedbackMessage;', 'const CALENDAR_EVENT_TYPE_OPTIONS');
+    const noticeSource = read(corePresentationPath);
+    const feedbackSource = read(presentationFeedbackPath);
 
-    expect(app).toContain("import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from './features/feedback/ActionFeedback';");
+    expect(app).toContain('type NoticeContent');
     expect(noticeSource).toContain('<ActionFeedback');
     expect(noticeSource).toContain('compact');
-    expect(noticeSource).toContain('actionFeedbackMessage');
-    expect(noticeSource).not.toMatch(/createPortal|Toast|toast|NotificationProvider|localStorage|sessionStorage|setTimeout/);
+    expect(feedbackSource).toContain('actionFeedbackMessage');
+    expect(`${noticeSource}\n${feedbackSource}`).not.toMatch(/createPortal|Toast|toast|NotificationProvider|localStorage|sessionStorage|setTimeout/);
   });
 
   test('selected homeowner actions use outcome-specific feedback without workflow promises', () => {
@@ -67,7 +70,8 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(appointmentSource).toContain('The contractor still needs to confirm before the appointment changes.');
     expect(appointmentSource).toContain("'Visit time confirmed'");
 
-    expect(requestSource).toContain("supabase.rpc('servsync_create_service_request'");
+    expect(requestSource).toContain("supabase.rpc('servsync_prepare_service_request_creation'");
+    expect(requestSource).toContain("supabase.rpc('servsync_commit_service_request_creation'");
     expect(estimateSource).toContain("supabase.rpc('servsync_homeowner_respond_to_estimate'");
     expect(agreementSource).toContain("supabase.rpc('servsync_homeowner_respond_to_service_agreement_offer'");
     expect(appointmentSource).toContain("supabase.rpc('servsync_homeowner_respond_to_appointment'");
@@ -92,8 +96,8 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(invoiceSource).toContain('It remains private until you send it to the homeowner.');
     expect(invoiceSource).toContain("'Invoice sent'");
     expect(invoiceSource).toContain('Online payment appears only when the contractor has completed Stripe test setup; offline payment remains available.');
-    expect(invoiceSource).toContain("'Invoice marked paid'");
-    expect(invoiceSource).toContain('ServSync did not process a payment.');
+    expect(invoiceSource).toContain("'Invoice paid'");
+    expect(invoiceSource).toContain('ServSync recorded an offline payment and did not process money.');
     expect(invoiceSource).toContain("'Invoice voided'");
     expect(jobCreateSource).toContain("'Job created'");
     expect(homeMapSource).toContain("'Home Map update submitted'");

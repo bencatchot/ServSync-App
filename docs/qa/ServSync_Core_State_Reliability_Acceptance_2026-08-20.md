@@ -35,14 +35,14 @@ Base: `0b73ce7073bf76ce1f328ae6698cbf6b0fec3f4b`
 
 Client action guards intentionally make no server-level claim. They acquire synchronously before the first awaited operation so rapid repeat clicks in the same application instance cannot start a second request. Refresh, another tab, a lost response, or another client still requires a durable server contract.
 
-## Protected Backend Changes Required For Full Phase 0.4 Acceptance
+## Protected Backend Follow-Up Status
 
-These changes were not authorized and were not applied:
+The owner subsequently authorized FB-039E1. Request creation and direct Estimate/Invoice Draft save requirements are now implemented and rolled out through the exact checksummed migration documented in [FB-039E1 acceptance](ServSync_Core_Authoring_Durable_Idempotency_Acceptance_2026-08-20.md). They remain subject to review of the draft application PR, but are no longer unimplemented backend gaps.
 
-1. Add a purpose-bound idempotency key and durable operation receipt to service-request creation. Reusing a key must return the original Request; conflicting payload reuse must fail closed.
-2. Replace direct multi-write Estimate and Invoice authoring with transactional, idempotent save operations covering header, lines, schedule, lineage, and one durable result.
-3. Make Job report finalization one replay-safe operation across canonical report identity, document registration, Home History, and notification. Storage preparation/finalization may be split, but the stable operation identity must prevent duplicate documents, notifications, and orphaned replacement uploads.
-4. Make manual Home History plus optional document registration transactional or operation-receipted, with one stable document/storage identity and conflict detection.
+The following protected changes still remain for full Phase 0.4 acceptance:
+
+1. Make Job report finalization one replay-safe operation across canonical report identity, document registration, Home History, and notification. Storage preparation/finalization may be split, but the stable operation identity must prevent duplicate documents, notifications, and orphaned replacement uploads.
+2. Make manual Home History plus optional document registration transactional or operation-receipted, with one stable document/storage identity and conflict detection.
 
 Each requires separately approved SQL/RPC/security work, focused concurrency and lost-response tests, cross-tenant/RLS validation, Sandbox -> Demo -> Production rollout, and exact preservation checks. Client hiding or button disabling is not an acceptable substitute.
 
@@ -79,4 +79,4 @@ Authenticated Preview evidence:
 
 ## Status
 
-Application candidate validated locally and against the exact deployed application commit. The presentation and browser-side reliability work may be reviewed independently, but FB-039E Phase 0.4 must not be marked fully complete until the protected backend operation contracts above are approved, implemented, and validated. An approved target-aligned shared-home member/viewer fixture is also required to repeat that distinct authenticated role pair; existing authority tests and application behavior were not weakened to manufacture the evidence.
+The application layer merged through PR #509 at `4a2fb59`. FB-039E1 now closes the Request and direct Estimate/Invoice Draft durable-operation gaps, subject to its draft PR review. FB-039E Phase 0.4 must not be marked fully complete until FB-039E2 report/Home History/document finalization and the remaining shared-home member/viewer acceptance are implemented and validated. Existing authority was not weakened to manufacture evidence.
