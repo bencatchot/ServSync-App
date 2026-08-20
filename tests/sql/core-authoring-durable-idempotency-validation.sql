@@ -50,6 +50,15 @@ begin
     raise exception 'Core-authoring RPC overload count is ambiguous.';
   end if;
 
+  if coalesce(obj_description('public.servsync_prepare_service_request_creation(uuid,jsonb)'::regprocedure,'pg_proc'),'')
+       <> 'servsync-core-authoring-request-preparation-renewal-v1'
+     or pg_get_functiondef('public.servsync_prepare_service_request_creation(uuid,jsonb)'::regprocedure)
+       not like '%''renewed'', true%'
+     or pg_get_functiondef('public.servsync_prepare_service_request_creation(uuid,jsonb)'::regprocedure)
+       not like '%expires_at = now() + interval ''30 days''%' then
+    raise exception 'Request preparation renewal forward fix is missing.';
+  end if;
+
   if not has_function_privilege('authenticated','public.servsync_prepare_service_request_creation(uuid,jsonb)','execute')
      or not has_function_privilege('authenticated','public.servsync_commit_service_request_creation(uuid,jsonb)','execute')
      or not has_function_privilege('authenticated','public.servsync_save_estimate_draft_idempotent(uuid,uuid,jsonb)','execute')

@@ -8,6 +8,18 @@ type DurableOperationRecord = {
 
 const STORAGE_PREFIX = 'servsync.durableOperation.v1.';
 
+const REQUEST_MEDIA_CONTENT_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+};
+
 export type PreparedRequestMedia = {
   ordinal: number;
   storage_path: string;
@@ -48,6 +60,13 @@ async function sha256(value: string) {
 export async function durableFileSha256(file: File) {
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function requestMediaContentType(file: Pick<File, 'name' | 'type'>) {
+  const browserType = file.type.trim().toLowerCase();
+  if (browserType) return browserType;
+  const extension = file.name.split('.').pop()?.trim().toLowerCase() ?? '';
+  return REQUEST_MEDIA_CONTENT_TYPES[extension] ?? 'application/octet-stream';
 }
 
 export async function uploadPreparedRequestMedia(

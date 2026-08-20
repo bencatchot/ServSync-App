@@ -304,28 +304,81 @@ async function run() {
   }, 'Request same-key/different-payload replay');
 
   const mediaKey = uuid();
-  const bytes = Uint8Array.from(Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415408d763f8cfc0f01f00050001ff89993d1d0000000049454e44ae426082', 'hex'));
-  const mediaSha = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+  const pngBytes = Uint8Array.from(Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415408d763f8cfc0f01f00050001ff89993d1d0000000049454e44ae426082', 'hex'));
+  const heicBytes = Uint8Array.from(Buffer.from(`${marker}-heic-fixture`));
+  const pngSha = Buffer.from(await crypto.subtle.digest('SHA-256', pngBytes)).toString('hex');
+  const heicSha = Buffer.from(await crypto.subtle.digest('SHA-256', heicBytes)).toString('hex');
   const mediaPayload = {
     ...requestPayload,
     title: `${marker} Request with media`,
-    media: [{ file_name: 'fixture.png', content_type: 'image/png', file_size_bytes: bytes.byteLength, extension: 'png', sha256: mediaSha }],
+    media: [
+      { file_name: 'fixture.png', content_type: 'image/png', file_size_bytes: pngBytes.byteLength, extension: 'png', sha256: pngSha },
+      { file_name: 'browser-empty-type.heic', content_type: 'image/heic', file_size_bytes: heicBytes.byteLength, extension: 'heic', sha256: heicSha },
+    ],
   };
   const mediaPreparation = await rpcOk(homeowner.client, 'servsync_prepare_service_request_creation', { p_operation_key: mediaKey, p_payload: mediaPayload });
-  const mediaPath = mediaPreparation.media_manifest?.[0]?.storage_path;
-  assert.ok(mediaPath);
-  uploadedPaths.push(mediaPath);
-  const { error: uploadError } = await homeowner.client.storage.from('service-request-media').upload(mediaPath, bytes, {
+  const firstMediaPath = mediaPreparation.media_manifest?.[0]?.storage_path;
+  const secondMediaPath = mediaPreparation.media_manifest?.[1]?.storage_path;
+  assert.ok(firstMediaPath && secondMediaPath);
+  uploadedPaths.push(firstMediaPath, secondMediaPath);
+  const { error: firstUploadError } = await homeowner.client.storage.from('service-request-media').upload(firstMediaPath, pngBytes, {
     contentType: 'image/png',
     upsert: false,
-    metadata: { servsync_sha256: mediaSha, servsync_operation_key: mediaKey },
+    metadata: { servsync_sha256: pngSha, servsync_operation_key: mediaKey },
   });
-  if (uploadError) throw new Error(`Prepared Request media upload failed: ${uploadError.message}`);
+  if (firstUploadError) throw new Error(`Prepared Request media upload failed: ${firstUploadError.message}`);
+
+  await managementQuery(`
+    update public.servsync_core_authoring_operations
+       set expires_at=now()-interval '1 second', updated_at=now()
+     where actor_user_id='${homeowner.user.id}'::uuid
+       and operation_type='service_request_create'
+       and operation_key='${mediaKey}'::uuid
+       and status='prepared';
+  `);
+  await rpcDenied(homeowner.client, 'servsync_prepare_service_request_creation', {
+    p_operation_key: mediaKey,
+    p_payload: { ...mediaPayload, title: `${marker} expired conflicting Request` },
+  }, 'expired Request same-key/different-payload replay');
+  const partialRenewal = await rpcOk(homeowner.client, 'servsync_prepare_service_request_creation', { p_operation_key: mediaKey, p_payload: mediaPayload });
+  assert.equal(partialRenewal.renewed, true);
+  assert.deepEqual(partialRenewal.media_manifest, mediaPreparation.media_manifest, 'renewal must preserve deterministic media paths');
+
+  const { error: duplicateFirstUpload } = await homeowner.client.storage.from('service-request-media').upload(firstMediaPath, pngBytes, {
+    contentType: 'image/png',
+    upsert: false,
+    metadata: { servsync_sha256: pngSha, servsync_operation_key: mediaKey },
+  });
+  assert.ok(duplicateFirstUpload, 'a partially existing deterministic upload must remain a duplicate');
+  const { error: secondUploadError } = await homeowner.client.storage.from('service-request-media').upload(secondMediaPath, heicBytes, {
+    contentType: 'image/heic',
+    upsert: false,
+    metadata: { servsync_sha256: heicSha, servsync_operation_key: mediaKey },
+  });
+  if (secondUploadError) throw new Error(`Prepared HEIC Request media upload failed: ${secondUploadError.message}`);
+
+  await managementQuery(`
+    update public.servsync_core_authoring_operations
+       set expires_at=now()-interval '1 second', updated_at=now()
+     where actor_user_id='${homeowner.user.id}'::uuid
+       and operation_type='service_request_create'
+       and operation_key='${mediaKey}'::uuid
+       and status='prepared';
+  `);
+  const completeRenewal = await rpcOk(homeowner.client, 'servsync_prepare_service_request_creation', { p_operation_key: mediaKey, p_payload: mediaPayload });
+  assert.equal(completeRenewal.renewed, true);
+  assert.deepEqual(completeRenewal.media_manifest, mediaPreparation.media_manifest, 'all-existing media renewal must preserve the manifest');
   const mediaResult = await rpcOk(homeowner.client, 'servsync_commit_service_request_creation', { p_operation_key: mediaKey, p_payload: mediaPayload });
   createdRequestIds.push(mediaResult.request_id);
   const mediaReplay = await rpcOk(homeowner.client, 'servsync_commit_service_request_creation', { p_operation_key: mediaKey, p_payload: mediaPayload });
   assert.equal(mediaReplay.request_id, mediaResult.request_id);
-  assert.equal(await countRows('service_request_media', 'request_id', mediaResult.request_id), 1);
+  assert.equal(await countRows('service_request_media', 'request_id', mediaResult.request_id), 2);
+  const succeededBefore = await managementQuery(`select expires_at,updated_at from public.servsync_core_authoring_operations where operation_key='${mediaKey}'::uuid;`);
+  const succeededPreparation = await rpcOk(homeowner.client, 'servsync_prepare_service_request_creation', { p_operation_key: mediaKey, p_payload: mediaPayload });
+  const succeededAfter = await managementQuery(`select expires_at,updated_at from public.servsync_core_authoring_operations where operation_key='${mediaKey}'::uuid;`);
+  assert.equal(succeededPreparation.status, 'succeeded');
+  assert.equal(succeededPreparation.renewed, undefined);
+  assert.deepEqual(succeededAfter, succeededBefore, 'a succeeded receipt must not be mutated by preparation replay');
 
   const estimateKey = uuid();
   const estimate = estimatePayload(subject, `${marker} Estimate`);
@@ -467,7 +520,7 @@ async function run() {
     target,
     projectRef,
     marker,
-    request: { sequentialReplay: 'PASS', concurrentReplay: 'PASS', lostResponseReplay: 'PASS', conflict: 'PASS', media: 'PASS' },
+    request: { sequentialReplay: 'PASS', concurrentReplay: 'PASS', lostResponseReplay: 'PASS', conflict: 'PASS', media: 'PASS', expiredPreparationRenewal: 'PASS', partialAndCompleteMediaReuse: 'PASS', succeededReceiptImmutable: 'PASS' },
     estimate: { createReplay: 'PASS', updateReplay: 'PASS', replacementAtomicity: 'PASS', lifecycleDenial: 'PASS', connectedLocalParity: 'PASS' },
     invoice: { createReplay: 'PASS', updateReplay: 'PASS', replacementAtomicity: 'PASS', lifecycleDenial: 'PASS', connectedLocalParity: 'PASS' },
     security: { crossTenant: 'PASS', homeownerAuthoringDenial: 'PASS', roleMatrix: target === 'sandbox' ? 'PASS' : 'bounded-owner-smoke' },

@@ -336,7 +336,7 @@ import { createActionGuard } from './features/reliability/actionGuard';
 import {
   completeDurableOperation,
   durableFileSha256,
-  durableOperationKey,
+  durableOperationKey, requestMediaContentType,
   saveServiceRequestDurably,
 } from './features/reliability/durableOperation';
 import { userFacingError } from './features/reliability/userFacingError';
@@ -12485,7 +12485,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       const media = await Promise.all(newRequestFiles.map(async file => ({
         file_name: file.name,
-        content_type: file.type,
+        content_type: requestMediaContentType(file),
         file_size_bytes: file.size,
         extension: file.name.split('.').pop()?.toLowerCase() ?? '',
         sha256: await durableFileSha256(file),

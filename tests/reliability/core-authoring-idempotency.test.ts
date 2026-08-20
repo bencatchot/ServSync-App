@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -6,7 +7,9 @@ import {
   completeDurableOperation,
   durableOperationCanonicalPayload,
   durableOperationKey,
+  requestMediaContentType,
   saveServiceRequestDurably,
+  uploadPreparedRequestMedia,
 } from '../../src/features/reliability/durableOperation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -22,6 +25,14 @@ test('canonical payload ordering is deterministic', () => {
     durableOperationCanonicalPayload({ z: 1, nested: { b: 2, a: 1 }, rows: [{ y: 2, x: 1 }] }),
     durableOperationCanonicalPayload({ rows: [{ x: 1, y: 2 }], nested: { a: 1, b: 2 }, z: 1 }),
   );
+});
+
+test('Request media derives a stable allowlisted MIME when the browser type is empty', () => {
+  assert.equal(requestMediaContentType({ name: 'kitchen.HEIC', type: '' }), 'image/heic');
+  assert.equal(requestMediaContentType({ name: 'walkthrough.MOV', type: '  ' }), 'video/quicktime');
+  assert.equal(requestMediaContentType({ name: 'before.jpeg', type: '' }), 'image/jpeg');
+  assert.equal(requestMediaContentType({ name: 'clip.webm', type: 'video/webm' }), 'video/webm');
+  assert.equal(requestMediaContentType({ name: 'unsupported.bin', type: '' }), 'application/octet-stream');
 });
 
 test('operation keys survive equivalent retry and rotate for changed payload or confirmed success', async () => {
@@ -66,8 +77,31 @@ test('a lost Request response reconciles the durable success before another atta
   assert.equal(rpcCalls, 1);
 });
 
+test('Request media upload reuses deterministic objects and continues missing uploads', async () => {
+  const uploaded: string[] = [];
+  const supabase = {
+    storage: {
+      from: () => ({
+        upload: async (path: string) => {
+          uploaded.push(path);
+          return path.endsWith('existing.heic')
+            ? { error: { statusCode: '409', message: 'The resource already exists' } }
+            : { error: null };
+        },
+      }),
+    },
+  } as unknown as SupabaseClient;
+  const files = [{ name: 'existing.heic' }, { name: 'missing.png' }] as File[];
+  await uploadPreparedRequestMedia(supabase, files, [
+    { ordinal: 0, storage_path: 'operation/existing.heic', sha256: 'a'.repeat(64), file_name: 'existing.heic', content_type: 'image/heic', file_size_bytes: 1 },
+    { ordinal: 1, storage_path: 'operation/missing.png', sha256: 'b'.repeat(64), file_name: 'missing.png', content_type: 'image/png', file_size_bytes: 1 },
+  ], 'operation-key');
+  assert.deepEqual(uploaded, ['operation/existing.heic', 'operation/missing.png']);
+});
+
 test('migration defines one private forced-RLS receipt model and purpose-bound RPCs', async () => {
   const sql = await readFile(new URL('../../servsync-core-authoring-durable-idempotency.sql', import.meta.url), 'utf8');
+  assert.equal(createHash('sha256').update(sql).digest('hex'), '5a364e95d2e791f0adc4712bc71502ebc732f3285e79c690220020e83b9f77f6');
   assert.match(sql, /create table public\.servsync_core_authoring_operations/);
   assert.match(sql, /enable row level security;\s*alter table public\.servsync_core_authoring_operations force row level security/);
   assert.match(sql, /revoke all on table public\.servsync_core_authoring_operations from public, anon, authenticated, service_role/);
@@ -76,6 +110,21 @@ test('migration defines one private forced-RLS receipt model and purpose-bound R
   assert.match(sql, /servsync_commit_service_request_creation/);
   assert.match(sql, /servsync_save_estimate_draft_idempotent/);
   assert.match(sql, /servsync_save_invoice_draft_idempotent/);
+});
+
+test('forward fix renews only expired same-payload Request preparations', async () => {
+  const sql = await readFile(new URL('../../servsync-core-authoring-request-preparation-renewal-forward-fix.sql', import.meta.url), 'utf8');
+  assert.match(sql, /servsync_private_core_authoring_operation_lock\(v_actor, 'service_request_create', p_operation_key\)[\s\S]*for update/);
+  assert.match(sql, /payload_sha256 <> v_hash/);
+  assert.match(sql, /v_existing\.status = 'succeeded'[\s\S]*return v_existing\.result_payload/);
+  assert.match(sql, /v_existing\.status <> 'prepared'/);
+  assert.match(sql, /v_existing\.expires_at > now\(\)[\s\S]*update public\.servsync_core_authoring_operations[\s\S]*expires_at = now\(\) \+ interval '30 days'/);
+  assert.match(sql, /contractor_id = v_existing\.contractor_id[\s\S]*connection\.status = 'active'/);
+  assert.match(sql, /home\.homeowner_user_id = v_actor/);
+  assert.match(sql, /'renewed', true/);
+  assert.match(sql, /comment on function public\.servsync_prepare_service_request_creation\(uuid,jsonb\)/);
+  assert.match(sql, /revoke all on function public\.servsync_prepare_service_request_creation\(uuid,jsonb\) from public, anon, authenticated, service_role/);
+  assert.match(sql, /grant execute on function public\.servsync_prepare_service_request_creation\(uuid,jsonb\) to authenticated/);
 });
 
 test('every operation locks before receipt resolution and rejects conflicting fingerprints', async () => {
@@ -127,9 +176,12 @@ test('application handlers use only durable RPC paths for the protected operatio
   const estimate = source.slice(source.indexOf('const saveEstimateDraft = async'), source.indexOf('const saveInvoiceDraft = async'));
   const invoice = source.slice(source.indexOf('const saveInvoiceDraft = async'), source.indexOf('const sendInvoiceToHomeowner'));
   assert.match(request, /saveServiceRequestDurably/);
+  assert.match(request, /content_type: requestMediaContentType\(file\)/);
+  assert.doesNotMatch(request, /content_type: file\.type/);
   assert.doesNotMatch(request, /rpc\('servsync_create_service_request'/);
   assert.match(durableOperations, /servsync_prepare_service_request_creation/);
   assert.match(durableOperations, /servsync_commit_service_request_creation/);
+  assert.match(durableOperations, /contentType: item\.content_type/);
   assert.match(estimate, /servsync_save_estimate_draft_idempotent/);
   assert.doesNotMatch(estimate, /from\('estimates'\)|from\('estimate_line_items'\)|from\('estimate_payment_schedule_items'\)/);
   assert.match(invoice, /servsync_save_invoice_draft_idempotent/);

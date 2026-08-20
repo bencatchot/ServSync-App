@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "core-authoring-request-preparation-renewal-forward-fix-v1",
+      "artifact": "servsync-core-authoring-request-preparation-renewal-forward-fix.sql (SHA-256 b4db9bebfc085e7b2c02a48797ed05c99f4e3aa81739c35d84c84bc36de28eb8)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 207-line forward fix was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-20 after rollback-only compilation. Same-key/same-payload expired preparation renewed the original receipt and deterministic manifest with partial and complete media already present; conflict denial, successful-receipt immutability, commit, role/tenant checks, exact business counts, and zero fixture residue passed."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. Bounded fictional renewal, partial/all-existing media reuse, conflict, commit, successful-receipt immutability, catalog/security parity, and zero-residue checks passed; existing business counts remained zero."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact bytes were applied to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. Read-only catalog/security checks passed; Requests 23, messages 29, Request media 1, Estimates 22, Estimate lines 39, schedules 12, Invoices 12, Invoice lines 33, and receipts 0 remained exact. No Production runtime fixture or business-record mutation ran."
+        }
+      }
+    },
+    {
       "id": "core-authoring-durable-idempotency-v1",
       "artifact": "servsync-core-authoring-durable-idempotency.sql (SHA-256 5a364e95d2e791f0adc4712bc71502ebc732f3285e79c690220020e83b9f77f6)",
       "environments": {
