@@ -15,13 +15,7 @@ import {
   rotateLocalEstimateDeliveryLink,
   sendLocalEstimateEmail,
 } from './requestFreeEstimateDelivery';
-
-function readableError(error: unknown, fallback: string) {
-  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-    return error.message;
-  }
-  return fallback;
-}
+import { userFacingError as readableError } from '../reliability/userFacingError';
 
 function dateTime(value: string | null) {
   if (!value) return 'Not yet';

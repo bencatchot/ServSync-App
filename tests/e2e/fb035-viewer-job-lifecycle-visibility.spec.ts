@@ -50,10 +50,17 @@ async function openJobsAs(page: Page, role: OperationalRole | 'viewer') {
   await main.getByLabel(/^Password$/i).fill(roleCredential(ROLE_ENV[role].password));
   await main.getByRole('button', { name: /^Sign in$/i }).click();
   await expect(page.getByText(/Contractor command center/i)).toBeVisible({ timeout: 30_000 });
-  if (!(await main.getByText(/^Jobs workspace$/i).isVisible())) {
-    await page.getByRole('button', { name: /^Jobs(?:\s+\d+)?$/i }).last().click();
+  const workWorkspace = main.getByText(/^Work workspace$/i);
+  if (!(await workWorkspace.isVisible())) {
+    await page.getByRole('button', { name: /^Work(?:\s+\d+)?$/i }).last().click();
   }
+  await expect(workWorkspace).toBeVisible();
   await expect(main.getByText(/Loading contractor workspace/i)).toBeHidden({ timeout: 30_000 });
+  const openJobsHeading = main.getByRole('heading', { level: 2, name: /^Open jobs$/i });
+  if (!(await openJobsHeading.isVisible())) {
+    await main.getByRole('button', { name: /Active Jobs/i }).first().click();
+  }
+  await expect(openJobsHeading).toBeVisible();
   return main;
 }
 
@@ -113,7 +120,7 @@ test.describe('FB-035 Viewer Job lifecycle visibility', () => {
   test('prevents cached edits, autosave, uploads, lifecycle handlers, and direct stale UI calls', () => {
     const source = appSource();
     expect(source).toContain("const storedDraft = canManageJobOperations && insp.status === 'draft'");
-    expect(source).toContain('if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;');
+    expect(source).toContain("if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection || completingInspectionId === activeInspection.id) return;");
     for (const marker of [
       'const persistInspectionRooms = async',
       'const startNewInspection = async',

@@ -46,10 +46,15 @@ async function openTab(page: Page, name: RegExp, heading: RegExp) {
 }
 
 async function openJobs(page: Page) {
-  await openTab(page, /^Jobs(?:\s+\d+)?$/i, /^Jobs$/i);
+  await openTab(page, /^Work(?:\s+\d+)?$/i, /^Work$/i);
   const main = page.getByRole('main');
   await expect(main.getByText(/Loading contractor workspace/i)).toBeHidden({ timeout: 30_000 });
-  await expect(main.getByText(/^Jobs workspace$/i)).toBeVisible();
+  await expect(main.getByText(/^Work workspace$/i)).toBeVisible();
+  const openJobsHeading = main.getByRole('heading', { level: 2, name: /^Open jobs$/i });
+  if (!(await openJobsHeading.isVisible())) {
+    await main.getByRole('button', { name: /Active Jobs/i }).first().click();
+  }
+  await expect(openJobsHeading).toBeVisible();
   return main;
 }
 
@@ -147,11 +152,11 @@ test.describe('FB-016 recurring authenticated role browser smoke', () => {
       const assertClean = captureOperationalErrors(page);
       if (portal === 'contractor') {
         await signInContractor(page, 'owner');
-        await openMobileTab(page, /^Jobs(?:\s+\d+)?$/i, /^Jobs$/i);
-        await expect(page.getByRole('main').getByText(/^Jobs workspace$/i)).toBeVisible();
+        await openMobileTab(page, /^Work(?:\s+\d+)?$/i, /^Work$/i);
+        await expect(page.getByRole('main').getByText(/^Work workspace$/i)).toBeVisible();
       } else {
         await signInHomeowner(page);
-        await openMobileTab(page, /^Properties\b/i, /^Properties$/i);
+        await openMobileTab(page, /^Properties\b/i, /^My Home$/i);
       }
       expect(await page.locator('html').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
       assertClean();

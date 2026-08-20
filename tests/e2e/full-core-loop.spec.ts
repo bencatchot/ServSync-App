@@ -176,6 +176,39 @@ async function markSeededPricedWorkItemsCompleted(jobId: string) {
   }
 }
 
+async function verifyPersistedInvoicePaymentState(
+  invoiceTitle: string,
+  expectedStatus: 'partially_paid' | 'paid',
+  expectedAmountPaidCents: number,
+) {
+  const url = requiredEnv('VITE_SUPABASE_URL');
+  if (!url.includes(SANDBOX_SUPABASE_REF)) {
+    throw new Error(`Refusing persisted Invoice verification outside sandbox ref ${SANDBOX_SUPABASE_REF}.`);
+  }
+  const client = createClient(url, requiredEnv('VITE_SUPABASE_ANON_KEY'), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  try {
+    const signIn = await client.auth.signInWithPassword(credentialsFor('contractor'));
+    expect(signIn.error, 'Contractor test-account login for persisted Invoice verification should succeed').toBeNull();
+
+    const invoice = await client
+      .from('invoices')
+      .select('status, amount_paid_cents')
+      .eq('title', invoiceTitle)
+      .single();
+    expect(invoice.error, 'Recorded payment Invoice should remain readable after the RPC response').toBeNull();
+    expect(invoice.data?.status).toBe(expectedStatus);
+    expect(invoice.data?.amount_paid_cents).toBe(expectedAmountPaidCents);
+  } finally {
+    await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  }
+}
+
 async function setPropertyScopeAllIfAvailable(main: Locator, label: RegExp) {
   const scope = main.getByLabel(label);
   if ((await scope.count()) > 0) {
@@ -281,7 +314,7 @@ async function createAndSendEstimateFromRequest(page: Page, requestTitle: string
   await expect(createEstimate).toBeVisible({ timeout: 30_000 });
   await createEstimate.click();
 
-  await expectActiveTabHeading(page, /^Jobs$/i);
+  await expectActiveTabHeading(page, /^Work$/i);
   await expect(main.getByText(/^Estimate draft$/i)).toBeVisible({ timeout: 30_000 });
   const buildBlankEstimate = main.getByRole('button', { name: /^Build blank estimate\b/i }).first();
   if (await buildBlankEstimate.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -347,9 +380,9 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   const main = page.getByRole('main');
   const invoiceTitle = `${recordPrefix} Invoice`;
 
-  await openSidebarTab(page, /^Jobs\b/i);
-  await expectActiveTabHeading(page, /^Jobs$/i);
-  await main.getByRole('button', { name: /^Estimates:/i }).click();
+  await openSidebarTab(page, /^Work\b/i);
+  await expectActiveTabHeading(page, /^Work$/i);
+  await main.getByRole('button', { name: /Open Estimates/i }).click();
   const estimatesTab = main.getByRole('tab', { name: /^Estimates\b/i }).first();
   await estimatesTab.waitFor({ state: 'visible', timeout: 30_000 });
   await estimatesTab.click();
@@ -379,14 +412,20 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   }
 
   const saveProgressResponse = page.waitForResponse(
-    response => response.url().includes('/rpc/servsync_update_inspection'),
+    response => response.url().includes('/rpc/servsync_update_inspection')
+      && response.request().postDataJSON()?.p_inspection_id === jobId,
     { timeout: 30_000 },
   );
   await main.getByTestId('contractor-save-job-progress').click();
   expect((await saveProgressResponse).ok()).toBeTruthy();
-  await expect(main.getByText(/Progress saved/i)).toBeVisible({ timeout: 30_000 });
+  await expect(main.getByText(/Progress (?:saved|is already saving)/i)).toBeVisible({ timeout: 30_000 });
   await markSeededPricedWorkItemsCompleted(jobId);
   await page.reload();
+
+  const persistedWorkCheckbox = main.locator('[data-testid="contractor-approved-work-checkbox"], [data-testid="contractor-work-item-checkbox"]').first();
+  await expect(persistedWorkCheckbox).toBeChecked({ timeout: 30_000 });
+  await expect(main.getByPlaceholder('Describe work performed, materials used, open follow-up, or completion notes...'))
+    .toHaveValue(new RegExp(escapeRegExp(recordPrefix)), { timeout: 30_000 });
 
   const completeJob = main.getByTestId('contractor-complete-job');
   await expect(completeJob).toBeEnabled({ timeout: 30_000 });
@@ -437,19 +476,31 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
 
 async function openContractorInvoiceCard(page: Page, invoiceTitle: string, closed = false) {
   const main = page.getByRole('main');
-  await openSidebarTab(page, /^Jobs\b/i);
-  await expectActiveTabHeading(page, /^Jobs$/i);
+  await openSidebarTab(page, /^Financials\b/i);
+  await expectActiveTabHeading(page, /^Financials$/i);
 
-  await main.getByRole('button', { name: /^Invoices:/i }).click();
+  const financialsDashboard = main.getByTestId('contractor-financials-dashboard');
+  const financialsOverviewTab = main.getByTestId('contractor-financials-header-tab-overview');
+  await expect(financialsDashboard.or(financialsOverviewTab).first()).toBeVisible({ timeout: 30_000 });
+  if (await financialsOverviewTab.isVisible()) {
+    await financialsOverviewTab.click();
+  }
+  await expect(financialsDashboard).toBeVisible({ timeout: 30_000 });
+  await financialsDashboard
+    .getByTestId(closed ? 'contractor-financials-summary-closed' : 'contractor-financials-summary-open')
+    .click();
 
   const invoicesTab = main.getByRole('tab', { name: /^Invoices\b/i }).first();
   await invoicesTab.waitFor({ state: 'visible', timeout: 30_000 });
-  await invoicesTab.click();
+  await expect(invoicesTab).toHaveAttribute('aria-selected', 'true');
 
   const search = main.getByTestId('contractor-invoice-search');
   await search.waitFor({ state: 'visible', timeout: 30_000 });
   await search.fill(invoiceTitle);
-  await main.getByTestId('contractor-invoice-status-filter').selectOption(closed ? 'paid' : 'all');
+  const expectedStatusFilter = closed ? 'paid' : 'all';
+  const statusFilter = main.getByTestId('contractor-invoice-status-filter');
+  await statusFilter.selectOption(expectedStatusFilter);
+  await expect(statusFilter).toHaveValue(expectedStatusFilter);
   const invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
   await expect(invoiceCard).toBeVisible({ timeout: 30_000 });
   return invoiceCard;
@@ -473,6 +524,7 @@ async function recordFullOfflinePayment(page: Page, invoiceTitle: string, record
   await dialog.getByRole('button', { name: /^Record payment$/i }).click();
   expect((await paymentResponse).ok()).toBeTruthy();
   await expect(page.getByRole('main').getByText(/^Invoice paid$/i)).toBeVisible({ timeout: 30_000 });
+  await verifyPersistedInvoicePaymentState(invoiceTitle, 'paid', 12_500);
 
   await page.reload();
   invoiceCard = await openContractorInvoiceCard(page, invoiceTitle, true);
@@ -515,6 +567,7 @@ async function recordPartialThenFinalOfflinePayment(page: Page, invoiceTitle: st
   await dialog.getByRole('button', { name: /^Record payment$/i }).click();
   expect((await paymentResponse).ok()).toBeTruthy();
   await expect(page.getByRole('main').getByText(/^Payment recorded$/i)).toBeVisible({ timeout: 30_000 });
+  await verifyPersistedInvoicePaymentState(invoiceTitle, 'partially_paid', 4_000);
 
   await page.reload();
   invoiceCard = await openContractorInvoiceCard(page, invoiceTitle);
@@ -538,6 +591,7 @@ async function recordPartialThenFinalOfflinePayment(page: Page, invoiceTitle: st
   await dialog.getByRole('button', { name: /^Record payment$/i }).click();
   expect((await paymentResponse).ok()).toBeTruthy();
   await expect(page.getByRole('main').getByText(/^Invoice paid$/i)).toBeVisible({ timeout: 30_000 });
+  await verifyPersistedInvoicePaymentState(invoiceTitle, 'paid', 12_500);
 
   await page.reload();
   invoiceCard = await openContractorInvoiceCard(page, invoiceTitle, true);
@@ -589,11 +643,8 @@ async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, re
   await expectActiveTabHeading(page, /^Estimates \/ Invoices$/i);
   await setPropertyScopeAllIfAvailable(main, /^Property scope$/i);
   const paidInvoices = main.getByRole('button').filter({ hasText: /^Paid \/ Closed/i }).first();
-  if (await paidInvoices.isVisible().catch(() => false)) {
-    await paidInvoices.click();
-  } else {
-    await main.getByRole('button').filter({ hasText: /^Open Invoices/i }).first().click();
-  }
+  await expect(paidInvoices).toBeVisible({ timeout: 30_000 });
+  await paidInvoices.click();
 
   const invoiceCard = main.getByTestId('homeowner-invoice-card').filter({ hasText: invoiceTitle }).first();
   await expect(invoiceCard).toBeVisible({ timeout: 30_000 });
