@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-22 - Estimate tutorial Work-navigation media refresh
+
+- Branch: `codex/help-estimate-tutorial-revision-3` from exact `origin/main` `ae610867b80138974e6c8b36de2c5e7ccf8ecb5a` in an isolated worktree.
+- Files changed: Help Studio architecture evidence; workflow/agent instructions; pull-request template and quality check; focused architecture validation; master-plan, completed-feature, and backlog precision; and this changelog. No application code changed.
+- Summary: Re-recorded the existing **How to create an estimate** Help walkthrough from the current Demo application so the visible contractor navigation says **Work** instead of the retired **Jobs** label. The protected human-paced recorder produced a validated 45.12-second 1440x900 MP4/poster package from source commit `ae610867b80138974e6c8b36de2c5e7ccf8ecb5a`. After owner review and explicit approval, Help Studio created and published immutable revision 3 while preserving revisions 1 and 2. A new tutorial-freshness gate now requires every PR to declare `NOT APPLICABLE`, `NONE`, `UPDATE REQUIRED`, or `UPDATED`; user-facing changes must include Help Studio search/playback evidence, and named stale tutorials remain open completion items until replacement verification.
+- Production proof: Walkthrough `9f62de0c-a06a-4840-86cb-6bf0362975f5` serves revision 3 from media asset `d8da7746-c271-4b34-9d6d-6b82b5d42c6b`. The exact MP4 SHA-256 is `f9a0a6d6498aceae1c9355d12d5590293d4bce3c0dc1c858521c63b601983ad7`; poster SHA-256 is `9135f291ae9e12e795b915977d00c37b56601541fc8b6e36cfc36f74a93d602c`. Help Studio Preview resolved the newly published private media after publication.
+- Validation: Demo fixture reset and exact final-state verification; shared human-paced pacing contract; sensitive-data scan; durable media promotion; MP4/poster checksum capture; sampled full-timeline visual review; owner normal-speed review and approval; staged revision Preview; explicit publication; post-publication Preview retrieval; focused tutorial-declaration architecture tests; PR-body quality-gate exercise; and repository diff/safety checks.
+- Known risks and follow-ups: Semantic video staleness still requires reviewed judgment; CI verifies that evidence and follow-up exist rather than pretending filenames reveal recorded-pixel meaning. No product workflow, role, permission, SQL, schema, RLS, RPC, auth, environment, provider, public post, paid AI, or application deployment changed. FB-038B/FB-038C remain separately governed future scope.
+- Backlog impact: FB-038 remains Implementation In Progress for FB-038B/FB-038C. The entry is updated only to identify revision 3 as the current production walkthrough; status, priority, remaining scope, and guardrails are unchanged.
+- Roadmap impact: Classified as unrelated maintenance. Phase 0 and the FB-039E2 next assignment remain unchanged.
+
 ## 2026-08-22 - Draft customer Safari pointer-selection correction
 
 - Branch: `codex/draft-customer-safari-pointer-fix-v1` from exact `origin/main` `9a1e88bc3d950dce2d5aa401763ab89ebfa89801` in an isolated worktree.

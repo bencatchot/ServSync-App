@@ -239,6 +239,27 @@ Codex may fix in-scope failures without additional approval. If a failure reveal
 
 Passing unrelated exhaustive checks is not required unless repository rules, CI, or the task make them relevant.
 
+## Tutorial Freshness Gate
+
+Every pull request must make one explicit tutorial-impact decision. This is a required verification step because a feature can remain functionally correct while its published guidance becomes misleading after a navigation, label, layout, role, workflow, state, or visible-data change.
+
+For a user-facing change:
+
+1. Search Help Studio by the affected feature area, route context, screen label, workflow terms, and likely synonyms.
+2. Preview every matching published walkthrough and compare its visible path, labels, controls, order of operations, role assumptions, and outcome with the proposed Preview or current Demo behavior.
+3. Record one status and concise evidence in the PR body:
+
+| Status | Meaning |
+| --- | --- |
+| `NOT APPLICABLE` | The PR cannot affect user-facing guidance; explain why. |
+| `NONE` | The Help Studio search and matching-tutorial review found no stale guidance. |
+| `UPDATE REQUIRED` | A named tutorial is stale; record the bounded replacement owner/task and do not call the overall work complete. |
+| `UPDATED` | The named replacement revision has been reviewed, published, and verified through the applicable Help surface. |
+
+`UPDATE REQUIRED` may be necessary when the recorder must wait for a merged Demo build. In that case, preserve the current immutable revision, identify the post-merge replacement as an open completion item, and make the merge decision acknowledge that temporary documentation gap. Publishing or otherwise changing Production Help content remains a protected action and requires explicit approval.
+
+The pull-request quality workflow validates that the declaration and required evidence are present. It does not pretend to infer semantic video staleness from changed filenames; the Help Studio search and playback comparison remain the required human/Codex verification evidence.
+
 ## Branch, PR, Merge, and Deployment Rules
 
 - Start implementation from current `origin/main` unless the task explicitly continues an existing branch or PR.
@@ -287,6 +308,7 @@ STATUS
 OUTCOME
 WHAT CHANGED
 VALIDATION EVIDENCE
+TUTORIAL IMPACT
 PR AND PREVIEW
 DOCUMENTATION IMPACT
 MATERIAL RISKS OR FOLLOW-UPS
@@ -302,6 +324,7 @@ List changed files when useful, especially for unexpected or sensitive areas. Do
 MERGE RESULT
 FINAL MAIN COMMIT
 CHECKS / DEPLOYMENT STATUS
+TUTORIAL IMPACT / FOLLOW-UP STATUS
 PROTECTED ACTIONS NOT TAKEN
 ISSUES OR NEXT STEP
 STATUS
@@ -328,6 +351,7 @@ PROTECTED CHANGES ALREADY APPROVED
 
 ACCEPTANCE EVIDENCE
 - [The behavior or evidence that will demonstrate success.]
+- [Tutorial-impact status and Help Studio search/preview evidence for user-facing changes.]
 
 Codex owns the in-scope technical approach, necessary files, tests, validation,
 documentation impact, branch, commits, draft PR, and Preview verification.
@@ -369,7 +393,10 @@ Merge the approved PR into main:
 [PR link or number]
 
 Before merging, confirm the PR target, head commit, required checks, and changed
-scope still match the reviewed result. If they do, merge using the repository's
+scope still match the reviewed result. Confirm the tutorial-impact declaration is
+supported by evidence; if it is `UPDATE REQUIRED`, keep the named replacement as
+an open completion item and explicitly acknowledge the temporary guidance gap. If
+the reviewed result remains acceptable, merge using the repository's
 normal merge method and verify the resulting main commit and automatic deployment
 status. Do not manually deploy, apply SQL, change settings, or begin new work.
 ```
