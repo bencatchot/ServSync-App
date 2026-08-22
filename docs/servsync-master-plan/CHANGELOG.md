@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-22 - Draft customer Safari pointer-selection correction
+
+- Branch: `codex/draft-customer-safari-pointer-fix-v1` from exact `origin/main` `9a1e88bc3d950dce2d5aa401763ab89ebfa89801` in an isolated worktree.
+- Files changed: shared Draft customer combobox; focused unified Draft customer browser coverage; and this changelog.
+- Summary: Keeps pointer focus inside the shared customer combobox until an option's existing click handler commits the selection, preventing Safari/WebKit's null-related-target blur from closing and unmounting the result first. The selected customer label now persists after the list closes and the existing single-property default continues to apply in both the durable Draft Composer and legacy Job composer.
+- Reason: Production Safari could blur the Customer input before dispatching an option click, closing the result list and leaving the field empty even though keyboard Enter and programmatic Customers-tab entry remained functional.
+- Validation: The focused unified Draft customer suite passed 14/14 relevant checks in both Chromium and WebKit, including a real option click, persistent selected label, single-property default, clearing, keyboard navigation/Escape, filtering, result limiting, saved-subject mapping, desktop/mobile accessibility, and shared durable/legacy composer wiring. Local Vite browser verification loaded meaningful content without an error overlay. TypeScript, Production build, diff, scope, and changed-file sensitive-value checks are recorded on the draft PR.
+- Known risks and follow-ups: Frontend event ordering only. No customer/property mapping, Draft lifecycle, role, permission, SQL, schema, RLS, RPC, auth, environment, provider, deployment setting, or Production data changes are included. The unrelated existing customer-profile source assertion in the same spec remains stale against current `origin/main` and is excluded from the focused interaction evidence.
+- Backlog impact: No update needed. This corrects existing unified Draft customer selection without changing feature status, remaining scope, priority, guardrails, or the next roadmap step.
+- Master plan impact: No update needed. Draft-first workflow definitions and product direction are unchanged.
+
 ## 2026-08-20 - FB-039E core-state application reliability candidate
 
 - Branch: `codex/fb039e-core-state-reliability-v1` from exact `origin/main` `0b73ce7073bf76ce1f328ae6698cbf6b0fec3f4b` in an isolated worktree.

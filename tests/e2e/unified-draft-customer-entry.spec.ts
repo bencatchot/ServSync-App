@@ -320,6 +320,24 @@ test.describe('unified Draft UI wiring', () => {
     expect(app).toContain('Create invoice from estimate');
   });
 
+  test('pointer selection keeps the customer label and applies the single-property default', async ({ page }) => {
+    await installUnifiedComposerHarness(page);
+
+    const customer = page.getByTestId('durable-draft-customer');
+    const property = page.getByTestId('durable-draft-property');
+    await customer.click();
+    await customer.fill('Alex Connected Home');
+    await page.getByRole('listbox', { name: 'Customer search results' }).getByRole('option').click();
+
+    await expect(page.getByRole('listbox', { name: 'Customer search results' })).toHaveCount(0);
+    await expect(customer).toHaveValue('Alex Customer — Connected · Main Home');
+    await expect(property).toHaveValue('home-1');
+
+    await page.getByRole('button', { name: 'Clear customer selection' }).click();
+    await expect(customer).toHaveValue('');
+    await expect(property).toHaveValue('');
+  });
+
   for (const viewport of [
     { name: 'desktop', width: 1280, height: 720 },
     { name: 'mobile', width: 390, height: 844 },
