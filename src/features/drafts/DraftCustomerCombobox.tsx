@@ -157,6 +157,10 @@ export function DraftCustomerCombobox({
                   index === activeIndex ? 'bg-blue-50' : 'hover:bg-slate-50'
                 }`}
                 onMouseEnter={() => setActiveIndex(index)}
+                onPointerDown={event => {
+                  // Keep Safari from blurring the input and unmounting this option before click.
+                  if (event.button === 0) event.preventDefault();
+                }}
                 onClick={() => choose(option)}
               >
                 <span className="min-w-0 flex-1">
