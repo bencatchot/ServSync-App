@@ -128,6 +128,25 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     }
     expect(() => module.assertSafeDemoTarget({ ...baseEnv, EMAIL_ENABLED: 'maybe' })).toThrow(/unrecognized boolean/i);
     expect(() => module.assertSafeDemoTarget({ ...baseEnv, EMAIL_ENABLED: ' false ' })).not.toThrow();
+    for (const flag of [
+      'HOME_ACCESS_INVITE_EMAIL_ENABLED',
+      'SERVSYNC_STRIPE_CONNECT_TEST_ENABLED',
+      'SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED',
+    ]) {
+      expect(() => module.assertSafeDemoTarget({ ...baseEnv, [flag]: 'true' })).toThrow(new RegExp(flag));
+    }
+    for (const credential of [
+      'RESEND_API_KEY',
+      'SENDGRID_API_KEY',
+      'STRIPE_SECRET_KEY',
+      'STRIPE_WEBHOOK_SECRET',
+      'STRIPE_CONNECT_WEBHOOK_SECRET',
+      'FACEBOOK_APP_SECRET',
+      'OPENAI_API_KEY',
+      'GEOCODING_API_KEY',
+    ]) {
+      expect(() => module.assertSafeDemoTarget({ ...baseEnv, [credential]: 'configured' })).toThrow(new RegExp(credential));
+    }
   });
 
   test('script reconciles every non-reset seed run before reseeding or resetting', () => {

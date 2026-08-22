@@ -21881,8 +21881,7 @@ function ContractorDashboard({
   const canManageFinancialActions = financialActionVisibility.canManageBilling;
   const jobActionVisibility = contractorJobActionVisibility(durableDraftCapabilities);
   const canManageJobOperations = jobActionVisibility.canManageJobOperations;
-  const canFinalizeCompletedJobReport = canManageJobOperations
-    || (SERVSYNC_DEMO_PRESENTATION_MODE && contractor?.owner_user_id === profile.id);
+  const canFinalizeCompletedJobReport = canManageJobOperations;
   const authorizedInvoiceComposerOpen = canManageFinancialActions && invoiceComposerOpen;
   useEffect(() => {
     if (durableDraftCapabilityLoading || canManageFinancialActions) return;

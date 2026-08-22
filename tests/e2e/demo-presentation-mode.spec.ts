@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 
 import {
   SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF,
+  SERVSYNC_DEMO_PRESENTATION_QUERY_KEY,
+  SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE,
   demoPresentationJobCheckpointLabel,
   isServSyncDemoPresentationMode,
   parseSupabaseProjectRef,
@@ -26,17 +28,27 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     VITE_SUPABASE_URL: `https://${SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF}.supabase.co`,
   };
 
-  test('activates only for the dedicated demo project with exact enabled flag', () => {
-    expect(parseSupabaseProjectRef(dedicatedEnv.VITE_SUPABASE_URL)).toBe(SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF);
-    expect(isServSyncDemoPresentationMode(dedicatedEnv)).toBe(true);
+  const recorderRuntime = {
+    search: `?${SERVSYNC_DEMO_PRESENTATION_QUERY_KEY}=${SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE}`,
+  };
 
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED: 'TRUE' })).toBe(false);
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED: '1' })).toBe(false);
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED: undefined })).toBe(false);
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PROJECT_REF: undefined })).toBe(false);
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SUPABASE_URL: undefined })).toBe(false);
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SUPABASE_URL: 'not-a-url' })).toBe(false);
-    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SUPABASE_URL: 'https://example.com' })).toBe(false);
+  test('activates only for the dedicated demo project with exact environment and recorder opt-in', () => {
+    expect(parseSupabaseProjectRef(dedicatedEnv.VITE_SUPABASE_URL)).toBe(SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF);
+    expect(isServSyncDemoPresentationMode(dedicatedEnv)).toBe(false);
+    expect(isServSyncDemoPresentationMode(dedicatedEnv, recorderRuntime)).toBe(true);
+    expect(isServSyncDemoPresentationMode(dedicatedEnv, { search: '?servsync-presentation=recorder' })).toBe(false);
+    expect(isServSyncDemoPresentationMode(dedicatedEnv, { search: '?servsync-presentation=RECORDER-V1' })).toBe(false);
+    expect(isServSyncDemoPresentationMode(dedicatedEnv, {
+      search: '?servsync-presentation=recorder-v1&servsync-presentation=recorder-v1',
+    })).toBe(false);
+
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED: 'TRUE' }, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED: '1' }, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED: undefined }, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SERVSYNC_DEMO_PROJECT_REF: undefined }, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SUPABASE_URL: undefined }, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SUPABASE_URL: 'not-a-url' }, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoPresentationMode({ ...dedicatedEnv, VITE_SUPABASE_URL: 'https://example.com' }, recorderRuntime)).toBe(false);
   });
 
   test('fails closed for production, shared sandbox, and mismatched refs', () => {
@@ -44,16 +56,16 @@ test.describe('Demo presentation mode guard and source wiring', () => {
       ...dedicatedEnv,
       VITE_SUPABASE_URL: 'https://uqgtheclhxqlnjpfmheq.supabase.co',
       VITE_SERVSYNC_DEMO_PROJECT_REF: 'uqgtheclhxqlnjpfmheq',
-    })).toBe(false);
+    }, recorderRuntime)).toBe(false);
     expect(isServSyncDemoPresentationMode({
       ...dedicatedEnv,
       VITE_SUPABASE_URL: 'https://zpzdkoaubyjtsomccxya.supabase.co',
       VITE_SERVSYNC_DEMO_PROJECT_REF: 'zpzdkoaubyjtsomccxya',
-    })).toBe(false);
+    }, recorderRuntime)).toBe(false);
     expect(isServSyncDemoPresentationMode({
       ...dedicatedEnv,
       VITE_SUPABASE_URL: 'https://aaaaaaaaaaaaaaaaaaaa.supabase.co',
-    })).toBe(false);
+    }, recorderRuntime)).toBe(false);
   });
 
   test('does not reference sensitive server-only demo credentials in browser source', () => {
@@ -81,6 +93,8 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     const app = sourceFile('src/App.tsx');
 
     expect(app).toContain('const SERVSYNC_DEMO_PRESENTATION_MODE = isServSyncDemoPresentationMode();');
+    expect(app).toContain('const canFinalizeCompletedJobReport = canManageJobOperations;');
+    expect(app).not.toContain('SERVSYNC_DEMO_PRESENTATION_MODE && contractor?.owner_user_id === profile.id');
     expect(app).toContain('const showInitialHomeSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE');
     expect(app).toContain('const showHomeownerOnboardingChecklist = !SERVSYNC_DEMO_PRESENTATION_MODE');
     expect(app).toContain('const showInitialContractorProfileSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE');
@@ -88,7 +102,7 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(app).toContain('actions={SERVSYNC_DEMO_PRESENTATION_MODE ? undefined : <NotificationBell');
     expect(app).toContain('const homeownerRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0');
     expect(app).toContain('const contractorHomeownersBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0');
-    expect(app).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (');
+    expect(app).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && customerProfileDraftAvailable && (');
     expect(app).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && showJobInvoiceAction && (');
     expect(app).toContain("action={!SERVSYNC_DEMO_PRESENTATION_MODE ? (");
 
@@ -151,7 +165,7 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(presentationSummarySource).toContain('Property: {presentationCurrentJobProperty}');
   });
 
-  test('selected-homeowner presentation summary appears on the default profile and jobs views', () => {
+  test('selected-homeowner presentation summary appears on the default profile and Work views', () => {
     const app = sourceFile('src/App.tsx');
     const profileViewSource = sourceBetween(
       app,
@@ -167,7 +181,7 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(profileViewSource).toContain('{renderDemoPresentationCurrentJobSummary()}');
     expect(profileViewSource).toContain('Profile');
     expect(jobsViewSource).toContain('{renderDemoPresentationCurrentJobSummary()}');
-    expect(jobsViewSource).toContain('Jobs dashboard');
+    expect(jobsViewSource).toContain('Service jobs');
   });
 
   test('presentation mode hides property suggestion mutation without removing normal code', () => {
@@ -184,7 +198,7 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(propertySuggestionSource).toContain('openConnectedPropertyProposalForm(connectionId)');
   });
 
-  test('contractor Jobs workspace surfaces the current checkpoint story for capture', () => {
+  test('contractor Work workspace surfaces the current checkpoint story for capture', () => {
     const app = sourceFile('src/App.tsx');
     const storySource = sourceBetween(
       app,
@@ -193,13 +207,13 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     );
     const jobsOverviewSource = sourceBetween(
       app,
-      "{contractorJobsView === 'overview' && (",
-      "{contractorJobsView === 'new_financial' && (",
+      '<section data-testid="contractor-jobs-overview"',
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
     );
     const jobsListSource = sourceBetween(
       app,
-      "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
-      "{showLocalContactForm && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
+      '{showLocalContactForm && canCreateContractorLocalCustomers && (',
     );
 
     expect(storySource).toContain('data-testid="demo-presentation-jobs-checkpoint-story"');
@@ -211,30 +225,30 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(jobsListSource).toContain('{renderDemoPresentationJobsCheckpointStory()}');
   });
 
-  test('contractor Jobs capture surfaces hide mutation labels only in presentation mode', () => {
+  test('contractor Work capture surfaces hide mutation labels only in presentation mode', () => {
     const app = sourceFile('src/App.tsx');
     const jobsListSource = sourceBetween(
       app,
-      "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
-      "{showLocalContactForm && (",
+      "{contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs') && (",
+      '{showLocalContactForm && canCreateContractorLocalCustomers && (',
     );
     const recentJobsSource = sourceBetween(
       app,
-      "{contractorJobsView === 'overview' && (",
-      "{contractorJobsView === 'templates' && (",
+      '<Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>',
+      '{showLocalContactForm && canCreateContractorLocalCustomers && (',
     );
 
-    expect(jobsListSource).toContain("{!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft'");
+    expect(jobsListSource).toContain("{!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && inspectionJobStatus(insp) === 'draft'");
     expect(jobsListSource).toContain('SERVSYNC_DEMO_PRESENTATION_MODE');
     expect(jobsListSource).toContain("? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'");
-    expect(jobsListSource).toContain(": checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'");
+    expect(jobsListSource).toContain(": !canManageJobOperations ? 'View Job' : checklistStyle ? (insp.status === 'draft' ? jobStatus === 'draft' ? 'Start Work' : 'Continue Work' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : jobStatus === 'draft' ? 'Start Work' : 'Continue Work'");
     expect(jobsListSource).toContain('{demoPresentationBadgeLabelForJob(insp)}');
     expect(jobsListSource).toContain('{subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : \'\'}');
 
-    expect(recentJobsSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === \'draft\'');
+    expect(recentJobsSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && inspectionJobStatus(insp) === \'draft\'');
     expect(recentJobsSource).toContain('SERVSYNC_DEMO_PRESENTATION_MODE');
     expect(recentJobsSource).toContain("? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'");
-    expect(recentJobsSource).toContain(": checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'");
+    expect(recentJobsSource).toContain(": !canManageJobOperations ? 'View Job' : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'");
     expect(recentJobsSource).toContain('{demoPresentationBadgeLabelForJob(insp)}');
     expect(recentJobsSource).toContain('{subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : \'\'}');
   });

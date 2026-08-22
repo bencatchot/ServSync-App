@@ -34,13 +34,15 @@ Known forbidden refs:
 
 Do not run the seed/reset/verify commands against production or the shared sandbox. Do not place a service-role key in frontend code or browser-accessible environment variables.
 
-The optional presentation mode is also dedicated-demo only. It activates in browser code only when all of these public Vite variables agree on the dedicated demo project:
+The optional presentation mode is also dedicated-demo only. The public Vite variables below make the dedicated deployment eligible to honor presentation requests, but they do not activate presentation mode by themselves:
 
 - `VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED=true`
 - `VITE_SERVSYNC_DEMO_PROJECT_REF=bdytwgejqnlblhrnqxkp`
 - `VITE_SUPABASE_URL` parses to project ref `bdytwgejqnlblhrnqxkp`
 
-Presentation mode fails closed for missing, malformed, mismatched, production, or shared-sandbox refs. Do not use it outside the dedicated demo Vercel environment.
+The Demo Recorder explicitly opts in by adding `servsync-presentation=recorder-v1` to each application URL. Browser code requires exactly one exact query value in addition to the three environment checks. Missing, malformed, mismatched, duplicated, Production, or shared-Sandbox signals fail closed. The signal is public capture intent, not a secret, role, entitlement, authentication mechanism, or authorization grant. It is never persisted to local or session storage.
+
+Ordinary visits to `https://servsync-demo.vercel.app` therefore use the Production-equivalent interface and workflow gates while continuing to use isolated Demo data. Do not manually add the recorder query for ordinary workflow testing.
 
 ## Required Environment Variables
 
@@ -342,7 +344,7 @@ Recommended recording order:
 2. Log in as the demo contractor to show the connected request and accepted-estimate job handoff.
 3. Return to the homeowner only where the seeded workflow already supports real homeowner visibility.
 
-Slice 2C-A presentation mode may be enabled only in the dedicated demo Vercel environment. In that mode, setup prompts, onboarding checklists, subscription/readiness clutter, notification badges/lists, homeowner dashboard reminder/Home History cards, homeowner accepted-estimate PDF/Home History action buttons, and selected mutating capture-surface controls are visually hidden so screenshots and recordings stay focused. Contractor Jobs capture surfaces keep read-only job details and checkpoint context visible while hiding deletion/completion/continuation wording and other mutation controls. The mode also uses presentation-safe job checkpoint copy such as `Draft job created from accepted estimate`, `Contractor visit scheduled`, `Work in progress`, `Ready for contractor review`, and `Work completed. Billing and home records are the next workflow and are intentionally outside this demo.` The contractor selected-homeowner Profile and Jobs views should show the current demo job title, property context, checkpoint copy, and work-item progress, and the contractor Jobs workspace should surface the same checkpoint story near the top of the capture surface.
+Slice 2C-A presentation mode may be enabled only in the dedicated demo Vercel environment and only through the recorder query. In that mode, setup prompts, onboarding checklists, subscription/readiness clutter, notification badges/lists, homeowner dashboard reminder/Home History cards, homeowner accepted-estimate PDF/Home History action buttons, and selected mutating capture-surface controls are visually hidden so screenshots and recordings stay focused. Contractor Work capture surfaces keep read-only job details and checkpoint context visible while hiding deletion/completion/continuation wording and other mutation controls. The mode also uses presentation-safe job checkpoint copy such as `Draft job created from accepted estimate`, `Contractor visit scheduled`, `Work in progress`, `Ready for contractor review`, and `Work completed. Billing and home records are the next workflow and are intentionally outside this demo.` Presentation mode never expands `canManageJobOperations` or another capability; normal role/capability resolution plus server authorization remain mandatory for every action the recorder performs.
 
 Slice 2C-A still does not add browser checkpoint controls, role switching, reset buttons, public demo controls, invoices, Home History, reports, PDFs, media, reminders, payments, or notification delivery. Demo Recorder v1 adds private local browser automation for the one bounded homeowner-request scenario; it does not add controls to the application or expose privileged fixture operations to the browser. Checkpoint selection remains a private local/server-side runner operation.
 
@@ -355,7 +357,7 @@ If seed fails:
 - Confirm `DEMO_SUPABASE_URL` and `DEMO_SUPABASE_PROJECT_REF` point to the same dedicated demo project.
 - Confirm the target is not production and not the shared sandbox.
 - Confirm demo passwords are present but not printed.
-- Confirm external-effect flags are unset or clearly disabled, not enabled-looking values.
+- Confirm external-effect flags are unset or clearly disabled, not enabled-looking values, and provider credentials are absent from the runner process.
 - If an existing auth email is found, confirm that user already has `servsync_demo_owned`, `servsync_demo_scenario`, and `servsync_demo_role` metadata for this scenario. The runner will not repurpose a normal user by email alone.
 
 If reset fails:

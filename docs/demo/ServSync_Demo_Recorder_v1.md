@@ -26,6 +26,8 @@ The 71-second flagship clip combines brand-neutral opening graphics with real de
 
 The recorder accepts only the durable ServSync Demo application origin and Supabase project `bdytwgejqnlblhrnqxkp`. It refuses Production, the shared Sandbox, and arbitrary Preview origins.
 
+Every recorder navigation adds the exact query `servsync-presentation=recorder-v1`. The application honors it only when the dedicated-Demo public environment/project checks also pass. The query is not persisted and grants no role, capability, data access, or server authority. Ordinary Demo visits omit it and retain the same core workflow presentation as Production.
+
 Credentials stay in process memory. Scenario definitions contain no email addresses, passwords, session tokens, service-role keys, or Vercel bypass values. The recorder uses the service role only through the existing private Demo fixture runner for exact fixture setup, ownership registration, and verification. Browser actions use normal homeowner and contractor password authentication.
 
 Do not record Production or real customer information. Do not paste recorder credentials into commands, logs, reports, screenshots, or videos.

@@ -6,6 +6,7 @@ import { runDemoCommand } from '../seed-demo-scenario.mjs';
 import {
   assertRecordingDuration,
   assertSafeRecorderEnvironment,
+  addDemoPresentationOptIn,
   buildArtifactMetadata,
   scanVisibleTextForSensitiveData,
 } from './lib.mjs';
@@ -20,7 +21,7 @@ function required(env, name) {
 }
 
 function pageUrl(appUrl, role, bypassSecret = '') {
-  const url = new URL(appUrl);
+  const url = addDemoPresentationOptIn(appUrl);
   url.hash = role === 'contractor' ? '#/contractor' : '#/home';
   if (bypassSecret) {
     url.searchParams.set('x-vercel-protection-bypass', bypassSecret);

@@ -29,5 +29,8 @@ jobs:
       - run: npm run lint
       - run: npm run check:app-size
       - run: npm run test:architecture
+      - run: npm run backend:parity:test
+      - run: npm run runtime:parity:test
+      - run: npm run test:demo-recorder
       - run: npm run typecheck
       - run: npm run build

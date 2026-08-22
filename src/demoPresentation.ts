@@ -1,11 +1,17 @@
 export const SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF = 'bdytwgejqnlblhrnqxkp';
 export const SERVSYNC_PRODUCTION_REF = 'uqgtheclhxqlnjpfmheq';
 export const SERVSYNC_SHARED_SANDBOX_REF = 'zpzdkoaubyjtsomccxya';
+export const SERVSYNC_DEMO_PRESENTATION_QUERY_KEY = 'servsync-presentation';
+export const SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE = 'recorder-v1';
 
 export type PresentationEnv = {
   VITE_SUPABASE_URL?: string;
   VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED?: string;
   VITE_SERVSYNC_DEMO_PROJECT_REF?: string;
+};
+
+export type PresentationRuntime = {
+  search?: string;
 };
 
 export function parseSupabaseProjectRef(url?: string | null) {
@@ -20,14 +26,21 @@ export function parseSupabaseProjectRef(url?: string | null) {
   }
 }
 
-export function isServSyncDemoPresentationMode(env: PresentationEnv = import.meta.env as unknown as PresentationEnv) {
+export function isServSyncDemoPresentationMode(
+  env: PresentationEnv = import.meta.env as unknown as PresentationEnv,
+  runtime: PresentationRuntime = {},
+) {
   if (env.VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED !== 'true') return false;
   if (env.VITE_SERVSYNC_DEMO_PROJECT_REF !== SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF) return false;
 
   const actualRef = parseSupabaseProjectRef(env.VITE_SUPABASE_URL);
   if (!actualRef) return false;
   if (actualRef === SERVSYNC_PRODUCTION_REF || actualRef === SERVSYNC_SHARED_SANDBOX_REF) return false;
-  return actualRef === env.VITE_SERVSYNC_DEMO_PROJECT_REF;
+  if (actualRef !== env.VITE_SERVSYNC_DEMO_PROJECT_REF) return false;
+
+  const search = runtime.search ?? (typeof window === 'undefined' ? '' : window.location.search);
+  const optIns = new URLSearchParams(search).getAll(SERVSYNC_DEMO_PRESENTATION_QUERY_KEY);
+  return optIns.length === 1 && optIns[0] === SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE;
 }
 
 export type DemoPresentationJobStatusInput = {

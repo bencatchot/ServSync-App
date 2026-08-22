@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-22 - Demo production-equivalence launch-safety correction
+
+- Branch: `codex/demo-production-equivalent-parity` from verified `origin/main` `1632890a40aaf1263f81781483e49c0b8cb08609` in an isolated worktree.
+- Summary: Corrects the build-wide Demo presentation default. Ordinary Demo URLs now retain the dedicated Demo data boundary while exposing normal Production-equivalent workflows; tutorial recording opts into the reduced presentation surface with the exact, non-persistent `servsync-presentation=recorder-v1` query signal. The dedicated Demo environment/project-ref checks remain eligibility guards, and presentation mode no longer participates in any capability decision.
+- Parity and safety: Adds a fail-closed manifest and read-only checker for Production/Demo active-commit parity, fixed Vercel project identities, separate expected Supabase refs, reviewed public workflow gates, intentional Demo-only presentation eligibility, and disabled/absent Demo provider effects. Pull-request quality now runs the credential-free runtime, backend-parity, and recorder contracts. Demo scenario startup rejects the expanded email, payment, social, AI, and geocoding gate/credential inventory.
+- Live findings: Both aliases were READY on the verified main commit and used the expected separate Supabase projects. Production had Work, Draft Job, and Shared Draft Composer enabled; Demo lacked those three flags. Demo's custom email, payment, social, SMS, webhook, accounting, AI, and geocoding enable keys/credentials were absent, and database publishing connections/provider secrets remained disabled or empty. The exact protected follow-up is to add those three public workflow flags as `true` to Demo production and preferably preview before its first corrected automatic build; no live setting was changed in this work.
+- Known risks and follow-ups: Supabase Auth email/password remains enabled with auto-confirm; custom ServSync delivery is closed, but public settings do not prove whether password-recovery mail has custom SMTP behind it. A literal zero-Auth-mail policy would require a separate protected dashboard audit/decision without disabling the Demo login workflow. Installing a least-privilege read-only Vercel token for scheduled live parity is also a protected follow-up; the operator checker and CI contract tests are ready.
+- Roadmap impact: Launch-safety correction only. FB-039 and the established Phase 0 sequence remain unchanged.
+
 ## 2026-08-22 - Estimate tutorial Work-navigation media refresh
 
 - Branch: `codex/help-estimate-tutorial-revision-3` from exact `origin/main` `ae610867b80138974e6c8b36de2c5e7ccf8ecb5a` in an isolated worktree.
