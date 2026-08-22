@@ -79,6 +79,12 @@ The Demo Playwright target guard requires the selected environment, Supabase URL
 
 Store secret values only in an ignored local environment file or approved secret store. Do not commit credentials or paste them into chat, terminal reports, PR descriptions, screenshots, traces, videos, or logs. The Playwright helpers report missing variable names only and must not print values.
 
+### Persistent Demo Browser Validation Credential
+
+The canonical primary Demo homeowner used for authorized browser validation is Sarah Johnson (`sarah.homeowner@example.test`, auth UID `313767d5-7183-422e-9200-ceea6c42870b`). Her ordinary sign-in credential is stored only through `DEMO_HOMEOWNER_EMAIL` and `DEMO_HOMEOWNER_PASSWORD` in the approved git-ignored local `.env.test.local` test-secret file. Keep that file mode owner-only and never inspect, print, screenshot, commit, or copy the password into another repository file.
+
+For future authorized Demo browser checks, load these existing environment names through the repository's validation-target helpers and establish a normal UI password session at `https://servsync-demo.vercel.app`. When the credential entries are present and a normal password grant succeeds, automation should use them directly instead of asking the owner to sign in manually. Do not generate admin or impersonation links, inspect browser credential/session storage, reset the password, or alter ownership/membership data. If normal authentication fails, first verify the exact Demo project, auth UID, email, profile role, and existing property authority read-only; password rotation still requires explicit protected-action approval.
+
 The runner also refuses to proceed if these external-effect flags are set to enabled-looking values in the process environment. Rejected values are case-insensitive and include `true`, `1`, `yes`, `on`, and `enabled`. Unrecognized non-empty boolean values also fail closed; unset the flag or use a clear disabled value such as `false`.
 
 - `EMAIL_ENABLED`
