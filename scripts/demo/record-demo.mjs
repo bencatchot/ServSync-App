@@ -16,6 +16,7 @@ import {
   assertSafeRecorderEnvironment,
   buildArtifactMetadata,
   cursorInterpolation,
+  addDemoPresentationOptIn,
   loadKnownLocalEnv,
   pacingFor,
   parseRecorderArgs,
@@ -39,7 +40,7 @@ function required(env, name) {
 }
 
 function pageUrl(appUrl, role, bypassSecret = '') {
-  const url = new URL(appUrl);
+  const url = addDemoPresentationOptIn(appUrl);
   if (bypassSecret) {
     url.searchParams.set('x-vercel-protection-bypass', bypassSecret);
     url.searchParams.set('x-vercel-set-bypass-cookie', 'true');

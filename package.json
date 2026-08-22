@@ -28,6 +28,8 @@
     "qa:e2e:readonly": "playwright test tests/e2e/contractor-smoke.spec.ts tests/e2e/homeowner-smoke.spec.ts",
     "backend:parity:check": "node scripts/backend-parity/check.mjs",
     "backend:parity:test": "node --test tests/backend-parity/*.test.mjs",
+    "runtime:parity:check": "node scripts/runtime-parity/check-live.mjs",
+    "runtime:parity:test": "node --test tests/runtime-parity/*.test.mjs",
     "backend:rollout:status": "node scripts/backend-parity/rollout-status.mjs",
     "ops:recovery:validate": "node scripts/recovery/validate-restored-project.mjs",
     "ops:storage-backup:run": "tsx scripts/storage-backup/run-storage-backup.ts",

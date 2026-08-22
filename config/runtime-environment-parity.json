@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "vercelTeamId": "team_Ga7ZoNeteThUar4RQbhiEvGf",
+  "environments": {
+    "production": {
+      "alias": "servsync.app",
+      "vercelProjectId": "prj_UfNB5L1kMcDP9p0fLd4Dc60bpDPP",
+      "vercelProjectName": "serv-sync-app-refresh",
+      "supabaseProjectRef": "uqgtheclhxqlnjpfmheq"
+    },
+    "demo": {
+      "alias": "servsync-demo.vercel.app",
+      "vercelProjectId": "prj_tB94FLcorqX9sW7EGPd7t32Z4rdS",
+      "vercelProjectName": "servsync-demo",
+      "supabaseProjectRef": "bdytwgejqnlblhrnqxkp"
+    }
+  },
+  "workflowParityFlags": {
+    "VITE_CONTRACTOR_WORK_UI_ENABLED": "true",
+    "VITE_DRAFT_JOB_UI_ENABLED": "true",
+    "VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED": "true",
+    "VITE_DURABLE_TRADE_SECTIONS_UI_ENABLED": null,
+    "VITE_CONTRACTOR_MARKETING_UI_ENABLED": null
+  },
+  "intentionalDemoDifferences": {
+    "VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED": "true",
+    "VITE_SERVSYNC_DEMO_PROJECT_REF": "bdytwgejqnlblhrnqxkp"
+  },
+  "demoExternalEffects": {
+    "falseOrAbsent": [
+      "EMAIL_ENABLED",
+      "HOME_ACCESS_INVITE_EMAIL_ENABLED",
+      "STRIPE_ENABLED",
+      "SERVSYNC_STRIPE_CONNECT_TEST_ENABLED",
+      "SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED",
+      "SMS_ENABLED",
+      "PUSH_NOTIFICATIONS_ENABLED",
+      "WEBHOOK_DELIVERY_ENABLED",
+      "QUICKBOOKS_ENABLED",
+      "ACCOUNTING_SYNC_ENABLED",
+      "AI_ENABLED",
+      "GEOCODING_ENABLED"
+    ],
+    "absentKeys": [
+      "RESEND_API_KEY",
+      "SENDGRID_API_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_CONNECT_WEBHOOK_SECRET",
+      "FACEBOOK_APP_SECRET",
+      "OPENAI_API_KEY",
+      "GEOCODING_API_KEY"
+    ]
+  }
+}
