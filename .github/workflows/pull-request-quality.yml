@@ -21,6 +21,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Verify tutorial impact declaration
+        env:
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: node scripts/validation/check-tutorial-impact-declaration.mjs
       - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run check:app-size

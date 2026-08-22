@@ -86,6 +86,8 @@ Do not perform broad document review as a ritual when those documents cannot aff
 
 Choose validation proportionate to the affected area and repository practices. Use relevant automated tests, static checks, build checks, diff review, secret safety, and Preview verification as appropriate.
 
+For every pull request, record the tutorial freshness result in the PR body. User-facing changes require a Help Studio search by affected feature, route context, screen, and workflow plus Preview of any matching published walkthrough. Use exactly `NOT APPLICABLE`, `NONE`, `UPDATE REQUIRED`, or `UPDATED`. `UPDATE REQUIRED` must name the affected tutorial and bounded follow-up, and the task must not be reported complete until the replacement revision is published and verified.
+
 Fix in-scope validation failures without requesting routine approval. Stop only if the fix requires material scope expansion or an unapproved protected change.
 
 ## Required Report
@@ -96,6 +98,7 @@ Lead with the result. Keep the report concise and include:
 OUTCOME
 WHAT CHANGED OR WHAT WAS FOUND
 VALIDATION EVIDENCE
+TUTORIAL IMPACT
 PR AND PREVIEW, IF APPLICABLE
 DOCUMENTATION IMPACT
 MATERIAL RISKS, FOLLOW-UPS, OR OWNER DECISIONS
