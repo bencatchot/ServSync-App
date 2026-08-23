@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-20",
+  "updatedOn": "2026-08-22",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "accepted-connection-request-context-visibility-v1",
+      "artifact": "servsync-accepted-connection-request-context-visibility.sql (SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27)",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Source and isolated PostgreSQL validation are complete. Shared SQL application is separately protected and was not authorized for this task."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production remains on the prior active connected-homeowner reader until the exact reviewed migration is separately approved and applied after merge. No Production SQL or customer data was read or changed."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo remains on the prior active connected-homeowner reader until the same exact migration is separately approved and applied for supported-backend parity."
+        }
+      }
+    },
     {
       "id": "core-authoring-request-preparation-renewal-forward-fix-v1",
       "artifact": "servsync-core-authoring-request-preparation-renewal-forward-fix.sql (SHA-256 b4db9bebfc085e7b2c02a48797ed05c99f4e3aa81739c35d84c84bc36de28eb8)",
