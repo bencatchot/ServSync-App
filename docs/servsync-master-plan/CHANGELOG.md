@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-23 - Homeowner dashboard attention priority
+
+- Branch: `codex/homeowner-attention-top` from exact `origin/main` `9efd20090286a4fe4ba2bde51f1cb8644603ee9c` in a fresh isolated worktree.
+- Files changed: homeowner dashboard presentation order, one focused source-order regression, and this changelog.
+- Summary: The complete **What needs your attention?** queue now appears immediately after the homeowner dashboard command center and before onboarding, beta feedback, and lower-priority dashboard content. The queue's data, empty state, metrics, actions, visibility, and responsive styling are unchanged.
+- Reason: Estimates, invoices, replies, appointments, and support updates are the homeowner's next-step queue and should be visible near the top of the Dashboard instead of below setup and feedback content.
+- Validation: The focused homeowner dashboard priority regression, TypeScript, Production build, ESLint warning budget, App monolith budget, architecture checks, `git diff --check`, and changed-file safety review pass. The current published Help catalog contains only the contractor **How to create an estimate** walkthrough; its Work/Drafts path and visible sequence are unaffected by this homeowner-only dashboard reorder.
+- Known risks and follow-ups: Frontend ordering only. No record logic, lifecycle, permission, SQL, RLS, RPC, auth, environment, deployment setting, or Production data changes are included. Master Plan, Product Roadmap, Feature Backlog, and marketing inventory do not change because no capability, workflow ownership, roadmap status, or marketing claim changed.
+
 ## 2026-08-22 - Accepted connection-request context continuity correction
 
 - Branch: `codex/accepted-connection-context-visibility` from exact `origin/main` `1632890a40aaf1263f81781483e49c0b8cb08609` in a fresh isolated worktree.
