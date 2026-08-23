@@ -16,8 +16,8 @@
           "reason": "Production remains on the prior active connected-homeowner reader until the exact reviewed migration is separately approved and applied after merge. No Production SQL or customer data was read or changed."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo remains on the prior active connected-homeowner reader until the same exact migration is separately approved and applied for supported-backend parity."
+          "status": "Applied",
+          "reason": "The same exact SHA-256 bytes were applied only to Demo bdytwgejqnlblhrnqxkp on 2026-08-23 from 01:24:46Z through 01:24:47Z after Sandbox passed. Demo and Sandbox share function-definition SHA-256 2aeeddf6f2a0d0dd0deb00f75213640dd6ecc81ce472c6eab3d144ae6a4fd084 plus the same postgres owner, fixed search path, stable SECURITY DEFINER behavior, authenticated-only grant, active-connection filter, and contractor-access guard. Rollback-only authenticated fictional fixtures passed pending visibility, exact message/timestamp preservation across acceptance, authorized active visibility, unrelated-contractor denial, no-message and legacy-null handling, and returned all auth/profile/contractor/homeowner/connection/permission/context/referral markers to zero."
         }
       }
     },
