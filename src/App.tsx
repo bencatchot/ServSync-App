@@ -180,6 +180,8 @@ import {
   normalizeLocalCustomerArchiveImpact,
   type LocalCustomerArchiveImpact,
 } from './features/customers/localCustomerArchive';
+import { ConnectionRequestContextSection } from './features/customers/ConnectionRequestContextSection';
+import { normalizeConnectionRequestContext } from './features/customers/connectionRequestContext';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { useDurableDraftSummary } from './features/drafts/useDurableDraftSummary';
 import {
@@ -6338,6 +6340,7 @@ function normalizeContractorConnectedHomeowner(connection: ContractorConnectedHo
     permissions: normalizeSharingPermissions(row.permissions as Partial<SharingPermissions> | null),
     home: fallbackHome ?? normalizedHomes[0] ?? null,
     homes: normalizedHomes,
+    request_context: normalizeConnectionRequestContext(row.request_context),
     created_at: sharedFieldDisplayValue(row.created_at),
     updated_at: sharedFieldDisplayValue(row.updated_at),
     source: sharedFieldDisplayValue(row.source),
@@ -35167,7 +35170,6 @@ function ContractorDashboard({
                   (() => {
                     const reqSubject = selectedSubject.request;
                     const isUpdating = updatingRequestId === reqSubject.connection_id;
-                    const requestMessage = reqSubject.request_context?.message?.trim() || '';
                     const sharedProperties = reqSubject.shared_properties || [];
                     const contactSummary = reqSubject.contact_summary || { display_name: 'Homeowner' };
                     const contactLocation = [contactSummary.city, contactSummary.state, contactSummary.zip_code].filter(Boolean).join(' ');
@@ -35197,12 +35199,7 @@ function ContractorDashboard({
                             <SharedField label="Photos / media" value="Deferred" allowed={false} />
                           </div>
 
-                          <div className="mt-5 rounded-xl border border-amber-200 bg-white/80 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Customer message</p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                              {requestMessage || 'No message included.'}
-                            </p>
-                          </div>
+                          <div className="mt-5"><ConnectionRequestContextSection context={reqSubject.request_context} title="Customer message" emptyText="No message included." tone="amber" /></div>
 
                           <div className="mt-5 space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -36564,6 +36561,7 @@ function ContractorDashboard({
 	                                  <button type="button" onClick={() => void loadSelectedLocalCustomerManagementDetail()} className={`${buttonClass('secondary')} mt-3`}>Try again</button>
 	                                </div>
 	                              )}
+	                              {conn && <ConnectionRequestContextSection context={conn.request_context} title="Original connection request" emptyText={conn.request_context ? 'No message included.' : 'No original connection request is available for this connection.'} formatTimestamp={formatDateTime} />}
 	                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">

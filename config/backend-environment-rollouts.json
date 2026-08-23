@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-20",
+  "updatedOn": "2026-08-22",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "accepted-connection-request-context-visibility-v1",
+      "artifact": "servsync-accepted-connection-request-context-visibility.sql (SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27 was applied only to Sandbox zpzdkoaubyjtsomccxya on 2026-08-23 from 01:13:10Z through 01:13:12Z. Catalog, postgres ownership, fixed-path SECURITY DEFINER behavior, stable volatility, authenticated-only grant, active-connection and contractor-access guards, pending-to-active continuity, exact fictional message/timestamp preservation, unrelated-contractor denial, no-message and legacy-null behavior, and rollback-only authenticated fixture validation passed. All five auth/profile markers, two contractor markers, three connection/permission/context markers, and referral side effects returned to zero."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production remains on the prior active connected-homeowner reader until the exact reviewed migration is separately approved and applied after merge. No Production SQL or customer data was read or changed."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact SHA-256 bytes were applied only to Demo bdytwgejqnlblhrnqxkp on 2026-08-23 from 01:24:46Z through 01:24:47Z after Sandbox passed. Demo and Sandbox share function-definition SHA-256 2aeeddf6f2a0d0dd0deb00f75213640dd6ecc81ce472c6eab3d144ae6a4fd084 plus the same postgres owner, fixed search path, stable SECURITY DEFINER behavior, authenticated-only grant, active-connection filter, and contractor-access guard. Rollback-only authenticated fictional fixtures passed pending visibility, exact message/timestamp preservation across acceptance, authorized active visibility, unrelated-contractor denial, no-message and legacy-null handling, and returned all auth/profile/contractor/homeowner/connection/permission/context/referral markers to zero."
+        }
+      }
+    },
     {
       "id": "core-authoring-request-preparation-renewal-forward-fix-v1",
       "artifact": "servsync-core-authoring-request-preparation-renewal-forward-fix.sql (SHA-256 b4db9bebfc085e7b2c02a48797ed05c99f4e3aa81739c35d84c84bc36de28eb8)",
