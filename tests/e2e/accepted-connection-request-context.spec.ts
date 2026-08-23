@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { normalizeConnectionRequestContext } from '../../src/features/customers/connectionRequestContext';
+import { connectionRequestContextPresentation, normalizeConnectionRequestContext } from '../../src/features/customers/connectionRequestContext';
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -82,10 +82,27 @@ test.describe('accepted connection-request context continuity', () => {
     expect(app).toContain('context={conn.request_context} title="Original connection request"');
     expect(app).toContain("formatTimestamp={formatDateTime}");
     expect(app).toContain("conn.request_context ? 'No message included.' : 'No original connection request is available for this connection.'");
-    expect(section).toContain('Submitted {formatTimestamp(submittedAt)}');
+    expect(section).toContain('{presentation.submittedLabel}');
     expect(section).toContain('whitespace-pre-wrap');
-    expect(section).toContain('{message || emptyText}');
+    expect(section).toContain('{presentation.message}');
     expect(section).not.toMatch(/\.trim\(\)/);
+  });
+
+  test('connected customer presentation preserves the exact message, timestamp, and both empty states', () => {
+    const message = '  Replace valve\nPlease estimate unchanged.  ';
+    expect(connectionRequestContextPresentation(
+      { message, created_at: '2026-08-22T14:30:00Z', updated_at: '2026-08-22T14:30:00Z' },
+      'No message included.',
+      value => `formatted:${value}`,
+    )).toEqual({ message, submittedLabel: 'Submitted formatted:2026-08-22T14:30:00Z' });
+    expect(connectionRequestContextPresentation(
+      { message: '', created_at: '2026-08-22T14:30:00Z', updated_at: '2026-08-22T14:30:00Z' },
+      'No message included.',
+    ).message).toBe('No message included.');
+    expect(connectionRequestContextPresentation(
+      null,
+      'No original connection request is available for this connection.',
+    ).message).toBe('No original connection request is available for this connection.');
   });
 
   test('repair does not create downstream work records or label current property sharing as original', () => {
