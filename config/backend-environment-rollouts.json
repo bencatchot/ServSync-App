@@ -8,8 +8,8 @@
       "artifact": "servsync-accepted-connection-request-context-visibility.sql (SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27)",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Source and isolated PostgreSQL validation are complete. Shared SQL application is separately protected and was not authorized for this task."
+          "status": "Applied",
+          "reason": "Exact SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27 was applied only to Sandbox zpzdkoaubyjtsomccxya on 2026-08-23 from 01:13:10Z through 01:13:12Z. Catalog, postgres ownership, fixed-path SECURITY DEFINER behavior, stable volatility, authenticated-only grant, active-connection and contractor-access guards, pending-to-active continuity, exact fictional message/timestamp preservation, unrelated-contractor denial, no-message and legacy-null behavior, and rollback-only authenticated fixture validation passed. All five auth/profile markers, two contractor markers, three connection/permission/context markers, and referral side effects returned to zero."
         },
         "production": {
           "status": "Pending",
