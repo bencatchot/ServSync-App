@@ -16,7 +16,7 @@ Migration SHA-256 values:
 - durable idempotency: `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` (1,120 lines)
 - staged legacy retirement: `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` (56 lines)
 
-Status: source complete; the exact durable migration is installed and runtime-accepted in Sandbox and Demo. Production, exact deployed-application Preview acceptance, and staged legacy retirement remain pending.
+Status: source complete; the exact durable migration is installed and accepted in Sandbox, Demo, and Production. Exact deployed-application acceptance and staged legacy retirement remain pending.
 
 ## Durable Operation Contract
 
@@ -45,7 +45,7 @@ Status: source complete; the exact durable migration is installed and runtime-ac
 - TypeScript and Production build: passed.
 - ESLint: passed at the existing exact 80-warning baseline with zero errors and no new warnings.
 - App architecture: `src/App.tsx` reduced to 50,824 lines; the ratcheting baseline was lowered by 10 lines. Architecture suite passed after the ratchet update.
-- Backend and runtime parity source suites: passed. The rollout ledger records the exact durable foundation as Applied and runtime-accepted in Sandbox and Demo, Pending in Production, and records the staged retirement as Pending in all three environments.
+- Backend and runtime parity source suites: passed. The rollout ledger records the exact durable foundation as Applied in Sandbox, Demo, and Production, and records the staged retirement as Pending in all three environments.
 - Isolated PostgreSQL 16 compilation: both exact migrations installed successfully in staged order over a bounded local foundation with all functions, grants, policies, indexes, forced-RLS receipt state, and final legacy grant/policy retirement.
 - Isolated runtime matrix passed: sequential replay, lost-response replay, true concurrent report commit, true concurrent regenerated-PDF attempts with different file SHA/size/name converging on the first valid object, true concurrent document-free manual History commit, changed-semantic conflict, regenerated-PDF manifest refresh before upload, expired preparation renewal, Storage metadata verification, report document/Home History/notification convergence, manual History with and without a document, Viewer denial, cross-owner denial, forced-RLS/no-policy receipts, and exact canonical counts. Final-byte PostgreSQL 16 regressions additionally commit and delete manual History both with and without a document, retry the same operation key/payload, and prove zero History resurrection, zero duplicate document/object registration, stable logical result IDs, nullable live-row pointers, and preserved succeeded tombstones.
 - Final source hygiene passed: `git diff --check`, changed-file sensitive-value scan, changed Markdown-link resolution, and exact migration hash/line verification.
@@ -90,15 +90,26 @@ Cleanup removed only the exact run-created Storage paths and Auth identities thr
 
 Repository typecheck, Production build, exact 80-warning lint budget, App-size and architecture gates, focused 13/13 and combined 33/33 reliability suites, final-byte PostgreSQL 16 regression, backend parity source tests 16/16, runtime parity source/live checks 6/6, rollout ledger validation, JSON/diff/secret hygiene, Demo Recorder 30/30, and Marketing 79/79 passed. Live backend parity correctly failed closed while Production remains behind: its Demo comparison reports the expected FB-039E2 receipt/function/grant/policy additions plus the exact `home_docs_upload` policy change, and no comparator exception was added to hide that supported-object drift. Full live backend parity is therefore a Production-rollout gate, not completed Demo evidence.
 
+## Production Protected Rollout Acceptance — 2026-08-24
+
+Owner approval pinned PR #517 head `a8a2770f64dd11c69b34e4736804cd56d1bdadc0`, exact durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461`, and Production project `uqgtheclhxqlnjpfmheq`. Local tooling was explicitly relinked from Demo, after which both the local marker and healthy remote project identity were re-read and matched Production. Material hashes remained exact for `src/App.tsx` `745350c8560682d87249c8b62b592abfbee4c84dce23d8da6571e381e1491017`, finalization helper `74cd65f9d726a98bc07739a71607962fc63316bf277b59fb43a1949daed4b5b1`, durable migration `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461`, and staged retirement `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289`.
+
+Read-only preflight found no receipt table, private helper, public operation, prepared-upload policy, receipt, or FB-039E2 Auth/business/Storage marker. Every schema prerequisite and the deliberate legacy finalizer/upload helper were present with their captured definitions and security metadata. A fresh PostgreSQL 16 final-byte compile and isolated tombstone/concurrency regression passed. The complete baseline captured 161 pre-existing public/Auth/Storage relation fingerprints with volatile/secret Auth fields excluded, plus explicit Help, Marketing, provider, publication, and publishing-control identity/status fingerprints without exposing record content or credentials.
+
+The unchanged migration file was applied once immediately after rechecking the branch head, local link, healthy remote identity, and artifact SHA. Read-only post-install verification matched all 11 compiled definitions. Every function is postgres-owned with exact volatility and fixed `search_path=public`; the four public operations and required prepared-upload predicate are authenticated-only while private helpers remain postgres-only. The receipt table is postgres-owned, forced-RLS, policy-free, empty, has zero non-postgres table grants, and uses `ON DELETE SET NULL` for manual History tombstones. The prepared-upload policy is present. The six-argument legacy finalizer and legacy upload helper remain present and definition-identical. The source precondition still refuses an existing receipt table, so repeat-install behavior was verified without reapplying shared SQL. The retirement migration was not applied.
+
+All 161 pre-existing fingerprints were exactly equal after installation; the sole new relation was the empty receipt table. Profiles 18, contractors 7, homes 7, Requests 23, quotes 0, Estimates 23, Jobs 9, Invoices 12, documents 0, Home History 4, notifications 72, Auth users/identities 18, nine Storage buckets, and 15 Storage objects remained exact. Help retained one walkthrough, three revisions/contexts, six assets, one recording job, six recording events, and exact identity/status fingerprints. Marketing retained all 30 table fingerprints, one workspace, 21 Content rows, seven Directions, four creation requests, three provider connections, two publications, and one publishing control with exact provider/publication/readiness state. Zero fixture, auth-session, product-RPC, Storage, workflow, notification, provider, publication, or external-delivery action ran.
+
+Production versus Demo live backend parity now returns `PASS WITH INTENTIONAL DIFFERENCES`: all 158 Production-supported relations, 2,289 columns, 1,548 constraints, 633 indexes, 220 policies, 596 functions, grants, managed security, and default ACLs match; only the 129 approved Demo scenario objects differ. The full comparator continues to fail closed on the separately documented 21-item pre-existing Sandbox drift, which was neither mutated nor hidden. Production public smoke passed 7/7 routes with no sign-in. Authenticated read-only smoke was unavailable because the approved local Production credential set was absent; no credential was created, rotated, or requested.
+
 ## Compatibility And Remaining Protected Work
 
 The durable migration is database-ahead-of-application compatible. It intentionally leaves the legacy six-argument `servsync_finalize_field_work` RPC and broad legacy report-upload policy available while the currently deployed application still uses them. The separately staged retirement migration is now included in the reviewed source: after the new application path is deployed and observed, it revokes every client/trusted-role grant on the legacy RPC and broad upload predicate and drops the old report-upload policy. Existing finalized reports are adopted read-only by the new path without replacement uploads or fabricated historical equivalence.
 
 Full Phase 0.4 acceptance still requires:
 
-1. Identical-byte Production rollout with read-only catalog/security and exact business-count preservation; no Production fixture mutation.
-2. Exact deployed-application Preview against the rolled-out backend.
-3. Identical-byte staged retirement of the legacy finalizer and legacy upload bypass after deployment observation, followed by durable replay and delivery preservation checks.
+1. Exact deployed-application acceptance against the rolled-out backend.
+2. Identical-byte staged retirement of the legacy finalizer and legacy upload bypass after deployment observation, followed by durable replay and delivery preservation checks.
 
 Phase 0.5 mobile remains blocked until those gates pass.
 
@@ -108,8 +119,8 @@ Phase 0.5 mobile remains blocked until those gates pass.
 2. Snapshot relevant Job, document, Home History, notification, Storage-object, and receipt counts/fingerprints.
 3. Treat the completed Sandbox authenticated/Storage API/zero-residue matrix as the first protected gate; do not rerun it without a new discrepancy or explicit reason.
 4. Treat the completed identical-byte Demo authenticated/Storage API/zero-residue matrix and Demo Recorder/Marketing preservation as the second protected gate; do not rerun it without a new discrepancy or explicit reason.
-5. After explicit Production approval, apply the identical bytes once; verify function ownership, fixed search paths, volatility, authenticated-only public grants, private helper denial, forced RLS/no policies, Storage policy, marker, repeat-install refusal, parity, and exact pre/post business counts without fixtures.
-6. Merge/deploy the application only after the durable backend is ahead and accepted. Observe the new path, then apply the already reviewed staged retirement migration in Sandbox -> Demo -> Production order with a separate approval at each protected gate.
+5. Treat the completed identical-byte Production catalog/security/zero-write preservation gate as the third protected gate; do not reapply it.
+6. Merge/deploy the application only after owner approval. Observe the new path, then apply the already reviewed staged retirement migration in Sandbox -> Demo -> Production order with a separate approval at each protected gate.
 
 Before any successful receipt exists, rollback may drop only the new Storage policy, restore the prior generic homeowner upload policy, and drop the four public RPCs, private helpers, indexes, and receipt table in dependency order. After successful receipts exist, use a reviewed roll-forward repair rather than deleting operation evidence or canonical records. Before retirement rollback, restore only the reviewed broad report policy plus its authenticated helper/RPC grants; after retirement acceptance, prefer roll-forward. The legacy path remains available only during the deliberate database-ahead deployment window.
 
@@ -119,10 +130,10 @@ Before any successful receipt exists, rollback may drop only the new Storage pol
 
 ## Protected Actions Not Taken
 
-- No SQL was applied to Production. The exact approved durable migration was applied only to Sandbox and Demo; the staged retirement was not applied anywhere.
-- Demo used only fixed-prefix fictional `FB039E2DM1` fixtures separate from canonical Demo Recorder and Marketing state. Storage API cleanup and Auth lifecycle deletion returned every exact marker and receipt to zero and preserved all 164 pre-existing public/Auth/Storage fingerprints. Canonical Demo Recorder and Marketing records were not reset, modified, recorded, reviewed, published, reseeded, or repackaged. No Production record, provider, environment, secret, or infrastructure setting was mutated.
+- The exact approved durable migration is applied in Sandbox, Demo, and Production. The staged retirement was not applied anywhere.
+- Production received no fixture, auth identity/session, product RPC, Storage object, workflow event, notification, provider/publication, or external-delivery mutation. All pre-existing Production business/Auth/Storage/Help/Marketing fingerprints remained exact. No environment, secret, provider, or infrastructure setting was mutated.
 - No merge or manual deployment/promotion occurred.
 
 ## Status
 
-FB-039E2 source is complete and the durable migration is installed and runtime-accepted in Sandbox and Demo, including shared-home member/viewer boundaries and Demo Recorder/Marketing preservation. Phase 0.4 remains open pending Production rollout, exact deployed-application Preview acceptance, and staged legacy-bypass retirement.
+FB-039E2 source and durable migration rollout are complete across Sandbox, Demo, and Production. Sandbox/Demo runtime boundaries, Production preservation, Demo Recorder/Marketing preservation, and Demo-to-Production catalog parity are accepted. Phase 0.4 remains open pending exact deployed-application acceptance and staged legacy-bypass retirement.
