@@ -5,8 +5,13 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
 const PROJECT_REF = 'zpzdkoaubyjtsomccxya';
-const EXPECTED_HEAD = 'd8a3f6487f6245c18f39eae6bb21c7403b8209c9';
-const EXPECTED_MIGRATION_SHA = 'b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461';
+const APPROVED_SOURCE_HEAD = 'd8a3f6487f6245c18f39eae6bb21c7403b8209c9';
+const MATERIAL_CONTRACT_HASHES = {
+  'src/App.tsx': '745350c8560682d87249c8b62b592abfbee4c84dce23d8da6571e381e1491017',
+  'src/features/reliability/recordFinalization.ts': '74cd65f9d726a98bc07739a71607962fc63316bf277b59fb43a1949daed4b5b1',
+  'servsync-core-record-finalization-durable-idempotency.sql': 'b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461',
+  'servsync-core-record-finalization-legacy-retirement.sql': 'edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289',
+};
 const MARKER = 'FB039E2RT2';
 const EMAIL_PREFIX = 'fb039e2rt2-';
 const BUCKET = 'home-documents';
@@ -68,6 +73,7 @@ const sessions = [];
 let service;
 let baselineBefore;
 let cleanupStarted = false;
+let repositoryHead;
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -122,6 +128,7 @@ function baselineQuery() {
 function markerResidueQuery() {
   const operationIds = Object.entries(ids).filter(([key]) => key.startsWith('op')).map(([, value]) => value);
   const jobIds = Object.entries(ids).filter(([key]) => key.startsWith('report')).map(([, value]) => value);
+  const reportObjectPredicates = jobIds.map(id => `name like '%/${id}/%'`).join(' or ');
   return `select
     (select count(*) from auth.users where email like '${EMAIL_PREFIX}%@example.invalid') as auth_users,
     (select count(*) from public.profiles where email like '${EMAIL_PREFIX}%@example.invalid') as profiles,
@@ -133,7 +140,7 @@ function markerResidueQuery() {
     (select count(*) from public.servsync_core_record_finalization_operations where operation_key in (${sqlUuidList(operationIds)})) as receipts,
     (select count(*) from public.home_documents where file_name like '${MARKER}%') as documents,
     (select count(*) from public.home_maintenance_log where title like '${MARKER}%') as history,
-    (select count(*) from storage.objects where bucket_id = '${BUCKET}' and (name like '%/${ids.reportMain}/%' or name like '%/${ids.reportMetadata}/%' or name like '%/${ids.reportLegacy}/%' or name like '%/${ids.opManualDocument}.%')) as objects;`;
+    (select count(*) from storage.objects where bucket_id = '${BUCKET}' and (${reportObjectPredicates} or name like '%/${ids.opManualDocument}.%')) as objects;`;
 }
 
 function definitionQuery() {
@@ -159,8 +166,11 @@ function assertZeroResidue(row, label) {
 function preflight() {
   assert.equal(readFileSync('supabase/.temp/project-ref', 'utf8').trim(), PROJECT_REF, 'linked project must be Sandbox');
   assert.equal(cli(['--version']).trim().startsWith('2.'), true, 'Supabase CLI must be available');
-  assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), EXPECTED_HEAD, 'git head mismatch');
-  assert.equal(sha256(readFileSync('servsync-core-record-finalization-durable-idempotency.sql')), EXPECTED_MIGRATION_SHA, 'migration hash mismatch');
+  repositoryHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  execFileSync('git', ['merge-base', '--is-ancestor', APPROVED_SOURCE_HEAD, repositoryHead]);
+  for (const [path, expectedHash] of Object.entries(MATERIAL_CONTRACT_HASHES)) {
+    assert.equal(sha256(readFileSync(path)), expectedHash, `${path} material contract hash mismatch`);
+  }
   const definitions = dbQuery(definitionQuery());
   assert.equal(definitions.length, 5, 'all five installed definitions must exist');
   for (const item of definitions) {
@@ -426,16 +436,34 @@ async function testReportMatrix(actors) {
   await rpcOk(actors.owner.client, 'servsync_commit_job_report_finalization', badArgs);
 
   const roleCases = [
-    [actors.admin.client, ids.reportAdmin, ids.opReportAdmin],
-    [actors.office.client, ids.reportOffice, ids.opReportOffice],
-    [actors.field.client, ids.reportField, ids.opReportField],
+    { label: 'Admin', actor: actors.admin.client, job: ids.reportAdmin, operation: ids.opReportAdmin },
+    { label: 'Office', actor: actors.office.client, job: ids.reportOffice, operation: ids.opReportOffice },
+    { label: 'Field Technician', actor: actors.field.client, job: ids.reportField, operation: ids.opReportField },
   ];
-  for (const [actor, job, operation] of roleCases) {
+  for (const { label, actor, job, operation } of roleCases) {
     const bytes = Buffer.from(`%PDF-1.4\n${MARKER} role ${job}\n%%EOF\n`);
-    const prepared = await rpcOk(actor, 'servsync_prepare_job_report_finalization', {
-      p_operation_key: operation, p_inspection_id: job, p_payload: reportPayload(bytes, operation.slice(-3), `${MARKER} role report`),
-    });
-    assert.equal(prepared.status, 'prepared');
+    const payload = reportPayload(bytes, operation.slice(-3), `${MARKER} ${label} complete role report`);
+    const args = { p_operation_key: operation, p_inspection_id: job, p_payload: payload };
+    const prepared = await rpcOk(actor, 'servsync_prepare_job_report_finalization', args);
+    assert.equal(prepared.status, 'prepared', `${label} report must prepare`);
+    const uploaded = await upload(actor, prepared.storage_path, bytes, 'application/pdf', operation);
+    assert.equal(uploaded.error, null, `${label} prepared report upload must succeed`);
+    const committed = await rpcOk(actor, 'servsync_commit_job_report_finalization', args);
+    assert.equal(committed.inspection_id, job, `${label} report must commit its canonical Job`);
+    assert.ok(committed.document_id && committed.maintenance_log_id && committed.notification_id, `${label} report must return complete canonical lineage`);
+    const replayed = await rpcOk(actor, 'servsync_commit_job_report_finalization', args);
+    assert.equal(replayed.idempotent, true, `${label} same-key success must replay`);
+    assert.equal(replayed.document_id, committed.document_id, `${label} replay must preserve document identity`);
+    assert.equal(replayed.maintenance_log_id, committed.maintenance_log_id, `${label} replay must preserve Home History identity`);
+    assert.equal(replayed.notification_id, committed.notification_id, `${label} replay must preserve notification identity`);
+    const roleState = dbQuery(`select
+      (select count(*) from public.inspections where id='${job}' and status='finalized' and job_status='completed' and report_storage_path='${prepared.storage_path}') jobs,
+      (select count(*) from public.home_documents where id='${committed.document_id}' and storage_path='${prepared.storage_path}' and homeowner_user_id='${actors.homeowner.id}' and home_id='${ids.home}' and upload_source='contractor_report') documents,
+      (select count(*) from public.home_maintenance_log where id='${committed.maintenance_log_id}' and inspection_id='${job}' and report_document_id='${committed.document_id}' and home_id='${ids.home}') history,
+      (select count(*) from public.notifications where id='${committed.notification_id}' and user_id='${actors.homeowner.id}' and type='inspection_report_filed') notifications,
+      (select count(*) from public.servsync_core_record_finalization_operations where operation_key='${operation}' and status='succeeded' and result_id='${job}') receipts,
+      (select count(*) from storage.objects where bucket_id='${BUCKET}' and name='${prepared.storage_path}' and user_metadata->>'servsync_sha256'='${payload.file_sha256}' and user_metadata->>'servsync_operation_key'='${operation}') objects;`)[0];
+    assert.deepEqual(roleState, { jobs: 1, documents: 1, history: 1, notifications: 1, receipts: 1, objects: 1 }, `${label} canonical finalization state must be singular and complete`);
   }
   const deniedBytes = Buffer.from(`%PDF-1.4\n${MARKER} denied\n%%EOF\n`);
   await rpcDenied(actors.viewer.client, 'servsync_prepare_job_report_finalization', {
@@ -632,8 +660,10 @@ async function run() {
   console.log(JSON.stringify({
     status: 'passed',
     project_ref: PROJECT_REF,
-    head: EXPECTED_HEAD,
-    migration_sha256: EXPECTED_MIGRATION_SHA,
+    approved_source_head: APPROVED_SOURCE_HEAD,
+    repository_head: repositoryHead,
+    material_contract_sha256: MATERIAL_CONTRACT_HASHES,
+    harness_sha256: sha256(readFileSync('scripts/validation/validate-core-record-finalization-sandbox-runtime.mjs')),
     runtime_matrix: 'complete',
     storage_cleanup: 'supabase-api',
     fixture_residue: 0,

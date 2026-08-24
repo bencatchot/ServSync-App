@@ -12,6 +12,8 @@ import {
 
 const migrationUrl = new URL('../../servsync-core-record-finalization-durable-idempotency.sql', import.meta.url);
 const retirementMigrationUrl = new URL('../../servsync-core-record-finalization-legacy-retirement.sql', import.meta.url);
+const sandboxHarnessUrl = new URL('../../scripts/validation/validate-core-record-finalization-sandbox-runtime.mjs', import.meta.url);
+const packageUrl = new URL('../../package.json', import.meta.url);
 
 async function migrationSource() {
   return readFile(migrationUrl, 'utf8');
@@ -404,4 +406,30 @@ test('prepared Storage is operation-owned, renewable, reusable, and bounded agai
   assert.match(sql, /operation\.operation_type = 'job_report_finalize'[\s\S]*current_user_can_write_contractor_jobs\(operation\.contractor_id\)/i);
   assert.match(sql, /status\s*=\s*'succeeded'[\s\S]*(?:return|result_payload)/i);
   assert.doesNotMatch(sql, /upsert\s*[:=]\s*true/i);
+});
+
+test('Sandbox runtime acceptance is explicitly gated and proves complete non-owner role finalization', async () => {
+  const harness = await readFile(sandboxHarnessUrl, 'utf8');
+  const packageJson = JSON.parse(await readFile(packageUrl, 'utf8')) as { scripts?: Record<string, string> };
+  const packageCommand = packageJson.scripts?.['test:core-record-finalization-sandbox-runtime'] ?? '';
+
+  assert.doesNotMatch(packageCommand, /--execute-sandbox/);
+  assert.match(harness, /process\.argv\.includes\('--execute-sandbox'\)/);
+  assert.match(harness, /Refusing shared mutation/);
+  assert.ok(harness.indexOf('Refusing shared mutation') < harness.indexOf('function loadKeys'), 'the mutation barrier must run before credentials are loaded');
+  assert.match(harness, /APPROVED_SOURCE_HEAD/);
+  assert.match(harness, /MATERIAL_CONTRACT_HASHES/);
+  assert.doesNotMatch(harness, /assert\.equal\([^\n]*rev-parse[^\n]*EXPECTED_HEAD/);
+
+  for (const role of ['Admin', 'Office', 'Field Technician']) {
+    assert.match(harness, new RegExp(`label: '${role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
+  }
+  const roleLoop = harness.slice(harness.indexOf('const roleCases ='), harness.indexOf('const deniedBytes ='));
+  assert.match(roleLoop, /servsync_prepare_job_report_finalization/);
+  assert.match(roleLoop, /await upload\(/);
+  assert.match(roleLoop, /servsync_commit_job_report_finalization/);
+  assert.match(roleLoop, /idempotent/);
+  for (const canonical of ['inspections', 'home_documents', 'home_maintenance_log', 'notifications', 'servsync_core_record_finalization_operations', 'storage.objects']) {
+    assert.match(roleLoop, new RegExp(canonical.replace('.', '\\.')));
+  }
 });
