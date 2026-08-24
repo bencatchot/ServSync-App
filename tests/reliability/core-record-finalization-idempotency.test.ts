@@ -408,18 +408,28 @@ test('prepared Storage is operation-owned, renewable, reusable, and bounded agai
   assert.doesNotMatch(sql, /upsert\s*[:=]\s*true/i);
 });
 
-test('Sandbox runtime acceptance is explicitly gated and proves complete non-owner role finalization', async () => {
+test('shared runtime acceptance is target-pinned, explicitly gated, and proves complete non-owner role finalization', async () => {
   const harness = await readFile(sandboxHarnessUrl, 'utf8');
   const packageJson = JSON.parse(await readFile(packageUrl, 'utf8')) as { scripts?: Record<string, string> };
-  const packageCommand = packageJson.scripts?.['test:core-record-finalization-sandbox-runtime'] ?? '';
+  const sandboxCommand = packageJson.scripts?.['test:core-record-finalization-sandbox-runtime'] ?? '';
+  const demoCommand = packageJson.scripts?.['test:core-record-finalization-demo-runtime'] ?? '';
 
-  assert.doesNotMatch(packageCommand, /--execute-sandbox/);
+  assert.doesNotMatch(sandboxCommand, /--execute-sandbox|--execute-demo/);
+  assert.doesNotMatch(demoCommand, /--execute-sandbox|--execute-demo/);
   assert.match(harness, /process\.argv\.includes\('--execute-sandbox'\)/);
+  assert.match(harness, /process\.argv\.includes\('--execute-demo'\)/);
+  assert.match(harness, /bdytwgejqnlblhrnqxkp/);
+  assert.match(harness, /executeSandbox === executeDemo/);
   assert.match(harness, /Refusing shared mutation/);
   assert.ok(harness.indexOf('Refusing shared mutation') < harness.indexOf('function loadKeys'), 'the mutation barrier must run before credentials are loaded');
   assert.match(harness, /APPROVED_SOURCE_HEAD/);
   assert.match(harness, /MATERIAL_CONTRACT_HASHES/);
   assert.doesNotMatch(harness, /assert\.equal\([^\n]*rev-parse[^\n]*EXPECTED_HEAD/);
+  assert.match(harness, /pg_tables where schemaname = 'public'/);
+  assert.match(harness, /'auth\.users'/);
+  assert.match(harness, /'auth\.identities'/);
+  assert.match(harness, /'storage\.buckets'/);
+  assert.match(harness, /'storage\.objects'/);
 
   for (const role of ['Admin', 'Office', 'Field Technician']) {
     assert.match(harness, new RegExp(`label: '${role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));

@@ -4,7 +4,13 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
-const PROJECT_REF = 'zpzdkoaubyjtsomccxya';
+const executeSandbox = process.argv.includes('--execute-sandbox');
+const executeDemo = process.argv.includes('--execute-demo');
+if (executeSandbox === executeDemo) {
+  throw new Error('Refusing shared mutation. Supply exactly one explicitly approved execution flag.');
+}
+const TARGET = executeDemo ? 'Demo' : 'Sandbox';
+const PROJECT_REF = executeDemo ? 'bdytwgejqnlblhrnqxkp' : 'zpzdkoaubyjtsomccxya';
 const APPROVED_SOURCE_HEAD = 'd8a3f6487f6245c18f39eae6bb21c7403b8209c9';
 const MATERIAL_CONTRACT_HASHES = {
   'src/App.tsx': '745350c8560682d87249c8b62b592abfbee4c84dce23d8da6571e381e1491017',
@@ -12,16 +18,13 @@ const MATERIAL_CONTRACT_HASHES = {
   'servsync-core-record-finalization-durable-idempotency.sql': 'b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461',
   'servsync-core-record-finalization-legacy-retirement.sql': 'edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289',
 };
-const MARKER = 'FB039E2RT2';
-const EMAIL_PREFIX = 'fb039e2rt2-';
+const MARKER = executeDemo ? 'FB039E2DM1' : 'FB039E2RT2';
+const EMAIL_PREFIX = executeDemo ? 'fb039e2dm1-' : 'fb039e2rt2-';
 const BUCKET = 'home-documents';
-const execute = process.argv.includes('--execute-sandbox');
+const ID_PREFIX = executeDemo ? 'f039e203' : 'f039e202';
+const targetId = value => value.replace('f039e202', ID_PREFIX);
 
-if (!execute) {
-  throw new Error('Refusing shared mutation. Re-run with --execute-sandbox only after explicit owner approval.');
-}
-
-const ids = {
+const ids = Object.fromEntries(Object.entries({
   contractor: 'f039e202-0000-4000-8000-000000000101',
   contractorB: 'f039e202-0000-4000-8000-000000000102',
   home: 'f039e202-0000-4000-8000-000000000201',
@@ -56,7 +59,7 @@ const ids = {
   memberAdmin: 'f039e202-0000-4000-8000-000000000711',
   memberMember: 'f039e202-0000-4000-8000-000000000712',
   memberViewer: 'f039e202-0000-4000-8000-000000000713',
-};
+}).map(([key, value]) => [key, targetId(value)]));
 
 const expectedFunctionHashes = {
   'servsync_can_upload_prepared_record_finalization(text)': 'd9fde3b6502820c2a51befa7dc9f68d3',
@@ -104,25 +107,43 @@ function sqlUuidList(values) {
 }
 
 function baselineQuery() {
-  return `with baseline as (
-    select 'auth_users' label, count(*)::bigint count, md5(coalesce(string_agg(id::text, ',' order by id), '')) fingerprint from auth.users
-    union all select 'profiles', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.profiles
-    union all select 'contractor_profiles', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.contractor_profiles
-    union all select 'contractor_team_members', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.contractor_team_members
-    union all select 'contractor_billing_accounts', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.contractor_billing_accounts
-    union all select 'referral_codes', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.referral_codes
-    union all select 'referrals', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.referrals
-    union all select 'servsync_referral_invites', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.servsync_referral_invites
-    union all select 'homes', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.homes
-    union all select 'home_memberships', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.home_memberships
-    union all select 'service_requests', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.service_requests
-    union all select 'service_request_quotes', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.service_request_quotes
-    union all select 'inspections', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.inspections
-    union all select 'home_documents', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.home_documents
-    union all select 'home_maintenance_log', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.home_maintenance_log
-    union all select 'notifications', count(*), md5(coalesce(string_agg(id::text, ',' order by id), '')) from public.notifications
-    union all select 'storage_home_documents', count(*), md5(coalesce(string_agg(name, ',' order by name), '')) from storage.objects where bucket_id = '${BUCKET}'
-  ) select label, count, fingerprint from baseline order by label;`;
+  return `begin;
+    create temp table servsync_finalization_fingerprints(
+      label text primary key, count bigint, fingerprint text
+    ) on commit drop;
+    do $fingerprints$
+    declare relation record;
+    begin
+      for relation in
+        select schemaname, tablename from pg_tables where schemaname = 'public'
+      loop
+        execute format(
+          'insert into servsync_finalization_fingerprints select %L,count(*)::bigint,md5(coalesce(string_agg(md5(to_jsonb(row_value)::text),'''' order by md5(to_jsonb(row_value)::text)),'''')) from %I.%I row_value',
+          relation.schemaname || '.' || relation.tablename,
+          relation.schemaname,
+          relation.tablename
+        );
+      end loop;
+    end
+    $fingerprints$;
+    insert into servsync_finalization_fingerprints
+    select 'auth.users', count(*), md5(coalesce(string_agg(
+      md5((to_jsonb(row_value) - 'encrypted_password' - 'confirmation_token' - 'recovery_token'
+        - 'email_change_token_new' - 'email_change' - 'email_change_token_current'
+        - 'reauthentication_token' - 'phone_change_token' - 'phone_change')::text),
+      '' order by id), '')) from auth.users row_value;
+    insert into servsync_finalization_fingerprints
+    select 'auth.identities', count(*), md5(coalesce(string_agg(
+      md5((to_jsonb(row_value) - 'identity_data')::text), '' order by id), ''))
+      from auth.identities row_value;
+    insert into servsync_finalization_fingerprints
+    select 'storage.buckets', count(*), md5(coalesce(string_agg(
+      md5(to_jsonb(row_value)::text), '' order by id), '')) from storage.buckets row_value;
+    insert into servsync_finalization_fingerprints
+    select 'storage.objects', count(*), md5(coalesce(string_agg(
+      md5(to_jsonb(row_value)::text), '' order by id), '')) from storage.objects row_value;
+    select label, count, fingerprint from servsync_finalization_fingerprints order by label;
+    rollback;`;
 }
 
 function markerResidueQuery() {
@@ -164,7 +185,7 @@ function assertZeroResidue(row, label) {
 }
 
 function preflight() {
-  assert.equal(readFileSync('supabase/.temp/project-ref', 'utf8').trim(), PROJECT_REF, 'linked project must be Sandbox');
+  assert.equal(readFileSync('supabase/.temp/project-ref', 'utf8').trim(), PROJECT_REF, `linked project must be ${TARGET}`);
   assert.equal(cli(['--version']).trim().startsWith('2.'), true, 'Supabase CLI must be available');
   repositoryHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   execFileSync('git', ['merge-base', '--is-ancestor', APPROVED_SOURCE_HEAD, repositoryHead]);
@@ -196,7 +217,7 @@ function loadKeys() {
   const keys = JSON.parse(cli(['projects', 'api-keys', '--project-ref', PROJECT_REF, '--output', 'json']));
   const anonKey = keys.find(item => item.name === 'anon')?.api_key;
   const serviceRoleKey = keys.find(item => item.name === 'service_role')?.api_key;
-  assert.ok(anonKey && serviceRoleKey, 'Sandbox legacy API keys are required in memory');
+  assert.ok(anonKey && serviceRoleKey, `${TARGET} legacy API keys are required in memory`);
   return { anonKey, serviceRoleKey };
 }
 
@@ -362,8 +383,8 @@ async function assertStorageDenied(actor, path, label) {
 }
 
 async function testReportMatrix(actors) {
-  const bufferA = Buffer.from('%PDF-1.4\nFB039E2RT2 report bytes A\n%%EOF\n');
-  const bufferB = Buffer.from('%PDF-1.4\nFB039E2RT2 regenerated report bytes B are different\n%%EOF\n');
+  const bufferA = Buffer.from(`%PDF-1.4\n${MARKER} report bytes A\n%%EOF\n`);
+  const bufferB = Buffer.from(`%PDF-1.4\n${MARKER} regenerated report bytes B are different\n%%EOF\n`);
   const payloadA = reportPayload(bufferA, 'a');
   const payloadB = reportPayload(bufferB, 'b');
   const prepArgs = payload => ({ p_operation_key: ids.opReportMain, p_inspection_id: ids.reportMain, p_payload: payload });
@@ -416,7 +437,7 @@ async function testReportMatrix(actors) {
     (select count(*) from storage.objects where bucket_id='${BUCKET}' and name='${reportPath}' and user_metadata->>'servsync_sha256'='${payloadA.file_sha256}' and user_metadata->>'servsync_operation_key'='${ids.opReportMain}') objects;`)[0];
   assert.deepEqual(canonicalRows, { jobs: 1, documents: 1, history: 1, notifications: 1, receipts: 1, objects: 1 });
 
-  const badBuffer = Buffer.from('%PDF-1.4\nFB039E2RT2 metadata rejection\n%%EOF\n');
+  const badBuffer = Buffer.from(`%PDF-1.4\n${MARKER} metadata rejection\n%%EOF\n`);
   const badPayload = reportPayload(badBuffer, 'metadata', `${MARKER} metadata report`);
   const badArgs = { p_operation_key: ids.opReportMetadata, p_inspection_id: ids.reportMetadata, p_payload: badPayload };
   const badPrep = await rpcOk(actors.owner.client, 'servsync_prepare_job_report_finalization', badArgs);
@@ -630,7 +651,7 @@ async function cleanup() {
   try {
     assertZeroResidue(dbQuery(markerResidueQuery())[0], 'post-cleanup');
     const baselineAfter = dbQuery(baselineQuery());
-    assert.deepEqual(baselineAfter, baselineBefore, 'pre-existing Sandbox counts/fingerprints must remain exact');
+    assert.deepEqual(baselineAfter, baselineBefore, `pre-existing ${TARGET} counts/fingerprints must remain exact`);
   } catch (error) {
     cleanupErrors.push(error);
   }
@@ -652,13 +673,14 @@ async function run() {
   try {
     await cleanup();
   } catch (cleanupError) {
-    throw new AggregateError([runtimeError, cleanupError].filter(Boolean), 'Sandbox runtime or exact cleanup failed. Stop immediately.');
+    throw new AggregateError([runtimeError, cleanupError].filter(Boolean), `${TARGET} runtime or exact cleanup failed. Stop immediately.`);
   }
   if (runtimeError) throw runtimeError;
   const postDefinitions = dbQuery(definitionQuery());
   assert.deepEqual(postDefinitions, definitions, 'installed function definitions must remain unchanged');
   console.log(JSON.stringify({
     status: 'passed',
+    target: TARGET,
     project_ref: PROJECT_REF,
     approved_source_head: APPROVED_SOURCE_HEAD,
     repository_head: repositoryHead,
