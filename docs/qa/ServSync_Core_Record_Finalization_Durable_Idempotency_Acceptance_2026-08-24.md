@@ -16,7 +16,7 @@ Migration SHA-256 values:
 - durable idempotency: `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` (1,120 lines)
 - staged legacy retirement: `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` (56 lines)
 
-Status: source complete; the exact durable migration is installed in Sandbox, but protected Sandbox runtime acceptance stopped safely and remains incomplete. Demo, Production, exact-head shared-environment acceptance, and staged legacy retirement remain pending.
+Status: source complete; the exact durable migration is installed and runtime-accepted in Sandbox. Demo, Production, exact deployed-application Preview acceptance, and staged legacy retirement remain pending.
 
 ## Durable Operation Contract
 
@@ -45,7 +45,7 @@ Status: source complete; the exact durable migration is installed in Sandbox, bu
 - TypeScript and Production build: passed.
 - ESLint: passed at the existing exact 80-warning baseline with zero errors and no new warnings.
 - App architecture: `src/App.tsx` reduced to 50,824 lines; the ratcheting baseline was lowered by 10 lines. Architecture suite passed after the ratchet update.
-- Backend and runtime parity source suites: passed before rollout. The rollout ledger now records the exact durable foundation as Applied in Sandbox with runtime acceptance incomplete, Pending in Demo and Production, and records the staged retirement as Pending in all three environments.
+- Backend and runtime parity source suites: passed. The rollout ledger records the exact durable foundation as Applied and runtime-accepted in Sandbox, Pending in Demo and Production, and records the staged retirement as Pending in all three environments.
 - Isolated PostgreSQL 16 compilation: both exact migrations installed successfully in staged order over a bounded local foundation with all functions, grants, policies, indexes, forced-RLS receipt state, and final legacy grant/policy retirement.
 - Isolated runtime matrix passed: sequential replay, lost-response replay, true concurrent report commit, true concurrent regenerated-PDF attempts with different file SHA/size/name converging on the first valid object, true concurrent document-free manual History commit, changed-semantic conflict, regenerated-PDF manifest refresh before upload, expired preparation renewal, Storage metadata verification, report document/Home History/notification convergence, manual History with and without a document, Viewer denial, cross-owner denial, forced-RLS/no-policy receipts, and exact canonical counts. Final-byte PostgreSQL 16 regressions additionally commit and delete manual History both with and without a document, retry the same operation key/payload, and prove zero History resurrection, zero duplicate document/object registration, stable logical result IDs, nullable live-row pointers, and preserved succeeded tombstones.
 - Final source hygiene passed: `git diff --check`, changed-file sensitive-value scan, changed Markdown-link resolution, and exact migration hash/line verification.
@@ -62,7 +62,17 @@ Runtime acceptance stopped before report commit. The first harness inserted a pr
 
 Read-only residue inspection found 11 fictional auth/profile users, two contractors, four team rows, two homes, three shared-home memberships, and one Job from the committed fixture setup, with zero receipts, documents, Home History rows, notifications, or Storage objects. Exact lifecycle cleanup deleted only those 11 fixed fictional auth-user IDs. Final residue was zero across auth users, profiles, referral codes, contractor billing, contractors, team rows, homes, memberships, Jobs, receipts, documents, Home History, notifications, and Storage. The relevant pre/post business counts and ID fingerprints remained exact: profiles 19, contractors 6, homes 9, Requests 47, quotes 0, Jobs 208, documents 11, Home History 30, and notifications 163. The `home-documents` bucket remained 26 objects with name fingerprint `80db891372c29592d0afb4eb69ae53b1`; receipt count returned to zero.
 
-The next protected Sandbox acceptance attempt must use real authenticated Storage API upload/delete for the exact prepared paths, keep contractor upload verification separate from homeowner read visibility, and retain an exact cleanup/zero-residue trap. No further shared fixture execution was performed after the stop condition.
+The corrected follow-up retained this stopped attempt as audit history and replaced its invalid assumptions rather than interpreting it as product evidence.
+
+## Corrected Sandbox Runtime Acceptance — 2026-08-24
+
+Owner approval pinned PR #517 head `d8a3f6487f6245c18f39eae6bb21c7403b8209c9` and the unchanged durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461`. Preflight found zero receipts and zero fixed `FB039E2RT2` markers. The five installed public/policy-helper definition MD5 values exactly matched a fresh PostgreSQL 16 compile of the pinned migration: prepared-upload predicate `d9fde3b6502820c2a51befa7dc9f68d3`, report prepare `669744e3521def83b715f3c973990879`, report commit `2ec472c1d7b5eb4e5dfb41f2d7f7fff7`, manual prepare `65cb802125f40233ff1c7fb53c3e90e2`, and manual commit `a346916bef87e946f9efe39ce18bf220`. Ownership, fixed search paths, volatility, forced RLS/no receipt policies, `ON DELETE SET NULL`, authenticated-only prepared upload, and the deliberate legacy finalizer remained exact.
+
+The corrected fail-closed harness used real authenticated Supabase Storage API upload/download for receipt-prepared paths, did not directly mutate `storage.objects`, did not grant or assume contractor `SELECT` visibility into homeowner folders, used the primary homeowner only for established private reads, and used the service-authorized Storage API solely for exact cleanup. Independent authenticated sessions passed Job-report same-payload preparation and lost-response commit replay, changed-payload conflict, regenerated-byte preparation plus first-valid deterministic object preservation, duplicate-upload non-replacement, true concurrent commit convergence, metadata rejection with no Job/document/History/notification writes, retry after exact API cleanup, 30-day renewal, Owner/Admin/Office/Field Technician authority, Viewer/homeowner/cross-tenant denial, atomic canonical Job/document/Home History/notification/receipt lineage, homeowner-only report read, contractor read denial, and the still-available legacy upload/finalizer plus new-path read-only adoption.
+
+Manual Home History passed true concurrent same-operation commit and replay without a document, changed-payload conflict, expiry renewal, verified-metadata rejection and retry with a document, deterministic duplicate-upload reuse, concurrent commit/lost-response replay, primary-homeowner ownership, cross-homeowner denial, shared-home admin/member/viewer RPC and private History/document/Storage denial, and ordinary-History deletion tombstone replay both without and with a document. Deleted logical results were not resurrected; the document variant retained exactly one registered document and one Storage object while its succeeded receipt kept the logical result ID with nullable live `history_id`.
+
+The exact cleanup trap removed all run-created objects through the Supabase Storage API, signed out sessions, deleted all 11 fixed-prefix fictional identities through the Auth lifecycle, and then independently proved zero auth/profile/contractor/team/home/membership/Job/receipt/document/History/Storage residue. Fresh pre/post counts and ID/name fingerprints were byte-for-byte equal across Auth users, profiles, contractor profiles/team/billing, referral codes/referrals/invites, homes/memberships, Requests/quotes, Jobs, documents, Home History, notifications, and `home-documents` Storage. The final independent read showed profiles 19, contractors 6, homes 9, Requests 47, quotes 0, Jobs 208, documents 11, Home History 30, notifications 163, 26 Storage objects, and zero receipts/markers. The five installed definition hashes and durable migration SHA remained unchanged.
 
 ## Compatibility And Remaining Protected Work
 
@@ -70,12 +80,10 @@ The durable migration is database-ahead-of-application compatible. It intentiona
 
 Full Phase 0.4 acceptance still requires:
 
-1. A renewed bounded approval to finish exact Sandbox replay/concurrency/interruption/Storage API/role/tenant/shared-home denial and cleanup evidence against the already-installed durable migration.
-2. Successful zero-residue completion of that exact Sandbox runtime matrix.
-3. Identical-byte Demo rollout with bounded fictional validation and Demo Recorder/Marketing preservation.
-4. Identical-byte Production rollout with read-only catalog/security and exact business-count preservation; no Production fixture mutation.
-5. Exact application-head Preview against the rolled-out backend, including the previously outstanding shared-home member/viewer fixture run.
-6. Identical-byte staged retirement of the legacy finalizer and legacy upload bypass after deployment observation, followed by durable replay and delivery preservation checks.
+1. Identical-byte Demo rollout with bounded fictional validation and Demo Recorder/Marketing preservation.
+2. Identical-byte Production rollout with read-only catalog/security and exact business-count preservation; no Production fixture mutation.
+3. Exact deployed-application Preview against the rolled-out backend.
+4. Identical-byte staged retirement of the legacy finalizer and legacy upload bypass after deployment observation, followed by durable replay and delivery preservation checks.
 
 Phase 0.5 mobile remains blocked until those gates pass.
 
@@ -83,7 +91,7 @@ Phase 0.5 mobile remains blocked until those gates pass.
 
 1. Reconfirm both migration SHA-256 values and line counts; run rollback-only compile and duplicate/precondition checks in order.
 2. Snapshot relevant Job, document, Home History, notification, Storage-object, and receipt counts/fingerprints.
-3. Against the exact durable bytes already installed in Sandbox, run the full authenticated matrix through real authenticated Storage API upload/delete and remove only prefix-scoped fictional records/objects.
+3. Treat the completed Sandbox authenticated/Storage API/zero-residue matrix as the first protected gate; do not rerun it without a new discrepancy or explicit reason.
 4. Repeat with identical bytes in Demo and verify Demo Recorder/Marketing preservation.
 5. After explicit Production approval, apply the identical bytes once; verify function ownership, fixed search paths, volatility, authenticated-only public grants, private helper denial, forced RLS/no policies, Storage policy, marker, repeat-install refusal, parity, and exact pre/post business counts without fixtures.
 6. Merge/deploy the application only after the durable backend is ahead and accepted. Observe the new path, then apply the already reviewed staged retirement migration in Sandbox -> Demo -> Production order with a separate approval at each protected gate.
@@ -97,9 +105,9 @@ Before any successful receipt exists, rollback may drop only the new Storage pol
 ## Protected Actions Not Taken
 
 - No SQL was applied to Demo or Production. The exact approved durable migration was applied only to Sandbox; the staged retirement was not applied anywhere.
-- Only fixed-ID fictional Sandbox fixtures were created during the stopped runtime attempt. They were removed through exact actor/profile lifecycle cleanup, leaving zero fixture or Storage residue and preserving all snapshotted business/Storage counts and fingerprints. No Demo or Production record, provider, environment, secret, or infrastructure setting was mutated.
+- Only fixed-prefix fictional Sandbox fixtures were created during the stopped and corrected runtime attempts. Both runs returned every exact marker to zero. The corrected run used Storage API cleanup and Auth lifecycle deletion and preserved all snapshotted Auth/business/Storage counts and fingerprints. No Demo or Production record, provider, environment, secret, or infrastructure setting was mutated.
 - No merge or manual deployment/promotion occurred.
 
 ## Status
 
-FB-039E2 source is complete and locally validated. The durable migration is installed in Sandbox with catalog/security acceptance complete, but Sandbox runtime acceptance remains incomplete after the required safe stop. Phase 0.4 remains open pending renewed Sandbox runtime acceptance, Demo/Production rollout, exact-head shared-home acceptance, and staged legacy-bypass retirement.
+FB-039E2 source is complete and the durable migration is installed and runtime-accepted in Sandbox, including the previously outstanding shared-home member/viewer boundary. Phase 0.4 remains open pending Demo/Production rollout, exact deployed-application Preview acceptance, and staged legacy-bypass retirement.
