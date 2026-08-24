@@ -41,6 +41,7 @@
     "test:core-state-reliability": "node --import tsx --test tests/reliability/*.test.ts",
     "test:core-authoring-idempotency": "node --import tsx --test tests/reliability/core-authoring-idempotency.test.ts",
     "test:core-record-finalization-idempotency": "node --import tsx --test tests/reliability/core-record-finalization-idempotency.test.ts",
+    "test:core-record-finalization-history-deletion": "bash scripts/validation/validate-core-record-finalization-history-deletion.sh",
     "test:accepted-connection-context": "bash scripts/validation/validate-accepted-connection-request-context.sh && TEST_APP_URL=http://localhost:4173 playwright test tests/e2e/accepted-connection-request-context.spec.ts --project=chromium",
     "qa:e2e:role-smoke": "playwright test tests/e2e/recurring-authenticated-role-smoke.spec.ts --project=chromium",
     "qa:e2e:role-smoke:demo": "playwright test tests/e2e/recurring-demo-readonly-smoke.spec.ts --project=chromium",

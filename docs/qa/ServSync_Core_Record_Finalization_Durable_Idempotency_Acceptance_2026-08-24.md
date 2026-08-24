@@ -13,7 +13,7 @@ Migrations:
 
 Migration SHA-256 values:
 
-- durable idempotency: `a0247e8b1ddbc54ab634cc897a97740d950bac4f207873ca9fe930a858273efc` (1,117 lines)
+- durable idempotency: `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` (1,120 lines)
 - staged legacy retirement: `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` (56 lines)
 
 Status: source complete; protected rollout and exact-head shared-environment acceptance pending.
@@ -28,7 +28,7 @@ Status: source complete; protected rollout and exact-head shared-environment acc
 - Commit verifies the private Storage bucket, exact path, size, MIME type, SHA metadata, and operation metadata before changing canonical records. An uncertain commit error never deletes a potentially committed object; the next preparation reconciles the receipt first.
 - Connected Job commit atomically finalizes the Job and creates exactly one private document, Job-lineage Home History row, homeowner notification, and succeeded receipt. The Job's canonical homeowner, home, Request, and contractor lineage remain server-derived. Local-customer Jobs finalize one contractor record/private PDF and create no homeowner document, Home History, or notification.
 - Manual Home History commit creates exactly one succeeded receipt and History row; when a document is present it atomically adds exactly one `home_history_receipt` document linked through `invoice_document_id`. The no-document variant performs no Storage or document write.
-- A report receipt is foreign-key-bound to its canonical Job and a completed manual receipt to its canonical Home History row. Owned-record cleanup therefore cascades its replay state instead of leaving a stale successful receipt; prepared manual operations remain explicit expiring receipts until completion or primary-owner cleanup.
+- A report receipt remains foreign-key-bound to its canonical Job. A completed manual receipt preserves `result_id` and `result_payload` as terminal replay/tombstone evidence when an ordinary Home History deletion clears its nullable `history_id` pointer. A stale same-key replay therefore returns the deleted logical result without recreating History, registering another document, or touching the deterministic object. Manual receipt lifecycle cleanup is instead bound to the actor/profile lifecycle; Demo finalized-report reset remains bound to explicit registered-artifact cleanup plus the Job cascade.
 - The browser now uses only the new prepare/upload/commit helpers for these two operations. Stable operation keys survive refresh/lost response, duplicate Storage responses are reused, and completed keys rotate only after confirmed success.
 
 ## Authority And Privacy Preservation
@@ -47,7 +47,7 @@ Status: source complete; protected rollout and exact-head shared-environment acc
 - App architecture: `src/App.tsx` reduced to 50,824 lines; the ratcheting baseline was lowered by 10 lines. Architecture suite passed after the ratchet update.
 - Backend and runtime parity source suites: passed. The rollout ledger correctly reports the new foundation as Pending in all three environments.
 - Isolated PostgreSQL 16 compilation: both exact migrations installed successfully in staged order over a bounded local foundation with all functions, grants, policies, indexes, forced-RLS receipt state, and final legacy grant/policy retirement.
-- Isolated runtime matrix passed: sequential replay, lost-response replay, true concurrent report commit, true concurrent regenerated-PDF attempts with different file SHA/size/name converging on the first valid object, true concurrent document-free manual History commit, changed-semantic conflict, regenerated-PDF manifest refresh before upload, expired preparation renewal, Storage metadata verification, report document/Home History/notification convergence, manual History with and without a document, Viewer denial, cross-owner denial, forced-RLS/no-policy receipts, exact canonical counts, and receipt removal cascading from canonical Job/manual-History cleanup.
+- Isolated runtime matrix passed: sequential replay, lost-response replay, true concurrent report commit, true concurrent regenerated-PDF attempts with different file SHA/size/name converging on the first valid object, true concurrent document-free manual History commit, changed-semantic conflict, regenerated-PDF manifest refresh before upload, expired preparation renewal, Storage metadata verification, report document/Home History/notification convergence, manual History with and without a document, Viewer denial, cross-owner denial, forced-RLS/no-policy receipts, and exact canonical counts. Final-byte PostgreSQL 16 regressions additionally commit and delete manual History both with and without a document, retry the same operation key/payload, and prove zero History resurrection, zero duplicate document/object registration, stable logical result IDs, nullable live-row pointers, and preserved succeeded tombstones.
 - Final source hygiene passed: `git diff --check`, changed-file sensitive-value scan, changed Markdown-link resolution, and exact migration hash/line verification.
 
 The isolated matrix is source evidence, not a substitute for the required exact-byte shared-environment acceptance.

@@ -277,7 +277,12 @@ test('record finalization receipts are private, forced-RLS, actor/purpose bound 
   );
   assert.match(sql, /unique\s*\(actor_user_id,\s*operation_type,\s*operation_key\)/i);
   assert.match(sql, /job_id uuid references public\.inspections\(id\) on delete cascade/i);
-  assert.match(sql, /history_id uuid references public\.home_maintenance_log\(id\) on delete cascade/i);
+  assert.match(sql, /history_id uuid references public\.home_maintenance_log\(id\) on delete set null/i);
+  assert.match(
+    sql,
+    /status\s*=\s*'succeeded'[\s\S]*history_id\s*=\s*result_id\s+or\s+history_id\s+is\s+null/i,
+  );
+  assert.match(sql, /result_id and result_payload remain as terminal tombstone evidence/i);
   assert.match(sql, /payload_sha256/i);
   assert.match(sql, /status[^;]*(?:prepared|succeeded)/is);
   assert.doesNotMatch(sql, /create policy[^;]+servsync_core_record_finalization_operations/is);

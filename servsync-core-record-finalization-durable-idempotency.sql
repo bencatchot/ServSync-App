@@ -61,7 +61,7 @@ create table public.servsync_core_record_finalization_operations (
   homeowner_user_id uuid references public.profiles(id) on delete cascade,
   subject_id uuid not null,
   job_id uuid references public.inspections(id) on delete cascade,
-  history_id uuid references public.home_maintenance_log(id) on delete cascade,
+  history_id uuid references public.home_maintenance_log(id) on delete set null,
   home_id uuid references public.homes(id) on delete set null,
   payload_sha256 text not null check (payload_sha256 ~ '^[0-9a-f]{64}$'),
   status text not null check (status in ('prepared', 'succeeded')),
@@ -92,7 +92,10 @@ create table public.servsync_core_record_finalization_operations (
       and (
         (status = 'prepared' and history_id is null)
         or
-        (status = 'succeeded' and history_id = result_id)
+        (
+          status = 'succeeded'
+          and (history_id = result_id or history_id is null)
+        )
       )
     )
   ),
@@ -104,7 +107,7 @@ create table public.servsync_core_record_finalization_operations (
 );
 
 comment on table public.servsync_core_record_finalization_operations is
-  'Private purpose-bound receipts for replay-safe Job report and manual Home History finalization. Browser and generic service roles have no direct table access.';
+  'Private purpose-bound receipts for replay-safe Job report and manual Home History finalization. A deleted manual History row clears only history_id while result_id and result_payload remain as terminal tombstone evidence. Browser and generic service roles have no direct table access.';
 
 create unique index servsync_record_finalization_one_job_operation_idx
   on public.servsync_core_record_finalization_operations(operation_type, subject_id)

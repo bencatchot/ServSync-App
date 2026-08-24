@@ -5,7 +5,7 @@
   "foundations": [
     {
       "id": "core-record-finalization-durable-idempotency-v1",
-      "artifact": "servsync-core-record-finalization-durable-idempotency.sql (SHA-256 a0247e8b1ddbc54ab634cc897a97740d950bac4f207873ca9fe930a858273efc)",
+      "artifact": "servsync-core-record-finalization-durable-idempotency.sql (SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461)",
       "environments": {
         "sandbox": {
           "status": "Pending",
