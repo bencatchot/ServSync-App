@@ -52,7 +52,7 @@ The isolated Demo Vercel project must carry these public workflow gates with val
 
 These flags expose the existing client workflow surface only. They do not grant authentication, tenant access, role capability, RLS/RPC authority, or permission to invoke external providers.
 
-The durable Draft workspace also requires the authenticated contractor to pass `servsync_current_contractor_durable_draft_entitlement`. Treat that database-backed cohort result as a separate protected state boundary: verify it read-only when diagnosing parity, and never enroll a Demo contractor, change cohort data, or add a client-side bypass without explicit owner approval.
+The durable Draft workspace also requires the authenticated contractor to pass `servsync_current_contractor_durable_draft_entitlement`. For Production-equivalent Demo behavior, first compare the environment-wide `public.servsync_runtime_settings` row whose exact key is `durable_draft_preview_all_contractors_enabled`; do not substitute contractor billing-row enrollment or a client-side bypass. Any approved parity change must target Demo only, preflight exactly one matching row currently `false`, update that exact row to `true`, require exactly one affected row, and read back exactly one matching row as `true`. It must not change contractor billing rows, schema, RPCs, RLS, Auth, providers, or Production. Rollback updates the exact same Demo row to `false`, verifies exactly one row, then reruns read-only entitlement, runtime parity, and authenticated Demo smoke.
 
 ## Required Environment Variables
 
