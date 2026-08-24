@@ -70,8 +70,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(appointmentSource).toContain('The contractor still needs to confirm before the appointment changes.');
     expect(appointmentSource).toContain("'Visit time confirmed'");
 
-    expect(requestSource).toContain("supabase.rpc('servsync_prepare_service_request_creation'");
-    expect(requestSource).toContain("supabase.rpc('servsync_commit_service_request_creation'");
+    expect(requestSource).toContain('saveServiceRequestDurably');
     expect(estimateSource).toContain("supabase.rpc('servsync_homeowner_respond_to_estimate'");
     expect(agreementSource).toContain("supabase.rpc('servsync_homeowner_respond_to_service_agreement_offer'");
     expect(appointmentSource).toContain("supabase.rpc('servsync_homeowner_respond_to_appointment'");
@@ -114,7 +113,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(invoiceSource).toContain("supabase.rpc('servsync_void_invoice'");
     expect(homeMapSource).toContain("supabase.rpc('servsync_submit_home_map_draft'");
     expect(homeMapSource).toContain("supabase.rpc('servsync_revoke_home_map_draft'");
-    expect(reportSource).toContain("supabase.rpc('servsync_finalize_field_work'");
+    expect(reportSource).toContain('finalizeJobReportDurably');
     expect(reportSource).toContain("supabase.rpc('servsync_notify_field_work_report'");
   });
 
