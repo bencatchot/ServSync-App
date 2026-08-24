@@ -75,7 +75,7 @@ test.describe('contractor mutating report finalization', () => {
     });
 
     const finalizeResponsePromise = page.waitForResponse(
-      response => response.url().includes('/rpc/servsync_finalize_field_work'),
+      response => response.url().includes('/rpc/servsync_commit_job_report_finalization'),
       { timeout: 30_000 },
     );
 

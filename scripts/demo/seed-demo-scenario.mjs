@@ -3545,7 +3545,7 @@ async function adoptRecorderFinalizedReport(env, target, scenarioKey) {
   const sourceMetadata = {
     source_ui: 'canonical_contractor_finalize_report',
     source_generator: 'generateInspectionPdf',
-    source_rpc: 'servsync_finalize_field_work',
+    source_rpc: 'servsync_commit_job_report_finalization',
   };
   await registerRecord(
     service,

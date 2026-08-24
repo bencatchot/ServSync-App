@@ -10,6 +10,7 @@ const estimateJobSql = await readFile(new URL('../../servsync-estimate-job-suppo
 const invoiceSourceSql = await readFile(new URL('../../servsync-invoice-from-source.sql', import.meta.url), 'utf8');
 const paymentSql = await readFile(new URL('../../servsync-draft-invoice-mark-paid.sql', import.meta.url), 'utf8');
 const reportSql = await readFile(new URL('../../servsync-finalized-report-home-lineage.sql', import.meta.url), 'utf8');
+const recordFinalizationSql = await readFile(new URL('../../servsync-core-record-finalization-durable-idempotency.sql', import.meta.url), 'utf8');
 
 test('action guard rejects duplicate work synchronously and releases exact keys', () => {
   const guard = createActionGuard();
@@ -89,8 +90,12 @@ test('existing backend contracts provide durable idempotency for Draft launch, l
   assert.match(paymentSql, /'created', false/);
 });
 
-test('final report client reconciliation does not overstate the current backend document guarantee', () => {
+test('legacy report finalization stays an explicit rollout bypass while the new path is durable', () => {
   assert.match(reportSql, /insert into public\.home_documents/);
   assert.doesNotMatch(reportSql, /p_idempotency_key/);
   assert.doesNotMatch(reportSql, /on conflict[\s\S]{0,240}home_documents/i);
+  assert.match(recordFinalizationSql, /documented compatibility bypass/i);
+  assert.match(recordFinalizationSql, /servsync_prepare_job_report_finalization/);
+  assert.match(recordFinalizationSql, /servsync_commit_job_report_finalization/);
+  assert.match(recordFinalizationSql, /servsync_core_record_finalization_operations/);
 });

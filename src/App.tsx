@@ -341,6 +341,13 @@ import {
   durableOperationKey, requestMediaContentType,
   saveServiceRequestDurably,
 } from './features/reliability/durableOperation';
+import {
+  createManualHomeHistoryDurably,
+  finalizeJobReportDurably,
+  recordFinalizationBlobSha256,
+  type JobReportFinalizationPayload,
+  type ManualHomeHistoryPayload,
+} from './features/reliability/recordFinalization';
 import { userFacingError } from './features/reliability/userFacingError';
 import {
   WorkspaceLoadBoundary,
@@ -11478,15 +11485,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return data as HomeDocument;
   };
 
-  const createHomeDocumentFromFile = async (
-    file: File,
-    documentType: HomeDocumentType,
-    notes: string,
-    options: { homeId?: string | null; uploadSource?: HomeDocumentUploadSource } = {},
-  ) => {
-    return createHomeDocumentFromBlob(file, file.name, documentType, notes, options);
-  };
-
   const saveLogEntry = async () => {
     if (!supabase) return;
     if (!logDraft.title.trim()) { setError('Add a title before saving.'); return; }
@@ -11497,53 +11495,42 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setNotice('');
     setSavingLogEntry(true);
     try {
-      const invoiceDocument = logInvoiceFile
-        ? await createHomeDocumentFromFile(
-            logInvoiceFile,
-            'receipt',
-            `Invoice/receipt for Home History${logDraft.title.trim() ? `: ${logDraft.title.trim()}` : ''}`,
-            { homeId: selectedHome?.id || selectedHomeId || null, uploadSource: 'home_history_receipt' },
-          )
-        : null;
       const linkedLogRequest = logDraft.service_request_id
         ? serviceRequests.find(request => request.id === logDraft.service_request_id) ?? null
         : null;
       const logEntryHomeId = linkedLogRequest?.home_id || selectedHome?.id || selectedHomeId || null;
-      const payload = {
-        homeowner_user_id: profile.id,
+      const document = logInvoiceFile ? {
+        file_name: logInvoiceFile.name,
+        content_type: logInvoiceFile.type.trim().toLowerCase()
+          || (fileExtensionFromName(logInvoiceFile.name) === 'pdf' ? 'application/pdf' : requestMediaContentType(logInvoiceFile)),
+        file_size_bytes: logInvoiceFile.size,
+        sha256: await durableFileSha256(logInvoiceFile),
+      } : null;
+      const payload: ManualHomeHistoryPayload = {
         service_request_id: logDraft.service_request_id,
         home_id: logEntryHomeId,
-        ...(invoiceDocument ? { invoice_document_id: invoiceDocument.id } : {}),
         category: logDraft.category,
         title: logDraft.title.trim(),
         description: cleanHumanWrittenText(logDraft.description),
         performed_at: logDraft.performed_at,
         contractor_name: logDraft.contractor_name.trim(),
         cost_cents: logDraft.cost ? dollarsToCents(logDraft.cost) : null,
-        notes: [
-          cleanHumanWrittenText(logDraft.notes),
-          invoiceDocument ? `Invoice saved in Documents: ${invoiceDocument.file_name}` : '',
-        ].filter(Boolean).join('\n'),
+        notes: cleanHumanWrittenText(logDraft.notes),
+        document,
       };
-      const { error: insertError } = await supabase.from('home_maintenance_log').insert(payload);
-      if (insertError) {
-        const message = insertError.message || '';
-        if (/(invoice_document_id|home_id|schema cache|column)/i.test(message)) {
-          const fallbackPayload = { ...payload };
-          delete (fallbackPayload as Record<string, unknown>).invoice_document_id;
-          delete (fallbackPayload as Record<string, unknown>).home_id;
-          const { error: fallbackError } = await supabase.from('home_maintenance_log').insert(fallbackPayload);
-          if (fallbackError) throw fallbackError;
-        } else {
-          throw insertError;
-        }
+      const operationScope = `homeowner:${profile.id}:home-history:create`;
+      const operationKey = await durableOperationKey(operationScope, payload);
+      const result = await createManualHomeHistoryDurably(supabase, operationKey, payload, logInvoiceFile);
+      if (result?.status !== 'succeeded') {
+        throw new Error('ServSync could not confirm the Home History entry. Retry without changing its details.');
       }
+      await completeDurableOperation(operationScope, operationKey, payload);
       setLogDraft(emptyLogDraft());
       setLogInvoiceFile(null);
       setLogInvoiceNotice('');
       setLogFormOpen(false);
       setQuickLogDrafts({});
-      setNotice(invoiceDocument ? 'Home History entry saved and invoice stored in Documents.' : 'Home History entry saved.');
+      setNotice(document ? 'Home History entry saved and invoice stored in Documents.' : 'Home History entry saved.');
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to save Home History entry.'));
@@ -30340,22 +30327,25 @@ function ContractorDashboard({
         includeValueAdd: includeReportValueAdd,
         valueAddText: cleanHumanWrittenText(reportValueAddText),
       });
-
-      const storagePath = insp.homeowner_user_id
-        ? `${insp.homeowner_user_id}/field-work/${insp.id}/${crypto.randomUUID()}.pdf`
-        : `contractor-field-work/${contractor.id}/${insp.id}/${crypto.randomUUID()}.pdf`;
-      const { error: uploadErr } = await supabase.storage.from('home-documents').upload(storagePath, blob, { contentType: 'application/pdf' });
-      if (uploadErr) throw uploadErr;
-
-      const { error: finalizeError } = await supabase.rpc('servsync_finalize_field_work', {
-        p_inspection_id: insp.id,
-        p_rooms_with_findings: updatedRooms,
-        p_summary: summaryText,
-        p_storage_path: storagePath,
-        p_file_name: fileName,
-        p_file_size_bytes: blob.size,
-      });
-      if (finalizeError) throw finalizeError;
+      const valueAddText = cleanHumanWrittenText(reportValueAddText);
+      const reportPayload: JobReportFinalizationPayload = {
+        rooms_with_findings: updatedRooms,
+        summary: summaryText,
+        file_name: fileName,
+        file_size_bytes: blob.size,
+        file_sha256: await recordFinalizationBlobSha256(blob),
+        include_summary: includeReportSummary,
+        include_value_add: includeReportValueAdd,
+        value_add_text: valueAddText,
+      };
+      const operationScope = `contractor:${contractor.id}:job-report:${insp.id}:finalize`;
+      const operationKey = await durableOperationKey(operationScope, reportPayload);
+      const result = await finalizeJobReportDurably(supabase, operationKey, insp.id, reportPayload, blob);
+      const storagePath = result?.report_storage_path || result?.storage_path;
+      if (result?.status !== 'succeeded' || !storagePath) {
+        throw new Error('ServSync could not confirm the finalized report. Retry without changing the report.');
+      }
+      await completeDurableOperation(operationScope, operationKey, reportPayload);
 
       const finalized = {
         ...finalInsp,
@@ -30363,7 +30353,7 @@ function ContractorDashboard({
         job_status: 'completed' as const,
         completed_at: finalInsp.completed_at ?? new Date().toISOString(),
         report_storage_path: storagePath,
-        report_file_name: fileName,
+        report_file_name: result.report_file_name || fileName,
       };
       resetInspectionLayoutBaseline();
       setInspections(prev => prev.map(i => i.id === insp.id ? finalized : i));
