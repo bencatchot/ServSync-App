@@ -44,6 +44,16 @@ The Demo Recorder explicitly opts in by adding `servsync-presentation=recorder-v
 
 Ordinary visits to `https://servsync-demo.vercel.app` therefore use the Production-equivalent interface and workflow gates while continuing to use isolated Demo data. Do not manually add the recorder query for ordinary workflow testing.
 
+The isolated Demo Vercel project must carry these public workflow gates with value `true` for both Production and Preview scopes:
+
+- `VITE_CONTRACTOR_WORK_UI_ENABLED`
+- `VITE_DRAFT_JOB_UI_ENABLED`
+- `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED`
+
+These flags expose the existing client workflow surface only. They do not grant authentication, tenant access, role capability, RLS/RPC authority, or permission to invoke external providers.
+
+The durable Draft workspace also requires the authenticated contractor to pass `servsync_current_contractor_durable_draft_entitlement`. Treat that database-backed cohort result as a separate protected state boundary: verify it read-only when diagnosing parity, and never enroll a Demo contractor, change cohort data, or add a client-side bypass without explicit owner approval.
+
 ## Required Environment Variables
 
 Values are intentionally omitted from this runbook.
