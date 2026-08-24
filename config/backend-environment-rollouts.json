@@ -8,8 +8,8 @@
       "artifact": "servsync-core-record-finalization-durable-idempotency.sql (SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461)",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Source is complete on FB-039E2, but this task did not authorize SQL application or shared fixture mutation. Apply the exact reviewed bytes only after explicit approval, then run replay, conflict, true-concurrency, lost-response, deterministic Storage, expiry-renewal, owner/role/tenant, shared-home denial, preservation, and zero-residue validation."
+          "status": "Applied",
+          "reason": "Exact SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461 was applied to Sandbox zpzdkoaubyjtsomccxya on 2026-08-24 from PR #517 head 73faad19d73719327c08df2194b9a2bdc4f62dc2. Catalog/security verification passed: postgres ownership, forced RLS with no receipt policies or client table grants, authenticated-only public RPC grants, ON DELETE SET NULL tombstone lineage, the new prepared-upload policy, and deliberate legacy-path preservation. Runtime acceptance stopped before report commit when the first harness used contractor-session Storage SELECT visibility for a homeowner-owned path and its emergency direct Storage delete was rejected by Sandbox protection. The upload transaction rolled back, exact auth/profile fixtures were lifecycle-deleted, all FB039E2 fixture/receipt/object markers returned to zero, and pre/post business and home-documents Storage counts/fingerprints were exact. Replay/concurrency/storage/role/shared-home runtime acceptance remains pending with a Storage API-backed cleanup harness."
         },
         "production": {
           "status": "Pending",
