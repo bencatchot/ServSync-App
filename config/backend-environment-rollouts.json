@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-20",
+  "updatedOn": "2026-08-22",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "accepted-connection-request-context-visibility-v1",
+      "artifact": "servsync-accepted-connection-request-context-visibility.sql (SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27 was applied only to Sandbox zpzdkoaubyjtsomccxya on 2026-08-23 from 01:13:10Z through 01:13:12Z. Catalog, postgres ownership, fixed-path SECURITY DEFINER behavior, stable volatility, authenticated-only grant, active-connection and contractor-access guards, pending-to-active continuity, exact fictional message/timestamp preservation, unrelated-contractor denial, no-message and legacy-null behavior, and rollback-only authenticated fixture validation passed. All five auth/profile markers, two contractor markers, three connection/permission/context markers, and referral side effects returned to zero."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The unchanged merged migration at SHA-256 0275c49acda7b04fe13e2287fcda65284c17c070113173826ee82330aebaca27 was applied only to Production uqgtheclhxqlnjpfmheq on 2026-08-23 from 01:47:29Z through 01:47:30Z after merge commit 9efd20090286a4fe4ba2bde51f1cb8644603ee9c and automatic deployment dpl_8evzc2iSu1s2hhYCVUKcPcvB1rz4 reached READY. The reader moved from definition SHA-256 ce066dcf936db24a37f23aa26c65fc33c926882abc92ec84bd6e0d7d549b8bb7 to the Sandbox/Demo-matching 2aeeddf6f2a0d0dd0deb00f75213640dd6ecc81ce472c6eab3d144ae6a4fd084 with the intended 15-column contract, postgres owner, fixed search path, stable SECURITY DEFINER behavior, authenticated-only grant, active-only filter, contractor-access guard, and PostgREST reload notification. Aggregate profiles 18, contractor profiles 7, homeowner profiles 6, homes 7, connections 6, permissions 5, request contexts 4, shared properties 7, Requests 23, Estimates 22, Jobs 9, and Invoices 12 were unchanged; no content fields were selected. Production versus Demo returned PASS WITH INTENTIONAL DIFFERENCES with 129 approved Demo additions and zero unexplained or format-only differences. The Production alias returned HTTP 200."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact SHA-256 bytes were applied only to Demo bdytwgejqnlblhrnqxkp on 2026-08-23 from 01:24:46Z through 01:24:47Z after Sandbox passed. Demo and Sandbox share function-definition SHA-256 2aeeddf6f2a0d0dd0deb00f75213640dd6ecc81ce472c6eab3d144ae6a4fd084 plus the same postgres owner, fixed search path, stable SECURITY DEFINER behavior, authenticated-only grant, active-connection filter, and contractor-access guard. Rollback-only authenticated fictional fixtures passed pending visibility, exact message/timestamp preservation across acceptance, authorized active visibility, unrelated-contractor denial, no-message and legacy-null handling, and returned all auth/profile/contractor/homeowner/connection/permission/context/referral markers to zero."
+        }
+      }
+    },
     {
       "id": "core-authoring-request-preparation-renewal-forward-fix-v1",
       "artifact": "servsync-core-authoring-request-preparation-renewal-forward-fix.sql (SHA-256 b4db9bebfc085e7b2c02a48797ed05c99f4e3aa81739c35d84c84bc36de28eb8)",

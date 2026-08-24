@@ -9,7 +9,7 @@ import {
   requireSmokeInvariant,
   roleSmokeTrigger,
   safeErrorSummary,
-  validateBackupHealth,
+  validateBackupHealthResponse,
   type ContractorSmokeRole,
   type RoleSmokePreflight,
   type SmokeCheckResult,
@@ -202,8 +202,7 @@ async function verifyBackupHealth() {
   if (!url || !token) throw new RoleSmokeFailure('CREDENTIAL FAILURE', 'storage_backup_health', 'Backup-health observer configuration is missing.');
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   const body = await response.json().catch(() => null);
-  assert(response.ok && body, response.status >= 500 ? 'PROVIDER/EXTERNAL FAILURE' : 'BACKUP HEALTH FAILURE', 'storage_backup_health', 'Backup-health endpoint did not return a healthy response.');
-  validateBackupHealth(body);
+  validateBackupHealthResponse(response.status, body);
 }
 
 async function emitReport(report: ReturnType<typeof createRoleSmokeReport>) {

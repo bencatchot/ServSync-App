@@ -18,6 +18,7 @@ test.describe('FB-016 recurring Demo read-only smoke', () => {
     await expect(main.getByText(/^Start New Draft$/i).first()).toBeVisible();
     await openSidebarTab(page, /^Financials\b/i);
     await expectActiveTabHeading(page, /^Financials$/i);
+    await expect(main.getByTestId('contractor-financials-dashboard')).toBeVisible();
     await expect(page.getByTestId('demo-presentation-jobs-checkpoint-story')).toHaveCount(0);
     await openSidebarTab(page, /^Calendar\b/i);
     await expectActiveTabHeading(page, /^Calendar$/i);

@@ -180,6 +180,8 @@ import {
   normalizeLocalCustomerArchiveImpact,
   type LocalCustomerArchiveImpact,
 } from './features/customers/localCustomerArchive';
+import { ConnectionRequestContextSection } from './features/customers/ConnectionRequestContextSection';
+import { normalizeConnectionRequestContext } from './features/customers/connectionRequestContext';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { useDurableDraftSummary } from './features/drafts/useDurableDraftSummary';
 import {
@@ -6338,6 +6340,7 @@ function normalizeContractorConnectedHomeowner(connection: ContractorConnectedHo
     permissions: normalizeSharingPermissions(row.permissions as Partial<SharingPermissions> | null),
     home: fallbackHome ?? normalizedHomes[0] ?? null,
     homes: normalizedHomes,
+    request_context: normalizeConnectionRequestContext(row.request_context),
     created_at: sharedFieldDisplayValue(row.created_at),
     updated_at: sharedFieldDisplayValue(row.updated_at),
     source: sharedFieldDisplayValue(row.source),
@@ -17228,6 +17231,50 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </section>
 
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Needs Attention</p>
+                <h2 className="mt-1.5 text-base font-bold text-slate-950">What needs your attention?</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Estimates, invoices, replies, appointments, and support updates that may need your next step.
+                </p>
+              </div>
+            </div>
+            {homeownerNeedsAttentionItems.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="font-semibold text-emerald-900">You're all caught up.</p>
+                <p className="mt-1 text-sm text-emerald-800">No estimates, invoices, replies, appointments, or support updates need action right now.</p>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {homeownerNeedsAttentionItems.map(item => (
+                  <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${attentionToneClass(item.tone)}`}>
+                        {item.icon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-950">{item.title}</p>
+                        <p className="mt-0.5 text-sm text-slate-600">{item.detail}</p>
+                        {item.meta && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.meta}</p>}
+                      </div>
+                    </div>
+                    <button type="button" onClick={item.onAction} className={`${buttonClass('primary')} mt-3 w-full justify-center sm:w-auto`}>
+                      {item.actionLabel}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricButton label="Estimates to review" value={String(pendingEstimateCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('needs_review'); setHomeownerTab('estimates'); }} />
+              <MetricButton label="Open invoices" value={String(openHomeownerInvoiceCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('open_invoices'); setHomeownerTab('estimates'); }} />
+              <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerRequestView('open_pending'); setHomeownerTab('requests'); }} />
+              <MetricButton label="Calendar items" value={String(upcomingAppointments.length)} onClick={() => setHomeownerTab('calendar')} />
+            </div>
+          </section>
+
           {showHomeownerOnboardingChecklist && (
             <section className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -17291,50 +17338,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </section>
           )}
-
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Needs Attention</p>
-                <h2 className="mt-1.5 text-base font-bold text-slate-950">What needs your attention?</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Estimates, invoices, replies, appointments, and support updates that may need your next step.
-                </p>
-              </div>
-            </div>
-            {homeownerNeedsAttentionItems.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="font-semibold text-emerald-900">You're all caught up.</p>
-                <p className="mt-1 text-sm text-emerald-800">No estimates, invoices, replies, appointments, or support updates need action right now.</p>
-              </div>
-            ) : (
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {homeownerNeedsAttentionItems.map(item => (
-                  <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${attentionToneClass(item.tone)}`}>
-                        {item.icon}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-slate-950">{item.title}</p>
-                        <p className="mt-0.5 text-sm text-slate-600">{item.detail}</p>
-                        {item.meta && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.meta}</p>}
-                      </div>
-                    </div>
-                    <button type="button" onClick={item.onAction} className={`${buttonClass('primary')} mt-3 w-full justify-center sm:w-auto`}>
-                      {item.actionLabel}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <MetricButton label="Estimates to review" value={String(pendingEstimateCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('needs_review'); setHomeownerTab('estimates'); }} />
-              <MetricButton label="Open invoices" value={String(openHomeownerInvoiceCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('open_invoices'); setHomeownerTab('estimates'); }} />
-              <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerRequestView('open_pending'); setHomeownerTab('requests'); }} />
-              <MetricButton label="Calendar items" value={String(upcomingAppointments.length)} onClick={() => setHomeownerTab('calendar')} />
-            </div>
-          </section>
 
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             {!SERVSYNC_DEMO_PRESENTATION_MODE && (
@@ -35166,7 +35169,6 @@ function ContractorDashboard({
                   (() => {
                     const reqSubject = selectedSubject.request;
                     const isUpdating = updatingRequestId === reqSubject.connection_id;
-                    const requestMessage = reqSubject.request_context?.message?.trim() || '';
                     const sharedProperties = reqSubject.shared_properties || [];
                     const contactSummary = reqSubject.contact_summary || { display_name: 'Homeowner' };
                     const contactLocation = [contactSummary.city, contactSummary.state, contactSummary.zip_code].filter(Boolean).join(' ');
@@ -35196,12 +35198,7 @@ function ContractorDashboard({
                             <SharedField label="Photos / media" value="Deferred" allowed={false} />
                           </div>
 
-                          <div className="mt-5 rounded-xl border border-amber-200 bg-white/80 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Customer message</p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                              {requestMessage || 'No message included.'}
-                            </p>
-                          </div>
+                          <div className="mt-5"><ConnectionRequestContextSection context={reqSubject.request_context} title="Customer message" emptyText="No message included." tone="amber" /></div>
 
                           <div className="mt-5 space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -36563,6 +36560,7 @@ function ContractorDashboard({
 	                                  <button type="button" onClick={() => void loadSelectedLocalCustomerManagementDetail()} className={`${buttonClass('secondary')} mt-3`}>Try again</button>
 	                                </div>
 	                              )}
+	                              {conn && <ConnectionRequestContextSection context={conn.request_context} title="Original connection request" emptyText={conn.request_context ? 'No message included.' : 'No original connection request is available for this connection.'} formatTimestamp={formatDateTime} />}
 	                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">

@@ -7,7 +7,9 @@ export const SERVSYNC_STORAGE_BUCKETS = [
   'discover-media',
   'email-assets',
   'home-documents',
+  'help-walkthroughs',
   'inspection-media',
+  'marketing-assets',
   'service-request-media',
   'support-attachments',
 ] as const;

@@ -1171,6 +1171,7 @@ export interface ContractorConnectedHomeowner {
   permissions: SharingPermissions;
   home: ContractorConnectedHomeownerHome | null;
   homes?: ContractorConnectedHomeownerHome[];
+  request_context?: ConnectionRequestContext | null;
   created_at: string;
   updated_at: string;
   source: string;

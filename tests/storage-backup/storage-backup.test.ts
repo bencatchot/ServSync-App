@@ -115,13 +115,17 @@ async function backup(source: FakeSource, destination: FakeBackup, runId: string
 }
 
 test('initial and unchanged backups are complete, hashed, and content-addressed', async () => {
+  assert.deepEqual(
+    [...SERVSYNC_STORAGE_BUCKETS].sort(),
+    ['contractor-assets', 'discover-media', 'email-assets', 'help-walkthroughs', 'home-documents', 'inspection-media', 'marketing-assets', 'service-request-media', 'support-attachments'].sort(),
+  );
   const source = new FakeSource();
   const destination = new FakeBackup();
   const first = await backup(source, destination, 'run-1', '2026-08-13T01:00:00.000Z');
-  assert.equal(first.envelope.manifest.metrics.bucketCount, 7);
+  assert.equal(first.envelope.manifest.metrics.bucketCount, 9);
   assert.equal(first.envelope.manifest.metrics.sourceObjectCount, 1);
   assert.equal(first.envelope.manifest.metrics.newObjectVersions, 1);
-  assert.equal(first.envelope.manifest.buckets.filter(bucket => bucket.objectCount === 0).length, 6);
+  assert.equal(first.envelope.manifest.buckets.filter(bucket => bucket.objectCount === 0).length, 8);
   const object = first.envelope.manifest.objects[0];
   assert.equal(object.deleted, false);
   assert.equal(object.backupKey, `objects/${SOURCE_REF}/sha256/${object.sha256}`);
@@ -219,7 +223,10 @@ test('backup refuses changed bucket inventories and source or destination identi
   await assert.rejects(() => backup(source, destination, 'run-2', '2026-08-13T01:00:00.000Z'), /destination identity mismatch/);
 
   destination.accountId = ACCOUNT_ID;
-  source.listBuckets = async () => [];
+  source.listBuckets = async () => [
+    ...SERVSYNC_STORAGE_BUCKETS.map(name => ({ name, public: false, fileSizeLimit: null, allowedMimeTypes: null })),
+    { name: 'unknown-tenth-bucket', public: false, fileSizeLimit: null, allowedMimeTypes: null },
+  ];
   await assert.rejects(() => backup(source, destination, 'run-3', '2026-08-13T01:00:00.000Z'), /bucket inventory changed/);
 });
 

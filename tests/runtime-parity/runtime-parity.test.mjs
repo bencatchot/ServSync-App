@@ -82,7 +82,8 @@ test('rejects unapproved presentation configuration and enabled external effects
 
 test('live checker never bulk-decrypts unrelated project configuration', () => {
   const source = readFileSync(new URL('../../scripts/runtime-parity/check-live.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /env\?decrypt=true/);
-  assert.match(source, /\/v10\/projects\/\$\{encodeURIComponent\(expected\.vercelProjectId\)\}\/env/);
-  assert.match(source, /\/v1\/projects\/\$\{encodeURIComponent\(expected\.vercelProjectId\)\}\/env\/\$\{encodeURIComponent\(entryId\)\}/);
+  assert.doesNotMatch(source, /decrypt=true/);
+  assert.doesNotMatch(source, /\/v10\/projects\/.*\/env/);
+  assert.match(source, /Array\.isArray\(deployment\.env\)/);
+  assert.match(source, /readPublicBundle\(expected\.alias\)/);
 });

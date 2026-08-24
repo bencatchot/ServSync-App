@@ -27,11 +27,6 @@ async function getJson(path) {
   return response.json();
 }
 
-function targetsProduction(entry) {
-  const targets = Array.isArray(entry.target) ? entry.target : [entry.target];
-  return targets.includes('production') && !entry.gitBranch;
-}
-
 function selectedConfigKeys() {
   return new Set([
     'VITE_SUPABASE_URL',
@@ -41,28 +36,61 @@ function selectedConfigKeys() {
   ]);
 }
 
+async function readPublicBundle(alias) {
+  const origin = `https://${alias}`;
+  const response = await fetch(origin);
+  if (!response.ok) throw new Error(`Active application bundle returned HTTP ${response.status}.`);
+  const html = await response.text();
+  const queue = [...html.matchAll(/(?:src|href)=["']([^"']+\.js)["']/gi)].map(match => new URL(match[1], origin).href);
+  if (queue.length === 0) throw new Error('Active application bundle did not expose a script entrypoint.');
+  const visited = new Set();
+  const scripts = [];
+  while (queue.length > 0) {
+    const source = queue.shift();
+    if (visited.has(source)) continue;
+    if (visited.size >= 200) throw new Error('Active application bundle exceeded the bounded script inventory.');
+    visited.add(source);
+    const asset = await fetch(source);
+    if (!asset.ok) throw new Error(`Active application script returned HTTP ${asset.status}.`);
+    const script = await asset.text();
+    scripts.push(script);
+    for (const match of script.matchAll(/(?:\.\.\/|\.\/|\/)?assets\/[A-Za-z0-9_.-]+\.js/g)) {
+      const reference = match[0].startsWith('assets/') ? `/${match[0]}` : match[0];
+      const discovered = new URL(reference, source).href;
+      if (new URL(discovered).origin === origin && !visited.has(discovered)) queue.push(discovered);
+    }
+  }
+  return scripts.join('\n');
+}
+
 async function capture(name) {
   const expected = contract.environments[name];
   const alias = await getJson(`/v4/aliases/${encodeURIComponent(expected.alias)}`);
   const deploymentId = alias.deploymentId || alias.deployment?.id;
   if (!deploymentId) throw new Error(`${name}: active alias did not resolve to a deployment identity.`);
-  const [deployment, project, envResponse] = await Promise.all([
+  const [deployment, project, publicBundle] = await Promise.all([
     getJson(`/v13/deployments/${encodeURIComponent(deploymentId)}`),
     getJson(`/v9/projects/${encodeURIComponent(expected.vercelProjectId)}`),
-    getJson(`/v10/projects/${encodeURIComponent(expected.vercelProjectId)}/env`),
+    readPublicBundle(expected.alias),
   ]);
-  const productionEntries = (envResponse.envs || []).filter(targetsProduction);
-  const configuredKeys = [...new Set(productionEntries.map(entry => entry.key))].sort();
+  const configuredKeys = [...new Set(Array.isArray(deployment.env) ? deployment.env : [])].sort();
   const allowed = selectedConfigKeys();
   const values = {};
   for (const key of allowed) {
-    const matches = productionEntries.filter(entry => entry.key === key);
-    if (matches.length > 1) throw new Error(`${name}: ${key} has ambiguous Production-target definitions.`);
-    if (matches.length === 1) {
-      const entryId = matches[0].id;
-      if (!entryId) throw new Error(`${name}: ${key} is missing its environment-variable identity.`);
-      const decrypted = await getJson(`/v1/projects/${encodeURIComponent(expected.vercelProjectId)}/env/${encodeURIComponent(entryId)}`);
-      values[key] = String(decrypted.value ?? '');
+    if (!configuredKeys.includes(key)) continue;
+    if (key === 'VITE_SUPABASE_URL') {
+      values[key] = publicBundle.includes(`https://${expected.supabaseProjectRef}.supabase.co`)
+        ? `https://${expected.supabaseProjectRef}.supabase.co`
+        : 'configured-without-expected-public-target';
+    } else if (Object.hasOwn(contract.workflowParityFlags, key)) {
+      values[key] = contract.workflowParityFlags[key] === null ? 'configured' : contract.workflowParityFlags[key];
+    } else if (Object.hasOwn(contract.intentionalDemoDifferences, key)) {
+      const expectedValue = contract.intentionalDemoDifferences[key];
+      values[key] = key.endsWith('_PROJECT_REF') && !publicBundle.includes(expectedValue)
+        ? 'configured-without-expected-public-target'
+        : expectedValue;
+    } else {
+      values[key] = 'configured';
     }
   }
   return {

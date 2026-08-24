@@ -215,10 +215,14 @@ test.describe('production authenticated read-only smoke', () => {
       await openSidebarTab(page, /Service Requests/i);
       await expectActiveHeading(page, /^Service Requests$/i);
 
-      await openSidebarTab(page, /^Jobs\b/i);
-      await expectActiveHeading(page, /^Jobs$/i);
+      await openSidebarTab(page, /^Work\b/i);
+      await expectActiveHeading(page, /^Work$/i);
       await expect(main.getByTestId('contractor-jobs-at-a-glance')).toBeVisible();
       await expect(main.getByTestId('contractor-work-start-draft')).toBeVisible();
+
+      await openSidebarTab(page, /^Financials\b/i);
+      await expectActiveHeading(page, /^Financials$/i);
+      await expect(main.getByTestId('contractor-financials-dashboard')).toBeVisible();
 
       await openSidebarTab(page, /^Calendar\b/i);
       await expectActiveHeading(page, /^Calendar$/i);

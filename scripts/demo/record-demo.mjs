@@ -678,8 +678,8 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     const contractorContext = await browser.newContext({ viewport: scenario.viewport, acceptDownloads: true });
     const contractorPage = await contractorContext.newPage();
     await login(contractorPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '');
-    await openSidebar(contractorPage, /^Jobs$/i);
-    await contractorPage.getByRole('heading', { level: 1, name: /^Jobs$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await openSidebar(contractorPage, /^Work$/i);
+    await contractorPage.getByRole('heading', { level: 1, name: /^Work$/i }).waitFor({ state: 'visible', timeout: 30_000 });
     await contractorPage.getByRole('button', { name: /Completed \/ Closed Jobs/i }).click();
     const completedJobRow = contractorPage.locator(
       `[data-testid="contractor-job-row"][data-record-id="${canonicalJobId}"]`,

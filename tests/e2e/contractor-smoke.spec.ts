@@ -41,10 +41,14 @@ test.describe('contractor read-only smoke', () => {
     await expectActiveTabHeading(page, /^Service Requests$/i);
     await expect(main.getByRole('heading', { level: 2, name: /^Service requests$/i })).toBeVisible();
 
-    await openSidebarTab(page, /^Jobs\b/i);
-    await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByTestId('contractor-jobs-overview').getByRole('heading', { level: 2, name: /^Jobs$/i })).toBeVisible();
-    await expect(main.getByRole('heading', { level: 3, name: /^Estimates \/ Invoices$/i })).toBeVisible();
+    await openSidebarTab(page, /^Work\b/i);
+    await expectActiveTabHeading(page, /^Work$/i);
+    await expect(main.getByTestId('contractor-jobs-at-a-glance')).toBeVisible();
+    await expect(main.getByTestId('contractor-work-start-draft')).toBeVisible();
+
+    await openSidebarTab(page, /^Financials\b/i);
+    await expectActiveTabHeading(page, /^Financials$/i);
+    await expect(main.getByTestId('contractor-financials-dashboard')).toBeVisible();
 
     await openSidebarTab(page, /^Calendar\b/i);
     await expectActiveTabHeading(page, /^Calendar$/i);

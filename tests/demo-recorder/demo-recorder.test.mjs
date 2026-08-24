@@ -94,6 +94,17 @@ test('recorder adds the explicit non-persistent presentation opt-in', () => {
   assert.equal(url.searchParams.getAll(DEMO_PRESENTATION_QUERY_KEY).length, 1);
 });
 
+test('recorder navigates through the current Work destination, not the retired Jobs tab', () => {
+  for (const path of [
+    'scripts/demo/record-demo.mjs',
+    'scripts/demo/recorder/flagship-introduction.mjs',
+  ]) {
+    const source = readFileSync(resolve(process.cwd(), path), 'utf8');
+    assert.match(source, /openSidebar\([^\n]+, \/\^Work\$\/i\)/);
+    assert.doesNotMatch(source, /openSidebar\([^\n]+, \/\^Jobs\$\/i\)/);
+  }
+});
+
 test('operator arguments stay intentionally small', () => {
   assert.deepEqual(parseRecorderArgs(['homeowner-service-request']), {
     scenarioKey: 'homeowner-service-request', pacing: 'marketing', outputDir: null, headed: false,
