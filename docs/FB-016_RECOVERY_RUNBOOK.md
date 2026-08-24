@@ -91,7 +91,7 @@ Backup runs are all-or-nothing: a run writes its immutable manifest and advances
 
 Restore always targets a separately approved project whose name starts with `servsync-recovery-drill-`. The operator refuses the immutable Production, Demo, and Sandbox refs, validates the manifest envelope and every object hash, requires exact bucket privacy/upload-policy metadata, and re-downloads each restored object for a second SHA-256 comparison. Restore Production data before Storage bytes so application references exist, then validate record-to-bucket/path linkage and public/private access. Never rely on copying from a damaged live source as the recovery procedure.
 
-The current Storage-dependent classes include contractor/discovery/email assets, service-request media, inspection media, home documents, support attachments, and any generated or filed document/media stored in those buckets. An incident inventory must use the then-current bucket catalog.
+The current fail-closed backup scope contains nine application-owned buckets: contractor, discovery, and email assets; Home documents; Help walkthroughs; inspection and service-request media; Marketing assets; and support attachments. An incident inventory must use the then-current bucket catalog. The seven-bucket counts below remain historical August 14 drill evidence rather than the current contract.
 
 ## External Configuration Checklist
 

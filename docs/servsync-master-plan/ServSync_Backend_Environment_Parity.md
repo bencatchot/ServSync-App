@@ -6,6 +6,8 @@ Production defines the supported ServSync backend schema. Demo should normally c
 
 This rule applies to backend schema and access contracts. It does not require environments to share business data, auth users, credentials, Vercel variables, feature flags, Presentation mode, rollout settings, entitlements, provider safeguards, or other operational configuration.
 
+Deployment and non-secret runtime parity are guarded separately by `config/runtime-environment-parity.json` and `scripts/runtime-parity/check-live.mjs`. That contract requires the active Production and Demo aliases to resolve to the same Git commit, pins both Vercel project identities, requires their distinct expected Supabase refs, compares the reviewed public workflow flags, and confirms Demo's provider-effect gates and credential names remain disabled or absent. Its output is key/status only and never prints environment values.
+
 ## Commands
 
 The parity checker is an explicit controlled operator command. It is not a credentialed CI job.
@@ -28,9 +30,17 @@ npm run backend:parity:test
 
 # Repository rollout ledger; no live credentials
 npm run backend:rollout:status
+
+# Local runtime-parity contract tests; no live credentials
+npm run runtime:parity:test
+
+# Read-only live deployment/configuration comparison
+SERVSYNC_RUNTIME_PARITY_VERCEL_TOKEN=... npm run runtime:parity:check
 ```
 
 Load `SUPABASE_ACCESS_TOKEN` only from an approved secret store. Do not paste it into a command history, report, PR, screenshot, or committed file. The checker never prints it.
+
+Likewise, load `SERVSYNC_RUNTIME_PARITY_VERCEL_TOKEN` only from an approved secret store and scope it read-only to the pinned Vercel team/projects. The live runtime command is operator-controlled until that least-privilege credential is deliberately installed for scheduled automation. It does not modify aliases, deployments, projects, or environment variables. Pull-request CI runs the credential-free runtime contract tests and the backend comparer tests; the live backend catalog check remains an explicit operator action.
 
 ## Comparison Contract
 

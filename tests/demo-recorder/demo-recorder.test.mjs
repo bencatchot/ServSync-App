@@ -15,6 +15,9 @@ import {
   assertSafeRecorderEnvironment,
   buildArtifactMetadata,
   cursorInterpolation,
+  addDemoPresentationOptIn,
+  DEMO_PRESENTATION_QUERY_KEY,
+  DEMO_PRESENTATION_QUERY_VALUE,
   HUMAN_PACED_PROFILE_NAME,
   HUMAN_PACED_RECORDING_PRESET,
   pacingFor,
@@ -81,6 +84,25 @@ test('recorder target guard rejects Production, Sandbox, and non-durable app ori
   assert.throws(() => assertSafeRecorderEnvironment({ DEMO_SUPABASE_PROJECT_REF: 'zpzdkoaubyjtsomccxya' }, scenario), /dedicated ServSync Demo/i);
   assert.throws(() => assertSafeRecorderEnvironment({ DEMO_SUPABASE_URL: 'https://bdytwgejqnlblhrnqxkp.example.com' }, scenario), /dedicated ServSync Demo/i);
   assert.throws(() => assertSafeRecorderEnvironment({ DEMO_RECORDING_APP_URL: 'https://servsync.app' }, scenario), /durable ServSync Demo origin/i);
+});
+
+test('recorder adds the explicit non-persistent presentation opt-in', () => {
+  const url = addDemoPresentationOptIn('https://servsync-demo.vercel.app/?existing=value#/home');
+  assert.equal(url.searchParams.get(DEMO_PRESENTATION_QUERY_KEY), DEMO_PRESENTATION_QUERY_VALUE);
+  assert.equal(url.searchParams.get('existing'), 'value');
+  assert.equal(url.hash, '#/home');
+  assert.equal(url.searchParams.getAll(DEMO_PRESENTATION_QUERY_KEY).length, 1);
+});
+
+test('recorder navigates through the current Work destination, not the retired Jobs tab', () => {
+  for (const path of [
+    'scripts/demo/record-demo.mjs',
+    'scripts/demo/recorder/flagship-introduction.mjs',
+  ]) {
+    const source = readFileSync(resolve(process.cwd(), path), 'utf8');
+    assert.match(source, /openSidebar\([^\n]+, \/\^Work\$\/i\)/);
+    assert.doesNotMatch(source, /openSidebar\([^\n]+, \/\^Jobs\$\/i\)/);
+  }
 });
 
 test('operator arguments stay intentionally small', () => {
@@ -346,7 +368,8 @@ test('Marketing Home History uses the canonical product finalizer and cannot see
   assert.match(recorderSource, /Math\.max\(scenePacing\.finalHold, 5500\)/);
   assert.match(appSource, /data-testid="simple-job-finalize-report"/);
   assert.match(appSource, /onClick=\{\(\) => void finalizeInspection\(activeInspection\)\}/);
-  assert.match(appSource, /canFinalizeCompletedJobReport = canManageJobOperations[\s\S]*SERVSYNC_DEMO_PRESENTATION_MODE && contractor\?\.owner_user_id === profile\.id/);
+  assert.match(appSource, /canFinalizeCompletedJobReport = canManageJobOperations;/);
+  assert.doesNotMatch(appSource, /SERVSYNC_DEMO_PRESENTATION_MODE && contractor\?\.owner_user_id === profile\.id/);
   assert.match(appSource, /canFinalizeCompletedJobReport && activeInspection\.status === 'draft'/);
   assert.match(appSource, /const finalizeInspection[\s\S]*if \(!canFinalizeCompletedJobReport\)/);
   assert.doesNotMatch(appSource, /!SERVSYNC_DEMO_PRESENTATION_MODE && canManageJobOperations && activeInspection\.status === 'draft'/);

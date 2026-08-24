@@ -6,6 +6,7 @@ import { runDemoCommand } from '../seed-demo-scenario.mjs';
 import {
   assertRecordingDuration,
   assertSafeRecorderEnvironment,
+  addDemoPresentationOptIn,
   buildArtifactMetadata,
   scanVisibleTextForSensitiveData,
 } from './lib.mjs';
@@ -20,7 +21,7 @@ function required(env, name) {
 }
 
 function pageUrl(appUrl, role, bypassSecret = '') {
-  const url = new URL(appUrl);
+  const url = addDemoPresentationOptIn(appUrl);
   url.hash = role === 'contractor' ? '#/contractor' : '#/home';
   if (bypassSecret) {
     url.searchParams.set('x-vercel-protection-bypass', bypassSecret);
@@ -168,7 +169,7 @@ async function captureProductFrames({ browser, scenario, env, target, stagingDir
   {
     const { context, page } = await newAuthenticatedPage(browser, target, 'contractor', contractor, scenario.viewport, bypass);
     trackErrors(page);
-    await openSidebar(page, /^Jobs$/i);
+    await openSidebar(page, /^Work$/i);
     await page.getByRole('button', { name: /Completed \/ Closed Jobs/i }).click();
     const row = page.locator(`[data-testid="contractor-job-row"][data-record-id="${jobId}"]`);
     await row.waitFor({ state: 'visible', timeout: 30_000 });
@@ -184,7 +185,7 @@ async function captureProductFrames({ browser, scenario, env, target, stagingDir
     invoiceAdopted = true;
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
-    await openSidebar(page, /^Jobs$/i);
+    await openSidebar(page, /^Work$/i);
     await page.getByText('Loading contractor workspace...').waitFor({ state: 'hidden', timeout: 30_000 }).catch(() => {});
     const main = page.getByRole('main');
     const openFinancials = main.getByRole('button').filter({ hasText: /Open Estimates \/ Invoices/i }).first();

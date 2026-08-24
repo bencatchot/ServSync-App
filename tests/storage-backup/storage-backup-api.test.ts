@@ -14,7 +14,7 @@ test('backup endpoint requires the Cron bearer secret and returns only aggregate
           manifestSha256: 'hash',
           manifest: {
             runId: 'run', completedAt: '2026-08-13T00:00:00.000Z', sourceProjectRef: 'source',
-            metrics: { bucketCount: 7, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 4, unchangedObjectVersions: 0, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 10 },
+            metrics: { bucketCount: 9, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 4, unchangedObjectVersions: 0, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 10 },
           },
         },
         retention: { expiredManifests: 0, expiredObjects: 0 },
@@ -41,7 +41,7 @@ test('health endpoint treats backups older than 36 hours as unhealthy', async ()
       read: async () => ({
         sourceProjectRef: 'source', status: 'healthy', healthVersion: 1, lastRunId: 'run', manifestKey: 'manifest', manifestSha256: 'hash',
         lastSuccessfulBackupAt: '2026-08-10T00:00:00.000Z',
-        metrics: { bucketCount: 7, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 0, unchangedObjectVersions: 4, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 0 },
+        metrics: { bucketCount: 9, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 0, unchangedObjectVersions: 4, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 0 },
       }),
       now: () => new Date('2026-08-13T00:00:00.000Z'),
     });
@@ -65,7 +65,7 @@ test('health endpoint accepts the narrow observer token without granting backup 
       read: async () => ({
         sourceProjectRef: 'source', status: 'healthy', healthVersion: 1, lastRunId: 'run', manifestKey: 'manifest', manifestSha256: 'a'.repeat(64),
         lastSuccessfulBackupAt: '2026-08-13T00:00:00.000Z',
-        metrics: { bucketCount: 7, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 0, unchangedObjectVersions: 4, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 0 },
+        metrics: { bucketCount: 9, sourceObjectCount: 4, sourceBytes: 10, backedUpObjectCount: 4, newObjectVersions: 0, unchangedObjectVersions: 4, tombstoneCount: 0, failedObjectCount: 0, r2BytesWritten: 0 },
       }),
       now: () => new Date('2026-08-13T01:00:00.000Z'),
     });

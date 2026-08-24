@@ -8,6 +8,7 @@ import {
   roleSmokeTrigger,
   safeErrorSummary,
   validateBackupHealth,
+  validateBackupHealthResponse,
 } from '../../scripts/operational-smoke/roleSmokeContract.ts';
 
 function sandboxEnv(): NodeJS.ProcessEnv {
@@ -79,7 +80,25 @@ test('backup-health validation enforces Production identity, SHA, completeness, 
     () => validateBackupHealth(healthy, new Date('2026-08-16T17:00:00.000Z')),
     (error: unknown) => error instanceof RoleSmokeFailure && error.category === 'BACKUP HEALTH FAILURE',
   );
-  assert.throws(() => validateBackupHealth({ ...healthy, metrics: { ...healthy.metrics, failedObjectCount: 1 } }), /incomplete/);
+  assert.throws(
+    () => validateBackupHealth({ ...healthy, metrics: { ...healthy.metrics, failedObjectCount: 1 } }, new Date('2026-08-15T04:00:00.000Z')),
+    /incomplete/,
+  );
+});
+
+test('backup-health response classification distinguishes a valid unhealthy report from an unavailable provider', () => {
+  assert.throws(
+    () => validateBackupHealthResponse(503, { status: 'unhealthy', sourceProjectRef: 'uqgtheclhxqlnjpfmheq' }),
+    (error: unknown) => error instanceof RoleSmokeFailure && error.category === 'BACKUP HEALTH FAILURE',
+  );
+  assert.throws(
+    () => validateBackupHealthResponse(503, { error: 'storage_backup_failed' }),
+    (error: unknown) => error instanceof RoleSmokeFailure && error.category === 'PROVIDER/EXTERNAL FAILURE',
+  );
+  assert.throws(
+    () => validateBackupHealthResponse(200, null),
+    (error: unknown) => error instanceof RoleSmokeFailure && error.category === 'BACKUP HEALTH FAILURE',
+  );
 });
 
 test('report serialization is bounded and error summaries redact identity and secret patterns', () => {

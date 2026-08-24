@@ -257,3 +257,24 @@ export function validateBackupHealth(payload: BackupHealthPayload, now = new Dat
     throw new RoleSmokeFailure('BACKUP HEALTH FAILURE', 'storage_backup_health', 'Production Storage backup is incomplete.');
   }
 }
+
+export function validateBackupHealthResponse(status: number, payload: unknown, now = new Date()): void {
+  const isHealthPayload = Boolean(
+    payload
+      && typeof payload === 'object'
+      && !Array.isArray(payload)
+      && typeof (payload as BackupHealthPayload).status === 'string',
+  );
+
+  if (status >= 500 && !isHealthPayload) {
+    throw new RoleSmokeFailure('PROVIDER/EXTERNAL FAILURE', 'storage_backup_health', 'Backup-health endpoint is unavailable.');
+  }
+  if (status < 200 || status >= 300) {
+    if (isHealthPayload) validateBackupHealth(payload as BackupHealthPayload, now);
+    throw new RoleSmokeFailure('BACKUP HEALTH FAILURE', 'storage_backup_health', 'Backup-health endpoint did not return a healthy response.');
+  }
+  if (!isHealthPayload) {
+    throw new RoleSmokeFailure('BACKUP HEALTH FAILURE', 'storage_backup_health', 'Backup-health endpoint returned an invalid health response.');
+  }
+  validateBackupHealth(payload as BackupHealthPayload, now);
+}

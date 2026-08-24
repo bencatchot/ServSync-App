@@ -27,6 +27,15 @@ The first qualifying natural run passed on 2026-08-15:
 
 This closes the first-natural-run acceptance gate for the bounded v1 milestone. One passing scheduled run proves that the scheduler and current contract operated successfully once; it is not a long-term availability guarantee and does not replace recurring observation, mutating workflow drills, recovery exercises, or formal provider RPO monitoring.
 
+### 2026-08-24 Scheduled Observation
+
+Natural run `32695447873` at default-branch SHA `38dcb2898e4469ae3f2699787fd79886750a866d` exposed two independent conditions:
+
+- Demo and Production authenticated browser checks used the retired `Jobs` navigation label. Sandbox identity, fixture, authorization, and tenant checks passed. The launch-health selectors now follow the canonical `Work` and `Financials` destinations.
+- `storage_backup_health` received HTTP 503. The natural 04:17 UTC backup had already returned sanitized `storage_backup_failed / backup_unavailable`; every inspected natural run from August 16 through August 24 failed, after an August 15 success. Production Storage grew from seven to nine application-owned buckets when private `marketing-assets` and `help-walkthroughs` were introduced, but the exact backup scope and fixtures remained at seven. The source credential still reads all nine buckets and required Vercel key metadata is unchanged, confirming a fail-closed source integration omission rather than a provider outage.
+
+The source contract now includes both buckets and tests require the exact nine-bucket inventory while still rejecting an unknown tenth bucket. After merge and automatic deployment, do not manually invoke the backup: wait for the next natural 04:17 UTC run, require HTTP 200, then verify through aggregate read-only health that all nine buckets have zero failures, complete object accounting, a valid manifest SHA, and age no greater than 36 hours. Reverting this source change restores the prior fail-closed seven-bucket behavior without deleting R2 data, but cannot restore healthy backup operation while Production has nine buckets.
+
 ## Environment Scope
 
 | Environment | Recurring scope | Mutation |
@@ -90,7 +99,7 @@ Supabase physical-backup inventory is not automated with a long-lived Management
 - `AUTHORIZATION FAILURE`: capability or cross-tenant visibility differs.
 - `APPLICATION FAILURE`: exact-head build, browser navigation, or runtime surface fails.
 - `BACKUP HEALTH FAILURE`: latest-success identity, age, manifest, or completeness fails.
-- `PROVIDER/EXTERNAL FAILURE`: Supabase, Vercel, GitHub, or another required provider is unavailable.
+- `PROVIDER/EXTERNAL FAILURE`: the health endpoint cannot return its documented health payload, or Supabase, Vercel, GitHub, or another required provider is unavailable. A valid documented `unhealthy` backup payload remains `BACKUP HEALTH FAILURE`, even when its HTTP status is 5xx.
 
 ## Repair Policy
 

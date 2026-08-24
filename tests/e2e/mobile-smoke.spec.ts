@@ -105,21 +105,14 @@ test.describe('mobile read-only smoke', () => {
     await openMobileTab(page, /Service Requests/i, 'Service Requests');
     await expect(main.getByRole('heading', { level: 2, name: /^Service requests$/i })).toBeVisible();
 
-    await openMobileTab(page, /^Jobs\b/i, 'Jobs');
-    await expect(main.getByRole('heading', { level: 2, name: /^Jobs$/i })).toBeVisible();
-    const draftFirstWorkOverview = main.locator(
-      '[data-testid="contractor-work-durable-drafts-overview"], [data-testid="contractor-work-dashboard"], [data-testid="contractor-work-dashboard-empty"]',
-    );
-    const draftFirstVisible = await expect(draftFirstWorkOverview.first()).toBeVisible({ timeout: 10_000 }).then(
-      () => true,
-      () => false,
-    );
-    if (draftFirstVisible) {
-      await expect(main.getByRole('button', { name: /Start New Draft/i }).first()).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-    } else {
-      await expect(main.getByRole('heading', { level: 3, name: /^Estimates \/ Invoices$/i })).toBeVisible();
-    }
+    await openMobileTab(page, /^Work\b/i, 'Work');
+    await expect(main.getByTestId('contractor-work-dashboard')).toBeVisible();
+    await expect(main.getByTestId('contractor-work-start-draft')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await openMobileTab(page, /^Financials\b/i, 'Financials');
+    await expect(main.getByTestId('contractor-financials-dashboard')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
 
     await openMobileTab(page, /^Calendar\b/i, 'Calendar');
     await expect(main.getByRole('heading', { level: 2, name: /^Calendar$/i })).toBeVisible();

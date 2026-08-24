@@ -34,7 +34,10 @@ export const LIFECYCLE_STEP_KEYS = lifecycleStepKeys;
 
 const FORBIDDEN_EXTERNAL_FLAGS = [
   'EMAIL_ENABLED',
+  'HOME_ACCESS_INVITE_EMAIL_ENABLED',
   'STRIPE_ENABLED',
+  'SERVSYNC_STRIPE_CONNECT_TEST_ENABLED',
+  'SERVSYNC_FACEBOOK_PUBLIC_POSTS_ENABLED',
   'SMS_ENABLED',
   'PUSH_NOTIFICATIONS_ENABLED',
   'WEBHOOK_DELIVERY_ENABLED',
@@ -42,6 +45,17 @@ const FORBIDDEN_EXTERNAL_FLAGS = [
   'ACCOUNTING_SYNC_ENABLED',
   'AI_ENABLED',
   'GEOCODING_ENABLED',
+];
+
+const FORBIDDEN_EXTERNAL_CREDENTIALS = [
+  'RESEND_API_KEY',
+  'SENDGRID_API_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_CONNECT_WEBHOOK_SECRET',
+  'FACEBOOK_APP_SECRET',
+  'OPENAI_API_KEY',
+  'GEOCODING_API_KEY',
 ];
 
 const ENABLED_BOOLEAN_VALUES = new Set(['true', '1', 'yes', 'on', 'enabled']);
@@ -225,6 +239,12 @@ export function assertSafeDemoTarget(env = process.env) {
 
     if (!DISABLED_BOOLEAN_VALUES.has(normalized)) {
       throw new Error(`Demo runner refused: ${flag} has an unrecognized boolean value; unset it or use false.`);
+    }
+  }
+
+  for (const credential of FORBIDDEN_EXTERNAL_CREDENTIALS) {
+    if (String(env[credential] || '').trim()) {
+      throw new Error(`Demo runner refused: ${credential} must be absent from the Demo runner process.`);
     }
   }
 
