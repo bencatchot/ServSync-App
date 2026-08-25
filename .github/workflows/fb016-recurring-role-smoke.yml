@@ -4,12 +4,6 @@ on:
   schedule:
     - cron: '23 5 * * *'
   workflow_dispatch:
-    inputs:
-      field_mobile_acceptance:
-        description: Run the resettable full lifecycle at the field-critical 390x844 viewport
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: fb016-recurring-role-smoke
@@ -79,11 +73,6 @@ jobs:
         run: npm run ops:role-smoke:api
       - name: Run read-only role browser smoke
         run: npm run qa:e2e:role-smoke
-      - name: Run resettable field-critical mobile lifecycle
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.field_mobile_acceptance == true }}
-        env:
-          SERVSYNC_FIELD_MOBILE_ACCEPTANCE: 'true'
-        run: npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium
       - name: Record browser result
         if: always()
         run: |

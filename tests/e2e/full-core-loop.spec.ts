@@ -22,6 +22,18 @@ function quoteSqlText(value: string) {
   return `'${value.replaceAll("'", "''")}%'`;
 }
 
+function requireLinkedSandboxCleanup() {
+  let linkedProject = '';
+  try {
+    linkedProject = readFileSync('supabase/.temp/project-ref', 'utf8').trim();
+  } catch {
+    throw new Error(`Refusing core-loop mutation without a local Supabase CLI link to Sandbox ${SANDBOX_SUPABASE_REF}; cleanup cannot be guaranteed.`);
+  }
+  if (linkedProject !== SANDBOX_SUPABASE_REF) {
+    throw new Error(`Refusing core-loop mutation outside linked Sandbox ${SANDBOX_SUPABASE_REF}.`);
+  }
+}
+
 function cleanupCoreLoopFixtures(recordPrefixes: string[]) {
   if (recordPrefixes.length === 0) return;
   const linkedProject = readFileSync('supabase/.temp/project-ref', 'utf8').trim();
@@ -750,6 +762,7 @@ test.describe('full sandbox core loop', () => {
 
   test('homeowner request to paid contractor invoice to Home History reminder', async ({ browser }, testInfo) => {
     requireApprovedSandboxForMutation();
+    requireLinkedSandboxCleanup();
     test.setTimeout(300_000);
 
     const timestamp = timestampForRecord();
@@ -770,6 +783,7 @@ test.describe('full sandbox core loop', () => {
 
   test('partial offline payment persists before exact final payment', async ({ browser }, testInfo) => {
     requireApprovedSandboxForMutation();
+    requireLinkedSandboxCleanup();
     test.setTimeout(300_000);
 
     const recordPrefix = `E2E Partial Payment ${timestampForRecord()}`;
