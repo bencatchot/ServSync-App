@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-25 - FB-039E2 Production legacy retirement and Phase 0.4 completion
+
+- Gate pin: Draft PR #518 matched exact starting head `c5f99b5b4d9bb80377659d53c0360567d9e754f0`, clean merged-release ancestry, retirement SHA-256 `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` at 56 lines, unchanged durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461`, accepted Sandbox/Demo evidence, and healthy Production identity `uqgtheclhxqlnjpfmheq`.
+- Preflight/apply: Zero receipts/markers, exact legacy definitions/grants/policy, durable definitions/security/tombstone state, and the complete 162-label/803-row fingerprint passed. The exact existing retirement file was applied once from `2026-08-25T18:46:41Z` through `18:46:44Z` without reauthoring or partial execution.
+- Catalog/security: Both dependency-safe legacy functions remain cataloged with unchanged definitions but are unexecutable by public/anon/authenticated/service_role. The old report-upload policy is absent; durable hashes/owners/paths/volatility/grants, prepared-upload policy, postgres-owned forced-RLS/no-policy receipts, zero client table grants, and `ON DELETE SET NULL` remain exact. Receipts stayed empty.
+- Preservation/smoke: The post-install aggregate remained exactly `c1981d9ce4738d90433ed776e964f658` across 162 labels/803 rows. Profiles 18, contractors 7, homeowners 6, homes 7, Requests 23, Estimates 23, Jobs 9, Invoices 12, documents 0, Home History 4, notifications 72, Auth users/identities 18, nine buckets, 15 objects, and every Help/Marketing/provider/publication fingerprint were unchanged. Production public smoke passed 7/7. Authenticated read-only smoke did not run because approved credentials were unavailable; no sign-in or credential action occurred.
+- Parity/roadmap: Production-to-Demo parity passes with only 129 approved Demo additions; the full comparator retains only 21 separately documented older Sandbox differences. FB-039E2 and Phase 0.4 are complete. The smallest next action is owner approval to merge draft PR #518; Phase 0.5 remains unstarted and separately governed.
+- Tutorial impact: `NOT APPLICABLE`. This rollout evidence changes no visible workflow or Help content.
+
 ## 2026-08-25 - FB-039E2 identical-byte Demo legacy retirement
 
 - Gate pin: Draft PR #518 was re-read at exact starting head `ab363957cadc14bdf18a2f7664c2e1f1a4f881b2` with merged-release ancestry from `6d28655ac5a81eb8fb1b243161b164e8d4d7acc3`. Local and healthy remote identity matched Demo `bdytwgejqnlblhrnqxkp`. Durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` remained exact; retirement SHA-256 `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` remained exactly 56 lines.
