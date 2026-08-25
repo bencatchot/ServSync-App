@@ -6,6 +6,8 @@ Phase 0.5 starts from a clean re-read of `origin/main` at exact normal merge com
 
 Branch: `codex/phase-0-5-mobile-acceptance`
 
+Draft PR: [#519](https://github.com/bencatchot/ServSync-App/pull/519)
+
 Status: **IN PROGRESS — exact-head Preview acceptance remains required.** Source or local rendering alone does not complete Phase 0.5.
 
 The accepted product boundary is unchanged: Work owns Drafts, Estimates, Jobs, reports, checklists, findings, and work attachments; Financials owns Invoices and payment state; Customers owns contact/property context; homeowners retain Properties, Home History, and Documents; existing role and shared-home privacy rules remain authoritative.
@@ -40,7 +42,8 @@ The bounded audit covers the established phone path at `390x844`:
 - Focused Phase 0.5 rendered/source coverage: 6/6 passed at exact `390x844`.
 - Applicable secure guest Estimate and Invoice delivery coverage: combined focused run passed 55/55, including desktop and exact `390x844` responsive rendering, response state, reload, error/empty handling, dialog focus, and no horizontal overflow.
 - One separately Sandbox-configured Pay online case failed in the first broad local run because the clean worktree intentionally had no Sandbox payment flag/configuration; it passed no Phase 0.5 code path and was excluded from the applicable rerun rather than manufacturing environment access.
-- Resettable full-core-loop mobile mode is source-ready but still requires approved Sandbox credentials to execute; no personal account or Production identity was substituted.
+- Exact-source authenticated workflow [run 32890866808](https://github.com/bencatchot/ServSync-App/actions/runs/32890866808) passed Sandbox fixture/authorization health, Owner/Admin/Office/Field Technician/Viewer browser coverage, contractor and homeowner bounded mobile navigation, Demo read-only navigation, Production public/authenticated read-only navigation, and published Help playback.
+- The resettable full-core-loop mobile mode was invoked once in the credential-safe workflow. It stopped before the first mutation because that runner had no local Supabase CLI link and therefore could not guarantee exact cleanup. The harness now checks the linked Sandbox cleanup path before mutation and the responsive shared navigation helper supports mobile drawers. No lifecycle fixture record was created by the failed preflight.
 
 ## Role, Privacy, And Durability Preservation
 
@@ -56,18 +59,20 @@ The bounded audit covers the established phone path at `390x844`:
 | Local Vite exact source | `390x844` | App initialized without error overlay or console errors; the missing-Supabase setup state rendered as expected in the clean worktree. |
 | Rendered Today's Work harness | `390x844` | One dominant next action, secondary later work, empty return path, touch height, and zero horizontal overflow passed. |
 | Secure guest Estimate/Invoice fixtures | Desktop + `390x844` | Responsive render, response/reload/error states, focus containment, and zero horizontal overflow passed. |
-| PR-head Vercel Preview | `390x844` | **PENDING. Required before completion.** |
-| PR-head desktop regression | Desktop | **PENDING. Required before completion.** |
+| Demo Preview from runtime/test head `8d94d62b10962b66c19cab843e2786eb38b33a2f` | `390x844` | [Immutable Preview](https://servsync-demo-31gd4qhhv-bencatchots-projects.vercel.app): exact viewport, zero horizontal overflow, zero clipped controls, and 44 px Sign in/account-entry/Trust & Safety targets passed. |
+| Same exact-head Demo Preview | `1440x1000` | Zero horizontal overflow and zero clipped visible controls passed. |
+| Exact-source Sandbox role workflow | Desktop + bounded mobile navigation | All five contractor roles, homeowner navigation, API identity, fixture, authorization, and backup health passed. |
+| Exact-source resettable lifecycle | `390x844` | **BLOCKED BEFORE MUTATION:** the available runner had no linked Sandbox cleanup path. Required before Phase 0.5 completion. |
 
 ## Tutorial Freshness
 
-**PENDING.** Search Help Studio for Request, Estimate, Work/Job, Invoice/Financials, Customer/property, Home History, and likely synonyms; Preview every matching published walkthrough against the exact PR-head Preview. Record exactly `NONE`, `UPDATE REQUIRED`, or `UPDATED` before completion. No Help content has been changed or published.
+`NONE`. The Help inventory search covered Request, Estimate, Work/Job, Invoice/Financials, Customer/property, Home History, Drafts, billing, records, and property synonyms. The only published match is **How to create an estimate**, revision 3. Production Owner playback in exact-source workflow run 32890866808 opened the actual contextual result, dialog, and signed video source. Its established Work -> Drafts estimate-creation path, visible labels, control order, Owner/Admin/Office role assumption, and outcome are unchanged by the Dashboard priority, homeowner response-layout, Job-dialog, and touch-target corrections. No Help content was changed or published.
 
 ## Remaining Non-Blocking Items And Exit Decision
 
 - Real-device Safari/Chrome and installed-PWA observation remains a later QA layer; this slice does not claim native, offline, camera, or app-store behavior.
-- The clean local worktree lacks approved authenticated Sandbox/Demo credentials, so it does not claim the resettable lifecycle or five-role browser matrix has run yet.
-- Phase 0.5 exits only after exact-head Preview mobile acceptance, desktop regression, proportional role/privacy observation, and Tutorial Freshness pass with no launch blocker.
+- The exact-source five-role/read-only matrix, public Preview phone/desktop checks, and Tutorial Freshness pass are complete.
+- Phase 0.5 still requires one approved execution of the resettable full lifecycle at `390x844` from the exact PR runtime source with a verified local Sandbox CLI link so cleanup is guaranteed. That run must cover Request -> Estimate -> Job -> Invoice -> payment -> Home History reload without overflow, clipping, or hidden primary actions.
 
 Current exit decision: **DO NOT EXIT PHASE 0.5 YET.**
 
