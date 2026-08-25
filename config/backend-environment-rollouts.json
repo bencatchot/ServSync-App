@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-24",
+  "updatedOn": "2026-08-25",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -26,16 +26,16 @@
       "artifact": "servsync-core-record-finalization-legacy-retirement.sql (SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289)",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Apply only after the exact durable-idempotency migration passes Sandbox acceptance and the new application path is running there. Then prove the legacy RPC and broad report-upload predicate are unexecutable and the old Storage policy is absent while durable replay still passes."
+          "status": "Applied",
+          "reason": "Exact SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289 (56 lines) was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-25 after merged Demo deployment dpl_A8sbgXk7FkecueKcSd8Qj53u9mq5 served main commit 6d28655ac5a81eb8fb1b243161b164e8d4d7acc3 and browser-level Demo observation passed report finalization plus manual Home History with/without a document. Post-install catalog retained both dependency-safe legacy functions but denied execute to public, anon, authenticated, and service_role; removed home_docs_upload_contractor_field_work_reports; and preserved the durable prepared-upload policy. The explicit FB039E2RT3 Sandbox harness then passed real receipt-bound Storage upload, prepare/commit/same-key replay, canonical Job/document/Home History/notification/receipt/object counts, primary-homeowner read visibility, and authenticated legacy RPC/upload denial. Exact Storage API plus Auth-lifecycle cleanup returned every marker and receipt to zero. All 168 pre-existing public/Auth/Storage row fingerprints remained exact."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Apply only after identical-byte Sandbox and Demo retirement acceptance, Production durable-idempotency rollout, automatic application deployment, and observation of the new path. Use read-only catalog/security and preservation checks; do not create Production fixtures."
+          "status": "Applied",
+          "reason": "Exact SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289 (56 lines) was applied once to Production uqgtheclhxqlnjpfmheq from 2026-08-25T18:46:41Z through 18:46:44Z after draft PR #518 exact head c5f99b5b4d9bb80377659d53c0360567d9e754f0, merged-release ancestry, local/remote Production identity, durable SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461, accepted Sandbox/Demo retirement evidence, zero receipts/markers, legacy pre-retirement grants/policy, durable definitions/security, and a complete 162-label/803-row fingerprint matched. Post-install, both dependency-safe legacy functions remain cataloged but are unexecutable by public, anon, authenticated, and service_role; the old report-upload policy is absent; durable hashes/owners/path/volatility/grants, the prepared-upload policy, forced-RLS/no-policy receipt table, zero client table grants, and ON DELETE SET NULL tombstone remain exact. Receipts stayed empty and the complete aggregate fingerprint remained c1981d9ce4738d90433ed776e964f658. Production public smoke passed 7/7; authenticated read-only smoke did not run because its approved credential variables were unavailable. Production-to-Demo parity passed with only 129 approved Demo additions; the full comparator retained only the 21 separately documented older Sandbox differences. No Production fixture, Auth session, product RPC, Storage operation, provider/publication action, or business-record mutation occurred."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Apply only after Sandbox retirement passes, the identical durable migration is accepted in Demo, and the new Demo application path plus Demo Recorder are observed. Reverify recorder reset, finalized-report delivery, and no legacy execute/upload authority."
+          "status": "Applied",
+          "reason": "Exact SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289 (56 lines) was applied once to Demo bdytwgejqnlblhrnqxkp on 2026-08-25 from draft PR #518 after exact head ab363957cadc14bdf18a2f7664c2e1f1a4f881b2, merged-release ancestry, local/remote identity, durable SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461, zero receipts/markers, legacy pre-retirement grants/policy, durable definition hashes, and a complete 165-label/412-row fingerprint matched. Post-install, both dependency-safe legacy functions remain cataloged but are unexecutable by public, anon, authenticated, and service_role; the old report-upload policy is absent; the durable prepared-upload policy and five durable definition hashes remain exact. Fixed FB039E2UI1 deployed-UI acceptance passed report finalization, reload reconciliation, manual Home History with/without one private document, exact canonical lineage, two registered objects, zero duplicate/orphan outcomes, homeowner-only download visibility, and denial of the legacy RPC, unprepared upload, and contractor private download. Storage API plus Auth-lifecycle cleanup returned all markers/receipts/objects to zero, and the exact 165-label aggregate fingerprint 2ee2c08b73fc44101a4512871473efaf remained unchanged across all public/Auth/Storage plus Recorder/Help/Marketing/provider/publication state."
         }
       }
     },

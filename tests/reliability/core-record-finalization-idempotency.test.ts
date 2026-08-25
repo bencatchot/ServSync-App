@@ -13,6 +13,9 @@ import {
 const migrationUrl = new URL('../../servsync-core-record-finalization-durable-idempotency.sql', import.meta.url);
 const retirementMigrationUrl = new URL('../../servsync-core-record-finalization-legacy-retirement.sql', import.meta.url);
 const sandboxHarnessUrl = new URL('../../scripts/validation/validate-core-record-finalization-sandbox-runtime.mjs', import.meta.url);
+const demoUiHarnessUrl = new URL('../../scripts/validation/validate-core-record-finalization-demo-ui.mjs', import.meta.url);
+const sandboxRetirementHarnessUrl = new URL('../../scripts/validation/validate-core-record-finalization-sandbox-retirement-runtime.mjs', import.meta.url);
+const environmentFingerprintUrl = new URL('../../tests/sql/core-record-finalization-environment-fingerprint.sql', import.meta.url);
 const packageUrl = new URL('../../package.json', import.meta.url);
 
 async function migrationSource() {
@@ -442,4 +445,46 @@ test('shared runtime acceptance is target-pinned, explicitly gated, and proves c
   for (const canonical of ['inspections', 'home_documents', 'home_maintenance_log', 'notifications', 'servsync_core_record_finalization_operations', 'storage.objects']) {
     assert.match(roleLoop, new RegExp(canonical.replace('.', '\\.')));
   }
+});
+
+test('post-merge Demo observation and Sandbox/Demo retirement harnesses stay exact-target and fail closed', async () => {
+  const demoUi = await readFile(demoUiHarnessUrl, 'utf8');
+  const sandboxRetirement = await readFile(sandboxRetirementHarnessUrl, 'utf8');
+  const fingerprint = await readFile(environmentFingerprintUrl, 'utf8');
+
+  assert.match(demoUi, /bdytwgejqnlblhrnqxkp/);
+  assert.match(demoUi, /6d28655ac5a81eb8fb1b243161b164e8d4d7acc3/);
+  assert.match(demoUi, /FB039E2UI1/);
+  assert.match(demoUi, /--setup/);
+  assert.match(demoUi, /--verify/);
+  assert.match(demoUi, /--cleanup/);
+  assert.match(demoUi, /assertRetiredCatalog/);
+  assert.match(demoUi, /legacy_finalizer_authenticated:\s*false/);
+  assert.match(demoUi, /legacy_upload_authenticated:\s*false/);
+  assert.match(demoUi, /legacy_policy:\s*0/);
+  assert.match(demoUi, /prepared_policy:\s*1/);
+  assert.match(demoUi, /retired six-argument finalizer must be denied/);
+  assert.match(demoUi, /unprepared legacy report upload must be denied/);
+  assert.match(demoUi, /primary homeowner must read/);
+  assert.match(demoUi, /contractor must not browse homeowner private report storage/);
+  assert.match(demoUi, /service\.storage\.from\(BUCKET\)\.remove/);
+  assert.match(demoUi, /service\.auth\.admin\.deleteUser/);
+  assert.doesNotMatch(demoUi, /delete\s+from\s+storage\.objects/i);
+
+  assert.match(sandboxRetirement, /zpzdkoaubyjtsomccxya/);
+  assert.match(sandboxRetirement, /--execute-sandbox-retirement/);
+  assert.ok(sandboxRetirement.indexOf('Refusing shared Sandbox mutation') < sandboxRetirement.indexOf('function loadKeys'));
+  assert.match(sandboxRetirement, /legacy finalizer must be denied/);
+  assert.match(sandboxRetirement, /Legacy report-upload bypass unexpectedly succeeded/);
+  assert.match(sandboxRetirement, /servsync_prepare_job_report_finalization/);
+  assert.match(sandboxRetirement, /servsync_commit_job_report_finalization/);
+  assert.match(sandboxRetirement, /idempotent/);
+  assert.match(sandboxRetirement, /service\.storage\.from\(BUCKET\)\.remove/);
+  assert.match(sandboxRetirement, /service\.auth\.admin\.deleteUser/);
+  assert.doesNotMatch(sandboxRetirement, /delete\s+from\s+storage\.objects/i);
+
+  for (const relation of ['public', 'auth.users', 'auth.identities', 'storage.buckets', 'storage.objects']) {
+    assert.match(fingerprint, new RegExp(relation.replace('.', '\\.')));
+  }
+  assert.match(fingerprint, /rollback;/i);
 });
