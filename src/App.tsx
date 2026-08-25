@@ -7170,7 +7170,7 @@ function TopBar({
               </button>
             </>
           ) : (
-            <button type="button" onClick={() => updateRoute('contractor')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005FD6]">
+            <button type="button" onClick={() => updateRoute('contractor')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005FD6]">
               Sign in
             </button>
           )}
@@ -7753,14 +7753,14 @@ function LandingPage() {
             estimates, jobs, invoices, calendar events, and home service history in one place.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('primary')}>
+            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={`${buttonClass('primary')} min-h-11`}>
               Create contractor account <ArrowRight size={16} />
             </button>
-            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('secondary')}>
+            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={`${buttonClass('secondary')} min-h-11`}>
               Create free homeowner account <ArrowRight size={16} />
             </button>
           </div>
-          <button type="button" onClick={() => updateRoute('trust-safety')} className="mt-4 w-fit text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
+          <button type="button" onClick={() => updateRoute('trust-safety')} className="mt-4 inline-flex min-h-11 w-fit items-center text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
             View Trust & Safety
           </button>
         </div>

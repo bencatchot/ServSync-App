@@ -27,6 +27,7 @@ The bounded audit covers the established phone path at `390x844`:
 
 | Finding | Mobile impact | Bounded correction |
 | --- | --- | --- |
+| Preview inspection found Sign in and public account-entry actions at only 36-38 px tall. | The contractor's first phone interaction missed the accepted touch target even though it was visible and unclipped. | Raised the existing entry actions and adjacent Trust & Safety return target to a 44 px minimum without changing routes or hierarchy. |
 | Contractor Dashboard led with a full-week schedule instead of the immediate field task. | An unfamiliar contractor had to scan the week before finding the next scheduled action. | Added Today's Work before the weekly schedule, with the earliest item as the single dominant action and later items secondary. |
 | Initial business-profile setup rendered globally above active contractor destinations. | Setup explanation could appear ahead of Request, Work, Customer, Financials, or Job work. | Scoped the prompt to Dashboard only; existing setup remains available without blocking active tasks. |
 | Homeowner Estimate action groups retained compact desktop-width buttons. | Review/approve/decline, file, and return-to-history actions could be harder to scan and tap in dense cards. | Reused the established full-width-on-mobile action hierarchy while preserving desktop wrapping and primary/secondary weight. |
@@ -36,7 +37,7 @@ The bounded audit covers the established phone path at `390x844`:
 ## Automated Evidence
 
 - `npm run typecheck`: passed.
-- Focused Phase 0.5 rendered/source coverage: 5/5 passed at exact `390x844`.
+- Focused Phase 0.5 rendered/source coverage: 6/6 passed at exact `390x844`.
 - Applicable secure guest Estimate and Invoice delivery coverage: combined focused run passed 55/55, including desktop and exact `390x844` responsive rendering, response state, reload, error/empty handling, dialog focus, and no horizontal overflow.
 - One separately Sandbox-configured Pay online case failed in the first broad local run because the clean worktree intentionally had no Sandbox payment flag/configuration; it passed no Phase 0.5 code path and was excluded from the applicable rerun rather than manufacturing environment access.
 - Resettable full-core-loop mobile mode is source-ready but still requires approved Sandbox credentials to execute; no personal account or Production identity was substituted.

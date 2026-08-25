@@ -77,6 +77,17 @@ test.describe('Phase 0.5 field-critical mobile acceptance', () => {
     expect(contractorDashboard).toContain('recurringCalendarEventOccurrences(event, scheduleDataStart, scheduleDataEnd)');
   });
 
+  test('public contractor entry actions preserve phone touch targets', () => {
+    const app = sourceFile('src/App.tsx');
+    const topBar = sourceBetween(app, 'function TopBar({', 'function NavButton({');
+    const landing = sourceBetween(app, 'function LandingPage()', 'function PasswordResetUpdatePage');
+
+    expect(topBar).toMatch(/updateRoute\('contractor'\)[\s\S]*?min-h-11[\s\S]*?Sign in/);
+    expect(landing).toMatch(/updateRoute\('contractor', 'mode=signup'\)[\s\S]*?min-h-11/);
+    expect(landing).toMatch(/updateRoute\('homeowner', 'mode=signup'\)[\s\S]*?min-h-11/);
+    expect(landing).toMatch(/updateRoute\('trust-safety'\)[\s\S]*?min-h-11/);
+  });
+
   test('homeowner Estimate handoffs stack primary and secondary actions on phones', () => {
     const app = sourceFile('src/App.tsx');
     const estimateCard = sourceBetween(app, 'const renderHomeownerEstimateCard =', 'const renderHomeownerRecordsSection =');
