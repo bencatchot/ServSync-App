@@ -13,6 +13,7 @@ const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
 const PRODUCTION_HOSTS = new Set(['servsync.app', 'www.servsync.app']);
 const PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN = 'ALLOW_PRODUCTION_TEST_ACCOUNT_SMOKE';
 const DURABLE_SANDBOX_SERVER_ORIGIN = 'https://servsync-stripe-sandbox.vercel.app';
+const FIELD_CRITICAL_MOBILE_ACCEPTANCE = process.env.SERVSYNC_FIELD_MOBILE_ACCEPTANCE === 'true';
 
 function quoteSqlText(value: string) {
   if (!/^E2E (?:Core Loop|Partial Payment) \d{14}$/.test(value)) {
@@ -112,7 +113,7 @@ function appContextOptions() {
     extraHTTPHeaders: bypass
       ? { 'x-vercel-protection-bypass': bypass, 'x-vercel-set-bypass-cookie': 'true' }
       : undefined,
-    viewport: { width: 1440, height: 1000 },
+    viewport: FIELD_CRITICAL_MOBILE_ACCEPTANCE ? { width: 390, height: 844 } : { width: 1440, height: 1000 },
   };
 }
 
@@ -216,6 +217,43 @@ async function setPropertyScopeAllIfAvailable(main: Locator, label: RegExp) {
   }
 }
 
+async function expectFieldMobileLayout(page: Page, label: string, primaryAction?: Locator) {
+  if (!FIELD_CRITICAL_MOBILE_ACCEPTANCE) return;
+
+  expect(page.viewportSize(), `${label}: exact mobile viewport`).toEqual({ width: 390, height: 844 });
+  const layout = await page.evaluate(() => {
+    const viewportWidth = document.documentElement.clientWidth;
+    const clippedControls = Array.from(document.querySelectorAll<HTMLElement>('button, input, select, textarea, [role="button"]'))
+      .filter(element => {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || element.getClientRects().length === 0) return false;
+        const rect = element.getBoundingClientRect();
+        return rect.left < -2 || rect.right > viewportWidth + 2;
+      })
+      .slice(0, 5)
+      .map(element => element.getAttribute('aria-label') || element.textContent?.trim().slice(0, 80) || element.tagName);
+    return {
+      overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - viewportWidth,
+      clippedControls,
+    };
+  });
+  expect(layout.overflow, `${label}: horizontal overflow`).toBeLessThanOrEqual(2);
+  expect(layout.clippedControls, `${label}: horizontally clipped controls`).toEqual([]);
+
+  if (primaryAction) {
+    await primaryAction.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+    const bounds = await primaryAction.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height };
+    });
+    expect(bounds.left, `${label}: primary action left edge`).toBeGreaterThanOrEqual(-2);
+    expect(bounds.right, `${label}: primary action right edge`).toBeLessThanOrEqual(392);
+    expect(bounds.top, `${label}: primary action top edge`).toBeGreaterThanOrEqual(0);
+    expect(bounds.bottom, `${label}: primary action bottom edge`).toBeLessThanOrEqual(844);
+    expect(bounds.height, `${label}: primary action touch height`).toBeGreaterThanOrEqual(40);
+  }
+}
+
 async function waitForEstimateDraftSave(main: Locator, saveEstimateButton: Locator) {
   const saveError = main
     .getByText(/Unable to save estimate|Add at least one line item|Add a .* title|contractor profile is still loading|ServSync is still connecting/i)
@@ -297,6 +335,7 @@ async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
 
   await expect(main.getByText(/Service request submitted/i)).toBeVisible({ timeout: 30_000 });
   await expect(main.getByTestId('homeowner-service-request-card').filter({ hasText: requestTitle }).first()).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, 'homeowner Request submitted');
 
   return { requestTitle, requestDescription };
 }
@@ -348,6 +387,7 @@ async function createAndSendEstimateFromRequest(page: Page, requestTitle: string
   await estimateCard.getByTestId('contractor-send-estimate').click();
   expect((await sendEstimateResponse).ok()).toBeTruthy();
   await expect(estimateCard.getByText(/Waiting on homeowner/i)).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, 'contractor Estimate sent');
 
   return { estimateTitle };
 }
@@ -374,6 +414,7 @@ async function acceptHomeownerEstimate(page: Page, estimateTitle: string) {
   await main.getByRole('button').filter({ hasText: /^Accepted Estimates/i }).first().click();
   const acceptedEstimateCard = main.getByTestId('homeowner-estimate-card').filter({ hasText: estimateTitle }).first();
   await expect(acceptedEstimateCard.getByText(/^Accepted$/i)).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, 'homeowner Estimate accepted');
 }
 
 async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string, recordPrefix: string) {
@@ -406,6 +447,7 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
 
   const workCheckbox = main.locator('[data-testid="contractor-approved-work-checkbox"], [data-testid="contractor-work-item-checkbox"]').first();
   await expect(workCheckbox).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, 'contractor Job opened', workCheckbox);
   await expect(workCheckbox).toHaveAttribute('aria-label', /.+/);
   if (!(await workCheckbox.isChecked())) {
     await workCheckbox.check();
@@ -470,6 +512,7 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   expect((await saveInvoiceResponse).ok()).toBeTruthy();
   expect((await sendInvoiceResponse).ok()).toBeTruthy();
   await expect(main.getByText(/^Invoice sent$/i)).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, 'contractor Invoice sent');
 
   return { invoiceTitle };
 }
@@ -503,6 +546,7 @@ async function openContractorInvoiceCard(page: Page, invoiceTitle: string, close
   await expect(statusFilter).toHaveValue(expectedStatusFilter);
   const invoiceCard = main.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
   await expect(invoiceCard).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, closed ? 'contractor closed Invoice' : 'contractor open Invoice');
   return invoiceCard;
 }
 
@@ -516,6 +560,7 @@ async function recordFullOfflinePayment(page: Page, invoiceTitle: string, record
   await dialog.locator('select').selectOption('check');
   await dialog.locator('input[maxlength="120"]').fill(`${recordPrefix} check`);
   await dialog.locator('textarea[maxlength="500"]').fill(`${recordPrefix}: full offline payment E2E verification.`);
+  await expectFieldMobileLayout(page, 'contractor payment dialog', dialog.getByRole('button', { name: /^Record payment$/i }));
 
   const paymentResponse = page.waitForResponse(
     response => response.url().includes('/rpc/servsync_record_offline_invoice_payment'),
@@ -693,6 +738,7 @@ async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, re
   await expect(refreshedHistoryEntry).toBeVisible({ timeout: 30_000 });
   await expect(refreshedHistoryEntry.getByText(/Linked Home Reminders/i)).toBeVisible({ timeout: 30_000 });
   await expect(refreshedHistoryEntry.getByText(new RegExp(`^${escapeRegExp(reminderTitle)}\\.?$`, 'i'))).toBeVisible({ timeout: 30_000 });
+  await expectFieldMobileLayout(page, 'homeowner Home History after reload');
 }
 
 test.describe('full sandbox core loop', () => {

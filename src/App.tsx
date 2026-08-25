@@ -283,10 +283,7 @@ import {
   OPEN_JOB_STATUSES,
 } from './features/jobs/status';
 import { DraftJobComposer } from './features/jobs/DraftJobComposer';
-import {
-  ContractorScheduleSnapshot,
-  type ContractorScheduleSnapshotItem,
-} from './features/dashboard/ContractorScheduleSnapshot';
+import { ContractorScheduleSnapshot, ContractorTodayWork, type ContractorScheduleSnapshotItem } from './features/dashboard/ContractorScheduleSnapshot';
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
@@ -14253,14 +14250,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </div>
           <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">${(estimate.total_cents / 100).toFixed(2)}</p>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className={`mt-3 ${mobileActionRowClass()}`}>
           <button
             type="button"
             onClick={() => {
               setViewingInvoiceId(null);
               setViewingEstimateId(current => current === estimate.id ? null : estimate.id);
             }}
-            className={buttonClass(options.needsReview && !isOpen ? 'primary' : 'secondary')}
+            className={mobileButtonClass(options.needsReview && !isOpen ? 'primary' : 'secondary')}
           >
             <Receipt size={16} />
             {isOpen ? 'Hide Details' : options.needsReview ? 'Review Estimate' : 'View Details'}
@@ -14274,7 +14271,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 customerAddress: home?.address_line1 || '',
                 contractorLogoUrl: contractorLogoUrl(estimateConnection?.logo_url || estimateDirectoryContractor?.logo_url),
               }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
-              className={buttonClass('secondary')}
+              className={mobileButtonClass('secondary')}
             >
               <Download size={16} />
               Download PDF
@@ -14284,7 +14281,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <button
               type="button"
               onClick={() => openRequestFromDashboard(linkedRequest)}
-              className={buttonClass('secondary')}
+              className={mobileButtonClass('secondary')}
             >
               <MessageSquare size={16} />
               View Request
@@ -14310,12 +14307,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
             {!SERVSYNC_DEMO_PRESENTATION_MODE && estimate.status === 'accepted' && (
-              <div className="flex flex-wrap gap-2">
+              <div className={mobileActionRowClass()}>
                 <button
                   type="button"
                   onClick={() => void fileEstimateToHomeRecords(estimate, contractorName)}
                   disabled={filingEstimateId === estimate.id || estimateFiled}
-                  className={estimateFiled ? buttonClass('secondary') : buttonClass('primary')}
+                  className={mobileButtonClass(estimateFiled ? 'secondary' : 'primary')}
                 >
                   <FolderOpen size={16} />
                   {estimateFiled ? 'Filed to Home History' : filingEstimateId === estimate.id ? 'Filing...' : 'File to Home History'}
@@ -14323,7 +14320,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <button
                   type="button"
                   onClick={() => setHomeownerTab('log')}
-                  className={buttonClass('secondary')}
+                  className={mobileButtonClass('secondary')}
                 >
                   <ClipboardList size={16} />
                   View Home History
@@ -14422,7 +14419,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
             {estimate.status === 'sent' && (
-              <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+              <div className={`${mobileActionRowClass()} border-t border-slate-200 pt-4`}>
                 {paymentScheduleRows.length > 0 && (
                   <p className="basis-full rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900">
                     By approving, you accept the estimate scope, total, and payment schedule.
@@ -14434,7 +14431,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   disabled={updatingEstimateId === estimate.id}
                   data-testid="homeowner-accept-estimate"
                   aria-label={`Accept estimate ${estimate.title}`}
-                  className={buttonClass('primary')}
+                  className={mobileButtonClass('primary')}
                 >
                   <CheckCircle2 size={16} />
                   {updatingEstimateId === estimate.id ? 'Updating...' : 'Accept estimate'}
@@ -14443,7 +14440,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   type="button"
                   onClick={() => void respondToEstimate(estimate, 'decline')}
                   disabled={updatingEstimateId === estimate.id}
-                  className={buttonClass('secondary')}
+                  className={mobileButtonClass('secondary')}
                 >
                   Decline
                 </button>
@@ -28611,6 +28608,7 @@ function ContractorDashboard({
   const scheduleSnapshotEnd = new Date(scheduleSnapshotStart);
   scheduleSnapshotEnd.setDate(scheduleSnapshotEnd.getDate() + 7);
   const dashboardCurrentWeekStart = contractorDashboardCurrentWeekStart();
+  const scheduleDataStart = new Date(Math.min(scheduleSnapshotStart.getTime(), dashboardCurrentWeekStart.getTime())), scheduleDataEnd = new Date(Math.max(scheduleSnapshotEnd.getTime(), dashboardCurrentWeekStart.getTime() + (7 * 24 * 60 * 60 * 1_000)));
   const setDashboardWeekOffset = (offset: number) => {
     setContractorDashboardWeekStart(current => {
       const currentDate = scheduleDateFromValue(current) ?? contractorDashboardCurrentWeekStart();
@@ -28621,9 +28619,8 @@ function ContractorDashboard({
   };
   const resetDashboardScheduleWeek = () => setContractorDashboardWeekStart(contractorDashboardCurrentWeekStart().toISOString());
   const scheduleTimeLabel = (date: Date) => formatTime(date);
-  const scheduleItemInSnapshot = (date: Date) => date.getTime() >= scheduleSnapshotStart.getTime() && date.getTime() < scheduleSnapshotEnd.getTime();
-  const todayScheduleKey = scheduleDayKey(new Date());
-  const isCurrentDashboardWeek = scheduleDayKey(scheduleSnapshotStart) === scheduleDayKey(dashboardCurrentWeekStart);
+  const scheduleItemInSnapshot = (date: Date) => date.getTime() >= scheduleDataStart.getTime() && date.getTime() < scheduleDataEnd.getTime();
+  const todayScheduleKey = scheduleDayKey(new Date()), isCurrentDashboardWeek = scheduleDayKey(scheduleSnapshotStart) === scheduleDayKey(dashboardCurrentWeekStart);
   const scheduleWeekLabel = `${formatShortMonthDay(scheduleSnapshotStart)} - ${formatShortMonthDay(new Date(scheduleSnapshotEnd.getTime() - 1))}`;
   const scheduleSnapshotDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(scheduleSnapshotStart);
@@ -28692,7 +28689,7 @@ function ContractorDashboard({
       }];
     }),
     ...contractorCalendarEvents.flatMap(event =>
-      recurringCalendarEventOccurrences(event, scheduleSnapshotStart, scheduleSnapshotEnd)
+      recurringCalendarEventOccurrences(event, scheduleDataStart, scheduleDataEnd)
         .flatMap(occurrence => {
           const date = scheduleDateFromValue(occurrence.startsAt);
           if (!date || !scheduleItemInSnapshot(date)) return [];
@@ -32325,7 +32322,7 @@ function ContractorDashboard({
         </section>
       )}
 
-      {showInitialContractorProfileSetupPrompt && (
+      {showInitialContractorProfileSetupPrompt && contractorTab === 'overview' && (
         <section className="mb-4 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -32370,12 +32367,12 @@ function ContractorDashboard({
       )}
 
       {homeTemplatePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-950/50 px-3 py-3 sm:px-4 sm:py-6" role="dialog" aria-modal="true" aria-labelledby="home-template-prompt-title">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Home-specific inspection checklist</p>
-                <h3 className="mt-1 text-lg font-bold text-slate-950">Save this inspection layout?</h3>
+                <h3 id="home-template-prompt-title" className="mt-1 text-lg font-bold text-slate-950">Save this inspection layout?</h3>
               </div>
               <button
                 type="button"
@@ -32420,13 +32417,13 @@ function ContractorDashboard({
                 </Field>
               )}
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className={`mt-5 ${mobileActionRowClass()}`}>
               {homeTemplatePrompt.existingTemplates.length > 0 && (
                 <button
                   type="button"
                   onClick={() => void saveHomeTemplateFromPrompt('update')}
                   disabled={Boolean(savingHomeTemplateAction)}
-                  className={buttonClass('primary')}
+                  className={mobileButtonClass('primary')}
                 >
                   {savingHomeTemplateAction === 'update' ? 'Updating...' : 'Update Existing Home-specific Inspection Checklist'}
                 </button>
@@ -32435,7 +32432,7 @@ function ContractorDashboard({
                 type="button"
                 onClick={() => void saveHomeTemplateFromPrompt('insert')}
                 disabled={Boolean(savingHomeTemplateAction)}
-                className={buttonClass(homeTemplatePrompt.existingTemplates.length > 0 ? 'secondary' : 'primary')}
+                className={mobileButtonClass(homeTemplatePrompt.existingTemplates.length > 0 ? 'secondary' : 'primary')}
               >
                 {savingHomeTemplateAction === 'insert'
                   ? 'Saving...'
@@ -32456,7 +32453,7 @@ function ContractorDashboard({
                   }
                 }}
                 disabled={Boolean(savingHomeTemplateAction)}
-                className={buttonClass('secondary')}
+                className={mobileButtonClass('secondary')}
               >
                 Continue Without Saving
               </button>
@@ -32464,7 +32461,7 @@ function ContractorDashboard({
                 type="button"
                 onClick={() => setHomeTemplatePrompt(null)}
                 disabled={Boolean(savingHomeTemplateAction)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                className={`${mobileButtonClass('secondary')} disabled:opacity-50`}
               >
                 Cancel
               </button>
@@ -32482,11 +32479,14 @@ function ContractorDashboard({
                 {contractorDraft.business_name || 'Set up your ServSync workspace'}
               </h2>
               <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-600">
-                Scan the week, see where work stands, and use setup tools when you need them.
+                Start with today&apos;s work, then review the week or use setup tools when you need them.
               </p>
             </div>
           </section>
 
+          <Card title="Today" icon={<ClipboardCheck size={18} />}>
+            <ContractorTodayWork items={scheduleSnapshotItems.filter(item => item.dayKey === todayScheduleKey)} onOpenCalendar={() => setContractorTab('calendar')} />
+          </Card>
           <Card title="Schedule snapshot" icon={<Calendar size={18} />}>
             <ContractorScheduleSnapshot
               days={scheduleSnapshotDays}

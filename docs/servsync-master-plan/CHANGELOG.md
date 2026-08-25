@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-25 - Phase 0.5 field-critical mobile acceptance source slice
+
+- Starting point: Re-read `origin/main` at exact merged PR #518 commit `15cd71c93487a0d0611bc2726fc5ed2804feb2b3` and created `codex/phase-0-5-mobile-acceptance` from that clean state.
+- Mobile hierarchy: Added a compact Today's Work block ahead of the weekly schedule. Its earliest scheduled item is the single dominant next action, later same-day work is secondary, and the empty state provides a touch-sized Calendar return path. Business-profile setup now appears only on the contractor Dashboard instead of interrupting active Work, Request, Customer, Financials, or Job tasks.
+- Critical handoffs: Homeowner Estimate review, PDF/Request, approval/decline, filing, and Home History actions stack at phone width while retaining desktop wrapping. The Job checklist layout-save prompt now uses an accessible, viewport-bounded, independently scrollable dialog with full-width mobile actions so its controls remain reachable above a software keyboard.
+- Regression coverage: Added focused `390x844` rendered/source acceptance for Today's Work, action hierarchy, overflow, touch target, setup placement, homeowner Estimate handoffs, and Job dialog bounds. The existing resettable Sandbox Request -> Estimate -> Job -> Invoice -> payment -> Home History loop now supports an explicit `SERVSYNC_FIELD_MOBILE_ACCEPTANCE=true` viewport and asserts horizontal bounds, clipped controls, primary-action reachability, reload persistence, and the exact phone viewport at lifecycle checkpoints.
+- Validation so far: TypeScript passed. The focused mobile/guest Estimate/Invoice set passed 55/55 after excluding the separately Sandbox-flagged Pay online case; the initial broad run passed the same 55 applicable tests and failed only that expected environment-specific case because the clean worktree did not contain Sandbox payment flags. Exact-head Preview, proportional authenticated role observation, full repository validation, and Tutorial Freshness remain open and Phase 0.5 is not yet claimed complete.
+- Product/security boundary: Work/Financials ownership, terminology, role capabilities, homeowner Home History/Documents ownership, shared-home privacy, and all Phase 0.4 durable replay behavior are unchanged. No schema, RLS, RPC, Storage policy, auth, environment, provider, shared-data, Production, merge, or manual deployment action is included.
+
 ## 2026-08-25 - FB-039E2 Production legacy retirement and Phase 0.4 completion
 
 - Gate pin: Draft PR #518 matched exact starting head `c5f99b5b4d9bb80377659d53c0360567d9e754f0`, clean merged-release ancestry, retirement SHA-256 `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` at 56 lines, unchanged durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461`, accepted Sandbox/Demo evidence, and healthy Production identity `uqgtheclhxqlnjpfmheq`.
