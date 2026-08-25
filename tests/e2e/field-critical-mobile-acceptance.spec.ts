@@ -88,6 +88,18 @@ test.describe('Phase 0.5 field-critical mobile acceptance', () => {
     expect(landing).toMatch(/updateRoute\('trust-safety'\)[\s\S]*?min-h-11/);
   });
 
+  test('mobile shell exposes the active destination as the page heading', () => {
+    const app = sourceFile('src/App.tsx');
+    const authHelper = sourceFile('tests/e2e/helpers/auth.ts');
+    const sidebar = sourceBetween(app, 'function SidebarLayout({', 'function AutocompleteInput({');
+
+    expect(sidebar).toContain('<h1 className="truncate text-xs text-[#223D67]">{activeTabMeta?.label || brand.subtitle}</h1>');
+    expect(sidebar).toContain('<h1 className="mt-0.5 text-lg font-bold text-[#02132D]">{activeTabMeta?.label || brand.subtitle}</h1>');
+    expect(sidebar).not.toContain('<p className="text-xs text-[#223D67] truncate">{activeTabMeta?.label || brand.subtitle}</p>');
+    expect(authHelper).toContain("page.getByRole('heading', { level: 1, name })");
+    expect(authHelper).not.toContain("getByRole('main').getByRole('heading', { level: 1, name })");
+  });
+
   test('homeowner Estimate handoffs stack primary and secondary actions on phones', () => {
     const app = sourceFile('src/App.tsx');
     const estimateCard = sourceBetween(app, 'const renderHomeownerEstimateCard =', 'const renderHomeownerRecordsSection =');
@@ -110,5 +122,7 @@ test.describe('Phase 0.5 field-critical mobile acceptance', () => {
     expect(prompt).toContain('max-h-[calc(100dvh-1.5rem)]');
     expect(prompt).toContain('mobileActionRowClass()');
     expect(prompt).toContain("mobileButtonClass('primary')");
+    expect(app).toContain('flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-slate-950');
+    expect(app).toContain('flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-slate-600');
   });
 });

@@ -42162,7 +42162,7 @@ function ContractorDashboard({
                                     {simpleJobReadonly ? (
                                       <p className="mt-0.5 text-sm font-semibold text-slate-950">{item.title}</p>
                                     ) : (
-                                      <label className="mt-0.5 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                                      <label className="mt-0.5 flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-slate-950">
                                         <input
                                           type="checkbox"
                                           aria-label={`Complete approved work: ${item.title}`}
@@ -42211,7 +42211,7 @@ function ContractorDashboard({
                                           {taskComplete ? 'Complete' : 'Not complete'}
                                         </span>
                                       ) : (
-                                        <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                        <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-slate-600">
                                           <input
                                             type="checkbox"
                                             aria-label={`${taskComplete ? 'Mark incomplete' : 'Complete work item'}: ${row.finding.title}`}
@@ -49680,7 +49680,7 @@ function SidebarLayout({
           </button>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-[#02132D] text-sm leading-tight">{brand.name}</p>
-            <p className="text-xs text-[#223D67] truncate">{activeTabMeta?.label || brand.subtitle}</p>
+            <h1 className="truncate text-xs text-[#223D67]">{activeTabMeta?.label || brand.subtitle}</h1>
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
         </div>

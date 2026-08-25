@@ -87,6 +87,27 @@ delete from public.estimates where id in (select id from audit_estimate_ids);
 delete from public.service_request_media where request_id in (select id from audit_request_ids);
 delete from public.service_request_messages where request_id in (select id from audit_request_ids);
 delete from public.service_requests where id in (select id from audit_request_ids);
+do $$
+begin
+  if exists (select 1 from public.service_requests where title like any (array[${patterns}]))
+     or exists (select 1 from public.estimates where title like any (array[${patterns}]))
+     or exists (select 1 from public.inspections where name like any (array[${patterns}]))
+     or exists (select 1 from public.invoices where title like any (array[${patterns}]))
+     or exists (select 1 from public.home_reminders where title like any (array[${patterns}]))
+     or exists (select 1 from public.workflow_thread_reads where service_request_id in (select id from audit_request_ids) or inspection_id in (select id from audit_job_ids))
+     or exists (select 1 from public.workflow_activity_events where service_request_id in (select id from audit_request_ids) or estimate_id in (select id from audit_estimate_ids) or inspection_id in (select id from audit_job_ids) or invoice_id in (select id from audit_invoice_ids))
+     or exists (select 1 from public.workflow_messages where service_request_id in (select id from audit_request_ids) or inspection_id in (select id from audit_job_ids))
+     or exists (select 1 from public.notifications where request_id in (select id from audit_request_ids) or estimate_id in (select id from audit_estimate_ids) or invoice_id in (select id from audit_invoice_ids))
+     or exists (select 1 from public.invoice_offline_payment_records where invoice_id in (select id from audit_invoice_ids))
+     or exists (select 1 from public.invoice_backlog_items where invoice_id in (select id from audit_invoice_ids))
+     or exists (select 1 from public.invoice_line_items where invoice_id in (select id from audit_invoice_ids))
+     or exists (select 1 from public.job_work_items where inspection_id in (select id from audit_job_ids) or reserved_invoice_id in (select id from audit_invoice_ids) or invoiced_invoice_id in (select id from audit_invoice_ids))
+     or exists (select 1 from public.estimate_line_items where estimate_id in (select id from audit_estimate_ids))
+     or exists (select 1 from public.service_request_media where request_id in (select id from audit_request_ids))
+     or exists (select 1 from public.service_request_messages where request_id in (select id from audit_request_ids)) then
+    raise exception 'Core-loop fixture cleanup left residue';
+  end if;
+end $$;
 commit;
   `.trim();
   execFileSync('supabase', ['db', 'query', '--linked', sql], {
@@ -459,7 +480,7 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
 
   const workCheckbox = main.locator('[data-testid="contractor-approved-work-checkbox"], [data-testid="contractor-work-item-checkbox"]').first();
   await expect(workCheckbox).toBeVisible({ timeout: 30_000 });
-  await expectFieldMobileLayout(page, 'contractor Job opened', workCheckbox);
+  await expectFieldMobileLayout(page, 'contractor Job opened', workCheckbox.locator('xpath=ancestor::label'));
   await expect(workCheckbox).toHaveAttribute('aria-label', /.+/);
   if (!(await workCheckbox.isChecked())) {
     await workCheckbox.check();

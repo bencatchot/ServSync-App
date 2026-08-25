@@ -41,5 +41,5 @@ export async function openSidebarTab(page: Page, name: RegExp) {
 }
 
 export async function expectActiveTabHeading(page: Page, name: RegExp) {
-  await expect(page.getByRole('main').getByRole('heading', { level: 1, name })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
