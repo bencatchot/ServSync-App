@@ -8,7 +8,7 @@ Branch: `codex/phase-0-5-mobile-acceptance`
 
 Draft PR: [#519](https://github.com/bencatchot/ServSync-App/pull/519)
 
-Status: **IN PROGRESS — exact-head Preview acceptance remains required.** Source or local rendering alone does not complete Phase 0.5.
+Status: **COMPLETE — exact application head `6b2b90d76b2f9bcc01d4fc1f1f004dc01030d35c` passed the resettable Sandbox lifecycle and immutable Preview acceptance.**
 
 The accepted product boundary is unchanged: Work owns Drafts, Estimates, Jobs, reports, checklists, findings, and work attachments; Financials owns Invoices and payment state; Customers owns contact/property context; homeowners retain Properties, Home History, and Documents; existing role and shared-home privacy rules remain authoritative.
 
@@ -35,15 +35,18 @@ The bounded audit covers the established phone path at `390x844`:
 | Homeowner Estimate action groups retained compact desktop-width buttons. | Review/approve/decline, file, and return-to-history actions could be harder to scan and tap in dense cards. | Reused the established full-width-on-mobile action hierarchy while preserving desktop wrapping and primary/secondary weight. |
 | The Job checklist layout-save prompt was centered but not viewport bounded. | A long prompt or software keyboard could make lower actions unreachable. | Added accessible dialog semantics, `100dvh` bounds, independent vertical scrolling, overscroll containment, and phone-width actions. |
 | The resettable full lifecycle regression was desktop-fixed. | The established path could regress on phones without exercising real transitions. | Added an explicit field-mobile mode at exact `390x844` with overflow, clipping, primary-action, touch-height, and reload checks at lifecycle checkpoints. |
+| The mobile shell displayed the active destination as paragraph text while the regression helper required an `h1` inside `main`. | The visible destination was correct, but the page-level heading semantics were incomplete and the test was scoped to the wrong landmark. | Exposed the active mobile destination as the page `h1`; retained content `h2` semantics; and scoped the shared helper to the visible page-level `h1` rather than weakening heading level coverage. |
+| Job completion checkboxes and their labels exposed only a 16 px tap area. | A field user could see the action but miss it with a thumb. | Kept the native checkbox visual size and expanded both established completion labels to a 44 px clickable target; runtime acceptance measures the label hit area and still verifies the checkbox accessible name/state. |
 
 ## Automated Evidence
 
 - `npm run typecheck`: passed.
-- Focused Phase 0.5 rendered/source coverage: 6/6 passed at exact `390x844`.
+- Focused Phase 0.5 rendered/source coverage: 7/7 passed at exact `390x844`.
 - Applicable secure guest Estimate and Invoice delivery coverage: combined focused run passed 55/55, including desktop and exact `390x844` responsive rendering, response state, reload, error/empty handling, dialog focus, and no horizontal overflow.
 - One separately Sandbox-configured Pay online case failed in the first broad local run because the clean worktree intentionally had no Sandbox payment flag/configuration; it passed no Phase 0.5 code path and was excluded from the applicable rerun rather than manufacturing environment access.
 - Exact-source authenticated workflow [run 32890866808](https://github.com/bencatchot/ServSync-App/actions/runs/32890866808) passed Sandbox fixture/authorization health, Owner/Admin/Office/Field Technician/Viewer browser coverage, contractor and homeowner bounded mobile navigation, Demo read-only navigation, Production public/authenticated read-only navigation, and published Help playback.
-- The resettable full-core-loop mobile mode was invoked once in the credential-safe workflow. It stopped before the first mutation because that runner had no local Supabase CLI link and therefore could not guarantee exact cleanup. The harness now checks the linked Sandbox cleanup path before mutation and the responsive shared navigation helper supports mobile drawers. No lifecycle fixture record was created by the failed preflight.
+- Exact application source `6b2b90d76b2f9bcc01d4fc1f1f004dc01030d35c` passed the real resettable Sandbox lifecycle 2/2 at `390x844`: Request -> Estimate -> homeowner approval -> Job -> Invoice -> full offline payment -> homeowner filing -> Home History reminder/reload, plus partial payment persistence before exact final payment.
+- Cleanup is fail-closed. The harness checks the exact linked Sandbox ref before mutation, deletes the allowlisted timestamp prefixes and every dependent record it touches, and raises if any primary or dependent-table residue remains. Both passing cases completed with zero residue. Earlier heading and touch-target failures also ran teardown; the first heading failure occurred before record creation.
 
 ## Role, Privacy, And Durability Preservation
 
@@ -59,10 +62,11 @@ The bounded audit covers the established phone path at `390x844`:
 | Local Vite exact source | `390x844` | App initialized without error overlay or console errors; the missing-Supabase setup state rendered as expected in the clean worktree. |
 | Rendered Today's Work harness | `390x844` | One dominant next action, secondary later work, empty return path, touch height, and zero horizontal overflow passed. |
 | Secure guest Estimate/Invoice fixtures | Desktop + `390x844` | Responsive render, response/reload/error states, focus containment, and zero horizontal overflow passed. |
-| Demo Preview from runtime/test head `8d94d62b10962b66c19cab843e2786eb38b33a2f` | `390x844` | [Immutable Preview](https://servsync-demo-31gd4qhhv-bencatchots-projects.vercel.app): exact viewport, zero horizontal overflow, zero clipped controls, and 44 px Sign in/account-entry/Trust & Safety targets passed. |
+| Demo Preview from exact application head `6b2b90d76b2f9bcc01d4fc1f1f004dc01030d35c` | `390x844` | [Immutable Preview](https://servsync-demo-eyd1c5gob-bencatchots-projects.vercel.app): exact viewport, zero horizontal overflow, zero clipped controls, and 44 px Sign in/account-entry/Trust & Safety targets passed. |
 | Same exact-head Demo Preview | `1440x1000` | Zero horizontal overflow and zero clipped visible controls passed. |
 | Exact-source Sandbox role workflow | Desktop + bounded mobile navigation | All five contractor roles, homeowner navigation, API identity, fixture, authorization, and backup health passed. |
-| Exact-source resettable lifecycle | `390x844` | **BLOCKED BEFORE MUTATION:** the available runner had no linked Sandbox cleanup path. Required before Phase 0.5 completion. |
+| Exact-source resettable Sandbox lifecycle | `390x844` | 2/2 passed against the real linked Sandbox with approved test identities: full payment/Home History reload and partial-then-final payment. Exact cleanup and zero residue passed. |
+| Exact application-head Sandbox Preview | `390x844` | [Immutable Preview](https://servsync-stripe-sandbox-cx03165v3-bencatchots-projects.vercel.app) deployed successfully, but browser automation remained at the Vercel login wall before app access or mutation. This infrastructure limitation is covered by the same-source linked-Sandbox lifecycle plus immutable exact-head Demo Preview inspection. |
 
 ## Tutorial Freshness
 
@@ -72,9 +76,10 @@ The bounded audit covers the established phone path at `390x844`:
 
 - Real-device Safari/Chrome and installed-PWA observation remains a later QA layer; this slice does not claim native, offline, camera, or app-store behavior.
 - The exact-source five-role/read-only matrix, public Preview phone/desktop checks, and Tutorial Freshness pass are complete.
-- Phase 0.5 still requires one approved execution of the resettable full lifecycle at `390x844` from the exact PR runtime source with a verified local Sandbox CLI link so cleanup is guaranteed. That run must cover Request -> Estimate -> Job -> Invoice -> payment -> Home History reload without overflow, clipping, or hidden primary actions.
+- Phase 0.5 has no remaining launch blocker. The exact-source lifecycle, fail-closed cleanup, role/read-only evidence, immutable Preview inspection, desktop regression, and Tutorial Freshness Gate are complete.
+- Phase 0.6 repeatable launch QA fixtures is the next Launch Roadmap assignment.
 
-Current exit decision: **DO NOT EXIT PHASE 0.5 YET.**
+Current exit decision: **EXIT PHASE 0.5; ADVANCE TO PHASE 0.6.**
 
 ## Protected Actions Not Taken
 
