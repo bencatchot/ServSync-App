@@ -31,11 +31,11 @@
         },
         "production": {
           "status": "Pending",
-          "reason": "Apply only after identical-byte Sandbox and Demo retirement acceptance, Production durable-idempotency rollout, automatic application deployment, and observation of the new path. Use read-only catalog/security and preservation checks; do not create Production fixtures."
+          "reason": "Sandbox and Demo identical-byte retirement acceptance passed on 2026-08-25. Apply only under a separate explicit Production approval after rechecking exact hashes, project identity, durable definitions, zero receipts/markers, and complete business/Auth/Storage/Help/Marketing fingerprints. Production acceptance must remain read-only after the catalog change; do not create Production fixtures or call mutating product RPCs."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Sandbox identical-byte retirement passed on 2026-08-25. Apply to Demo only with a new explicit approval after rechecking exact hashes, deployed application/Recorder preservation, zero residue, and the existing Demo project identity; then rerun durable report and private-record acceptance without changing canonical Recorder, Help, or Marketing state."
+          "status": "Applied",
+          "reason": "Exact SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289 (56 lines) was applied once to Demo bdytwgejqnlblhrnqxkp on 2026-08-25 from draft PR #518 after exact head ab363957cadc14bdf18a2f7664c2e1f1a4f881b2, merged-release ancestry, local/remote identity, durable SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461, zero receipts/markers, legacy pre-retirement grants/policy, durable definition hashes, and a complete 165-label/412-row fingerprint matched. Post-install, both dependency-safe legacy functions remain cataloged but are unexecutable by public, anon, authenticated, and service_role; the old report-upload policy is absent; the durable prepared-upload policy and five durable definition hashes remain exact. Fixed FB039E2UI1 deployed-UI acceptance passed report finalization, reload reconciliation, manual Home History with/without one private document, exact canonical lineage, two registered objects, zero duplicate/orphan outcomes, homeowner-only download visibility, and denial of the legacy RPC, unprepared upload, and contractor private download. Storage API plus Auth-lifecycle cleanup returned all markers/receipts/objects to zero, and the exact 165-label aggregate fingerprint 2ee2c08b73fc44101a4512871473efaf remained unchanged across all public/Auth/Storage plus Recorder/Help/Marketing/provider/publication state."
         }
       }
     },

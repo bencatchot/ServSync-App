@@ -4,6 +4,16 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-25 - FB-039E2 identical-byte Demo legacy retirement
+
+- Gate pin: Draft PR #518 was re-read at exact starting head `ab363957cadc14bdf18a2f7664c2e1f1a4f881b2` with merged-release ancestry from `6d28655ac5a81eb8fb1b243161b164e8d4d7acc3`. Local and healthy remote identity matched Demo `bdytwgejqnlblhrnqxkp`. Durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` remained exact; retirement SHA-256 `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` remained exactly 56 lines.
+- Preflight/apply: Zero receipts or FB-039E2 residue, complete legacy grants/policy prerequisites, exact durable definitions/security, and a 165-label/412-row complete fingerprint passed. The exact reviewed retirement file was applied once to Demo without reauthoring. Legacy functions remain cataloged but public/anon/authenticated/service_role execution is denied; the old report-upload policy is absent; durable definition hashes/grants and prepared-upload policy remain exact.
+- Deployed runtime: Fixed `FB039E2UI1` actual-UI acceptance passed contractor report finalization and reload reconciliation plus homeowner manual Home History with/without one private PNG. Exactly one canonical report Job/document/History/notification/receipt, two manual results, two registered objects, and zero duplicate/orphan outcomes remained after reload. The retired RPC, unprepared upload, and contractor private download were denied; primary-homeowner downloads remained allowed; browser warning/error output was empty.
+- Cleanup/preservation: Exact Storage API and Auth lifecycle cleanup returned all fictional identities, records, receipts, notifications, and objects to zero. The fresh complete fingerprint remained exactly `2ee2c08b73fc44101a4512871473efaf` across all 165 labels/412 rows, including Demo Recorder, Help, Marketing/provider/publication, public, Auth, buckets, and objects.
+- Parity: Live runtime parity passed. The Production-to-Demo backend comparator remained fail-closed on exactly the old Storage policy plus authenticated/service-role grants for the two retired functions, while retaining the 129 approved Demo scenario additions; no exception was added for this authorized temporary stage difference.
+- Roadmap impact: Sandbox and Demo retirement are complete. Production retirement is the sole remaining FB-039E2/Phase 0.4 gate and remains separately protected; Phase 0.5 stays blocked until it passes.
+- Tutorial impact: `NOT APPLICABLE`. This rollout evidence changes no visible application path, label, role, layout, or outcome and publishes no Help content.
+
 ## 2026-08-25 - FB-039E2 deployed Demo observation and Sandbox legacy retirement
 
 - Release pin: PR #517 merged at exact main commit `6d28655ac5a81eb8fb1b243161b164e8d4d7acc3` with reviewed parent `5df343f1ce6e509c603dbb9bbca9a7bbc3105ba2`. Ordinary Demo deployment `dpl_A8sbgXk7FkecueKcSd8Qj53u9mq5` was READY at that exact Git source before any observation fixture was created.

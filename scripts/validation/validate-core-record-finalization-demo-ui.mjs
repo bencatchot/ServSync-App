@@ -109,6 +109,39 @@ function residueQuery() {
     (select count(*) from storage.objects where bucket_id='${BUCKET}' and name in (select storage_manifest->>'storage_path' from public.servsync_core_record_finalization_operations where contractor_id='${ids.contractor}' or home_id='${ids.home}')) objects;`;
 }
 
+function retirementCatalogQuery() {
+  return `select
+    (to_regprocedure('public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)') is not null) legacy_finalizer,
+    (to_regprocedure('public.servsync_can_upload_field_work_report_path(text)') is not null) legacy_upload_helper,
+    has_function_privilege('public','public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)','execute') legacy_finalizer_public,
+    has_function_privilege('anon','public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)','execute') legacy_finalizer_anon,
+    has_function_privilege('authenticated','public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)','execute') legacy_finalizer_authenticated,
+    has_function_privilege('service_role','public.servsync_finalize_field_work(uuid,jsonb,text,text,text,integer)','execute') legacy_finalizer_service,
+    has_function_privilege('public','public.servsync_can_upload_field_work_report_path(text)','execute') legacy_upload_public,
+    has_function_privilege('anon','public.servsync_can_upload_field_work_report_path(text)','execute') legacy_upload_anon,
+    has_function_privilege('authenticated','public.servsync_can_upload_field_work_report_path(text)','execute') legacy_upload_authenticated,
+    has_function_privilege('service_role','public.servsync_can_upload_field_work_report_path(text)','execute') legacy_upload_service,
+    (select count(*) from pg_policies where schemaname='storage' and tablename='objects' and policyname='home_docs_upload_contractor_field_work_reports') legacy_policy,
+    (select count(*) from pg_policies where schemaname='storage' and tablename='objects' and policyname='home_docs_upload_prepared_record_finalizations') prepared_policy;`;
+}
+
+function assertRetiredCatalog() {
+  assert.deepEqual(dbQuery(retirementCatalogQuery())[0], {
+    legacy_finalizer: true,
+    legacy_upload_helper: true,
+    legacy_finalizer_public: false,
+    legacy_finalizer_anon: false,
+    legacy_finalizer_authenticated: false,
+    legacy_finalizer_service: false,
+    legacy_upload_public: false,
+    legacy_upload_anon: false,
+    legacy_upload_authenticated: false,
+    legacy_upload_service: false,
+    legacy_policy: 0,
+    prepared_policy: 1,
+  });
+}
+
 function assertZero(row, label) {
   for (const [key, value] of Object.entries(row ?? {})) {
     assert.equal(Number(value), 0, `${label}: ${key} residue must be zero`);
@@ -137,6 +170,7 @@ async function insertOne(service, table, value) {
 
 async function setup() {
   preflight();
+  assertRetiredCatalog();
   assertZero(dbQuery(residueQuery())[0], 'preflight');
   const baseline = dbQuery(baselineQuery());
   const { serviceRoleKey } = loadKeys();
@@ -199,17 +233,65 @@ function observationQuery() {
 
 async function verify() {
   preflight();
+  assertRetiredCatalog();
   const row = dbQuery(observationQuery())[0];
   assert.deepEqual(row, {
     finalized_jobs: 1, report_documents: 1, report_history: 1, report_notifications: 1,
     report_receipts: 1, manual_without_document: 1, manual_with_document: 1,
     manual_documents: 1, manual_receipts: 2, registered_objects: 2, orphan_objects: 0,
   });
-  console.log(JSON.stringify({ status: 'passed', observation: row }, null, 2));
+
+  const { anonKey } = loadKeys();
+  const contractor = client(anonKey);
+  const homeowner = client(anonKey);
+  const { error: contractorSignInError } = await contractor.auth.signInWithPassword(actors.contractor);
+  const { error: homeownerSignInError } = await homeowner.auth.signInWithPassword(actors.homeowner);
+  assert.equal(contractorSignInError, null, 'fictional contractor must authenticate');
+  assert.equal(homeownerSignInError, null, 'fictional homeowner must authenticate');
+
+  const { error: legacyRpcError } = await contractor.rpc('servsync_finalize_field_work', {
+    p_inspection_id: ids.job,
+    p_rooms_with_findings: [],
+    p_report_storage_path: 'retired-path-must-not-run.pdf',
+    p_report_file_name: 'retired-path-must-not-run.pdf',
+    p_report_content_type: 'application/pdf',
+    p_report_file_size_bytes: 1,
+  });
+  assert.ok(legacyRpcError, 'retired six-argument finalizer must be denied');
+
+  const unpreparedPath = `${ids.job}/FB039E2UI1-unprepared-report.pdf`;
+  const { error: unpreparedUploadError } = await contractor.storage.from(BUCKET).upload(
+    unpreparedPath,
+    new Blob(['not-a-prepared-report'], { type: 'application/pdf' }),
+    { contentType: 'application/pdf', upsert: false },
+  );
+  assert.ok(unpreparedUploadError, 'unprepared legacy report upload must be denied');
+
+  const documents = dbQuery(`select file_name,storage_path from public.home_documents
+    where id in (select nullif(result_payload->>'document_id','')::uuid
+      from public.servsync_core_record_finalization_operations
+      where contractor_id='${ids.contractor}' or home_id='${ids.home}')
+    order by file_name`);
+  assert.equal(documents.length, 2, 'UI workflow must register exactly two private documents');
+  for (const document of documents) {
+    const { error } = await homeowner.storage.from(BUCKET).download(document.storage_path);
+    assert.equal(error, null, `primary homeowner must read ${document.file_name}`);
+  }
+  const report = documents.find(document => document.file_name.endsWith('.pdf'));
+  assert.ok(report, 'canonical report registration must exist');
+  const { error: contractorDownloadError } = await contractor.storage.from(BUCKET).download(report.storage_path);
+  assert.ok(contractorDownloadError, 'contractor must not browse homeowner private report storage');
+
+  console.log(JSON.stringify({
+    status: 'passed', observation: row,
+    retirement: { legacy_rpc: 'denied', unprepared_upload: 'denied' },
+    privacy: { homeowner_downloads: 2, contractor_private_download: 'denied' },
+  }, null, 2));
 }
 
 async function cleanup() {
   preflight();
+  assertRetiredCatalog();
   const state = JSON.parse(readFileSync(STATE_PATH, 'utf8'));
   const { serviceRoleKey } = loadKeys();
   const service = client(serviceRoleKey);

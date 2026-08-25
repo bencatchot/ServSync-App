@@ -447,7 +447,7 @@ test('shared runtime acceptance is target-pinned, explicitly gated, and proves c
   }
 });
 
-test('post-merge Demo observation and Sandbox retirement harnesses stay exact-target and fail closed', async () => {
+test('post-merge Demo observation and Sandbox/Demo retirement harnesses stay exact-target and fail closed', async () => {
   const demoUi = await readFile(demoUiHarnessUrl, 'utf8');
   const sandboxRetirement = await readFile(sandboxRetirementHarnessUrl, 'utf8');
   const fingerprint = await readFile(environmentFingerprintUrl, 'utf8');
@@ -458,6 +458,15 @@ test('post-merge Demo observation and Sandbox retirement harnesses stay exact-ta
   assert.match(demoUi, /--setup/);
   assert.match(demoUi, /--verify/);
   assert.match(demoUi, /--cleanup/);
+  assert.match(demoUi, /assertRetiredCatalog/);
+  assert.match(demoUi, /legacy_finalizer_authenticated:\s*false/);
+  assert.match(demoUi, /legacy_upload_authenticated:\s*false/);
+  assert.match(demoUi, /legacy_policy:\s*0/);
+  assert.match(demoUi, /prepared_policy:\s*1/);
+  assert.match(demoUi, /retired six-argument finalizer must be denied/);
+  assert.match(demoUi, /unprepared legacy report upload must be denied/);
+  assert.match(demoUi, /primary homeowner must read/);
+  assert.match(demoUi, /contractor must not browse homeowner private report storage/);
   assert.match(demoUi, /service\.storage\.from\(BUCKET\)\.remove/);
   assert.match(demoUi, /service\.auth\.admin\.deleteUser/);
   assert.doesNotMatch(demoUi, /delete\s+from\s+storage\.objects/i);

@@ -16,7 +16,7 @@ Migration SHA-256 values:
 - durable idempotency: `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` (1,120 lines)
 - staged legacy retirement: `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` (56 lines)
 
-Status: PR #517 merged at `6d28655ac5a81eb8fb1b243161b164e8d4d7acc3`; the exact durable migration is installed across Sandbox, Demo, and Production. Deployed Demo application observation and identical-byte Sandbox legacy retirement are accepted. Demo and Production retirement remain pending in that order.
+Status: PR #517 merged at `6d28655ac5a81eb8fb1b243161b164e8d4d7acc3`; the exact durable migration is installed across Sandbox, Demo, and Production. Deployed Demo application observation plus identical-byte Sandbox and Demo legacy retirement are accepted. Production retirement remains pending under separate approval.
 
 ## Durable Operation Contract
 
@@ -118,16 +118,27 @@ The exact existing retirement bytes were applied once without reauthoring. Both 
 
 Cleanup removed the exact object through the Storage API and both fictional identities through Auth lifecycle deletion. Final receipts, identities, rows, objects, and markers returned to zero. Every one of the 168 pre-existing fingerprint labels matched the pre-retirement snapshot exactly. No rollback or compensating shared mutation was attempted.
 
-Production-to-Demo live parity remains `PASS WITH INTENTIONAL DIFFERENCES` for only the approved Demo scenario objects. The full comparator correctly fails closed because Sandbox is now intentionally one retirement stage ahead, in addition to its separately documented pre-existing drift; no comparator exception was added to conceal either state.
+At the Sandbox-only stage, Production-to-Demo live parity remained `PASS WITH INTENTIONAL DIFFERENCES` for only the approved Demo scenario objects. The full comparator correctly failed closed because Sandbox was intentionally one retirement stage ahead, in addition to its separately documented pre-existing drift; no comparator exception was added to conceal either state.
+
+## Demo Legacy Retirement Acceptance — 2026-08-25
+
+Draft PR #518 was re-read at exact starting head `ab363957cadc14bdf18a2f7664c2e1f1a4f881b2` with clean branch state and ancestry from merged release `6d28655ac5a81eb8fb1b243161b164e8d4d7acc3`. Local tooling was explicitly relinked from Sandbox to Demo, and both the local link and healthy remote identity matched `bdytwgejqnlblhrnqxkp`. Retirement SHA-256 `edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289` remained exactly 56 lines; durable SHA-256 `b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461` remained unchanged.
+
+Read-only preflight found zero receipts and zero FB-039E2 Auth/profile/document/History/Storage markers. Both legacy functions, authenticated/service-role execute grants, and `home_docs_upload_contractor_field_work_reports` were present in the required pre-retirement state. The forced-RLS/no-policy receipt table, `home_docs_upload_prepared_record_finalizations`, and all five accepted durable definition MD5 values were exact. The complete snapshot covered 165 public/Auth/Storage fingerprint labels and 412 rows, with aggregate `2ee2c08b73fc44101a4512871473efaf`; explicit Demo Recorder, Help, Marketing workspace/content/provider/publication/publishing-control, Auth, bucket, and object fingerprints were captured without exposing content or credentials.
+
+The exact existing 56-line file was then applied once without reauthoring or partial execution. Both legacy functions remain cataloged with retirement comments and unchanged definitions/owner/path/security metadata, but public, anon, authenticated, and service_role all lack execute. The old report-upload policy is absent; the durable prepared-upload policy, authenticated public durable operations, private-helper denial, and five durable definition hashes remain unchanged. The complete business/Auth/Storage fingerprint was identical immediately after the catalog change.
+
+Bounded `FB039E2UI1` acceptance used the actual deployed `https://servsync-demo.vercel.app` UI. The contractor finalized the completed Job and reload reconciled to **Filed to Documents**, one download action, and no repeat finalization action. The primary homeowner saw the canonical report/notification, created manual Home History without a document and with one private PNG receipt, and retained all three History rows plus both private Documents after reload. Exact server checks found one finalized Job/report document/report History/notification/succeeded receipt, two manual succeeded receipts, one manual document, two registered objects, and zero orphans or duplicates. Authenticated checks denied the retired RPC and an unprepared report upload, allowed the primary homeowner to download both private objects, and denied contractor browsing of homeowner private Storage. Browser warning/error output remained empty.
+
+Cleanup removed only the two exact objects through the Storage API and the two fixed fictional users through Auth lifecycle deletion. All run-created identities, profiles, contractor/home/Job, documents, History, notification, receipts, and objects returned to zero. A fresh complete snapshot again returned 165 labels, 412 rows, and aggregate `2ee2c08b73fc44101a4512871473efaf`, proving exact preservation of every pre-existing Demo/Recorder/Help/Marketing/provider/publication/public/Auth/Storage state.
+
+The live Production-to-Demo backend comparator now fails closed on exactly five reviewed retirement-stage differences: the missing legacy Storage policy and the missing authenticated/service-role execute grants on each of the two legacy functions. It still recognizes all 129 approved Demo scenario additions, and no parity exception was added to hide the temporary retirement delta. Live runtime parity passed all environment/project/deployment/non-secret-flag and Demo fail-closed checks.
 
 ## Compatibility And Remaining Protected Work
 
-The durable migration is database-ahead-of-application compatible. It intentionally leaves the legacy six-argument `servsync_finalize_field_work` RPC and broad legacy report-upload policy available while the currently deployed application still uses them. The separately staged retirement migration is now included in the reviewed source: after the new application path is deployed and observed, it revokes every client/trusted-role grant on the legacy RPC and broad upload predicate and drops the old report-upload policy. Existing finalized reports are adopted read-only by the new path without replacement uploads or fabricated historical equivalence.
+The durable migration remains database-ahead-of-application compatible. Production deliberately retains the legacy six-argument `servsync_finalize_field_work` RPC and broad legacy report-upload policy until its separately approved retirement gate. Sandbox and Demo now deny every client/trusted-role grant on the legacy RPC and broad upload predicate and omit the old report-upload policy, while keeping the dependency-safe functions cataloged. Existing finalized reports are adopted read-only by the new path without replacement uploads or fabricated historical equivalence.
 
-Full Phase 0.4 acceptance still requires:
-
-1. Separately approved identical-byte Demo legacy retirement with exact Demo Recorder/Help/Marketing preservation and durable deployed-path observation.
-2. Separately approved identical-byte Production retirement with read-only catalog/security and exact preservation checks only.
+Full Phase 0.4 acceptance still requires separately approved identical-byte Production retirement with read-only catalog/security and exact preservation checks only.
 
 Phase 0.5 mobile remains blocked until those gates pass.
 
@@ -138,7 +149,7 @@ Phase 0.5 mobile remains blocked until those gates pass.
 3. Treat the completed Sandbox authenticated/Storage API/zero-residue matrix as the first protected gate; do not rerun it without a new discrepancy or explicit reason.
 4. Treat the completed identical-byte Demo authenticated/Storage API/zero-residue matrix and Demo Recorder/Marketing preservation as the second protected gate; do not rerun it without a new discrepancy or explicit reason.
 5. Treat the completed identical-byte Production catalog/security/zero-write preservation gate as the third protected gate; do not reapply it.
-6. Treat merged Demo application observation and Sandbox retirement as complete. Apply the identical retirement bytes next to Demo and then Production only under separate explicit approval, rechecking preservation at each gate.
+6. Treat merged Demo application observation plus Sandbox and Demo retirement as complete. Apply the identical retirement bytes next to Production only under separate explicit approval, using catalog/security and preservation checks without Production fixtures.
 
 Before any successful receipt exists, rollback may drop only the new Storage policy, restore the prior generic homeowner upload policy, and drop the four public RPCs, private helpers, indexes, and receipt table in dependency order. After successful receipts exist, use a reviewed roll-forward repair rather than deleting operation evidence or canonical records. Before retirement rollback, restore only the reviewed broad report policy plus its authenticated helper/RPC grants; after retirement acceptance, prefer roll-forward. The legacy path remains available only during the deliberate database-ahead deployment window.
 
@@ -148,10 +159,10 @@ Before any successful receipt exists, rollback may drop only the new Storage pol
 
 ## Protected Actions Not Taken
 
-- The exact approved durable migration is applied in Sandbox, Demo, and Production. The exact staged retirement is applied only in Sandbox; Demo and Production remain pending.
+- The exact approved durable migration is applied in Sandbox, Demo, and Production. The exact staged retirement is applied in Sandbox and Demo; Production remains pending.
 - Production received no fixture, auth identity/session, product RPC, Storage object, workflow event, notification, provider/publication, or external-delivery mutation. All pre-existing Production business/Auth/Storage/Help/Marketing fingerprints remained exact. No environment, secret, provider, or infrastructure setting was mutated.
 - PR #517 merged through the owner's separately approved release flow. This post-merge evidence task performed no merge or manual deployment/promotion.
 
 ## Status
 
-FB-039E2 source, durable rollout, deployed Demo observation, and Sandbox legacy retirement are complete. Demo and Production retirement remain protected and pending in that order. Phase 0.4 and the Phase 0.5 mobile gate remain open until both pass.
+FB-039E2 source, durable rollout, deployed Demo observation, and identical-byte Sandbox/Demo legacy retirement are complete. Production retirement remains protected and pending under separate approval. Phase 0.4 and the Phase 0.5 mobile gate remain open until it passes.
