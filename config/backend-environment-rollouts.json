@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-24",
+  "updatedOn": "2026-08-25",
   "authoritativeEnvironment": "production",
   "foundations": [
     {
@@ -26,8 +26,8 @@
       "artifact": "servsync-core-record-finalization-legacy-retirement.sql (SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289)",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Apply only after the exact durable-idempotency migration passes Sandbox acceptance and the new application path is running there. Then prove the legacy RPC and broad report-upload predicate are unexecutable and the old Storage policy is absent while durable replay still passes."
+          "status": "Applied",
+          "reason": "Exact SHA-256 edde0d89c5513cf36e4773ddb798261cf26dd1a4095c59f03875f2b716ce5289 (56 lines) was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-25 after merged Demo deployment dpl_A8sbgXk7FkecueKcSd8Qj53u9mq5 served main commit 6d28655ac5a81eb8fb1b243161b164e8d4d7acc3 and browser-level Demo observation passed report finalization plus manual Home History with/without a document. Post-install catalog retained both dependency-safe legacy functions but denied execute to public, anon, authenticated, and service_role; removed home_docs_upload_contractor_field_work_reports; and preserved the durable prepared-upload policy. The explicit FB039E2RT3 Sandbox harness then passed real receipt-bound Storage upload, prepare/commit/same-key replay, canonical Job/document/Home History/notification/receipt/object counts, primary-homeowner read visibility, and authenticated legacy RPC/upload denial. Exact Storage API plus Auth-lifecycle cleanup returned every marker and receipt to zero. All 168 pre-existing public/Auth/Storage row fingerprints remained exact."
         },
         "production": {
           "status": "Pending",
@@ -35,7 +35,7 @@
         },
         "demo": {
           "status": "Pending",
-          "reason": "Apply only after Sandbox retirement passes, the identical durable migration is accepted in Demo, and the new Demo application path plus Demo Recorder are observed. Reverify recorder reset, finalized-report delivery, and no legacy execute/upload authority."
+          "reason": "Sandbox identical-byte retirement passed on 2026-08-25. Apply to Demo only with a new explicit approval after rechecking exact hashes, deployed application/Recorder preservation, zero residue, and the existing Demo project identity; then rerun durable report and private-record acceptance without changing canonical Recorder, Help, or Marketing state."
         }
       }
     },
