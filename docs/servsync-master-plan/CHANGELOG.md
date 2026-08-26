@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-26 - Phase 0.6 protected Demo closeout
+
+- Approval and target: Owner approval was bounded to the Phase 0.6 Demo closeout for draft PR #520. Preflight pinned starting head `f13697ec0a327ad15fdae78b629b203d2d35f494`, healthy dedicated Demo `bdytwgejqnlblhrnqxkp`, and exact 152-line migration SHA-256 `d1454de4d86658f59f06b968a2028e1578cd4a986a55ed1e2db30af0dccf4c3b`. The exact migration was applied once only to Demo. Production and shared Sandbox were not changed.
+- Security: PostgreSQL owns both reset helpers. Fixed search paths remain exact; `public`, `anon`, and `authenticated` cannot execute them; only `service_role` can. Reminder/payment ordering is 124/123, and immutable-payment removal still requires the exact registered payment role and same-run Invoice ownership.
+- Live acceptance: The protected Demo matrix passed all 19 supported checkpoints, same-checkpoint replacement, repeat seeding, deliberate interruption recovery, and final exact reset. The final read-only query found zero registered scenario records and zero active runs carrying records. One failed reset run with zero records remains as deliberate recovery-audit evidence.
+- Corrections from real use: Immutable payment verification now uses the canonical authenticated list RPC instead of prohibited direct ledger-table access. Home History recording follows the current Properties workspace rather than a retired heading. PDF text inspection retains Poppler first and adds a read-only `pypdf` fallback. Finalized-report Storage cleanup now selects explicit report record roles and no longer misclassifies paid-Invoice Home History rows. Focused recorder/source contracts pass 38/38, and the current Demo UI produced two validated Home History recording packages with no sensitive-text findings before exact reset.
+- Known unrelated drift: The Demo security catalog remains 24 passed, 1 skipped, and 2 failed only for the previously documented `home_assets` authenticated grant/manager-policy mismatch. The closeout did not change or bypass it.
+- Roadmap: Phase 0.6 is complete subject only to normal PR #520 review and explicit merge approval. Phase 0.7 honest beta boundaries and contextual help is next. Tutorial impact is `NOT APPLICABLE`; no visible product workflow, label, route, role authority, provider, publication, or environment setting changed.
+
 ## 2026-08-26 - Phase 0.6 repeatable launch QA fixture source and Sandbox gate
 
 - Starting point: Re-read clean `origin/main` at exact merged PR #519 commit `93580012d668f94e25fb0be5abbb8349b24f7183` and created `codex/phase-0-6-launch-qa-fixtures` without changing the accepted Phase 0.5 product surface.

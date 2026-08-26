@@ -835,10 +835,8 @@ async function persistStorageCleanupState(service, run, state, storage, extra = 
 
 async function cleanupRegisteredFinalizedReportStorage(service, run) {
   const checkpoint = run.checkpoint || run.metadata?.selected_checkpoint;
-  const reportRecords = run.records.filter((record) =>
-    ['home_documents', 'home_maintenance_log'].includes(record.table_name) ||
-    record.record_role === FINALIZED_REPORT_RECORD_ROLES.notification
-  );
+  const finalizedReportRoles = new Set(Object.values(FINALIZED_REPORT_RECORD_ROLES));
+  const reportRecords = run.records.filter((record) => finalizedReportRoles.has(record.record_role));
   if (reportRecords.length === 0) {
     if (run.metadata?.report_storage_path || run.metadata?.report_storage_cleanup) {
       throw new Error('Finalized-report reset refused: run metadata claims Storage ownership without registered report artifacts.');
@@ -1941,18 +1939,20 @@ async function recordDemoOfflinePayment(contractorClient, service, runId, invoic
     'Unable to record Demo Invoice offline payment through the canonical authenticated RPC'
   );
   if (!result?.payment_id) throw new Error('Demo Invoice payment did not return an immutable ledger id.');
-  const payment = await fetchOneByPrimaryKey(
-    service,
-    'invoice_offline_payment_records',
-    'id',
-    result.payment_id,
-    'id,invoice_id,amount_cents,payment_date,payment_method'
-  );
+  const payments = await listDemoInvoiceOfflinePayments(contractorClient, invoiceId);
+  const payment = payments.find((candidate) => candidate.id === result.payment_id) || null;
   if (!payment || payment.invoice_id !== invoiceId || payment.amount_cents !== amountCents) {
     throw new Error('Demo Invoice payment ledger does not match the canonical payment result.');
   }
   await registerRecord(service, runId, 'invoice_offline_payment_records', payment.id, role, role === 'demo_invoice_partial_payment' ? 'invoice_partially_paid' : 'invoice_paid');
   return payment.id;
+}
+
+async function listDemoInvoiceOfflinePayments(contractorClient, invoiceId) {
+  return ensureOk(
+    await contractorClient.rpc('servsync_list_invoice_offline_payments', { p_invoice_id: invoiceId }),
+    'Unable to inspect Demo Invoice payment ledger through the canonical authenticated RPC'
+  );
 }
 
 async function fileDemoInvoiceAndCreateReminder(homeownerClient, service, runId, invoiceId, homeownerUserId, homeId, requestId, dates) {
@@ -2267,6 +2267,13 @@ async function verifyRegistryCompleteness(service, records, issues) {
       continue;
     }
 
+    // The immutable offline-payment ledger deliberately grants no direct table
+    // access, including to service_role. Its exact registered rows are checked
+    // later through the canonical authenticated list RPC.
+    if (record.table_name === 'invoice_offline_payment_records') {
+      continue;
+    }
+
     const row = await fetchOneByPrimaryKey(service, record.table_name, primaryKey, record.record_id, primaryKey);
     if (!row) {
       issues.push(`Registry points to missing ${record.table_name}.${record.record_id}.`);
@@ -2275,7 +2282,7 @@ async function verifyRegistryCompleteness(service, records, issues) {
 }
 
 async function verifyScenario(service, scenarioKey, env = process.env, requestedCheckpointKey = null) {
-  assertSafeDemoTarget(env);
+  const target = assertSafeDemoTarget(env);
 
   const issues = [];
   const homeownerEmail = env.DEMO_HOMEOWNER_EMAIL || DEMO_HOMEOWNER.defaultEmail;
@@ -2634,12 +2641,13 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         )
       : [];
   const invoicePayments = invoiceId
-    ? await ensureOk(
-        await service
-          .from('invoice_offline_payment_records')
-          .select('id,invoice_id,amount_cents,payment_date,payment_method,reference,note')
-          .eq('invoice_id', invoiceId),
-        'Unable to inspect Demo Invoice payment ledger'
+    ? await listDemoInvoiceOfflinePayments(
+        await signInDemoUser(
+          createSupabaseClients(env, target).makeUserClient,
+          contractorEmail,
+          requireEnv(env, 'DEMO_CONTRACTOR_PASSWORD')
+        ),
+        invoiceId
       )
     : [];
   const homeHistoryClauses = [

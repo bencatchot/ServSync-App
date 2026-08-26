@@ -35,10 +35,14 @@ test('Demo runner uses canonical Invoice, payment, filing, and homeowner reminde
   assert.match(runner, /servsync_send_invoice/);
   assert.match(runner, /servsync_homeowner_view_invoice/);
   assert.match(runner, /servsync_record_offline_invoice_payment/);
+  assert.match(runner, /contractorClient\.rpc\('servsync_list_invoice_offline_payments'/);
+  assert.doesNotMatch(runner, /service\s*\.from\('invoice_offline_payment_records'\)/);
   assert.match(runner, /servsync_file_invoice_to_home_history/);
   assert.match(runner, /homeownerClient[\s\S]*\.from\('home_reminders'\)[\s\S]*\.insert/);
   assert.match(runner, /invoicePayments\.reduce/);
   assert.match(runner, /actualPaymentIds[\s\S]*registeredPaymentIds/);
+  assert.match(runner, /new Set\(Object\.values\(FINALIZED_REPORT_RECORD_ROLES\)\)/);
+  assert.match(runner, /finalizedReportRoles\.has\(record\.record_role\)/);
   assert.match(runner, /SERVSYNC_DEMO_QA_INTERRUPT_AFTER_STEP/);
 });
 

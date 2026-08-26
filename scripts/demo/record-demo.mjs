@@ -223,15 +223,26 @@ async function renderFirstPdfPage(pdfPath, outputBasePath) {
     encoding: 'utf8',
   });
   if (result.status !== 0) {
-    throw new Error(`Unable to render the downloaded finalized report: ${result.stderr.trim() || 'pdftoppm failed'}`);
+    throw new Error(`Unable to render the downloaded finalized report: ${String(result.stderr || '').trim() || result.error?.message || 'pdftoppm failed'}`);
   }
   return `${outputBasePath}.png`;
 }
 
 function extractPdfText(pdfPath) {
-  const result = spawnSync('pdftotext', ['-layout', pdfPath, '-'], { encoding: 'utf8' });
+  let result = spawnSync('pdftotext', ['-layout', pdfPath, '-'], { encoding: 'utf8' });
+  if (result.error?.code === 'ENOENT') {
+    result = spawnSync(
+      'python3',
+      [
+        '-c',
+        'from pypdf import PdfReader; import sys; print("\\n".join((page.extract_text() or "") for page in PdfReader(sys.argv[1]).pages))',
+        pdfPath,
+      ],
+      { encoding: 'utf8' },
+    );
+  }
   if (result.status !== 0) {
-    throw new Error(`Unable to inspect the downloaded finalized report: ${result.stderr.trim() || 'pdftotext failed'}`);
+    throw new Error(`Unable to inspect the downloaded finalized report: ${String(result.stderr || '').trim() || result.error?.message || 'PDF text extraction failed'}`);
   }
   return result.stdout;
 }
@@ -765,13 +776,17 @@ async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName
     await wait(scenePacing.initialHold);
 
     await moveAndClick(page, page.getByRole('button', { name: /^Properties$/i }).first(), scenePacing);
-    await page.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i }).waitFor({ state: 'visible' });
-    const homeCard = page.getByRole('button').filter({ hasText: scenario.property.nickname }).first();
-    await moveAndClick(page, homeCard, scenePacing);
+    const propertyWorkspace = page.getByTestId('homeowner-properties-workspace');
+    await propertyWorkspace.waitFor({ state: 'visible' });
+    const propertyTitle = propertyWorkspace.getByTestId('property-workspace-title');
+    await propertyTitle.waitFor({ state: 'visible' });
+    if (!(await propertyTitle.innerText()).includes(scenario.property.nickname)) {
+      throw new Error('Properties scene did not select the canonical Demo home.');
+    }
     await wait(1400);
 
     await setCaption(page, scenario.scenes[1].caption);
-    await moveAndClick(page, page.getByRole('button', { name: /^Home History$/i }).first(), scenePacing);
+    await moveAndClick(page, propertyWorkspace.getByRole('button', { name: /^Home History$/i }), scenePacing);
     await page.getByRole('heading', { level: 1, name: /^Home History$/i }).waitFor({ state: 'visible' });
     const historyCard = page.locator(
       `[data-testid="home-history-entry-card"][data-record-id="${canonicalHomeHistoryId}"]`,
