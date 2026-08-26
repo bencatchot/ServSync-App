@@ -44,7 +44,15 @@ Source and exact-source Sandbox evidence:
 - Read-only linked-Sandbox security catalog: 24 passed, 1 opt-in concurrency probe skipped, and 2 failed on the already-missing `home_assets` authenticated grants/manager-only policy. Those catalog mismatches require a protected Sandbox schema correction, are not caused by this source-only fixture slice, and were not changed or bypassed here.
 - Tutorial Freshness: `NOT APPLICABLE`.
 
-PR commit and exact-head Preview evidence are appended before delivery.
+## PR and Preview evidence
+
+- Draft PR: #520.
+- Accepted source/documentation head before this evidence-only append: `4b1c92c94c16f74f4d971e836e5210d77e81587c` (`dfc90f3505ae747e10796ee57a8f6091fac5fd96` implementation plus `4b1c92c94c16f74f4d971e836e5210d77e81587c` documentation).
+- Pull Request Quality and all three automatic Vercel deployment checks passed.
+- App Preview: `https://serv-sync-app-refresh-git-codex-pha-4401a5-bencatchots-projects.vercel.app`.
+- Demo Preview: `https://servsync-demo-mhpv03yh4-bencatchots-projects.vercel.app`.
+- Sandbox Preview: `https://servsync-stripe-sandbox-5xny6c5x5-bencatchots-projects.vercel.app`.
+- Signed-in browser inspection loaded the ServSync app shell at all three exact deployments with zero console errors. The App Preview also passed a `390x844` viewport check with no horizontal document overflow. No Preview mutation was needed because the canonical lifecycle already passed against the exact accepted source locally with Sandbox configuration and guaranteed cleanup.
 
 ## Protected closeout still required
 
