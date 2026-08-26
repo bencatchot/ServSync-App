@@ -51,6 +51,10 @@ Before TUT-001 can be published:
 
 ## Tutorial Freshness
 
-Classification: `UPDATED` for source readiness.
+Tutorial impact: `UPDATED`.
+
+Tutorial evidence: Phase 0.7 verified the Production Help inventory and completed full revision 3 playback. That published Estimate tutorial remains current. TUT-001 is a new unpublished path with no matching published `contractor.service_requests` walkthrough; this slice supplies its protected source readiness only.
+
+Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 
 The existing published **How to create an estimate**, revision 3, is not replaced or changed by this slice. TUT-001 is new and remains unpublished, so the source candidate does not make a stale tutorial visible to users.
