@@ -36,8 +36,9 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 | ESLint budget | Pass, exact existing 79 warnings |
 | App monolith budget | Pass, exact existing 50,824 lines |
 | Diff whitespace check | Pass |
+| Deployed Demo Preview Service Requests acceptance | Pass at `c713827124accc2914056cabe311f67265fadb3c`: no console/page/HTTP errors, zero horizontal overflow, and zero unpublished Help controls |
 
-The deployed Demo Preview loaded Service Requests with zero horizontal overflow and no unpublished tutorial control. That check exposed a transient `403 Contractor context is required` from the Help search before contractor identity hydration; the candidate now waits for that identity before querying and includes a focused policy regression.
+The first deployed Demo Preview check exposed a transient `403 Contractor context is required` from the Help search before contractor identity hydration. The candidate now waits for that identity before querying and includes a focused policy regression. The replacement exact-head Preview then loaded Service Requests with no console, page, or `4xx`/`5xx` response errors, zero horizontal overflow, and no tutorial control before publication.
 
 ## Open acceptance gates
 
