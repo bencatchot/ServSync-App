@@ -33,6 +33,8 @@ as $$
   select case
     when p_schema_name <> 'public' then null
     when p_table_name = 'contractor_posts' then 125
+    when p_table_name = 'home_reminders' then 124
+    when p_table_name = 'invoice_offline_payment_records' then 123
     when p_table_name = 'workflow_activity_events' then 120
     when p_table_name = 'home_maintenance_log' then 119
     when p_table_name = 'home_documents' then 118
@@ -361,6 +363,7 @@ declare
   v_run public.demo_scenario_runs;
   v_record record;
   v_deleted integer;
+  v_payment_invoice_id uuid;
 begin
   select *
     into v_run
@@ -383,15 +386,50 @@ begin
       raise exception 'Registered demo target %.% is no longer allowed.', v_record.schema_name, v_record.table_name;
     end if;
 
-    execute format(
-      'delete from %I.%I where %I = $1',
-      v_record.schema_name,
-      v_record.table_name,
-      v_record.primary_key_column
-    )
-    using v_record.record_id;
+    if v_record.table_name = 'invoice_offline_payment_records' then
+      if v_record.record_role not in ('demo_invoice_partial_payment', 'demo_invoice_final_payment') then
+        raise exception 'Registered Demo payment row has an unsupported ownership role.';
+      end if;
 
-    get diagnostics v_deleted = row_count;
+      select payment.invoice_id
+        into v_payment_invoice_id
+        from public.invoice_offline_payment_records payment
+       where payment.id = v_record.record_id;
+
+      if v_payment_invoice_id is not null and not exists (
+        select 1
+          from public.demo_scenario_records invoice_record
+         where invoice_record.run_id = p_run_id
+           and invoice_record.schema_name = 'public'
+           and invoice_record.table_name = 'invoices'
+           and invoice_record.primary_key_column = 'id'
+           and invoice_record.record_id = v_payment_invoice_id
+           and invoice_record.record_role = 'demo_invoice'
+      ) then
+        raise exception 'Registered Demo payment row points to an Invoice not owned by the same run.';
+      end if;
+
+      -- The canonical payment ledger is append-only. This exact helper is
+      -- postgres-owned, service-role-only, row-registered, and transactionally
+      -- locks the table while bypassing only the named immutable trigger.
+      alter table public.invoice_offline_payment_records
+        disable trigger invoice_offline_payment_records_immutable;
+      delete from public.invoice_offline_payment_records
+       where id = v_record.record_id
+         and (v_payment_invoice_id is null or invoice_id = v_payment_invoice_id);
+      get diagnostics v_deleted = row_count;
+      alter table public.invoice_offline_payment_records
+        enable trigger invoice_offline_payment_records_immutable;
+    else
+      execute format(
+        'delete from %I.%I where %I = $1',
+        v_record.schema_name,
+        v_record.table_name,
+        v_record.primary_key_column
+      )
+      using v_record.record_id;
+      get diagnostics v_deleted = row_count;
+    end if;
 
     schema_name := v_record.schema_name;
     table_name := v_record.table_name;

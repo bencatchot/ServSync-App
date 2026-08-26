@@ -82,6 +82,8 @@ const DEMO_AUTH_METADATA = {
 };
 const RESETTABLE_PRIMARY_KEYS = {
   contractor_posts: 'id',
+  home_reminders: 'id',
+  invoice_offline_payment_records: 'id',
   workflow_activity_events: 'id',
   home_maintenance_log: 'id',
   home_documents: 'id',
@@ -357,6 +359,12 @@ export function buildDatePlan(anchorInput = new Date()) {
     jobInProgressAt: hours(dateOffsets.jobInProgressAtHours),
     jobReviewReadyAt: hours(dateOffsets.jobReviewReadyAtHours),
     jobCompletedAt: hours(dateOffsets.jobCompletedAtHours),
+    invoiceCreatedAt: hours(dateOffsets.invoiceCreatedAtHours),
+    invoiceSentAt: hours(dateOffsets.invoiceSentAtHours),
+    invoiceViewedAt: hours(dateOffsets.invoiceViewedAtHours),
+    invoicePartialPaidAt: hours(dateOffsets.invoicePartialPaidAtHours),
+    invoicePaidAt: hours(dateOffsets.invoicePaidAtHours),
+    invoiceHomeHistoryAt: hours(dateOffsets.invoiceHomeHistoryAtHours),
     visitWindowStart: days(dateOffsets.visitWindowStartDays),
     waterHeaterInstallDate: days(dateOffsets.waterHeaterInstallDateDays).slice(0, 10),
     waterHeaterWarrantyDate: days(dateOffsets.waterHeaterWarrantyDateDays).slice(0, 10),
@@ -1631,7 +1639,7 @@ async function fetchJobWorkItems(service, jobId) {
   return ensureOk(
     await service
       .from('job_work_items')
-      .select('id, title, completion_status, completed_at, completed_by, billing_status, sort_order, source_estimate_line_item_id')
+      .select('id, title, completion_status, completed_at, completed_by, billing_status, billable, unit_price_cents, sort_order, source_estimate_line_item_id')
       .eq('inspection_id', jobId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true }),
@@ -1858,6 +1866,137 @@ async function completeDemoJob(contractorClient, service, jobId, contractorUserI
     'Unable to set deterministic demo visit completion date'
   );
   return progress;
+}
+
+async function createDemoInvoiceDraft(contractorClient, service, runId, jobId, dates) {
+  const workItems = await fetchJobWorkItems(service, jobId);
+  const invoiceableIds = workItems
+    .filter((item) => item.completion_status === 'completed' && item.billing_status === 'unbilled' && item.unit_price_cents !== null)
+    .map((item) => item.id);
+  if (invoiceableIds.length !== workItems.length || invoiceableIds.length === 0) {
+    throw new Error('Demo Invoice checkpoint requires every completed priced Job work item to be exactly invoiceable.');
+  }
+  const creation = await ensureOk(
+    await contractorClient.rpc('servsync_create_partial_invoice_from_job', {
+      p_inspection_id: jobId,
+      p_work_item_ids: invoiceableIds,
+    }),
+    'Unable to create Demo Invoice through the canonical authenticated RPC'
+  );
+  const invoiceId = creation?.invoice_id;
+  if (!invoiceId) throw new Error('Demo Invoice creation did not return an Invoice id.');
+  await ensureOk(
+    await service.from('invoices').update({ created_at: dates.invoiceCreatedAt, updated_at: dates.invoiceCreatedAt }).eq('id', invoiceId),
+    'Unable to normalize Demo Invoice creation time'
+  );
+  const invoice = await fetchOneByPrimaryKey(
+    service,
+    'invoices',
+    'id',
+    invoiceId,
+    'id,total_cents,status,contractor_id,homeowner_user_id,home_id,service_request_id,estimate_id,job_id'
+  );
+  if (!invoice || invoice.status !== 'draft' || invoice.total_cents !== estimateFixture.subtotalCents + estimateFixture.taxCents) {
+    throw new Error('Demo Invoice draft does not match the canonical completed Job total.');
+  }
+  const lines = await ensureOk(
+    await service.from('invoice_line_items').select('id,invoice_id').eq('invoice_id', invoiceId),
+    'Unable to inspect Demo Invoice line items'
+  );
+  if (lines.length < 1) throw new Error('Demo Invoice draft must contain canonical line items.');
+  for (const line of lines) {
+    await registerRecord(service, runId, 'invoice_line_items', line.id, 'demo_invoice_line_item', 'invoice_draft');
+  }
+  await registerRecord(service, runId, 'invoices', invoiceId, 'demo_invoice', 'invoice_draft');
+  return { invoiceId, invoiceLineCount: lines.length, invoiceTotalCents: invoice.total_cents };
+}
+
+async function sendDemoInvoice(contractorClient, invoiceId) {
+  await ensureOk(
+    await contractorClient.rpc('servsync_send_invoice', { p_invoice_id: invoiceId }),
+    'Unable to send Demo Invoice through the canonical authenticated RPC'
+  );
+}
+
+async function viewDemoInvoice(homeownerClient, invoiceId) {
+  await ensureOk(
+    await homeownerClient.rpc('servsync_homeowner_view_invoice', { p_invoice_id: invoiceId }),
+    'Unable to mark Demo Invoice viewed through the canonical homeowner RPC'
+  );
+}
+
+async function recordDemoOfflinePayment(contractorClient, service, runId, invoiceId, amountCents, dates, role) {
+  const plannedPaymentAt = new Date(role === 'demo_invoice_partial_payment' ? dates.invoicePartialPaidAt : dates.invoicePaidAt);
+  const paymentDate = new Date(Math.min(plannedPaymentAt.getTime(), Date.now())).toISOString().slice(0, 10);
+  const result = await ensureOk(
+    await contractorClient.rpc('servsync_record_offline_invoice_payment', {
+      p_invoice_id: invoiceId,
+      p_idempotency_key: randomUUID(),
+      p_amount_cents: amountCents,
+      p_payment_date: paymentDate,
+      p_payment_method: role === 'demo_invoice_partial_payment' ? 'bank_transfer' : 'check',
+      p_reference: role === 'demo_invoice_partial_payment' ? 'DEMO-PARTIAL' : 'DEMO-FINAL',
+      p_note: 'Fictional Demo offline payment record. No money was processed.',
+    }),
+    'Unable to record Demo Invoice offline payment through the canonical authenticated RPC'
+  );
+  if (!result?.payment_id) throw new Error('Demo Invoice payment did not return an immutable ledger id.');
+  const payment = await fetchOneByPrimaryKey(
+    service,
+    'invoice_offline_payment_records',
+    'id',
+    result.payment_id,
+    'id,invoice_id,amount_cents,payment_date,payment_method'
+  );
+  if (!payment || payment.invoice_id !== invoiceId || payment.amount_cents !== amountCents) {
+    throw new Error('Demo Invoice payment ledger does not match the canonical payment result.');
+  }
+  await registerRecord(service, runId, 'invoice_offline_payment_records', payment.id, role, role === 'demo_invoice_partial_payment' ? 'invoice_partially_paid' : 'invoice_paid');
+  return payment.id;
+}
+
+async function fileDemoInvoiceAndCreateReminder(homeownerClient, service, runId, invoiceId, homeownerUserId, homeId, requestId, dates) {
+  const filing = await ensureOk(
+    await homeownerClient.rpc('servsync_file_invoice_to_home_history', { p_invoice_id: invoiceId }),
+    'Unable to file paid Demo Invoice through the canonical homeowner RPC'
+  );
+  if (!filing?.maintenance_log_id) throw new Error('Demo Invoice filing did not return a Home History id.');
+  await registerRecord(
+    service,
+    runId,
+    'home_maintenance_log',
+    filing.maintenance_log_id,
+    'demo_invoice_home_history_entry',
+    'invoice_home_history_updated'
+  );
+  const reminder = await ensureOk(
+    await homeownerClient
+      .from('home_reminders')
+      .insert({
+        homeowner_user_id: homeownerUserId,
+        home_id: homeId,
+        maintenance_log_id: filing.maintenance_log_id,
+        service_request_id: requestId,
+        invoice_id: invoiceId,
+        title: 'Schedule annual water-heater check',
+        notes: 'Fictional Demo follow-up linked to the paid Invoice Home History record.',
+        due_on: new Date(new Date(dates.invoiceHomeHistoryAt).getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        status: 'open',
+      })
+      .select('id')
+      .single(),
+    'Unable to create the linked Demo Home Reminder through homeowner authority'
+  );
+  await registerRecord(service, runId, 'home_reminders', reminder.id, 'demo_invoice_home_reminder', 'invoice_home_history_updated');
+  return { homeHistoryId: filing.maintenance_log_id, reminderId: reminder.id };
+}
+
+function maybeInterruptDemoQa(env, stepKey) {
+  if (env.SERVSYNC_DEMO_QA_INTERRUPT_AFTER_STEP !== stepKey) return;
+  if (env.SERVSYNC_DEMO_QA_INTERRUPT_ACKNOWLEDGE !== 'interrupt-demo-fixture-run') {
+    throw new Error('Demo QA interruption refused without the exact acknowledgement.');
+  }
+  throw new Error(`Deliberate Demo QA interruption after ${stepKey}. The next seed must reconcile this failed run.`);
 }
 
 // Marketing-ready Demo recordings must finalize reports through the normal contractor UI.
@@ -2202,6 +2341,12 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const requiresJobReviewReady = checkpointRequires(checkpointKey, 'jobReviewReady');
   const requiresJobCompleted = checkpointRequires(checkpointKey, 'jobCompleted');
   const requiresHomeHistory = checkpointRequires(checkpointKey, 'homeHistoryUpdated');
+  const requiresInvoice = checkpointRequires(checkpointKey, 'invoiceDraft');
+  const requiresInvoiceSent = checkpointRequires(checkpointKey, 'invoiceSent');
+  const requiresInvoiceViewed = checkpointRequires(checkpointKey, 'invoiceViewed');
+  const requiresInvoicePartialPayment = checkpointRequires(checkpointKey, 'invoicePartiallyPaid');
+  const requiresInvoicePaid = checkpointRequires(checkpointKey, 'invoicePaid');
+  const requiresInvoiceHomeHistory = checkpointRequires(checkpointKey, 'invoiceHomeHistoryUpdated');
 
   const records = run.records;
   const counts = countBy(records, 'table_name');
@@ -2239,6 +2384,18 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         issues.push(`Home History checkpoint requires exactly one registered ${tableName} record, found ${counts[tableName] || 0}.`);
       }
     }
+  }
+  if (requiresInvoice) {
+    for (const tableName of ['invoices', 'invoice_line_items']) {
+      if (!counts[tableName]) issues.push(`Invoice checkpoint requires registered ${tableName} records.`);
+    }
+  }
+  if (requiresInvoicePartialPayment && !counts.invoice_offline_payment_records) {
+    issues.push('Paid Invoice checkpoints require registered immutable offline-payment ledger records.');
+  }
+  if (requiresInvoiceHomeHistory) {
+    if (counts.home_maintenance_log !== 1) issues.push('Invoice Home History checkpoint requires one registered maintenance row.');
+    if (counts.home_reminders !== 1) issues.push('Invoice Home History checkpoint requires one registered Home Reminder.');
   }
   for (const tableName of requiredTables) {
     if (!counts[tableName]) {
@@ -2361,6 +2518,19 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const reportNotificationId = requiresHomeHistory
     ? requireExactlyOneId(issues, records, 'notifications', FINALIZED_REPORT_RECORD_ROLES.notification, 'finalized report notification')
     : null;
+  const invoiceIds = recordIds(records, 'invoices', 'demo_invoice');
+  const invoicePaymentIds = records
+    .filter((record) => record.table_name === 'invoice_offline_payment_records')
+    .map((record) => record.record_id);
+  const invoiceId = requiresInvoice
+    ? requireExactlyOneId(issues, records, 'invoices', 'demo_invoice', 'demo Invoice')
+    : null;
+  const invoiceHomeHistoryId = requiresInvoiceHomeHistory
+    ? requireExactlyOneId(issues, records, 'home_maintenance_log', 'demo_invoice_home_history_entry', 'Invoice Home History entry')
+    : null;
+  const invoiceReminderId = requiresInvoiceHomeHistory
+    ? requireExactlyOneId(issues, records, 'home_reminders', 'demo_invoice_home_reminder', 'Invoice Home Reminder')
+    : null;
   let estimateId = null;
   let jobId = null;
   if (requiresEstimate) {
@@ -2456,21 +2626,46 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const scenarioInvoices =
     invoiceClauses.length > 0
       ? await ensureOk(
-          await service.from('invoices').select('id, job_id, estimate_id, service_request_id, status').or(invoiceClauses.join(',')),
-          'Unable to inspect deferred demo invoices'
+          await service
+            .from('invoices')
+            .select('id, contractor_id, homeowner_user_id, home_id, job_id, estimate_id, service_request_id, status, total_cents, amount_paid_cents, paid_at, issued_at, created_at, updated_at')
+            .or(invoiceClauses.join(',')),
+          'Unable to inspect Demo invoices'
         )
       : [];
-  const homeHistoryClauses = [jobId ? `inspection_id.eq.${jobId}` : null, requestId ? `service_request_id.eq.${requestId}` : null].filter(Boolean);
+  const invoicePayments = invoiceId
+    ? await ensureOk(
+        await service
+          .from('invoice_offline_payment_records')
+          .select('id,invoice_id,amount_cents,payment_date,payment_method,reference,note')
+          .eq('invoice_id', invoiceId),
+        'Unable to inspect Demo Invoice payment ledger'
+      )
+    : [];
+  const homeHistoryClauses = [
+    jobId ? `inspection_id.eq.${jobId}` : null,
+    requestId ? `service_request_id.eq.${requestId}` : null,
+    invoiceId ? `invoice_id.eq.${invoiceId}` : null,
+  ].filter(Boolean);
   const homeHistoryRows =
     homeHistoryClauses.length > 0
       ? await ensureOk(
           await service
             .from('home_maintenance_log')
-            .select('id, homeowner_user_id, home_id, inspection_id, service_request_id, report_document_id')
+            .select('id, homeowner_user_id, home_id, inspection_id, service_request_id, invoice_id, report_document_id')
             .or(homeHistoryClauses.join(',')),
           'Unable to inspect deferred demo Home History rows'
         )
       : [];
+  const invoiceReminders = invoiceId
+    ? await ensureOk(
+        await service
+          .from('home_reminders')
+          .select('id,homeowner_user_id,home_id,maintenance_log_id,service_request_id,invoice_id,title,status,due_on')
+          .eq('invoice_id', invoiceId),
+        'Unable to inspect Demo Invoice Home Reminders'
+      )
+    : [];
   const reportDocuments = reportDocumentId
     ? await ensureOk(
         await service
@@ -2693,8 +2888,8 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (appointmentRows.length > 0) {
     issues.push('Demo job scheduling must not create homeowner appointment proposals.');
   }
-  if (!flagshipInvoiceExpected && scenarioInvoices.length !== 0) {
-    issues.push(`Demo Slice 2B must not create invoices, found ${scenarioInvoices.length}.`);
+  if (!flagshipInvoiceExpected && !requiresInvoice && scenarioInvoices.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} must not create Invoices, found ${scenarioInvoices.length}.`);
   }
   if (flagshipInvoiceExpected) {
     const registeredInvoiceIds = recordIds(records, 'invoices', 'demo_invoice');
@@ -2709,8 +2904,50 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       issues.push('Flagship Invoice line ownership does not match the recorded canonical line count.');
     }
   }
-  if (!requiresHomeHistory && homeHistoryRows.length !== 0) {
-    issues.push(`Demo Slice 2B must not file Home History rows, found ${homeHistoryRows.length}.`);
+  if (requiresInvoice) {
+    const invoice = scenarioInvoices[0] || null;
+    const registeredInvoiceLineIds = recordIds(records, 'invoice_line_items', 'demo_invoice_line_item');
+    if (
+      scenarioInvoices.length !== 1 ||
+      invoice?.id !== invoiceId ||
+      invoice?.contractor_id !== contractor?.id ||
+      invoice?.homeowner_user_id !== homeownerUser?.id ||
+      invoice?.home_id !== homeId ||
+      invoice?.job_id !== jobId ||
+      invoice?.estimate_id !== estimateId ||
+      invoice?.service_request_id !== requestId ||
+      invoice?.status !== checkpoint.expected.invoiceStatus ||
+      invoice?.total_cents !== estimateFixture.subtotalCents + estimateFixture.taxCents ||
+      invoice?.amount_paid_cents !== checkpoint.expected.invoiceAmountPaidCents
+    ) {
+      issues.push(`Invoice checkpoint ${checkpointKey} does not match its exact canonical lineage, status, total, or paid amount.`);
+    }
+    if (invoiceIds.length !== 1 || invoiceIds[0] !== invoiceId) {
+      issues.push('Demo Invoice is not owned by one exact registry row.');
+    }
+    if (registeredInvoiceLineIds.length !== Number(run.metadata?.invoice_line_count || 0) || registeredInvoiceLineIds.length < 1) {
+      issues.push('Demo Invoice line ownership does not match the recorded canonical line count.');
+    }
+    if (invoicePayments.length !== checkpoint.expected.invoicePaymentCount) {
+      issues.push(`Invoice checkpoint ${checkpointKey} expected ${checkpoint.expected.invoicePaymentCount} payment rows, found ${invoicePayments.length}.`);
+    }
+    const actualPaymentIds = [...invoicePayments.map((payment) => payment.id)].sort();
+    const registeredPaymentIds = [...invoicePaymentIds].sort();
+    if (JSON.stringify(actualPaymentIds) !== JSON.stringify(registeredPaymentIds)) {
+      issues.push('Demo Invoice immutable payment ledger IDs do not exactly match registry ownership.');
+    }
+    const paymentTotal = invoicePayments.reduce((total, payment) => total + Number(payment.amount_cents || 0), 0);
+    if (paymentTotal !== checkpoint.expected.invoiceAmountPaidCents) {
+      issues.push(`Invoice payment ledger totals ${paymentTotal}, expected ${checkpoint.expected.invoiceAmountPaidCents}.`);
+    }
+    if (requiresInvoiceSent && !invoice?.issued_at) issues.push('Sent or later Invoice checkpoint requires issued_at evidence.');
+    if (requiresInvoiceViewed && !['viewed', 'partially_paid', 'paid'].includes(invoice?.status || '')) {
+      issues.push('Viewed or later Invoice checkpoint lost the homeowner view transition.');
+    }
+    if (requiresInvoicePaid && !invoice?.paid_at) issues.push('Paid Invoice checkpoint requires paid_at evidence.');
+  }
+  if (!requiresHomeHistory && !requiresInvoiceHomeHistory && homeHistoryRows.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} must not file Home History rows, found ${homeHistoryRows.length}.`);
   }
   if (requiresHomeHistory) {
     const history = homeHistoryRows[0] || null;
@@ -2778,6 +3015,35 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     } catch (error) {
       issues.push(error.message);
     }
+  }
+  if (requiresInvoiceHomeHistory) {
+    const history = homeHistoryRows[0] || null;
+    const reminder = invoiceReminders[0] || null;
+    if (
+      homeHistoryRows.length !== 1 ||
+      history?.id !== invoiceHomeHistoryId ||
+      history?.homeowner_user_id !== homeownerUser?.id ||
+      history?.home_id !== homeId ||
+      history?.invoice_id !== invoiceId ||
+      history?.inspection_id !== null ||
+      history?.report_document_id !== null
+    ) {
+      issues.push('Paid Invoice Home History checkpoint does not have one exact structured Invoice record.');
+    }
+    if (
+      invoiceReminders.length !== 1 ||
+      reminder?.id !== invoiceReminderId ||
+      reminder?.homeowner_user_id !== homeownerUser?.id ||
+      reminder?.home_id !== homeId ||
+      reminder?.maintenance_log_id !== invoiceHomeHistoryId ||
+      reminder?.service_request_id !== requestId ||
+      reminder?.invoice_id !== invoiceId ||
+      reminder?.status !== 'open'
+    ) {
+      issues.push('Paid Invoice Home History checkpoint does not have one exact linked open Home Reminder.');
+    }
+  } else if (invoiceReminders.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} must not create Invoice-linked Home Reminders.`);
   }
 
   const requestEstimates = requestId
@@ -2880,7 +3146,12 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         completedWorkItems: jobWorkItems.filter((item) => item.completion_status === 'completed').length,
         openWorkItems: jobWorkItems.filter((item) => item.completion_status === 'open').length,
         invoices: scenarioInvoices.length,
+        invoiceId,
+        invoiceStatus: scenarioInvoices[0]?.status || null,
+        invoicePayments: invoicePayments.length,
+        invoiceAmountPaidCents: scenarioInvoices[0]?.amount_paid_cents || 0,
         homeHistoryRows: homeHistoryRows.length,
+        invoiceHomeReminders: invoiceReminders.length,
         reportDocuments: reportDocuments.length,
         reportNotifications: reportNotifications.length,
       },
@@ -2963,6 +3234,12 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       reportStorageSha256: null,
       reportFileName: null,
       reportFileSizeBytes: null,
+      invoiceId: null,
+      invoiceLineCount: 0,
+      invoiceTotalCents: 0,
+      invoicePaymentIds: [],
+      invoiceHomeHistoryId: null,
+      invoiceReminderId: null,
     };
     const executedSteps = ['identities', 'profilesAndCompany'];
 
@@ -3054,6 +3331,69 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       executedSteps.push('jobCompleted');
     }
 
+    if (checkpointRequires(checkpointKey, 'invoiceDraft')) {
+      const invoice = await createDemoInvoiceDraft(contractorClient, service, runId, created.jobId, dates);
+      created.invoiceId = invoice.invoiceId;
+      created.invoiceLineCount = invoice.invoiceLineCount;
+      created.invoiceTotalCents = invoice.invoiceTotalCents;
+      executedSteps.push('invoiceDraft');
+      maybeInterruptDemoQa(env, 'invoiceDraft');
+    }
+
+    if (checkpointRequires(checkpointKey, 'invoiceSent')) {
+      await sendDemoInvoice(contractorClient, created.invoiceId);
+      executedSteps.push('invoiceSent');
+    }
+
+    if (checkpointRequires(checkpointKey, 'invoiceViewed')) {
+      await viewDemoInvoice(homeownerClient, created.invoiceId);
+      executedSteps.push('invoiceViewed');
+    }
+
+    if (checkpointRequires(checkpointKey, 'invoicePartiallyPaid')) {
+      const paymentId = await recordDemoOfflinePayment(
+        contractorClient,
+        service,
+        runId,
+        created.invoiceId,
+        40000,
+        dates,
+        'demo_invoice_partial_payment'
+      );
+      created.invoicePaymentIds.push(paymentId);
+      executedSteps.push('invoicePartiallyPaid');
+    }
+
+    if (checkpointRequires(checkpointKey, 'invoicePaid')) {
+      const paymentId = await recordDemoOfflinePayment(
+        contractorClient,
+        service,
+        runId,
+        created.invoiceId,
+        created.invoiceTotalCents - 40000,
+        dates,
+        'demo_invoice_final_payment'
+      );
+      created.invoicePaymentIds.push(paymentId);
+      executedSteps.push('invoicePaid');
+    }
+
+    if (checkpointRequires(checkpointKey, 'invoiceHomeHistoryUpdated')) {
+      const filed = await fileDemoInvoiceAndCreateReminder(
+        homeownerClient,
+        service,
+        runId,
+        created.invoiceId,
+        homeownerUser.id,
+        created.homeId,
+        created.requestId,
+        dates
+      );
+      created.invoiceHomeHistoryId = filed.homeHistoryId;
+      created.invoiceReminderId = filed.reminderId;
+      executedSteps.push('invoiceHomeHistoryUpdated');
+    }
+
     await finishRun(service, runId, 'succeeded', {
       selected_checkpoint: checkpointKey,
       checkpoint_display_name: checkpoint.displayName,
@@ -3081,6 +3421,12 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       report_storage_sha256: created.reportStorageSha256,
       report_file_name: created.reportFileName,
       report_file_size_bytes: created.reportFileSizeBytes,
+      invoice_id: created.invoiceId,
+      invoice_line_count: created.invoiceLineCount,
+      invoice_total_cents: created.invoiceTotalCents,
+      invoice_payment_ids: created.invoicePaymentIds,
+      invoice_home_history_id: created.invoiceHomeHistoryId,
+      invoice_reminder_id: created.invoiceReminderId,
     });
 
     const verification = await verifyScenario(service, scenarioKey, env, checkpointKey);
@@ -3107,6 +3453,10 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
         estimateId: created.estimateId,
         jobId: created.jobId,
         visitEventId: created.visitEventId,
+        invoiceId: created.invoiceId,
+        invoicePaymentIds: created.invoicePaymentIds,
+        invoiceHomeHistoryId: created.invoiceHomeHistoryId,
+        invoiceReminderId: created.invoiceReminderId,
         workItemCount: created.jobWorkItemCount,
         completedWorkItemCount: created.completedWorkItemCount,
         openWorkItemCount: created.openWorkItemCount,

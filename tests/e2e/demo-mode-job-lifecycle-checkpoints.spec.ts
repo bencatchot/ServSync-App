@@ -15,7 +15,7 @@ test.describe('Demo Mode Slice 2B job lifecycle checkpoint source checks', () =>
   test('manifest exposes only the approved job lifecycle checkpoints before invoice and Home History states', async () => {
     const manifest = await import('../../scripts/demo/scenarios/water-heater-core-loop.mjs');
 
-    expect(manifest.supportedCheckpointKeys.slice(-4)).toEqual([
+    expect(manifest.supportedCheckpointKeys.slice(8, 12)).toEqual([
       'job_scheduled',
       'job_in_progress',
       'job_review_ready',
@@ -23,12 +23,13 @@ test.describe('Demo Mode Slice 2B job lifecycle checkpoint source checks', () =>
     ]);
     expect(manifest.defaultCheckpointKey).toBe('job_created');
     expect(manifest.deferredCheckpointKeys).toEqual(
-      expect.arrayContaining(['invoice_draft', 'invoice_sent', 'invoice_paid', 'home_history_updated'])
+      expect.arrayContaining(['estimate_declined', 'job_cancelled', 'invoice_overdue', 'invoice_void'])
     );
     expect(manifest.deferredCheckpointKeys).not.toContain('job_scheduled');
     expect(manifest.deferredCheckpointKeys).not.toContain('job_in_progress');
     expect(manifest.deferredCheckpointKeys).not.toContain('job_review_ready');
     expect(manifest.deferredCheckpointKeys).not.toContain('job_completed');
+    expect(manifest.deferredCheckpointKeys).not.toContain('home_history_updated');
     expect(manifest.checkpointByKey.job_scheduled.expected.visitSharedWithHomeowner).toBe(false);
     expect(manifest.checkpointByKey.job_completed.expected.invoiceCount).toBe(0);
     expect(manifest.checkpointByKey.job_completed.expected.homeHistoryCount).toBe(0);
@@ -60,19 +61,21 @@ test.describe('Demo Mode Slice 2B job lifecycle checkpoint source checks', () =>
 
   test('runner completion is lightweight and excludes reports, invoices, and Home History filing', () => {
     const script = read(scriptPath);
+    const completion = script.slice(
+      script.indexOf('async function completeDemoJob'),
+      script.indexOf('async function createDemoInvoiceDraft')
+    );
 
-    expect(script).toMatch(/async function completeDemoJob/);
-    expect(script).toMatch(/contractorClient\.rpc\('servsync_complete_visit_event_for_job'/);
-    expect(script).toMatch(/job_status: 'completed'/);
-    expect(script).toMatch(/closed_at: null/);
-    expect(script).toMatch(/report_storage_path: null/);
-    expect(script).toMatch(/report_file_name: null/);
-    expect(script).toMatch(/Demo Slice 2B must not create invoices/);
-    expect(script).toMatch(/Demo Slice 2B must not file Home History rows/);
+    expect(completion).toMatch(/async function completeDemoJob/);
+    expect(completion).toMatch(/contractorClient\.rpc\('servsync_complete_visit_event_for_job'/);
+    expect(completion).toMatch(/job_status: 'completed'/);
+    expect(completion).toMatch(/closed_at: null/);
+    expect(completion).toMatch(/report_storage_path: null/);
+    expect(completion).toMatch(/report_file_name: null/);
+    expect(completion).not.toMatch(/createDemoInvoiceDraft|servsync_file_invoice_to_home_history/);
     expect(script).toMatch(/Demo Slice 2B must not fabricate job_completed workflow events/);
-    expect(script).not.toMatch(/servsync_finalize_field_work/);
-    expect(script).not.toMatch(/servsync_notify_field_work_report/);
-    expect(script).not.toMatch(/createInvoiceFromJob/);
+    expect(completion).not.toMatch(/servsync_finalize_field_work/);
+    expect(completion).not.toMatch(/servsync_notify_field_work_report/);
   });
 
   test('verification checks exact lifecycle status, visit events, work-item counts, and deferred artifacts', () => {
