@@ -13,6 +13,7 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 - Six-workflow protected pilot tutorial matrix, including the current published Estimate revision and five missing tutorials.
 - First new scenario: contractor reviews a ready homeowner Service Request, reads the original request/customer/home context, and starts the Estimate from the Request.
 - Dedicated contextual Help lookup on `contractor.service_requests`; no visible button appears until an approved matching walkthrough is published.
+- Contractor contextual Help waits for the loaded contractor identity before calling the protected search RPC, avoiding a transient denied request during sign-in hydration.
 - Help Studio safe-scenario allowlist and focused recorder, contextual-placement, coverage, and freshness contracts.
 - Roadmap, Feature Backlog, Master Plan, planning index, and changelog handoff from completed Phase 0 to FB-040A.
 
@@ -35,6 +36,8 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 | ESLint budget | Pass, exact existing 79 warnings |
 | App monolith budget | Pass, exact existing 50,824 lines |
 | Diff whitespace check | Pass |
+
+The deployed Demo Preview loaded Service Requests with zero horizontal overflow and no unpublished tutorial control. That check exposed a transient `403 Contractor context is required` from the Help search before contractor identity hydration; the candidate now waits for that identity before querying and includes a focused policy regression.
 
 ## Open acceptance gates
 

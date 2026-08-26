@@ -13,6 +13,7 @@ import {
   validateHelpRecordingPackage,
 } from '../../src/features/help/helpStudio.ts';
 import { createHelpWalkthroughMediaHandler } from '../../server/helpWalkthroughMedia.ts';
+import { contextualHelpLookupReady } from '../../src/features/help/contextualHelpPolicy.ts';
 
 const walkthroughId = '10000000-0000-4000-8000-000000000001';
 const assetId = '20000000-0000-4000-8000-000000000001';
@@ -182,6 +183,16 @@ test('deterministic search adapter sends query, context, role context, and bound
     p_query: 'quote', p_route_context: 'contractor.drafts',
     p_contractor_id: '30000000-0000-4000-8000-000000000001', p_limit: 3,
   } }]);
+});
+
+test('contractor contextual Help waits for tenant context before calling its protected search', () => {
+  assert.equal(contextualHelpLookupReady('contractor.service_requests', undefined), false);
+  assert.equal(contextualHelpLookupReady('contractor.drafts', null), false);
+  assert.equal(
+    contextualHelpLookupReady('contractor.service_requests', '30000000-0000-4000-8000-000000000001'),
+    true,
+  );
+  assert.equal(contextualHelpLookupReady('homeowner.records', undefined), true);
 });
 
 test('search parser rejects untrusted media identities', () => {

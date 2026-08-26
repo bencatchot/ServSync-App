@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { HelpCircle, Loader2, Play, X } from 'lucide-react';
 import { findHelp, helpPlaybackUrl, type HelpSearchResult, type HelpStudioClient } from './helpStudio';
+import { contextualHelpLookupReady } from './contextualHelpPolicy';
 
 type ContextualHelpProps = {
   client: HelpStudioClient;
@@ -89,6 +90,10 @@ export function ContextualHelp({ client, contextKey, contractorId, label = 'How-
   const [selected, setSelected] = useState<HelpSearchResult | null>(null);
 
   useEffect(() => {
+    if (!contextualHelpLookupReady(contextKey, contractorId)) {
+      setWalkthroughs([]);
+      return;
+    }
     let active = true;
     void findHelp(client, { routeContext: contextKey, contractorId, limit: 3 }).then(items => {
       if (active) setWalkthroughs(items);
