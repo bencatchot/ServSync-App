@@ -17,6 +17,11 @@ export type ContractorScheduleSnapshotItem = {
   onOpen: () => void;
 };
 
+type ContractorTodayWorkProps = {
+  items: ContractorScheduleSnapshotItem[];
+  onOpenCalendar: () => void;
+};
+
 type ContractorScheduleSnapshotProps = {
   days: ContractorScheduleSnapshotDay[];
   itemsByDay: Record<string, ContractorScheduleSnapshotItem[]>;
@@ -41,6 +46,66 @@ const statusClass = (tone: ContractorScheduleSnapshotItem['tone']) => ({
   sky: 'text-sky-800',
   violet: 'text-violet-800',
 }[tone]);
+
+export function ContractorTodayWork({ items, onOpenCalendar }: ContractorTodayWorkProps) {
+  const [nextItem, ...laterItems] = items;
+
+  return (
+    <section className="space-y-3" data-testid="contractor-todays-work" aria-labelledby="contractor-todays-work-heading">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="contractor-todays-work-heading" className="text-lg font-bold text-slate-950">Today&apos;s Work</h2>
+          <p className="mt-1 text-sm leading-5 text-slate-600">Start with the next scheduled customer action.</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{items.length} today</span>
+      </div>
+
+      {nextItem ? (
+        <>
+          <button
+            type="button"
+            onClick={nextItem.onOpen}
+            className={`w-full rounded-xl border p-4 text-left shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${toneClass(nextItem.tone)}`}
+            data-testid="contractor-todays-work-primary"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700">Next</span>
+            <span className="mt-2 flex min-w-0 items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block break-words text-base font-bold text-slate-950">{nextItem.title}</span>
+                <span className="mt-1 block break-words text-sm text-slate-600">{nextItem.meta} · {nextItem.timeLabel}</span>
+              </span>
+              <span className={`shrink-0 rounded-full bg-white/80 px-2 py-1 text-xs font-bold ${statusClass(nextItem.tone)}`}>{nextItem.statusLabel}</span>
+            </span>
+          </button>
+
+          {laterItems.length > 0 ? (
+            <div className="space-y-2" data-testid="contractor-todays-work-later">
+              {laterItems.map(item => (
+                <button key={item.id} type="button" onClick={item.onOpen} className="flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-950">{item.title}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.meta} · {item.timeLabel}</span>
+                  </span>
+                  <span className={`shrink-0 text-xs font-bold ${statusClass(item.tone)}`}>{item.statusLabel}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex flex-col gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="contractor-todays-work-empty">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Nothing is scheduled today.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Check the full calendar for upcoming work or appointment requests.</p>
+          </div>
+          <button type="button" onClick={onOpenCalendar} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 sm:w-auto">
+            <Calendar size={16} /> Open calendar
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function ContractorScheduleSnapshot({
   days,

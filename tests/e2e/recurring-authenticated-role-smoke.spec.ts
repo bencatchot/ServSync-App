@@ -52,7 +52,7 @@ async function openJobs(page: Page) {
   await expect(main.getByText(/^Work workspace$/i)).toBeVisible();
   const openJobsHeading = main.getByRole('heading', { level: 2, name: /^Open jobs$/i });
   if (!(await openJobsHeading.isVisible())) {
-    await main.getByRole('button', { name: /Active Jobs/i }).first().click();
+    await main.getByRole('button', { name: /Open Jobs/i }).first().click();
   }
   await expect(openJobsHeading).toBeVisible();
   return main;

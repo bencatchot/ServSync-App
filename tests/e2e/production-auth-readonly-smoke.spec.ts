@@ -219,6 +219,14 @@ test.describe('production authenticated read-only smoke', () => {
       await expectActiveHeading(page, /^Work$/i);
       await expect(main.getByTestId('contractor-jobs-at-a-glance')).toBeVisible();
       await expect(main.getByTestId('contractor-work-start-draft')).toBeVisible();
+      await main.getByRole('button', { name: /^Drafts\b/i }).first().click();
+      const estimateHelp = main.getByTestId('contextual-help-contractor.drafts');
+      await expect(estimateHelp).toBeVisible({ timeout: 30_000 });
+      await estimateHelp.click();
+      const walkthrough = page.getByRole('dialog', { name: /How to create an estimate/i });
+      await expect(walkthrough).toBeVisible();
+      await expect(walkthrough.locator('video[aria-label="How to create an estimate"]')).toHaveAttribute('src', /^https:\/\//, { timeout: 30_000 });
+      await walkthrough.getByRole('button', { name: /Close walkthrough/i }).click();
 
       await openSidebarTab(page, /^Financials\b/i);
       await expectActiveHeading(page, /^Financials$/i);
