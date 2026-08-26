@@ -2,7 +2,7 @@
 
 Date: 2026-08-26
 
-Status: implementation and source validation complete; authenticated exact-head acceptance pending
+Status: implementation and authenticated Demo acceptance complete; current Production Help playback pending
 
 Branch: `codex/phase-0-7-beta-boundaries`
 
@@ -45,19 +45,24 @@ This is a presentation and help-navigation slice. It does not add or change:
 | App monolith budget | Pass, exact existing 50,824-line baseline |
 | Diff whitespace check | Pass |
 
-## Exact-head acceptance still required
+## Authenticated exact-head Preview evidence
+
+Commit `829d9ccedd6baf28635f4f5dddbb889683c8e41f` passed GitHub quality and all three Vercel Preview deployments. Authenticated acceptance used only the approved Demo contractor and homeowner accounts and did not create, edit, send, or submit any record.
+
+- Contractor desktop and `390x844`: the Beta Guide opened at the title with no horizontal overflow; mobile More exposed the same destination; Support opened at the top with `Question`, `Beta help`, and contractor Beta Guide context prefilled; Financials, Calendar, and Discover displayed their local boundaries.
+- Homeowner desktop and `390x844`: the Beta Guide opened at the title with no horizontal overflow; mobile More exposed the same destination; Support opened at the top with `Question`, `Beta help`, and homeowner Beta Guide context prefilled; Estimates / Invoices, Calendar, and Discover displayed their local boundaries.
+- The dashboard feedback-card path and the guide-to-Support path both reset the workspace/page scroller to zero. No Support message was sent.
+- The exact Production-backed Preview loaded successfully, but the approved contractor smoke credentials were rejected as invalid. No alternate credential, password reset, account change, Production record, or Help publication was attempted.
+
+## Acceptance still required
 
 Before Phase 0.7 can be called complete:
 
-1. Verify contractor Owner and homeowner views on the exact Preview head at desktop and `390x844`.
-2. Open the Beta Guide from desktop and mobile Help navigation for both roles.
-3. Confirm all three capability groups are readable without clipping or horizontal overflow.
-4. Confirm Support handoffs open the correct role-aware feedback flow and do not request unnecessary private details.
-5. Confirm contractor contextual Estimate Help resolves and opens the current published walkthrough.
-6. Search Help Studio using `beta`, `help`, `estimate`, `Work`, `Financials`, `invoice`, `payment`, `calendar`, `dispatch`, `Discover`, `reminder`, and relevant synonyms; compare every published match with the exact Preview behavior.
-7. Record tutorial freshness as `NONE`, `UPDATE REQUIRED`, or `UPDATED` only after that search and playback comparison.
-8. Confirm no new browser/page/`5xx` errors and no unintended role navigation exposure.
+1. Restore or supply the approved Production contractor smoke-account access without creating or mutating an account in this slice.
+2. Confirm contractor contextual Estimate Help resolves and opens the current published **How to create an estimate** walkthrough, revision 3.
+3. Reconfirm the Help Studio inventory search for `beta`, `help`, `estimate`, `Work`, `Financials`, `invoice`, `payment`, `calendar`, `dispatch`, `Discover`, `reminder`, and relevant synonyms; compare every published match with the exact Preview behavior.
+4. Finalize tutorial freshness as `NONE`, `UPDATE REQUIRED`, or `UPDATED` only after that current playback comparison.
 
 ## Roadmap handoff
 
-Phase 0.7 remains the active final Launch Foundation gate until the exact-head checks above pass and the PR receives normal owner review and explicit merge approval. The next roadmap assignment is Phase 1 / FB-040 controlled pilot preflight, not another broad feature slice.
+Phase 0.7 remains the active final Launch Foundation gate until current Production Help playback passes and the PR receives normal owner review and explicit merge approval. The next roadmap assignment is Phase 1 / FB-040 controlled pilot preflight, not another broad feature slice.
