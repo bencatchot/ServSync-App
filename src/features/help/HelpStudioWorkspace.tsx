@@ -49,6 +49,7 @@ const AUDIENCES = [
 
 const RECORDER_SCENARIOS = [
   ['contractor-create-estimate', 'Contractor creates an estimate'],
+  ['contractor-service-request-intake', 'Contractor reviews a service request'],
   ['homeowner-service-request', 'Homeowner sends a service request'],
   ['homeowner-home-history', 'Homeowner opens Home History'],
   ['servsync-platform-introduction', 'ServSync platform introduction'],

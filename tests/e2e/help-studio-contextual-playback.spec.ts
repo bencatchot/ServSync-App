@@ -113,6 +113,11 @@ test('admin can define a recorder request without engineering identifiers in the
   await expect(page.getByLabel('Required starting state')).toBeVisible();
   await expect(page.getByLabel('Expected final state')).toBeVisible();
   await expect(page.getByLabel('Recorder scenario')).toHaveValue('contractor-create-estimate');
+  await expect(page.getByLabel('Recorder scenario').locator('option')).toContainText([
+    'Contractor creates an estimate',
+    'Contractor reviews a service request',
+    'Homeowner sends a service request',
+  ]);
   await expect(page.getByText(/uuid|asset id|commit sha/i)).toHaveCount(0);
 });
 
