@@ -280,6 +280,25 @@ The local-customer journey uses the real request-free server handlers and the du
 
 These tests require the approved Sandbox Supabase identity, contractor/homeowner test credentials, the server-only Sandbox validation credential as `TEST_SUPABASE_SERVICE_ROLE_KEY`, the three Draft-first UI gates, and a Supabase CLI link to the exact Sandbox project. The alias is injected into the real request-free handler only for the duration of each server request; the connected lifecycle retains its guard against a globally configured `SUPABASE_SERVICE_ROLE_KEY`. They fail closed on project mismatch and must never run against Production or Demo business data.
 
+## Phase 0.6 Launch QA Paths
+
+Run the explicit connected-Customer launch paths against an exact-head local/Preview app configured for Sandbox:
+
+```bash
+npm run qa:e2e:launch-desktop
+npm run qa:e2e:launch-mobile
+```
+
+The desktop command runs the full-payment/Home History path and partial-to-final payment durability at `1440x1000`. The focused mobile command runs the canonical full-payment/Home History path at exactly `390x844`. Both use approved non-personal `TEST_*` identities, require the exact linked Sandbox ref, persist each generated exact prefix before the first mutation, and clear it only after the zero-residue SQL assertion commits.
+
+If the runner is terminated before Playwright teardown, recover only the durable pending prefixes with:
+
+```bash
+npm run qa:fixtures:sandbox:recover
+```
+
+The recovery command refuses mismatched target/ref/URL/link state, accepts only the two canonical E2E prefix formats, removes dependency rows for those exact prefixes, verifies zero residue, and then clears the ignored local manifest. It is not a general Sandbox cleanup command.
+
 ## Full Playwright Suite
 
 Use:
@@ -351,7 +370,7 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - secure guest Request changes/Decline within the full contractor lifecycle (focused guest-response coverage exists separately)
 - Home Reminder create/complete/dismiss E2E path
 - RLS/cross-user browser-level negative tests beyond direct Supabase client checks
-- mobile full workflow automation
+- broad mobile matrix execution across every mutating spec (the focused exact-390x844 canonical launch path is covered)
 - production smoke accounts
 - provider-backed Stripe Checkout/webhook lifecycle in this browser suite (offline full/partial payment is covered)
 - a clearly labeled closed/paid financial destination (the current `Open invoice records` tile leads to the all-status list)
@@ -379,7 +398,7 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - Use clearly labeled records such as `E2E Test Customer`, `E2E Test Job`, `E2E Test Estimate`, and `PR Preview Test`.
 - Prefer app UI and existing workflows over direct SQL.
 - Use direct sandbox SQL only after separate approval.
-- Lifecycle-audit specs must remove only their exact tagged records and verify zero residue; interrupted runs require an explicit exact-prefix cleanup before rerunning.
+- Lifecycle-audit specs must remove only their exact tagged records and verify zero residue. The Phase 0.6 launch paths persist exact prefixes under ignored `local-ops/phase-0-6/`; after abrupt termination, run `npm run qa:fixtures:sandbox:recover` before rerunning.
 - Do not create fake/demo production data.
 - Do not run mutating tests against real beta user data.
 
@@ -410,4 +429,4 @@ Fix the root cause before rerunning the test. Do not weaken tests into generic w
 - Test credentials stay in environment variables or a password manager.
 - Ignored/local credential files must not be printed or pasted; rotate smoke/load-test credentials if a local terminal/session may have exposed them.
 - Screenshots, videos, traces, and Playwright reports must not be committed.
-- E2E-created sandbox records are allowed to remain if clearly labeled.
+- Ordinary exploratory E2E records may remain only where the owning spec explicitly documents that policy. Phase 0.6 launch lifecycle records must return to zero residue.

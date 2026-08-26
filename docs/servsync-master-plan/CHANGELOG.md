@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-26 - Phase 0.6 repeatable launch QA fixture source and Sandbox gate
+
+- Starting point: Re-read clean `origin/main` at exact merged PR #519 commit `93580012d668f94e25fb0be5abbb8349b24f7183` and created `codex/phase-0-6-launch-qa-fixtures` without changing the accepted Phase 0.5 product surface.
+- Fixture contract: Extended the existing private `water_heater_core_loop` manifest/runner/verifier through canonical Invoice Draft, Sent, Viewed, Partially Paid, Paid, and paid-Invoice Home History/reminder checkpoints. Removed the nonexistent `estimate_viewed` expectation; negative/exception states remain focused regressions.
+- Exact reset authority: Added unapplied dedicated-Demo migration `servsync-demo-mode-invoice-payment-checkpoint-reset.sql` at SHA-256 `d1454de4d86658f59f06b968a2028e1578cd4a986a55ed1e2db30af0dccf4c3b` (152 lines). It adds exact registered Home Reminder/payment-ledger reset ordering and same-run Invoice lineage enforcement, stays service-role-only, and is `N/A` for Production/Sandbox. Applying it and running the live Demo matrix remain separately protected.
+- Repeatability: Added explicit Sandbox desktop and exact-`390x844` launch commands plus an ignored durable prefix manifest and exact recovery command for abrupt runner termination. Manifest entries clear only after transactional zero-residue verification.
+- Status: Source/static and safe Sandbox evidence are recorded in [the Phase 0.6 acceptance record](../qa/ServSync_Phase_0_6_Repeatable_Launch_QA_Fixtures_2026-08-26.md). Phase 0.6 remains incomplete until the protected Demo-only apply and live all-checkpoint reset/repeat/interruption matrix pass.
+- Tutorial impact: `NOT APPLICABLE`. No visible product behavior, route, terminology, role action, information architecture, or Help workflow changed.
+
 ## 2026-08-25 - Phase 0.5 field-critical mobile acceptance completion
 
 - Starting point: Re-read `origin/main` at exact merged PR #518 commit `15cd71c93487a0d0611bc2726fc5ed2804feb2b3` and created `codex/phase-0-5-mobile-acceptance` from that clean state.
