@@ -29,6 +29,7 @@ The beta should focus on the core service workflow:
 - Homeowner files eligible invoice records to Home History.
 - Homeowner creates manual Home Reminders.
 - Users submit support/feedback when something is confusing or broken.
+- Users can open Help -> Beta Guide to distinguish available, manual, and unavailable capability without leaving the app.
 
 Use this beta to learn whether the core workflow is understandable and useful in real contractor/homeowner relationships.
 
@@ -109,6 +110,7 @@ Before the first invite:
 - Prepare the feedback triage log.
 - Decide the exact first contractor and homeowner testers.
 - Confirm beta users understand what is manual or not live.
+- Confirm the Beta Guide opens for both roles and its Support handoff works on desktop and mobile.
 
 During the first week:
 

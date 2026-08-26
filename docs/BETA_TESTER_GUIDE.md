@@ -11,6 +11,8 @@ ServSync helps homeowners and contractors keep service work organized in one pla
 
 This is a beta. Some things will be improved based on your feedback.
 
+Open **Help → Beta Guide** at any time to see what works now, which steps are manual, what is not available yet, and how to contact Support. The guide is tailored to homeowner or contractor workflows.
+
 ## What Is Ready To Try
 
 Please focus on:
@@ -24,6 +26,7 @@ Please focus on:
 - Manual Home Reminders.
 - Calendar visibility and event details.
 - Support/feedback.
+- The role-aware Beta Guide and its Support handoff.
 
 ## Contractor Mission List
 

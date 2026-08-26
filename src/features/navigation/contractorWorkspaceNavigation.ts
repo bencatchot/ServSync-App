@@ -9,6 +9,7 @@ export type ContractorWorkspaceTab =
   | 'marketing'
   | 'work'
   | 'financials'
+  | 'beta'
   | 'trust'
   | 'privacy'
   | 'support';
@@ -70,6 +71,7 @@ const CONTRACTOR_TABS: readonly ContractorWorkspaceTab[] = [
   'marketing',
   'work',
   'financials',
+  'beta',
   'trust',
   'privacy',
   'support',
