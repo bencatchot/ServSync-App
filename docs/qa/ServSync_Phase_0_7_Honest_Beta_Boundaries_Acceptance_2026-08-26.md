@@ -2,7 +2,7 @@
 
 Date: 2026-08-26
 
-Status: implementation and authenticated Demo acceptance complete; current Production Help playback pending
+Status: implementation and acceptance complete; owner review and explicit merge approval pending
 
 Branch: `codex/phase-0-7-beta-boundaries`
 
@@ -52,17 +52,20 @@ Commit `829d9ccedd6baf28635f4f5dddbb889683c8e41f` passed GitHub quality and all 
 - Contractor desktop and `390x844`: the Beta Guide opened at the title with no horizontal overflow; mobile More exposed the same destination; Support opened at the top with `Question`, `Beta help`, and contractor Beta Guide context prefilled; Financials, Calendar, and Discover displayed their local boundaries.
 - Homeowner desktop and `390x844`: the Beta Guide opened at the title with no horizontal overflow; mobile More exposed the same destination; Support opened at the top with `Question`, `Beta help`, and homeowner Beta Guide context prefilled; Estimates / Invoices, Calendar, and Discover displayed their local boundaries.
 - The dashboard feedback-card path and the guide-to-Support path both reset the workspace/page scroller to zero. No Support message was sent.
-- The exact Production-backed Preview loaded successfully, but the approved contractor smoke credentials were rejected as invalid. No alternate credential, password reset, account change, Production record, or Help publication was attempted.
+- The exact PR application Preview did not accept the Production smoke identity, so it was not treated as evidence of Production Auth parity. After explicit owner approval, only the exact dedicated Production contractor smoke account password was reset to its existing stored value. No new secret was created or displayed.
 
-## Acceptance still required
+## Production tutorial freshness evidence
 
-Before Phase 0.7 can be called complete:
+Production Help Studio and isolated authenticated smoke completed the current tutorial-freshness gate:
 
-1. Restore or supply the approved Production contractor smoke-account access without creating or mutating an account in this slice.
-2. Confirm contractor contextual Estimate Help resolves and opens the current published **How to create an estimate** walkthrough, revision 3.
-3. Reconfirm the Help Studio inventory search for `beta`, `help`, `estimate`, `Work`, `Financials`, `invoice`, `payment`, `calendar`, `dispatch`, `Discover`, `reminder`, and relevant synonyms; compare every published match with the exact Preview behavior.
-4. Finalize tutorial freshness as `NONE`, `UPDATE REQUIRED`, or `UPDATED` only after that current playback comparison.
+- Production Help Studio contains one published walkthrough: **How to create an estimate**, revision 3, 45.12 seconds.
+- Searches for `estimate`, `Work`, `draft`, `quote`, and `pricing` resolve that walkthrough. Searches for the new `beta`, `help`, `Financials`, `invoice`, `payment`, `calendar`, `dispatch`, `Discover`, and `reminder` surfaces return no additional published tutorial match.
+- Full revision 3 playback completed at normal `1x` speed from `0` through `45.12` seconds. Its visible sequence remains Work -> Drafts -> Estimate, customer/home selection, agreed work and pricing, review, and estimate creation.
+- The approved dedicated Production contractor Owner smoke account passed the focused read-only Playwright flow 1/1: sign in, Dashboard, Customers, Service Requests, Work, Drafts, contextual **How to create an estimate** playback dialog/media resolution, Financials, and Calendar. Major console and page-error capture remained clean.
+- No Production business record, Help record, media, publication state, role, permission, or environment setting changed. The only approved Auth change was restoring the dedicated smoke account to its already stored password.
+
+Tutorial impact is `NONE`: Phase 0.7 adds a new guide and boundary copy without changing the published walkthrough path, labels, control order, role assumptions, or outcome.
 
 ## Roadmap handoff
 
-Phase 0.7 remains the active final Launch Foundation gate until current Production Help playback passes and the PR receives normal owner review and explicit merge approval. The next roadmap assignment is Phase 1 / FB-040 controlled pilot preflight, not another broad feature slice.
+Phase 0.7 implementation and acceptance are complete. PR #521 remains a draft until normal owner review and explicit merge approval. After merge, the next roadmap assignment is Phase 1 / FB-040 controlled pilot preflight, not another broad feature slice.
