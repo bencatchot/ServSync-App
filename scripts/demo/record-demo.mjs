@@ -546,7 +546,7 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
       await moveAndClick(page, requestCard.getByRole('button').first(), pacing);
       await requestCard.getByText(scenario.request.description, { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
       await setCaption(page, scenario.scenes[1].caption);
-      await wait(3000);
+      await wait(4000);
     }
     await moveAndClick(page, requestCard.getByTestId('contractor-create-estimate-from-request'), pacing);
     await page.getByTestId('estimate-start-choice').waitFor({ state: 'visible', timeout: 20_000 });
