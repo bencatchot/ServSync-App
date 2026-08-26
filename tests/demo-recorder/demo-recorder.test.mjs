@@ -148,6 +148,7 @@ test('contractor intake recorder is registered for Help and stops before busines
   assert.match(recorderSource, /contractorServiceRequestIntakeScenario/);
   assert.match(recorderSource, /isServiceRequestIntake/);
   assert.match(recorderSource, /requestCard\.getByRole\('button'\)\.first\(\)/);
+  assert.match(recorderSource, /getByText\(scenario\.request\.description, \{ exact: false \}\)\.first\(\)\.waitFor/);
   assert.match(recorderSource, /scenario\.finalState\.startChoiceTitle/);
   assert.match(helpSource, /'contractor-service-request-intake'/);
 });

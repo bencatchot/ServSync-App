@@ -544,7 +544,7 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
 
     if (isServiceRequestIntake) {
       await moveAndClick(page, requestCard.getByRole('button').first(), pacing);
-      await requestCard.getByText(scenario.request.description, { exact: false }).waitFor({ state: 'visible', timeout: 20_000 });
+      await requestCard.getByText(scenario.request.description, { exact: false }).first().waitFor({ state: 'visible', timeout: 20_000 });
       await setCaption(page, scenario.scenes[1].caption);
       await wait(1200);
     }
