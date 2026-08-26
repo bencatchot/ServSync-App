@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runDemoCommand } from './seed-demo-scenario.mjs';
 import { contractorCreateEstimateScenario } from './recorder/scenarios/contractor-create-estimate.mjs';
+import { contractorServiceRequestIntakeScenario } from './recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from './recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from './recorder/scenarios/homeowner-service-request.mjs';
 import { servsyncPlatformIntroductionScenario } from './recorder/scenarios/servsync-platform-introduction.mjs';
@@ -27,6 +28,7 @@ import { promoteValidatedRecording } from './recorder/output-library.mjs';
 
 const scenarios = new Map([
   [homeownerServiceRequestScenario.key, homeownerServiceRequestScenario],
+  [contractorServiceRequestIntakeScenario.key, contractorServiceRequestIntakeScenario],
   [contractorCreateEstimateScenario.key, contractorCreateEstimateScenario],
   [homeownerHomeHistoryScenario.key, homeownerHomeHistoryScenario],
   [servsyncPlatformIntroductionScenario.key, servsyncPlatformIntroductionScenario],
@@ -460,6 +462,7 @@ async function recordHomeownerServiceRequest({ scenario, env, outputDir, pacingN
 }
 
 async function recordContractorCreateEstimate({ scenario, env, outputDir, pacingName, headed }) {
+  const isServiceRequestIntake = scenario.key === contractorServiceRequestIntakeScenario.key;
   const pacing = pacingFor(pacingName);
   const target = assertSafeRecorderEnvironment(env, scenario);
   const contractor = {
@@ -539,33 +542,43 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
     await removeFreezeFrame(page);
     await wait(pacing.initialHold);
 
+    if (isServiceRequestIntake) {
+      await moveAndClick(page, requestCard.getByRole('button').first(), pacing);
+      await requestCard.getByText(scenario.request.description, { exact: false }).waitFor({ state: 'visible', timeout: 20_000 });
+      await setCaption(page, scenario.scenes[1].caption);
+      await wait(1200);
+    }
     await moveAndClick(page, requestCard.getByTestId('contractor-create-estimate-from-request'), pacing);
     await page.getByTestId('estimate-start-choice').waitFor({ state: 'visible', timeout: 20_000 });
-    await setCaption(page, scenario.scenes[1].caption);
-    await wait(650);
-    await moveAndClick(
-      page,
-      page.getByTestId('estimate-start-choice').getByRole('button', { name: /^Build blank estimate/i }),
-      pacing,
-    );
-    await moveAndType(page, page.getByLabel(/^Estimate title$/i), scenario.estimate.title, pacing);
-    await moveAndType(page, page.getByLabel(/^Scope of work$/i), scenario.estimate.scope, pacing);
-    await moveAndClick(page, page.getByRole('button', { name: /^Add blank line$/i }), pacing);
-    await moveAndType(page, page.getByLabel(/^Estimate line item 1 description$/i), scenario.estimate.line.line_title, pacing);
-    await moveAndType(page, page.getByLabel(/^Estimate line item 1 unit price$/i), scenario.estimate.unitPrice, pacing);
+    if (isServiceRequestIntake) {
+      await setCaption(page, scenario.scenes[2].caption);
+    } else {
+      await setCaption(page, scenario.scenes[1].caption);
+      await wait(650);
+      await moveAndClick(
+        page,
+        page.getByTestId('estimate-start-choice').getByRole('button', { name: /^Build blank estimate/i }),
+        pacing,
+      );
+      await moveAndType(page, page.getByLabel(/^Estimate title$/i), scenario.estimate.title, pacing);
+      await moveAndType(page, page.getByLabel(/^Scope of work$/i), scenario.estimate.scope, pacing);
+      await moveAndClick(page, page.getByRole('button', { name: /^Add blank line$/i }), pacing);
+      await moveAndType(page, page.getByLabel(/^Estimate line item 1 description$/i), scenario.estimate.line.line_title, pacing);
+      await moveAndType(page, page.getByLabel(/^Estimate line item 1 unit price$/i), scenario.estimate.unitPrice, pacing);
 
-    estimateSubmissionStarted = true;
-    await moveAndClick(page, page.getByRole('button', { name: /^Save estimate draft$/i }), pacing);
-    await page.getByTestId('contractor-estimate-save-feedback').waitFor({ state: 'visible', timeout: 30_000 });
-    const estimateCard = page.getByTestId('contractor-estimate-card').filter({ hasText: scenario.estimate.title }).first();
-    await estimateCard.waitFor({ state: 'visible', timeout: 30_000 });
-    await estimateCard.scrollIntoViewIfNeeded();
+      estimateSubmissionStarted = true;
+      await moveAndClick(page, page.getByRole('button', { name: /^Save estimate draft$/i }), pacing);
+      await page.getByTestId('contractor-estimate-save-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+      const estimateCard = page.getByTestId('contractor-estimate-card').filter({ hasText: scenario.estimate.title }).first();
+      await estimateCard.waitFor({ state: 'visible', timeout: 30_000 });
+      await estimateCard.scrollIntoViewIfNeeded();
 
-    const adoption = await runDemoCommand(['adopt-estimate', scenario.fixtureScenarioKey], env);
-    if (adoption.verification?.ok !== true) throw new Error('Recorder-created Estimate did not reach the verified estimate_draft checkpoint.');
-    estimateAdopted = true;
+      const adoption = await runDemoCommand(['adopt-estimate', scenario.fixtureScenarioKey], env);
+      if (adoption.verification?.ok !== true) throw new Error('Recorder-created Estimate did not reach the verified estimate_draft checkpoint.');
+      estimateAdopted = true;
+    }
 
-    await setCaption(page, scenario.scenes[2].caption);
+    if (!isServiceRequestIntake) await setCaption(page, scenario.scenes[2].caption);
     await moveCursorToRest(page, pacing);
     await wait(pacing.finalHold);
     const mainText = await page.getByRole('main').innerText();
@@ -576,15 +589,19 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
       'homeowner password': env.DEMO_HOMEOWNER_PASSWORD,
     });
     if (sensitiveIssues.length > 0) throw new Error(sensitiveIssues.join(' '));
-    const expectedFinalText = [
-      scenario.finalState.estimateTitle,
-      scenario.finalState.homeownerLabel,
-      scenario.property.addressLine1,
-      scenario.estimate.scope,
-      '$1895.00',
-    ];
+    const expectedFinalText = isServiceRequestIntake
+      ? [scenario.finalState.startChoiceTitle, scenario.finalState.blankEstimateAction, scenario.finalState.homeownerLabel]
+      : [
+        scenario.finalState.estimateTitle,
+        scenario.finalState.homeownerLabel,
+        scenario.property.addressLine1,
+        scenario.estimate.scope,
+        '$1895.00',
+      ];
     if (expectedFinalText.some((value) => !mainText.includes(value))) {
-      throw new Error('Final contractor scene did not show the expected draft Estimate, customer, property, scope, and total.');
+      throw new Error(isServiceRequestIntake
+        ? 'Final contractor scene did not show the expected request-linked Estimate starting choice and customer.'
+        : 'Final contractor scene did not show the expected draft Estimate, customer, property, scope, and total.');
     }
     if (errors.length > 0) throw new Error(`Recording encountered browser errors:\n${errors.join('\n')}`);
 

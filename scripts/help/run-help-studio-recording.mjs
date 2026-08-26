@@ -13,6 +13,7 @@ import { HUMAN_PACED_PROFILE_NAME } from '../demo/recorder/lib.mjs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_SCENARIOS = new Set([
   'homeowner-service-request',
+  'contractor-service-request-intake',
   'contractor-create-estimate',
   'homeowner-home-history',
   'servsync-platform-introduction',

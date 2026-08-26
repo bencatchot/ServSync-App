@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-26 - FB-040A pilot tutorial readiness candidate
+
+- Starting point: Began from clean merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7` on `codex/fb-040a-tutorial-readiness`.
+- Tutorial coverage: Establishes six protected pilot walkthroughs: one current published Estimate tutorial and five missing contractor/homeowner workflows. The coverage map records each role, lifecycle boundary, contextual destination, recorder scenario, state, recording order, publication gate, and Tutorial Freshness owner.
+- First path: Adds a Demo-only `contractor-service-request-intake` recorder scenario that opens the ready homeowner Request, shows the original message/customer/home, and starts the Estimate from that Request. It stops at the Estimate starting-choice screen and leaves the canonical fixture at `request_ready`; it does not create or adopt business data after seeding.
+- Context: Adds the `contractor.service_requests` Help lookup to the established Service Requests workspace. It remains invisible until a matching approved tutorial is published through Help Studio.
+- Boundaries: Source, tests, contextual lookup, and planning only. No SQL, schema, RLS, RPC, authentication, role, provider, environment, deployment setting, Production data, Help record, media, or publication state is changed. Production Help publication requires separate explicit approval.
+- Validation: Demo recorder contracts 40/40; focused Help/FB-040A contracts 5/5; full architecture 21/21; TypeScript; Production build; exact 79-warning ESLint budget; exact 50,824-line App budget; and `git diff --check` pass. The live Demo recorder attempt failed closed before seeding because this worktree lacks the dedicated Demo anon/service credentials; no Demo or Production data changed and no media was promoted. See [the FB-040A acceptance record](../qa/ServSync_FB_040A_Tutorial_Readiness_Acceptance_2026-08-26.md).
+- Tutorial impact: `UPDATED` for source readiness. The published **How to create an estimate** revision 3 remains unchanged and current; no published tutorial is replaced by this candidate.
+- Roadmap: Phase 0 is recorded complete through merged PR #521. FB-040A Tutorial Readiness is now the active controlled-pilot preflight assignment.
+
 ## 2026-08-26 - Phase 0.7 honest beta boundaries and contextual help candidate
 
 - Starting point: Began from exact merged PR #520 main commit `7470d4e12a7695d93e98269343a834c26555d81d` on `codex/phase-0-7-beta-boundaries`; the candidate is reviewable in draft PR #521.
