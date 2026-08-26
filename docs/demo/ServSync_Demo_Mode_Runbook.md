@@ -122,6 +122,14 @@ DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop npm run demo:reset
 npm run demo:checkpoints
 ```
 
+Phase 0.6 adds one deliberately protected all-checkpoint command:
+
+```bash
+npm run demo:qa:matrix -- --execute-demo
+```
+
+It refuses before credential loading unless the exact `--execute-demo` flag is present. Run it only after separate owner approval and after applying the exact reviewed `servsync-demo-mode-invoice-payment-checkpoint-reset.sql` to dedicated Demo. It restores, verifies, and resets every supported checkpoint, repeats `invoice_paid`, deliberately interrupts after registered Invoice creation, proves next-run reconciliation, and finishes with exact reset. It never targets Production or shared Sandbox and enables no external delivery.
+
 The reusable Demo Recorder builds on the same private fixture boundary. See [ServSync Demo Recorder v1](ServSync_Demo_Recorder_v1.md). Its first canonical command is:
 
 ```bash
@@ -211,8 +219,15 @@ Slice 2A adds deterministic checkpoint restoration for the existing `water_heate
 | `job_in_progress` | Contractor | Controlled demo fixture state for active work. | Linked job status `in_progress`; some estimate-derived work items complete and at least one still open. |
 | `job_review_ready` | Contractor | All seeded work items completed before lightweight completion. | Linked job remains `in_progress`; all estimate-derived work items complete; no completed-at timestamp. |
 | `job_completed` | Contractor | Lightweight current-product completion. | Linked job status `completed`, completed timestamp present, visit event completed, no closed timestamp, invoice, Home History row, report file, or fabricated `job_completed` workflow event. |
+| `invoice_draft` | Contractor | Completed Job handoff into Financials. | One canonical Job-derived Draft Invoice with exact registered line ownership; no payment or Home History row. |
+| `invoice_sent` | Homeowner | Open homeowner-visible Invoice. | Exact Invoice status `sent` with issued evidence; no payment. |
+| `invoice_viewed` | Contractor | Real homeowner view transition. | Exact Invoice status `viewed` through `servsync_homeowner_view_invoice`; no payment. |
+| `invoice_partially_paid` | Contractor | Durable remaining-balance state. | One exact registered append-only offline payment row; Invoice status `partially_paid`; ledger total equals `amount_paid_cents`. |
+| `invoice_paid` | Contractor | Exact final-payment state. | Two exact registered offline payment rows (partial plus final); Invoice status `paid`, zero balance, `paid_at`, and ledger total equals the Invoice total. |
+| `home_history_updated` | Homeowner | Canonical finalized Job report. | One normal-product PDF report, document, Home History row, notification, and SHA-verified private object adopted by the existing recorder. |
+| `invoice_home_history_updated` | Homeowner | Paid Invoice follow-up record. | Paid Invoice filed through the homeowner RPC, one structured Home History row, and one exact linked open reminder. |
 
-The base Slice 2B seeder still does not directly support `estimate_viewed`, `invoice_draft`, `invoice_sent`, `invoice_paid`, or `home_history_updated`. The Home History recorder reaches `home_history_updated` only through normal contractor UI finalization plus exact private adoption; it is not a general seed checkpoint.
+`estimate_viewed` is not a ServSync Estimate state and is not a checkpoint. Declined/expired/cancelled/overdue/void branches remain focused regressions. Direct `home_history_updated` seeding remains unsupported: the matrix reaches it only through normal contractor UI finalization plus exact private adoption. The Financials checkpoints use the established authenticated product RPCs and exact registry ownership; no payment processor call occurs.
 
 ## Checkpoint Reset and Restore Behavior
 
@@ -235,6 +250,8 @@ The `connected_request_ready` checkpoint creates the normal active demo-seed con
 - Lower checkpoints explicitly require later records to be absent. For example, `request_ready` fails if an estimate or job remains, and `estimate_accepted` fails if a linked job or `job_created` event exists.
 
 Registry rows record the creation step/checkpoint for each resettable row. Disposable rows remain tied to the exact run that created them; the revision-backed canonical property graph is transferred to the next successful run after exact revalidation. No `is_demo` fields are added to product tables. Slice 2B extends the reset allowlist only for registered `contractor_visit_events` rows created by the demo scheduling checkpoint.
+
+Phase 0.6 extends that same registry—not a second framework—with exact `home_reminders` and `invoice_offline_payment_records` ownership. Immutable ledger cleanup is allowed only when the payment row has one of the two exact Demo payment roles and points to an Invoice registered to the same run. The postgres-owned reset helper transactionally locks the ledger while bypassing only its named immutable trigger for the exact registered row, then restores the trigger before dependency-ordered Invoice cleanup. Browser roles remain denied; broad deletion, truncation, foreign Invoice cleanup, and Production/Sandbox application remain refused.
 
 ## Scenario Contents
 

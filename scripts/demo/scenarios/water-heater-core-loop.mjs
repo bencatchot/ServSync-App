@@ -13,16 +13,24 @@ export const supportedCheckpointKeys = [
   'job_in_progress',
   'job_review_ready',
   'job_completed',
+  'invoice_draft',
+  'invoice_sent',
+  'invoice_viewed',
+  'invoice_partially_paid',
+  'invoice_paid',
   'home_history_updated',
+  'invoice_home_history_updated',
 ];
 
 export const defaultCheckpointKey = 'job_created';
 
 export const deferredCheckpointKeys = [
-  'estimate_viewed',
-  'invoice_draft',
-  'invoice_sent',
-  'invoice_paid',
+  // Negative/exception branches remain focused regressions rather than launch fixtures.
+  'estimate_declined',
+  'estimate_expired',
+  'job_cancelled',
+  'invoice_overdue',
+  'invoice_void',
 ];
 
 export const lifecycleStepKeys = [
@@ -41,7 +49,13 @@ export const lifecycleStepKeys = [
   'jobInProgress',
   'jobReviewReady',
   'jobCompleted',
+  'invoiceDraft',
+  'invoiceSent',
+  'invoiceViewed',
+  'invoicePartiallyPaid',
+  'invoicePaid',
   'homeHistoryUpdated',
+  'invoiceHomeHistoryUpdated',
 ];
 
 export const checkpointDefinitions = [
@@ -347,6 +361,98 @@ export const checkpointDefinitions = [
     },
   },
   {
+    key: 'invoice_draft',
+    displayName: 'Invoice Draft',
+    primaryRole: 'contractor',
+    narrativePurpose: 'Show the completed Job carried into a truthful canonical draft Invoice in Financials.',
+    requiredSteps: [
+      'identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview',
+      'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled',
+      'jobInProgress', 'jobReviewReady', 'jobCompleted', 'invoiceDraft',
+    ],
+    expected: {
+      requestCount: 1, estimateStatus: 'accepted', estimateCount: 1, approvalEventCount: 1,
+      jobCount: 1, jobCreatedEventCount: 1, jobStatus: 'completed', jobCompletedAt: true,
+      jobClosedAt: false, visitEventCount: 1, visitEventStatus: 'completed', visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5, openWorkItemCount: 0, invoiceCount: 1, invoiceStatus: 'draft',
+      invoicePaymentCount: 0, invoiceAmountPaidCents: 0, homeHistoryCount: 0, reminderCount: 0,
+    },
+  },
+  {
+    key: 'invoice_sent',
+    displayName: 'Invoice Sent',
+    primaryRole: 'homeowner',
+    narrativePurpose: 'Show the homeowner-visible open Invoice after the contractor sends it.',
+    requiredSteps: [
+      'identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview',
+      'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled',
+      'jobInProgress', 'jobReviewReady', 'jobCompleted', 'invoiceDraft', 'invoiceSent',
+    ],
+    expected: {
+      requestCount: 1, estimateStatus: 'accepted', estimateCount: 1, approvalEventCount: 1,
+      jobCount: 1, jobCreatedEventCount: 1, jobStatus: 'completed', jobCompletedAt: true,
+      jobClosedAt: false, visitEventCount: 1, visitEventStatus: 'completed', visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5, openWorkItemCount: 0, invoiceCount: 1, invoiceStatus: 'sent',
+      invoicePaymentCount: 0, invoiceAmountPaidCents: 0, homeHistoryCount: 0, reminderCount: 0,
+    },
+  },
+  {
+    key: 'invoice_viewed',
+    displayName: 'Invoice Viewed',
+    primaryRole: 'contractor',
+    narrativePurpose: 'Show the real homeowner-view transition on the open Invoice.',
+    requiredSteps: [
+      'identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview',
+      'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled',
+      'jobInProgress', 'jobReviewReady', 'jobCompleted', 'invoiceDraft', 'invoiceSent', 'invoiceViewed',
+    ],
+    expected: {
+      requestCount: 1, estimateStatus: 'accepted', estimateCount: 1, approvalEventCount: 1,
+      jobCount: 1, jobCreatedEventCount: 1, jobStatus: 'completed', jobCompletedAt: true,
+      jobClosedAt: false, visitEventCount: 1, visitEventStatus: 'completed', visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5, openWorkItemCount: 0, invoiceCount: 1, invoiceStatus: 'viewed',
+      invoicePaymentCount: 0, invoiceAmountPaidCents: 0, homeHistoryCount: 0, reminderCount: 0,
+    },
+  },
+  {
+    key: 'invoice_partially_paid',
+    displayName: 'Invoice Partially Paid',
+    primaryRole: 'contractor',
+    narrativePurpose: 'Show one durable offline payment with an exact remaining balance.',
+    requiredSteps: [
+      'identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview',
+      'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled',
+      'jobInProgress', 'jobReviewReady', 'jobCompleted', 'invoiceDraft', 'invoiceSent', 'invoiceViewed',
+      'invoicePartiallyPaid',
+    ],
+    expected: {
+      requestCount: 1, estimateStatus: 'accepted', estimateCount: 1, approvalEventCount: 1,
+      jobCount: 1, jobCreatedEventCount: 1, jobStatus: 'completed', jobCompletedAt: true,
+      jobClosedAt: false, visitEventCount: 1, visitEventStatus: 'completed', visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5, openWorkItemCount: 0, invoiceCount: 1, invoiceStatus: 'partially_paid',
+      invoicePaymentCount: 1, invoiceAmountPaidCents: 40000, homeHistoryCount: 0, reminderCount: 0,
+    },
+  },
+  {
+    key: 'invoice_paid',
+    displayName: 'Invoice Paid',
+    primaryRole: 'contractor',
+    narrativePurpose: 'Show the exact final offline payment and durable paid Invoice state.',
+    requiredSteps: [
+      'identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview',
+      'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled',
+      'jobInProgress', 'jobReviewReady', 'jobCompleted', 'invoiceDraft', 'invoiceSent', 'invoiceViewed',
+      'invoicePartiallyPaid', 'invoicePaid',
+    ],
+    expected: {
+      requestCount: 1, estimateStatus: 'accepted', estimateCount: 1, approvalEventCount: 1,
+      jobCount: 1, jobCreatedEventCount: 1, jobStatus: 'completed', jobCompletedAt: true,
+      jobClosedAt: false, visitEventCount: 1, visitEventStatus: 'completed', visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5, openWorkItemCount: 0, invoiceCount: 1, invoiceStatus: 'paid',
+      invoicePaymentCount: 2, invoiceAmountPaidCents: 216500, homeHistoryCount: 0, reminderCount: 0,
+    },
+  },
+  {
     key: 'home_history_updated',
     displayName: 'Home History Report Ready',
     primaryRole: 'homeowner',
@@ -388,6 +494,25 @@ export const checkpointDefinitions = [
       homeHistoryCount: 1,
       reportDocumentCount: 1,
       reportNotificationCount: 1,
+    },
+  },
+  {
+    key: 'invoice_home_history_updated',
+    displayName: 'Paid Invoice Home History Ready',
+    primaryRole: 'homeowner',
+    narrativePurpose: 'Show the paid Invoice filed to Home History with one linked follow-up reminder and reload-stable lineage.',
+    requiredSteps: [
+      'identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview',
+      'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled',
+      'jobInProgress', 'jobReviewReady', 'jobCompleted', 'invoiceDraft', 'invoiceSent', 'invoiceViewed',
+      'invoicePartiallyPaid', 'invoicePaid', 'invoiceHomeHistoryUpdated',
+    ],
+    expected: {
+      requestCount: 1, estimateStatus: 'accepted', estimateCount: 1, approvalEventCount: 1,
+      jobCount: 1, jobCreatedEventCount: 1, jobStatus: 'completed', jobCompletedAt: true,
+      jobClosedAt: false, visitEventCount: 1, visitEventStatus: 'completed', visitSharedWithHomeowner: false,
+      completedWorkItemCount: 5, openWorkItemCount: 0, invoiceCount: 1, invoiceStatus: 'paid',
+      invoicePaymentCount: 2, invoiceAmountPaidCents: 216500, homeHistoryCount: 1, reminderCount: 1,
     },
   },
 ];
@@ -553,6 +678,12 @@ export const dateOffsets = {
   jobInProgressAtHours: -0.5,
   jobReviewReadyAtHours: -0.25,
   jobCompletedAtHours: -0.1,
+  invoiceCreatedAtHours: -0.08,
+  invoiceSentAtHours: -0.07,
+  invoiceViewedAtHours: -0.06,
+  invoicePartialPaidAtHours: -0.05,
+  invoicePaidAtHours: -0.04,
+  invoiceHomeHistoryAtHours: -0.03,
   visitWindowStartDays: 1,
   waterHeaterInstallDateDays: -2555,
   waterHeaterWarrantyDateDays: 1095,
@@ -571,7 +702,9 @@ export const presentationNotes = [
   'Use job_in_progress for partial work-item completion without invoices.',
   'Use job_review_ready for all work items complete before final job completion.',
   'Use job_completed for lightweight completion without invoice or Home History filing.',
+  'Use invoice_draft, invoice_sent, invoice_viewed, invoice_partially_paid, and invoice_paid for the canonical Financials states.',
   'Use home_history_updated for the homeowner Home History clip with one finalized, registry-owned PDF report.',
+  'Use invoice_home_history_updated for the paid Invoice, filed Home History, linked reminder, and reload-persistence state.',
 ];
 
 export const waterHeaterCoreLoopScenario = {

@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const scriptPath = resolve(process.cwd(), 'scripts/demo/seed-demo-scenario.mjs');
-const manifestPath = resolve(process.cwd(), 'scripts/demo/scenarios/water-heater-core-loop.mjs');
 const appPath = resolve(process.cwd(), 'src/App.tsx');
 const packagePath = resolve(process.cwd(), 'package.json');
 const connectionSharedPropertiesSqlPath = resolve(process.cwd(), 'servsync-connection-shared-properties.sql');
@@ -31,10 +30,18 @@ test.describe('Demo Mode checkpoint source checks', () => {
       'job_in_progress',
       'job_review_ready',
       'job_completed',
+      'invoice_draft',
+      'invoice_sent',
+      'invoice_viewed',
+      'invoice_partially_paid',
+      'invoice_paid',
+      'home_history_updated',
+      'invoice_home_history_updated',
     ]);
     expect(manifest.deferredCheckpointKeys).toEqual(
-      expect.arrayContaining(['estimate_viewed', 'invoice_draft', 'invoice_sent', 'invoice_paid', 'home_history_updated'])
+      expect.arrayContaining(['estimate_declined', 'estimate_expired', 'job_cancelled', 'invoice_overdue', 'invoice_void'])
     );
+    expect(manifest.deferredCheckpointKeys).not.toContain('estimate_viewed');
     expect(manifest.deferredCheckpointKeys).not.toEqual(expect.arrayContaining(['job_in_progress', 'job_completed']));
     expect(manifest.checkpointDefinitions.map((checkpoint: { key: string }) => checkpoint.key)).toEqual(manifest.supportedCheckpointKeys);
     expect(manifest.checkpointByKey.contractor_discovery_ready.requiredSteps).toEqual([
@@ -112,7 +119,8 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(module.parseCheckpointKey(['--checkpoint=request_ready'])).toBe('request_ready');
     expect(module.parseCheckpointKey(['--checkpoint', 'estimate_sent'])).toBe('estimate_sent');
     expect(module.parseCheckpointKey(['--checkpoint=job_completed'])).toBe('job_completed');
-    expect(() => module.parseCheckpointKey(['--checkpoint=estimate_viewed'])).toThrow(/Deferred demo checkpoint/);
+    expect(() => module.parseCheckpointKey(['--checkpoint=estimate_viewed'])).toThrow(/Unsupported demo checkpoint/);
+    expect(module.parseCheckpointKey(['--checkpoint=invoice_paid'])).toBe('invoice_paid');
     expect(() => module.parseCheckpointKey(['--checkpoint=job'])).toThrow(/Unsupported demo checkpoint/);
     expect(() => module.parseCheckpointKey(['--checkpoint='])).toThrow(/checkpoint key is required|Unsupported demo checkpoint/);
     expect(() => module.parseCheckpointKey(['--check=request_ready'])).toThrow(/Unsupported demo argument/);
@@ -192,8 +200,8 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(script).toMatch(/Expected \$\{checkpoint\.expected\.completedWorkItemCount\} completed job work items/);
     expect(script).toMatch(/Expected \$\{checkpoint\.expected\.openWorkItemCount\} open job work items/);
     expect(script).toMatch(/Demo job scheduling must not create homeowner appointment proposals/);
-    expect(script).toMatch(/Demo Slice 2B must not create invoices/);
-    expect(script).toMatch(/Demo Slice 2B must not file Home History rows/);
+    expect(script).toContain('Checkpoint ${checkpointKey} must not create Invoices');
+    expect(script).toContain('Checkpoint ${checkpointKey} must not file Home History rows');
     expect(script).toMatch(/Demo Slice 2B must not fabricate job_completed workflow events/);
   });
 

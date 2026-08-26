@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "demo-mode-invoice-payment-checkpoint-reset-v1",
+      "artifact": "servsync-demo-mode-invoice-payment-checkpoint-reset.sql (SHA-256 d1454de4d86658f59f06b968a2028e1578cd4a986a55ed1e2db30af0dccf4c3b)",
+      "environments": {
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated-Demo fixture registry/reset extension. Shared Sandbox retains its existing exact-prefix CLI cleanup and receives no schema or RPC change."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Dedicated-Demo fixture registry/reset extension. Production application is prohibited and no Production schema, RPC, permission, or data change is part of Phase 0.6."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Source-only Phase 0.6 migration is complete but unapplied. Separate owner approval is required to apply exact SHA-256 d1454de4d86658f59f06b968a2028e1578cd4a986a55ed1e2db30af0dccf4c3b to Demo bdytwgejqnlblhrnqxkp, update the intentional-addition fingerprint after exact catalog verification, and run the destructive live checkpoint matrix."
+        }
+      }
+    },
+    {
       "id": "core-record-finalization-durable-idempotency-v1",
       "artifact": "servsync-core-record-finalization-durable-idempotency.sql (SHA-256 b864e61a693ed881eb2abf497adf1833c48cd9803f185ac393e4f8f420fb4461)",
       "environments": {

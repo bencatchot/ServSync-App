@@ -1,9 +1,12 @@
 import { expect, test, type Browser, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
+import {
+  cleanupCoreLoopFixtures,
+  recordCoreLoopFixturePrefix,
+  requireLinkedSandboxCleanup,
+} from './helpers/coreLoopFixtures';
 import { escapeRegExp, timestampForRecord } from './helpers/customers';
 import { credentialsFor, requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
@@ -14,108 +17,6 @@ const PRODUCTION_HOSTS = new Set(['servsync.app', 'www.servsync.app']);
 const PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN = 'ALLOW_PRODUCTION_TEST_ACCOUNT_SMOKE';
 const DURABLE_SANDBOX_SERVER_ORIGIN = 'https://servsync-stripe-sandbox.vercel.app';
 const FIELD_CRITICAL_MOBILE_ACCEPTANCE = process.env.SERVSYNC_FIELD_MOBILE_ACCEPTANCE === 'true';
-
-function quoteSqlText(value: string) {
-  if (!/^E2E (?:Core Loop|Partial Payment) \d{14}$/.test(value)) {
-    throw new Error(`Refusing core-loop cleanup for unexpected record prefix "${value}".`);
-  }
-  return `'${value.replaceAll("'", "''")}%'`;
-}
-
-function requireLinkedSandboxCleanup() {
-  let linkedProject = '';
-  try {
-    linkedProject = readFileSync('supabase/.temp/project-ref', 'utf8').trim();
-  } catch {
-    throw new Error(`Refusing core-loop mutation without a local Supabase CLI link to Sandbox ${SANDBOX_SUPABASE_REF}; cleanup cannot be guaranteed.`);
-  }
-  if (linkedProject !== SANDBOX_SUPABASE_REF) {
-    throw new Error(`Refusing core-loop mutation outside linked Sandbox ${SANDBOX_SUPABASE_REF}.`);
-  }
-}
-
-function cleanupCoreLoopFixtures(recordPrefixes: string[]) {
-  if (recordPrefixes.length === 0) return;
-  const linkedProject = readFileSync('supabase/.temp/project-ref', 'utf8').trim();
-  if (linkedProject !== SANDBOX_SUPABASE_REF) {
-    throw new Error(`Refusing core-loop cleanup outside Sandbox ${SANDBOX_SUPABASE_REF}.`);
-  }
-  const patterns = [...new Set(recordPrefixes)].map(quoteSqlText).join(', ');
-  const sql = `
-begin;
-create temporary table audit_request_ids on commit drop as
-  select id from public.service_requests where title like any (array[${patterns}]);
-create temporary table audit_estimate_ids on commit drop as
-  select id from public.estimates where title like any (array[${patterns}]);
-create temporary table audit_job_ids on commit drop as
-  select id from public.inspections where name like any (array[${patterns}]);
-create temporary table audit_invoice_ids on commit drop as
-  select id from public.invoices where title like any (array[${patterns}]);
-delete from public.home_reminders where title like any (array[${patterns}]);
-delete from public.workflow_thread_reads
- where service_request_id in (select id from audit_request_ids)
-    or inspection_id in (select id from audit_job_ids);
-delete from public.workflow_activity_events
- where service_request_id in (select id from audit_request_ids)
-    or estimate_id in (select id from audit_estimate_ids)
-    or inspection_id in (select id from audit_job_ids)
-    or invoice_id in (select id from audit_invoice_ids);
-delete from public.workflow_messages
- where service_request_id in (select id from audit_request_ids)
-    or inspection_id in (select id from audit_job_ids);
-delete from public.notifications
- where request_id in (select id from audit_request_ids)
-    or estimate_id in (select id from audit_estimate_ids)
-    or invoice_id in (select id from audit_invoice_ids);
-alter table public.invoice_offline_payment_records disable trigger invoice_offline_payment_records_immutable;
-delete from public.invoice_offline_payment_records where invoice_id in (select id from audit_invoice_ids);
-alter table public.invoice_offline_payment_records enable trigger invoice_offline_payment_records_immutable;
-delete from public.invoice_backlog_items where invoice_id in (select id from audit_invoice_ids);
-delete from public.invoice_line_items where invoice_id in (select id from audit_invoice_ids);
-update public.job_work_items
-   set billing_status = case when billing_status = 'not_billable' then 'not_billable' else 'unbilled' end,
-       reserved_invoice_id = null,
-       invoiced_invoice_id = null,
-       updated_at = now()
- where reserved_invoice_id in (select id from audit_invoice_ids)
-    or invoiced_invoice_id in (select id from audit_invoice_ids);
-delete from public.invoices where id in (select id from audit_invoice_ids);
-delete from public.job_work_items where inspection_id in (select id from audit_job_ids);
-delete from public.estimate_line_items where estimate_id in (select id from audit_estimate_ids);
-delete from public.inspections where id in (select id from audit_job_ids);
-delete from public.estimates where id in (select id from audit_estimate_ids);
-delete from public.service_request_media where request_id in (select id from audit_request_ids);
-delete from public.service_request_messages where request_id in (select id from audit_request_ids);
-delete from public.service_requests where id in (select id from audit_request_ids);
-do $$
-begin
-  if exists (select 1 from public.service_requests where title like any (array[${patterns}]))
-     or exists (select 1 from public.estimates where title like any (array[${patterns}]))
-     or exists (select 1 from public.inspections where name like any (array[${patterns}]))
-     or exists (select 1 from public.invoices where title like any (array[${patterns}]))
-     or exists (select 1 from public.home_reminders where title like any (array[${patterns}]))
-     or exists (select 1 from public.workflow_thread_reads where service_request_id in (select id from audit_request_ids) or inspection_id in (select id from audit_job_ids))
-     or exists (select 1 from public.workflow_activity_events where service_request_id in (select id from audit_request_ids) or estimate_id in (select id from audit_estimate_ids) or inspection_id in (select id from audit_job_ids) or invoice_id in (select id from audit_invoice_ids))
-     or exists (select 1 from public.workflow_messages where service_request_id in (select id from audit_request_ids) or inspection_id in (select id from audit_job_ids))
-     or exists (select 1 from public.notifications where request_id in (select id from audit_request_ids) or estimate_id in (select id from audit_estimate_ids) or invoice_id in (select id from audit_invoice_ids))
-     or exists (select 1 from public.invoice_offline_payment_records where invoice_id in (select id from audit_invoice_ids))
-     or exists (select 1 from public.invoice_backlog_items where invoice_id in (select id from audit_invoice_ids))
-     or exists (select 1 from public.invoice_line_items where invoice_id in (select id from audit_invoice_ids))
-     or exists (select 1 from public.job_work_items where inspection_id in (select id from audit_job_ids) or reserved_invoice_id in (select id from audit_invoice_ids) or invoiced_invoice_id in (select id from audit_invoice_ids))
-     or exists (select 1 from public.estimate_line_items where estimate_id in (select id from audit_estimate_ids))
-     or exists (select 1 from public.service_request_media where request_id in (select id from audit_request_ids))
-     or exists (select 1 from public.service_request_messages where request_id in (select id from audit_request_ids)) then
-    raise exception 'Core-loop fixture cleanup left residue';
-  end if;
-end $$;
-commit;
-  `.trim();
-  execFileSync('supabase', ['db', 'query', '--linked', sql], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    stdio: 'pipe',
-  });
-}
 
 async function installSandboxServerRouteProxy(page: Page) {
   const appUrl = new URL(requiredEnv('TEST_APP_URL'));
@@ -789,6 +690,7 @@ test.describe('full sandbox core loop', () => {
     const timestamp = timestampForRecord();
     const recordPrefix = `E2E Core Loop ${timestamp}`;
     recordPrefixes.push(recordPrefix);
+    recordCoreLoopFixturePrefix(recordPrefix);
     const { invoiceTitle } = await createConnectedSentInvoice(browser, recordPrefix, testInfo);
 
     const contractorPayment = await freshRolePage(browser, 'contractor');
@@ -809,6 +711,7 @@ test.describe('full sandbox core loop', () => {
 
     const recordPrefix = `E2E Partial Payment ${timestampForRecord()}`;
     recordPrefixes.push(recordPrefix);
+    recordCoreLoopFixturePrefix(recordPrefix);
     const { invoiceTitle } = await createConnectedSentInvoice(browser, recordPrefix, testInfo);
 
     const contractorPayment = await freshRolePage(browser, 'contractor');

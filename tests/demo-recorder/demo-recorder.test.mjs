@@ -105,6 +105,15 @@ test('recorder navigates through the current Work destination, not the retired J
   }
 });
 
+test('Home History recorder follows the current Properties workspace instead of the retired page heading', () => {
+  const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
+  assert.match(recorderSource, /homeowner-properties-workspace/);
+  assert.match(recorderSource, /property-workspace-title/);
+  assert.doesNotMatch(recorderSource, /Home \\\/ Properties/);
+  assert.match(recorderSource, /result\.error\?\.code === 'ENOENT'/);
+  assert.match(recorderSource, /from pypdf import PdfReader/);
+});
+
 test('operator arguments stay intentionally small', () => {
   assert.deepEqual(parseRecorderArgs(['homeowner-service-request']), {
     scenarioKey: 'homeowner-service-request', pacing: 'marketing', outputDir: null, headed: false,
