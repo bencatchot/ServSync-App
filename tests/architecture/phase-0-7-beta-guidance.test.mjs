@@ -18,6 +18,7 @@ test('both pilot roles receive one stable Beta Guide destination and Support han
   assert.match(contractorNavigation, /\| 'beta'/);
   assert.match(guide, /data-testid=\{`\$\{role\}-beta-guide`\}/);
   assert.match(guide, /Open Support/);
+  assert.match(guide, /closest\('main'\)\?\.scrollTo\(\{ top: 0, behavior: 'auto' \}\)/);
 });
 
 test('Beta Guide distinguishes available, manual, and unavailable capability without inventing promises', () => {

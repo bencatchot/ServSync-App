@@ -14,6 +14,8 @@ Draft PR: #521
 
 The Phase 0.7 candidate gives each pilot role one stable **Help -> Beta Guide** destination. The guide distinguishes capability that is available in the controlled beta, intentionally manual, or unavailable. It also provides a direct Support handoff and, for contractors, reuses the existing published contextual **How to create an estimate** walkthrough instead of creating another help-media system.
 
+Preview review also confirmed that the dashboard feedback card can sit below other content. The guide therefore resets both the desktop workspace scroller and the mobile page scroller when it opens, and resets the same scrollers after its Support handoff, so the destination begins at its title instead of inheriting a prior screen position.
+
 The highest-risk workflow surfaces also carry concise local boundaries:
 
 - Contractor Financials and homeowner Invoices state that payment collection happens outside ServSync during the controlled beta.

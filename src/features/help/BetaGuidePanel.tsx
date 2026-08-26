@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { ArrowRight, CalendarDays, CheckCircle2, Clock3, MessageSquare, ShieldCheck, Smartphone, XCircle } from 'lucide-react';
 
 export type BetaGuideRole = 'contractor' | 'homeowner';
@@ -178,9 +178,24 @@ export function BetaFeedbackPrompt({
 
 export function BetaGuidePanel({ role, onOpenSupport, contextualHelp }: BetaGuidePanelProps) {
   const roleLabel = role === 'contractor' ? 'contractor' : 'homeowner';
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    panelRef.current?.closest('main')?.scrollTo({ top: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  const openSupport = () => {
+    const scrollContainer = panelRef.current?.closest('main');
+    onOpenSupport();
+    window.requestAnimationFrame(() => {
+      scrollContainer?.scrollTo({ top: 0, behavior: 'auto' });
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  };
 
   return (
-    <div className="space-y-5" data-testid={`${role}-beta-guide`}>
+    <div ref={panelRef} className="space-y-5" data-testid={`${role}-beta-guide`}>
       <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-sm">
         <div className="grid gap-0 lg:grid-cols-[1.25fr_0.75fr]">
           <div className="p-5 sm:p-6">
@@ -247,7 +262,7 @@ export function BetaGuidePanel({ role, onOpenSupport, contextualHelp }: BetaGuid
           {contextualHelp}
           <button
             type="button"
-            onClick={onOpenSupport}
+            onClick={openSupport}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700"
           >
             Open Support
