@@ -6,7 +6,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-26 - Phase 0.7 honest beta boundaries and contextual help candidate
 
-- Starting point: Began from exact merged PR #520 main commit `7470d4e12a7695d93e98269343a834c26555d81d` on `codex/phase-0-7-beta-boundaries`.
+- Starting point: Began from exact merged PR #520 main commit `7470d4e12a7695d93e98269343a834c26555d81d` on `codex/phase-0-7-beta-boundaries`; the candidate is reviewable in draft PR #521.
 - Product: Adds one role-aware **Beta Guide** destination under Help for homeowners and contractors. It separates available, manual, and unavailable pilot capability, keeps Support one click away, and reuses the published contextual **How to create an estimate** walkthrough for contractors. Existing dashboard feedback is consolidated into one shared prompt with direct Beta Guide, bug, confusion, improvement, trust, and privacy handoffs where applicable.
 - Contextual truth: Financials/Invoices state that payment collection remains outside ServSync; Calendar states that external sync, automatic reminders, route optimization, and advanced dispatch are unavailable; Discover states that coverage, ranking, response, and lead volume are not guaranteed. The guide also names unavailable accounting sync, automatic email/text/push reminders, native apps, and broad marketplace lead generation.
 - Boundaries: Presentation and help navigation only. No SQL, schema, RLS, RPC, authentication, role, permission, provider, notification, online-payment, dispatch, native/offline, environment, deployment-setting, or Production-data behavior changes.

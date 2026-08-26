@@ -8,6 +8,8 @@ Branch: `codex/phase-0-7-beta-boundaries`
 
 Starting main commit: `7470d4e12a7695d93e98269343a834c26555d81d`
 
+Draft PR: #521
+
 ## Outcome
 
 The Phase 0.7 candidate gives each pilot role one stable **Help -> Beta Guide** destination. The guide distinguishes capability that is available in the controlled beta, intentionally manual, or unavailable. It also provides a direct Support handoff and, for contractors, reuses the existing published contextual **How to create an estimate** walkthrough instead of creating another help-media system.
