@@ -160,6 +160,7 @@ import { CONTRACTOR_MARKETING_UI_ENABLED } from './features/marketing/contractor
 import { marketingFacebookReturnStatus } from './features/marketing/marketingFacebookConnection';
 import { HelpStudioWorkspace } from './features/help/HelpStudioWorkspace';
 import { ContextualHelp } from './features/help/ContextualHelp';
+import { BetaFeedbackPrompt, BetaGuidePanel } from './features/help/BetaGuidePanel';
 import { FilterSummary } from './features/search/FilterSummary';
 import {
   canCreateContractorLocalCustomersUi,
@@ -975,7 +976,7 @@ type StarterEstimateTemplate = {
   terms: string;
   line_items: EstimateTemplateLineItem[];
 };
-type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'trust' | 'privacy' | 'support';
+type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'beta' | 'trust' | 'privacy' | 'support';
 type HomeownerRecordSection = 'needs_review' | 'agreement_offers' | 'open_invoices' | 'accepted' | 'agreements' | 'closed';
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
@@ -9590,7 +9591,7 @@ function MissingProfile({
 }
 
 function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
-  const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'trust', 'privacy', 'support'] as const, 'overview'));
+  const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'beta', 'trust', 'privacy', 'support'] as const, 'overview'));
   const [homeownerPropertySection, setHomeownerPropertySection] = useState<HomeownerPropertySection>(() => storedTab(STORAGE_KEYS.homeownerPropertySection, ['overview', 'map', 'access', 'settings'] as const, 'overview'));
   const [homeowner, setHomeowner] = useState<HomeownerProfile | null>(null);
   const [homes, setHomes] = useState<HomeProfile[]>([]);
@@ -13453,6 +13454,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     log: 'Home History',
     documents: 'Documents',
     discover: 'Discover',
+    beta: 'Beta Guide',
     trust: 'Trust & Safety',
     privacy: 'Privacy & Data',
     support: 'Support',
@@ -14534,6 +14536,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <p className="text-sm font-semibold text-blue-900">Review estimates, invoices, and service plan offers from connected contractors</p>
           <p className="mt-1 text-sm text-blue-800">
             Drafts stay private to the contractor. Sent estimates and plan offers need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
+          </p>
+          <p className="mt-2 text-xs font-semibold leading-5 text-blue-900">
+            Payment collection happens outside ServSync during the controlled beta. ServSync can show and file eligible Invoice records, but it does not take your payment here.
           </p>
         </div>
 
@@ -16828,6 +16833,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
+        { id: 'beta',         label: 'Beta Guide',        icon: <HelpCircle size={17} />, group: 'Help' },
         { id: 'trust',        label: 'Trust & Safety',    icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',    icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',           icon: <MessageSquare size={17} />, badge: homeownerSupportBadgeCount, group: 'Help' },
@@ -17300,27 +17306,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
 
           {!SERVSYNC_DEMO_PRESENTATION_MODE && (
-          <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-950">Help improve ServSync</p>
-                <p className="mt-1 text-sm leading-5 text-slate-500">
-                  Tell us what broke, what confused you, or what would make this easier. Please do not include sensitive home details unless support needs them.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => openHomeownerBetaFeedback('bug', 'Bug report')} className={`${buttonClass('secondary')} bg-white`}>
-                  Report bug
-                </button>
-                <button type="button" onClick={() => openHomeownerBetaFeedback('tweak', 'Confusing experience')} className={`${buttonClass('secondary')} bg-white`}>
-                  Confusing?
-                </button>
-                <button type="button" onClick={() => openHomeownerBetaFeedback('feature_request', 'Feature suggestion')} className={`${buttonClass('secondary')} bg-white`}>
-                  Suggest improvement
-                </button>
-              </div>
-            </div>
-          </section>
+          <BetaFeedbackPrompt
+            role="homeowner"
+            onOpenGuide={() => setHomeownerTab('beta')}
+            onReportBug={() => openHomeownerBetaFeedback('bug', 'Bug report')}
+            onReportConfusion={() => openHomeownerBetaFeedback('tweak', 'Confusing experience')}
+            onSuggestImprovement={() => openHomeownerBetaFeedback('feature_request', 'Feature suggestion')}
+          />
           )}
 
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -19879,6 +19871,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'calendar' && (
         <Card title="My calendar" icon={<Calendar size={18} />}>
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" data-testid="homeowner-calendar-beta-boundary">
+            Calendar shows ServSync appointment details. Full Google/Outlook sync, automatic reminders, and advanced scheduling are not connected during the beta.
+          </p>
           <CalendarView
             requests={serviceRequests}
             perspective="homeowner"
@@ -20878,6 +20873,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 See recent posts, services, availability, and helpful maintenance notes from contractors in your area. Open a post
                 to learn more about the contractor, view their profile, connect, or request service when available.
               </p>
+              <p className="mt-2 max-w-3xl text-xs font-semibold leading-5 text-slate-600">
+                Discover is limited during the private beta. Contractor coverage, rankings, response times, and lead volume are not promised.
+              </p>
             </div>
             <DiscoverFeed
               perspective="homeowner"
@@ -20895,6 +20893,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             />
           </section>
         </div>
+      )}
+
+      {homeownerTab === 'beta' && (
+        <BetaGuidePanel role="homeowner" onOpenSupport={() => openHomeownerBetaFeedback('question', 'Beta help')} />
       )}
 
       {homeownerTab === 'trust' && (
@@ -28879,6 +28881,7 @@ function ContractorDashboard({
     marketing: 'Marketing',
     work: 'Work',
     financials: 'Financials',
+    beta: 'Beta Guide',
     trust: 'Trust & Safety',
     privacy: 'Privacy & Data',
     support: 'Support',
@@ -32144,6 +32147,7 @@ function ContractorDashboard({
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
         ...(canManageMarketing ? [{ id: 'marketing', label: 'Marketing', icon: <Megaphone size={17} />, group: 'Growth' }] : []),
+        { id: 'beta',         label: 'Beta Guide',         icon: <HelpCircle size={17} />, group: 'Help' },
         { id: 'trust',        label: 'Trust & Safety',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: contractorSupportBadgeCount, group: 'Help' },
@@ -32739,36 +32743,17 @@ function ContractorDashboard({
                   </div>
                 </Card>
 
-                <Card title="Support and feedback" icon={<MessageSquare size={18} />}>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <InfoBox label="Open support" value={String(openSupportInquiryCount)} />
-                    <InfoBox label="Waiting on you" value={String(waitingOnContractorSupportCount)} />
-                  </div>
-                  <p className="mt-3 text-sm leading-5 text-slate-500">
-                    Tell us what broke, what confused you, or what would make this easier. Please avoid including private customer details unless support needs them.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => openContractorBetaFeedback('bug', 'Bug report')} className={`${buttonClass('secondary')} bg-white`}>
-                      Report bug
-                    </button>
-                    <button type="button" onClick={() => openContractorBetaFeedback('tweak', 'Confusing experience')} className={`${buttonClass('secondary')} bg-white`}>
-                      Confusing?
-                    </button>
-                    <button type="button" onClick={() => openContractorBetaFeedback('feature_request', 'Feature suggestion')} className={`${buttonClass('secondary')} bg-white`}>
-                      Suggest improvement
-                    </button>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" className={`${buttonClass('secondary')} bg-white`} onClick={() => setContractorTab('trust')}>
-                      <ShieldCheck size={16} />
-                      Trust & safety
-                    </button>
-                    <button type="button" className={`${buttonClass('secondary')} bg-white`} onClick={() => setContractorTab('privacy')}>
-                      <Lock size={16} />
-                      Privacy & data
-                    </button>
-                  </div>
-                </Card>
+                <BetaFeedbackPrompt
+                  role="contractor"
+                  openCount={openSupportInquiryCount}
+                  waitingOnYouCount={waitingOnContractorSupportCount}
+                  onOpenGuide={() => setContractorTab('beta')}
+                  onReportBug={() => openContractorBetaFeedback('bug', 'Bug report')}
+                  onReportConfusion={() => openContractorBetaFeedback('tweak', 'Confusing experience')}
+                  onSuggestImprovement={() => openContractorBetaFeedback('feature_request', 'Feature suggestion')}
+                  onOpenTrust={() => setContractorTab('trust')}
+                  onOpenPrivacy={() => setContractorTab('privacy')}
+                />
               </div>
             </div>
           </details>
@@ -34479,6 +34464,9 @@ function ContractorDashboard({
             </button>
           ) : undefined}
         >
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" data-testid="contractor-calendar-beta-boundary">
+            Use Calendar for ServSync appointments and business events. External calendar sync, route optimization, and advanced dispatch are not available during the beta.
+          </p>
           <CalendarView
             requests={serviceRequests}
             visitEvents={contractorVisitEvents}
@@ -37896,13 +37884,18 @@ function ContractorDashboard({
       })()}
 
       {contractorTab === 'discover' && (
-        <DiscoverFeed
-          perspective="contractor"
-          userId={profile.id}
-          contractorId={contractor?.id ?? null}
-          contractorProfile={contractor}
-          connections={[]}
-        />
+        <div className="space-y-3">
+          <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-5 text-slate-600" data-testid="contractor-discover-beta-boundary">
+            Discover is limited during the private beta. Profile visibility does not guarantee ranking, distribution, customer responses, or lead volume.
+          </p>
+          <DiscoverFeed
+            perspective="contractor"
+            userId={profile.id}
+            contractorId={contractor?.id ?? null}
+            contractorProfile={contractor}
+            connections={[]}
+          />
+        </div>
       )}
 
       {contractorTab === 'marketing' && supabase && contractor?.id && canManageMarketing && (
@@ -37910,6 +37903,13 @@ function ContractorDashboard({
           client={supabase}
           contractorId={contractor.id}
           overview={buildContractorMarketingOverview()}
+        />
+      )}
+
+      {contractorTab === 'beta' && (
+        <BetaGuidePanel
+          role="contractor" onOpenSupport={() => openContractorBetaFeedback('question', 'Beta help')}
+          contextualHelp={supabase ? <ContextualHelp client={supabase} contextKey="contractor.drafts" contractorId={contractor?.id} label="Estimate walkthrough" /> : undefined}
         />
       )}
 
@@ -37972,7 +37972,7 @@ function ContractorDashboard({
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{financialsWorkspace ? 'Financials workspace' : 'Work workspace'}</p>
                         <h2 className="mt-1 text-xl font-bold text-slate-950">{financialsWorkspace ? 'Financials' : 'Work'}</h2>
-                        <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and payments.' : 'Plan, estimate, perform, and document customer work.'}</p>
+                        <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and manual payment records. Payment collection happens outside ServSync during beta.' : 'Plan, estimate, perform, and document customer work.'}</p>
                       </div>
                       {(financialsWorkspace ? contractorFinancialsView !== 'overview' : contractorWorkView !== 'overview') && (canManageFinancialActions || !financialsWorkspace) ? <div
                         role="tablist"

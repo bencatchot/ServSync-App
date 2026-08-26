@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-26 - Phase 0.7 honest beta boundaries and contextual help candidate
+
+- Starting point: Began from exact merged PR #520 main commit `7470d4e12a7695d93e98269343a834c26555d81d` on `codex/phase-0-7-beta-boundaries`.
+- Product: Adds one role-aware **Beta Guide** destination under Help for homeowners and contractors. It separates available, manual, and unavailable pilot capability, keeps Support one click away, and reuses the published contextual **How to create an estimate** walkthrough for contractors. Existing dashboard feedback is consolidated into one shared prompt with direct Beta Guide, bug, confusion, improvement, trust, and privacy handoffs where applicable.
+- Contextual truth: Financials/Invoices state that payment collection remains outside ServSync; Calendar states that external sync, automatic reminders, route optimization, and advanced dispatch are unavailable; Discover states that coverage, ranking, response, and lead volume are not guaranteed. The guide also names unavailable accounting sync, automatic email/text/push reminders, native apps, and broad marketplace lead generation.
+- Boundaries: Presentation and help navigation only. No SQL, schema, RLS, RPC, authentication, role, permission, provider, notification, online-payment, dispatch, native/offline, environment, deployment-setting, or Production-data behavior changes.
+- Validation: Phase 0.7 source contracts 4/4; complete architecture suite 19/19; Work/Financials navigation contracts 11/11; TypeScript; exact 79-warning ESLint budget; Production build; exact 50,824-line App budget; and `git diff --check`. Authenticated exact-head homeowner/contractor desktop and `390x844` Preview acceptance plus current Help Studio search/playback comparison remain open.
+- Roadmap: Phase 0.7 is the active final Launch Foundation gate. FB-040 controlled pilot preflight remains next only after exact-head acceptance, normal owner review, and explicit merge approval.
+
 ## 2026-08-26 - Phase 0.6 protected Demo closeout
 
 - Approval and target: Owner approval was bounded to the Phase 0.6 Demo closeout for draft PR #520. Preflight pinned starting head `f13697ec0a327ad15fdae78b629b203d2d35f494`, healthy dedicated Demo `bdytwgejqnlblhrnqxkp`, and exact 152-line migration SHA-256 `d1454de4d86658f59f06b968a2028e1578cd4a986a55ed1e2db30af0dccf4c3b`. The exact migration was applied once only to Demo. Production and shared Sandbox were not changed.

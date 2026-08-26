@@ -157,9 +157,9 @@ test.describe('FB-039B Work and Financials information architecture', () => {
     expect(source).not.toContain("currentContractorTeamRole === 'owner' || currentContractorTeamRole === 'admin'");
   });
 
-  test('leaves homeowner navigation ownership unchanged', () => {
+  test('keeps homeowner financial records together while allowing the later Beta Guide destination', () => {
     const source = repoFile('src/App.tsx');
-    expect(source).toContain("type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'trust' | 'privacy' | 'support';");
+    expect(source).toContain("type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'beta' | 'trust' | 'privacy' | 'support';");
     expect(source).toContain("{ id: 'estimates',    label: 'Estimates / Invoices'");
   });
 });

@@ -147,6 +147,8 @@ Test data rules:
 - [ ] Appointment-related views do not show stale/fake summary counts.
 - [ ] Support/feedback entry point works.
 - [ ] Feedback can be drafted without exposing private customer details unnecessarily.
+- [ ] Help -> Beta Guide opens and separates available, manual, and unavailable contractor capability.
+- [ ] Beta Guide opens the existing published Estimate walkthrough and hands off to Support.
 
 ## 7. Homeowner Account Readiness
 
@@ -182,6 +184,8 @@ Test data rules:
 - [ ] Homeowner calendar event modal opens for appointment events where test data exists.
 - [ ] Support/feedback entry point works.
 - [ ] Feedback can be drafted without asking for sensitive home details unnecessarily.
+- [ ] Help -> Beta Guide opens and separates available, manual, and unavailable homeowner capability.
+- [ ] Beta Guide hands off to Support without asking for sensitive home details.
 
 ## 8. Privacy, RLS, And Trust Checks
 
@@ -264,6 +268,7 @@ Contractor mobile checks:
 - [ ] Key actions are tappable.
 - [ ] Forms remain usable on phone width.
 - [ ] Full mobile workflow automation remains future work until manual mobile QA identifies stable, high-value targets.
+- [ ] Both role-aware Beta Guides remain readable and actionable at `390x844` without horizontal overflow.
 
 ## 11. Core Loop QA Gate
 
@@ -280,6 +285,7 @@ Before inviting controlled beta users, run a full sandbox pass for:
 - [ ] Homeowner files invoice to Home History.
 - [ ] Homeowner sees invoice-linked Home History entry.
 - [ ] Homeowner creates manual Home Reminder.
+- [ ] Homeowner and contractor each open the Beta Guide and reach Support.
 - [ ] Homeowner completes or dismisses reminder.
 
 E2E coverage gap:
@@ -336,6 +342,7 @@ Before using production smoke accounts:
 - [ ] Ask homeowners to view/file an invoice to Home History.
 - [ ] Ask homeowners to create a manual Home Reminder.
 - [ ] Ask testers to submit bugs, confusion, and feature suggestions through the in-app Support/feedback flow.
+- [ ] Ask each role to review the Beta Guide before beginning the mission list.
 - [ ] Review feedback daily during the first beta week.
 
 ## 14. Known Non-Blockers For Private Beta

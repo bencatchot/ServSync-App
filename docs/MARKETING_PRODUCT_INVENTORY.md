@@ -31,6 +31,7 @@ Current status:
 - ServSync is ready for a small controlled private beta.
 - The first beta should stay limited to 2 to 3 trusted contractors and friendly homeowner testers.
 - ServSync is not ready for broad public launch, paid contractor launch, or public marketplace lead-generation promises.
+- Signed-in pilot users can open a role-aware Beta Guide under Help to see what is available, what remains manual, what is unavailable, and how to contact Support. This guidance clarifies current capability; it does not make future roadmap items marketable claims.
 
 Primary contractor value:
 
