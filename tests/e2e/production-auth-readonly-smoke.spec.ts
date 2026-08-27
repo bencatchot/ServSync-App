@@ -220,7 +220,7 @@ test.describe('production authenticated read-only smoke', () => {
       const requestWalkthrough = page.getByRole('dialog', { name: /How to handle a homeowner service request/i });
       await expect(requestWalkthrough).toBeVisible();
       await expect(requestWalkthrough.locator('video[aria-label="How to handle a homeowner service request"]')).toHaveAttribute('src', /^https:\/\//, { timeout: 30_000 });
-      await expect(requestWalkthrough.locator('track[kind="captions"]')).toHaveAttribute('src', /^https:\/\//);
+      await expect(requestWalkthrough.locator('track[kind="captions"]')).toHaveAttribute('src', /^blob:https:\/\/servsync\.app\//);
       await requestWalkthrough.getByText('Read transcript', { exact: true }).click();
       await expect(requestWalkthrough.getByText(/Next, select Create Estimate on the request\./i)).toBeVisible();
       await requestWalkthrough.getByRole('button', { name: /Close walkthrough/i }).click();
