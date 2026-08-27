@@ -27,11 +27,14 @@ import {
   listHelpWalkthroughs,
   loadHelpUsage,
   reviewHelpRecordingJob,
+  sha256,
+  sha256Text,
   transitionHelpWalkthrough,
   transitionHelpRecordingJob,
   updateHelpWalkthrough,
   uploadHelpMedia,
   validateHelpRecordingPackage,
+  validateWebVtt,
   type HelpRecordingJob,
   type HelpRecordingSpecDraft,
   type HelpSearchResult,
@@ -49,12 +52,24 @@ const AUDIENCES = [
 
 const RECORDER_SCENARIOS = [
   ['contractor-create-estimate', 'Contractor creates an estimate'],
+  ['contractor-service-request-intake', 'Contractor reviews a service request'],
   ['homeowner-service-request', 'Homeowner sends a service request'],
   ['homeowner-home-history', 'Homeowner opens Home History'],
   ['servsync-platform-introduction', 'ServSync platform introduction'],
 ] as const;
 
 const fieldClass = 'mt-1 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+
+function useCaptionUrl(captionsVtt: string | null) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    if (!captionsVtt) { setUrl(''); return; }
+    const next = URL.createObjectURL(new Blob([captionsVtt], { type: 'text/vtt' }));
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [captionsVtt]);
+  return url;
+}
 
 function slugFromTitle(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
@@ -213,7 +228,7 @@ function RecordingRequestEditor({
         </label>
         <label className="text-sm font-semibold text-slate-700">Narration
           <select className={fieldClass} value={draft.narrationMode} onChange={event => set('narrationMode', event.target.value as HelpRecordingSpecDraft['narrationMode'])}>
-            <option value="none">None</option><option value="human">Human later</option><option value="ai">AI later</option>
+            <option value="ai">OpenAI Cedar voice + English captions</option>
           </select>
         </label>
       </div>
@@ -240,6 +255,10 @@ function RecordingRequestEditor({
 function RecordingPreview({ client, job, onClose }: { client: HelpStudioClient; job: HelpRecordingJob; onClose: () => void }) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const captionsVtt = typeof job.recorderMetadata.captions_vtt === 'string' ? job.recorderMetadata.captions_vtt : null;
+  const transcript = typeof job.recorderMetadata.narration_script === 'string' ? job.recorderMetadata.narration_script : null;
+  const disclosure = typeof job.recorderMetadata.narration_disclosure === 'string' ? job.recorderMetadata.narration_disclosure : null;
+  const captionUrl = useCaptionUrl(captionsVtt);
   useEffect(() => {
     let active = true;
     void helpRecordingPlaybackUrl(client, job.id)
@@ -255,7 +274,14 @@ function RecordingPreview({ client, job, onClose }: { client: HelpStudioClient; 
           <button type="button" onClick={onClose} className="min-h-10 px-3 text-sm font-semibold text-slate-600">Close</button>
         </div>
         {error ? <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</div> : url ? (
-          <video className="mt-3 aspect-video w-full bg-black object-contain" controls autoPlay={false} src={url} data-testid="help-recording-review-video" />
+          <>
+            <video className="mt-3 aspect-video w-full bg-black object-contain" controls autoPlay={false} src={url} data-testid="help-recording-review-video">
+              {captionUrl && <track kind="captions" src={captionUrl} srcLang="en" label="English" default />}
+            </video>
+            {transcript && <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700"><strong>Transcript:</strong> {transcript}</p>}
+            {disclosure && <p className="mt-2 text-xs text-slate-500">{disclosure}</p>}
+            {job.narrationMode === 'ai' && <p className="mt-2 text-sm font-semibold text-slate-700">Review the full video with captions enabled, then replay enough with sound muted to confirm it remains understandable.</p>}
+          </>
         ) : <div className="mt-3 flex aspect-video items-center justify-center bg-slate-100"><Loader2 className="animate-spin text-slate-500" /></div>}
       </div>
     </div>
@@ -277,18 +303,28 @@ function RecordingJobCard({
 }) {
   const [video, setVideo] = useState<File | null>(null);
   const [poster, setPoster] = useState<File | null>(null);
+  const [captions, setCaptions] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<File | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const attach = async () => {
-    if (!video || !poster || !metadata) { setError('Choose the validated MP4, poster, and recorder metadata.'); return; }
+    if (!video || !poster || !metadata || (job.narrationMode === 'ai' && !captions)) {
+      setError('Choose the narrated MP4, poster, English WebVTT captions, and recorder metadata.'); return;
+    }
     setBusy(true);
     setError('');
     let status: HelpRecordingJob['status'] = job.status;
     try {
-      const manifest = validateHelpRecordingPackage(JSON.parse(await metadata.text()), job, { video, poster });
+      const manifest = validateHelpRecordingPackage(JSON.parse(await metadata.text()), job, { video, poster, captions });
+      const captionsVtt = captions ? validateWebVtt(await captions.text()) : null;
+      if (captions && (await sha256(captions)) !== manifest.captionsSha256) {
+        throw new Error('The selected WebVTT bytes do not match the validated recorder package.');
+      }
+      if (manifest.narrationScript && (await sha256Text(manifest.narrationScript)) !== manifest.narrationScriptSha256) {
+        throw new Error('The narration script does not match its validated checksum.');
+      }
       const sourceCommit = manifest.sourceCommit;
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_preparing'); status = 'preparing';
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'start_recording'); status = 'recording';
@@ -305,21 +341,12 @@ function RecordingJobCard({
       await transitionHelpRecordingJob(client, { id: job.id, status }, 'complete', {
         video_asset_id: uploadedVideo.assetId,
         poster_asset_id: uploadedPoster.assetId,
-        source_version: 'Demo Recorder / servsync-human-paced-v1',
+        source_version: job.narrationMode === 'ai'
+          ? 'Demo Recorder / servsync-human-paced-v1 + OpenAI Cedar'
+          : 'Demo Recorder / servsync-human-paced-v1',
         recorder_metadata: {
-          recording_job_id: manifest.recordingJobId,
-          scenario: manifest.scenario,
-          pacing_profile: manifest.pacingProfile,
-          validation_status: manifest.raw.validation_status,
-          sensitive_data_check: manifest.raw.sensitive_data_check,
-          duration_seconds: manifest.durationSeconds,
-          viewport: manifest.raw.viewport,
-          source_git_commit: sourceCommit,
-          mp4_filename: manifest.mp4Filename,
-          poster_filename: manifest.posterFilename,
-          mp4_sha256: manifest.mp4Sha256,
-          poster_sha256: manifest.posterSha256,
-          canonical_output_provenance: manifest.raw.canonical_output_provenance,
+          ...manifest.raw,
+          captions_vtt: captionsVtt,
         },
       });
       await onChanged();
@@ -365,16 +392,18 @@ function RecordingJobCard({
       <div className="mt-3 flex flex-wrap gap-1.5 text-xs text-slate-600">
         <span className="rounded bg-slate-100 px-2 py-1">{job.featureArea}</span>
         <span className="rounded bg-slate-100 px-2 py-1">Human-paced</span>
+        <span className="rounded bg-slate-100 px-2 py-1">{job.narrationMode === 'ai' ? 'Cedar narration + captions' : 'Silent legacy package'}</span>
         <span className="rounded bg-slate-100 px-2 py-1">{RECORDER_SCENARIOS.find(([value]) => value === job.scenarioKey)?.[1] ?? job.scenarioKey}</span>
       </div>
       {job.failureMessage && <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{job.failureMessage}</div>}
       {error && <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
       {job.status === 'requested' && (
-        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 md:grid-cols-3">
-          <label className="text-xs font-semibold text-slate-600">Validated MP4<input className="mt-1 block w-full text-xs font-normal" type="file" accept="video/mp4" onChange={event => setVideo(event.target.files?.[0] ?? null)} /></label>
+        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 md:grid-cols-2 lg:grid-cols-4">
+          <label className="text-xs font-semibold text-slate-600">{job.narrationMode === 'ai' ? 'Narrated MP4' : 'Validated MP4'}<input className="mt-1 block w-full text-xs font-normal" type="file" accept="video/mp4" onChange={event => setVideo(event.target.files?.[0] ?? null)} /></label>
           <label className="text-xs font-semibold text-slate-600">Poster<input className="mt-1 block w-full text-xs font-normal" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => setPoster(event.target.files?.[0] ?? null)} /></label>
+          <label className="text-xs font-semibold text-slate-600">English captions<input className="mt-1 block w-full text-xs font-normal" type="file" accept=".vtt,text/vtt" disabled={job.narrationMode !== 'ai'} onChange={event => setCaptions(event.target.files?.[0] ?? null)} /></label>
           <label className="text-xs font-semibold text-slate-600">Recorder metadata<input className="mt-1 block w-full text-xs font-normal" type="file" accept="application/json" onChange={event => setMetadata(event.target.files?.[0] ?? null)} /></label>
-          <div className="flex flex-wrap gap-2 md:col-span-3">
+          <div className="flex flex-wrap gap-2 md:col-span-2 lg:col-span-4">
             <button type="button" onClick={() => downloadRecordingSpec(job)} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700"><Download size={15} /> Recording spec</button>
             <button type="button" disabled={busy} onClick={() => void attach()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-blue-700 px-3 text-sm font-bold text-white disabled:opacity-60"><Upload size={15} /> Attach validated recording</button>
           </div>
@@ -382,10 +411,11 @@ function RecordingJobCard({
       )}
       {job.status === 'ready_for_review' && (
         <div className="mt-3 border-t border-slate-200 pt-3">
+          {job.narrationMode !== 'ai' && <p className="mb-2 rounded-md bg-amber-50 p-3 text-sm font-semibold text-amber-800">This silent package is preserved as source evidence. Create a new Cedar-narrated, captioned recording request before publication.</p>}
           <label className="text-xs font-semibold text-slate-600">Review notes<input className={fieldClass} value={reviewNotes} onChange={event => setReviewNotes(event.target.value)} placeholder="Optional pacing or rerecord notes" /></label>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" onClick={onPreview} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700"><Play size={15} /> Review at normal speed</button>
-            <button type="button" disabled={busy} onClick={() => void review('approve')} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-60"><CheckCircle2 size={15} /> Approve recording</button>
+            <button type="button" disabled={busy || job.narrationMode !== 'ai'} onClick={() => void review('approve')} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-60"><CheckCircle2 size={15} /> Approve narration + captions</button>
             <button type="button" disabled={busy} onClick={() => void review('return')} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 disabled:opacity-60"><RotateCcw size={15} /> Return for rerecord</button>
           </div>
         </div>

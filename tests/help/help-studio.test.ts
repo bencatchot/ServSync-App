@@ -7,12 +7,15 @@ import {
   findHelp,
   helpRecordingSpecPayload,
   helpPayload,
+  parseHelpCaptionTrack,
   parseHelpSearchResult,
   parseHelpRecordingJob,
   parseHelpWalkthrough,
   validateHelpRecordingPackage,
+  validateWebVtt,
 } from '../../src/features/help/helpStudio.ts';
 import { createHelpWalkthroughMediaHandler } from '../../server/helpWalkthroughMedia.ts';
+import { contextualHelpLookupReady } from '../../src/features/help/contextualHelpPolicy.ts';
 
 const walkthroughId = '10000000-0000-4000-8000-000000000001';
 const assetId = '20000000-0000-4000-8000-000000000001';
@@ -108,7 +111,7 @@ test('recording request payload preserves a future-ready spec without engineerin
     action_steps: ['Open the service request.', 'Create the estimate.', 'Save the draft.'],
     expected_final_state: draft.expectedFinalState,
     desired_duration_seconds: 30,
-    narration_mode: 'none',
+    narration_mode: 'ai',
     talking_points: ['Start from the customer request.', 'Review scope and pricing.'],
   });
 });
@@ -141,6 +144,7 @@ test('recording package is bound to the exact job and selected media checksums b
     id: '40000000-0000-4000-8000-000000000001',
     scenarioKey: 'contractor-create-estimate',
     pacingProfile: 'servsync-human-paced-v1' as const,
+    narrationMode: 'none' as const,
   };
   const video = new File(['video'], 'estimate.mp4', { type: 'video/mp4' });
   const poster = new File(['poster'], 'estimate.png', { type: 'image/png' });
@@ -157,6 +161,67 @@ test('recording package is bound to the exact job and selected media checksums b
   assert.throws(() => validateHelpRecordingPackage({ ...manifest, mp4_sha256: 'd'.repeat(64) }, job, {
     video: new File(['video'], 'other.mp4', { type: 'video/mp4' }), poster,
   }), /exactly match/);
+});
+
+test('narrated recording package requires the approved Cedar provenance and exact caption file identity', () => {
+  const job = {
+    id: '40000000-0000-4000-8000-000000000001',
+    scenarioKey: 'contractor-service-request-intake',
+    pacingProfile: 'servsync-human-paced-v1' as const,
+    narrationMode: 'ai' as const,
+  };
+  const video = new File(['video'], 'request-cedar.mp4', { type: 'video/mp4' });
+  const poster = new File(['poster'], 'request-cedar.png', { type: 'image/png' });
+  const captions = new File(['WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nOpen the request.\n'], 'request-cedar.vtt', { type: 'text/vtt' });
+  const manifest = {
+    schema_version: 2, recording_job_id: job.id, scenario: job.scenarioKey, pacing_profile: job.pacingProfile,
+    validation_status: 'passed', sensitive_data_check: 'passed',
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
+    source_git_commit: 'a'.repeat(40), mp4_filename: video.name, mp4_sha256: 'b'.repeat(64),
+    poster_filename: poster.name, poster_sha256: 'c'.repeat(64),
+    viewport: { width: 1440, height: 900 }, duration_seconds: 16,
+    tutorial_media_standard: 'narrated_captioned_v1', narration_provider: 'OpenAI',
+    narration_model: 'gpt-4o-mini-tts', narration_voice: 'cedar',
+    narration_disclosure: "AI-generated voiceover using OpenAI's Cedar voice.",
+    narration_script: 'Open the homeowner request and review the details.',
+    narration_script_sha256: 'd'.repeat(64), source_silent_sha256: 'e'.repeat(64),
+    captions_filename: captions.name, captions_sha256: 'f'.repeat(64), caption_language: 'en',
+  };
+  const parsed = validateHelpRecordingPackage(manifest, job, { video, poster, captions });
+  assert.equal(parsed.narrationVoice, 'cedar');
+  assert.equal(parsed.captionsFilename, captions.name);
+  assert.throws(() => validateHelpRecordingPackage({ ...manifest, narration_voice: 'alloy' }, job, {
+    video, poster, captions,
+  }), /approved Cedar voice/);
+});
+
+test('role-aware caption parser accepts exact WebVTT metadata and rejects malformed tracks', () => {
+  const vtt = 'WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nOpen the request.\n';
+  assert.equal(validateWebVtt(vtt), vtt);
+  const parsed = parseHelpCaptionTrack({
+    walkthrough_id: walkthroughId, revision: 2, tutorial_media_standard: 'narrated_captioned_v1',
+    captions_vtt: vtt, captions_sha256: 'a'.repeat(64), caption_language: 'en',
+    transcript: 'Open the request.', narration_provider: 'OpenAI', narration_model: 'gpt-4o-mini-tts',
+    narration_voice: 'cedar', narration_disclosure: "AI-generated voiceover using OpenAI's Cedar voice.",
+  });
+  assert.equal(parsed.captionLanguage, 'en');
+  assert.throws(() => parseHelpCaptionTrack({
+    walkthrough_id: walkthroughId, revision: 2, tutorial_media_standard: 'narrated_captioned_v1',
+    captions_vtt: 'not-vtt', captions_sha256: 'a'.repeat(64),
+  }), /invalid caption track/);
+});
+
+test('narration and caption migration preserves the approved protected-tutorial boundary', async () => {
+  const migration = await readFile(new URL('../../servsync-help-narration-caption-foundation.sql', import.meta.url), 'utf8');
+  assert.match(migration, /servsync-help-narration-caption-foundation-v1/);
+  assert.match(migration, /'gpt-4o-mini-tts'/);
+  assert.match(migration, /'cedar'/);
+  assert.match(migration, /AI-generated voiceover using OpenAI''s Cedar voice\./);
+  assert.match(migration, /servsync_get_help_caption_track/);
+  assert.match(migration, /captions_vtt/);
+  assert.match(migration, /sound_off_review/);
+  assert.doesNotMatch(migration, /https?:\/\//i);
+  assert.doesNotMatch(migration, /update public\.help_walkthrough_revisions\s+set/i);
 });
 
 test('deterministic search adapter sends query, context, role context, and bounded limit', async () => {
@@ -182,6 +247,16 @@ test('deterministic search adapter sends query, context, role context, and bound
     p_query: 'quote', p_route_context: 'contractor.drafts',
     p_contractor_id: '30000000-0000-4000-8000-000000000001', p_limit: 3,
   } }]);
+});
+
+test('contractor contextual Help waits for tenant context before calling its protected search', () => {
+  assert.equal(contextualHelpLookupReady('contractor.service_requests', undefined), false);
+  assert.equal(contextualHelpLookupReady('contractor.drafts', null), false);
+  assert.equal(
+    contextualHelpLookupReady('contractor.service_requests', '30000000-0000-4000-8000-000000000001'),
+    true,
+  );
+  assert.equal(contextualHelpLookupReady('homeowner.records', undefined), true);
 });
 
 test('search parser rejects untrusted media identities', () => {

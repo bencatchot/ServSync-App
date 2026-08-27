@@ -24,6 +24,14 @@ The attachment boundary requires exact job ID, scenario, `servsync-human-paced-v
 
 The shared human-paced defaults are 700 ms nearby, 1100 ms medium, and 1500 ms large cursor travel; 550 ms settle before click; 900 ms post-click hold; 75 ms per typed character; 1300 ms opening hold; at least 3200 ms final hold; and smooth cubic ease-in-out interpolation. Scenario-specific longer reading holds remain allowed.
 
+## Protected Tutorial Media Standard
+
+FB-040A makes synchronized voiceover, timed captions/subtitles, and a durable transcript mandatory for every protected pilot tutorial. Burned-in scene labels remain useful recorder overlays but do not satisfy the caption requirement. The standard tutorial voice reuses the already reviewed Marketing configuration: OpenAI `gpt-4o-mini-tts`, Cedar voice, with the exact visible disclosure **AI-generated voiceover using OpenAI's Cedar voice.** The package preserves provider, voice, model, script, disclosure, and silent-master provenance. Bounded narration preparation for Help is approved; runtime generation, another provider/voice, and provider or secret configuration changes are not.
+
+The approved package contract binds the narration, caption track, and transcript to the exact reviewed video revision. Immutable WebVTT text, its SHA-256, language, transcript/script hash, source-silent hash, and narration provenance live on the immutable Help revision; video and poster objects remain in private Storage. A role-aware RPC returns the caption track and transcript only to the same intended audience that may retrieve the walkthrough. Help playback exposes a native caption track, searchable transcript, and disclosure. Review at normal speed covers the complete picture, audio, caption synchronization/text, transcript, and disclosure, followed by a sound-off comprehension check.
+
+PR #522 contains this source foundation in `servsync-help-narration-caption-foundation.sql`. It preserves existing published legacy tutorials, prevents future protected tutorials from publishing without the narrated/captioned standard, and prevents the existing silent TUT-001 package from being approved. Exact SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` is applied and verified in Sandbox, Demo, and Production.
+
 ## Authoring Boundary
 
 - Only an authenticated ServSync `platform_admin` can create or change Help Studio records.
@@ -32,7 +40,7 @@ The shared human-paced defaults are 700 ms nearby, 1100 ms medium, and 1500 ms l
 - Draft edits create a new immutable revision. They do not rewrite the published revision.
 - A published walkthrough edited into `needs_review` continues serving its prior published revision until the new revision is explicitly published.
 - Published usage includes only walkthroughs that remain available in `published` or `needs_review`; deprecated and archived records remain preserved but count as unpublished.
-- Publication requires a ready MP4, ready poster, and passed pacing, sensitive-data, product-truth, and overall validation reviews.
+- Publication of a protected pilot tutorial requires a ready MP4, ready poster, synchronized narration, timed captions, matching durable transcript, required narration provenance/disclosure, and passed pacing, sensitive-data, product-truth, sound-off, and overall validation reviews.
 - Unpublish, deprecate, and archive remove the walkthrough from ordinary contextual retrieval. Archived records remain durable history.
 
 ## Durable Media

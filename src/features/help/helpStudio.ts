@@ -4,6 +4,11 @@ export type HelpReviewState = 'pending' | 'passed' | 'failed';
 export type HelpRecordingStatus = 'requested' | 'preparing' | 'recording' | 'processing' | 'ready_for_review' | 'approved' | 'failed';
 export type HelpNarrationMode = 'none' | 'human' | 'ai';
 
+export const HELP_NARRATION_PROVIDER = 'OpenAI';
+export const HELP_NARRATION_MODEL = 'gpt-4o-mini-tts';
+export const HELP_NARRATION_VOICE = 'cedar';
+export const HELP_NARRATION_DISCLOSURE = "AI-generated voiceover using OpenAI's Cedar voice.";
+
 export type HelpRpcResult<T> = PromiseLike<{ data: T | null; error: { message?: string } | null }>;
 
 export type HelpStudioClient = {
@@ -76,6 +81,20 @@ export type HelpSearchResult = {
   height: number;
   narrationDisclosure: string | null;
   rank: number;
+};
+
+export type HelpCaptionTrack = {
+  walkthroughId: string;
+  revision: number;
+  tutorialMediaStandard: 'legacy_visual_v1' | 'narrated_captioned_v1';
+  captionsVtt: string | null;
+  captionsSha256: string | null;
+  captionLanguage: string | null;
+  transcript: string | null;
+  narrationProvider: string | null;
+  narrationModel: string | null;
+  narrationVoice: string | null;
+  narrationDisclosure: string | null;
 };
 
 export type HelpUsage = {
@@ -158,6 +177,17 @@ export type HelpRecordingPackageManifest = {
   width: number;
   height: number;
   durationSeconds: number;
+  tutorialMediaStandard: 'legacy_visual_v1' | 'narrated_captioned_v1';
+  narrationProvider: string | null;
+  narrationModel: string | null;
+  narrationVoice: string | null;
+  narrationDisclosure: string | null;
+  narrationScript: string | null;
+  narrationScriptSha256: string | null;
+  sourceSilentSha256: string | null;
+  captionsFilename: string | null;
+  captionsSha256: string | null;
+  captionLanguage: string | null;
   raw: Record<string, unknown>;
 };
 
@@ -242,7 +272,7 @@ export function emptyHelpRecordingSpecDraft(): HelpRecordingSpecDraft {
     routeContexts: '', audienceRoles: ['owner', 'admin', 'office'], keywords: '',
     requestedGoal: '', targetScreen: '', requiredStartingState: '',
     scenarioKey: 'contractor-create-estimate', actionSteps: '', expectedFinalState: '',
-    desiredDurationSeconds: '30', narrationMode: 'none', talkingPoints: '',
+    desiredDurationSeconds: '30', narrationMode: 'ai', talkingPoints: '',
   };
 }
 
@@ -395,8 +425,8 @@ export function parseHelpRecordingJob(value: unknown): HelpRecordingJob {
 
 export function validateHelpRecordingPackage(
   value: unknown,
-  job: Pick<HelpRecordingJob, 'id' | 'scenarioKey' | 'pacingProfile'>,
-  files: { video: File; poster: File },
+  job: Pick<HelpRecordingJob, 'id' | 'scenarioKey' | 'pacingProfile' | 'narrationMode'>,
+  files: { video: File; poster: File; captions?: File | null },
 ): HelpRecordingPackageManifest {
   const manifest = record(value);
   const recordingJobId = String(manifest.recording_job_id ?? '');
@@ -419,9 +449,61 @@ export function validateHelpRecordingPackage(
     || width < 1 || height < 1 || durationSeconds <= 0) {
     throw new Error('Recorder package does not exactly match this request and its validated media.');
   }
+  const narrated = job.narrationMode === 'ai';
+  const tutorialMediaStandard = narrated ? 'narrated_captioned_v1' : 'legacy_visual_v1';
+  const narrationProvider = nullableString(manifest.narration_provider);
+  const narrationModel = nullableString(manifest.narration_model);
+  const narrationVoice = nullableString(manifest.narration_voice);
+  const narrationDisclosure = nullableString(manifest.narration_disclosure);
+  const narrationScript = nullableString(manifest.narration_script);
+  const narrationScriptSha256 = nullableString(manifest.narration_script_sha256);
+  const sourceSilentSha256 = nullableString(manifest.source_silent_sha256);
+  const captionsFilename = nullableString(manifest.captions_filename);
+  const captionsSha256 = nullableString(manifest.captions_sha256);
+  const captionLanguage = nullableString(manifest.caption_language);
+  if (narrated && (
+    number(manifest.schema_version) !== 2
+    || manifest.tutorial_media_standard !== tutorialMediaStandard
+    || narrationProvider !== HELP_NARRATION_PROVIDER
+    || narrationModel !== HELP_NARRATION_MODEL
+    || narrationVoice !== HELP_NARRATION_VOICE
+    || narrationDisclosure !== HELP_NARRATION_DISCLOSURE
+    || !narrationScript || !SHA256.test(narrationScriptSha256 ?? '')
+    || !SHA256.test(sourceSilentSha256 ?? '') || !SHA256.test(captionsSha256 ?? '')
+    || captionLanguage !== 'en' || !files.captions || captionsFilename !== files.captions.name
+    || !['text/vtt', ''].includes(files.captions.type)
+  )) {
+    throw new Error('Narrated Help packages require the approved Cedar voice, exact script provenance, and matching WebVTT captions.');
+  }
   return {
     recordingJobId, scenario, pacingProfile, sourceCommit, mp4Filename, mp4Sha256,
-    posterFilename, posterSha256, width, height, durationSeconds, raw: manifest,
+    posterFilename, posterSha256, width, height, durationSeconds, tutorialMediaStandard,
+    narrationProvider, narrationModel, narrationVoice, narrationDisclosure,
+    narrationScript, narrationScriptSha256, sourceSilentSha256,
+    captionsFilename, captionsSha256, captionLanguage, raw: manifest,
+  };
+}
+
+export function parseHelpCaptionTrack(value: unknown): HelpCaptionTrack {
+  const item = record(value);
+  const walkthroughId = String(item.walkthrough_id ?? '');
+  const standard = String(item.tutorial_media_standard ?? 'legacy_visual_v1');
+  if (!UUID.test(walkthroughId) || !['legacy_visual_v1', 'narrated_captioned_v1'].includes(standard)) {
+    throw new Error('Help returned an invalid caption track.');
+  }
+  const captionsVtt = nullableString(item.captions_vtt);
+  const captionsSha256 = nullableString(item.captions_sha256);
+  if (standard === 'narrated_captioned_v1'
+    && (!captionsVtt?.startsWith('WEBVTT') || !SHA256.test(captionsSha256 ?? ''))) {
+    throw new Error('Help returned an invalid caption track.');
+  }
+  return {
+    walkthroughId, revision: number(item.revision),
+    tutorialMediaStandard: standard as HelpCaptionTrack['tutorialMediaStandard'],
+    captionsVtt, captionsSha256, captionLanguage: nullableString(item.caption_language),
+    transcript: nullableString(item.transcript), narrationProvider: nullableString(item.narration_provider),
+    narrationModel: nullableString(item.narration_model), narrationVoice: nullableString(item.narration_voice),
+    narrationDisclosure: nullableString(item.narration_disclosure),
   };
 }
 
@@ -482,6 +564,13 @@ export async function findHelp(client: HelpStudioClient, input: { query?: string
   return (Array.isArray(data) ? data : []).map(parseHelpSearchResult);
 }
 
+export async function loadHelpCaptionTrack(client: HelpStudioClient, walkthroughId: string, contractorId?: string | null) {
+  const value = await rpc(client, 'servsync_get_help_caption_track', {
+    p_walkthrough_id: walkthroughId, p_contractor_id: contractorId || null,
+  }, 'Captions are unavailable right now.');
+  return parseHelpCaptionTrack(value);
+}
+
 export async function loadHelpUsage(client: HelpStudioClient): Promise<HelpUsage> {
   const value = record(await rpc(client, 'servsync_get_help_media_usage', {}, 'Unable to load Help media usage.'));
   return {
@@ -513,6 +602,19 @@ export async function sha256(file: File) {
   const bytes = await file.arrayBuffer();
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+
+export async function sha256Text(value: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(item => item.toString(16).padStart(2, '0')).join('');
+}
+
+export function validateWebVtt(value: string) {
+  if (!/^WEBVTT(?:\r?\n)/.test(value) || value.length > 50000
+    || !/\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}/.test(value)) {
+    throw new Error('Choose a valid English WebVTT caption file with timed cues.');
+  }
+  return value;
 }
 
 export async function inspectMediaFile(file: File, kind: 'video' | 'poster') {

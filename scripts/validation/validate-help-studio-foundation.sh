@@ -32,7 +32,9 @@ create role authenticated nologin;
 create role service_role nologin bypassrls;
 create schema auth authorization postgres;
 create schema storage authorization postgres;
-create extension if not exists pgcrypto;
+create schema extensions authorization postgres;
+create extension if not exists pgcrypto with schema extensions;
+grant usage on schema extensions to anon, authenticated, service_role;
 create function auth.uid() returns uuid language sql stable
   as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid; $$;
 create table public.profiles (id uuid primary key, role text not null, full_name text not null default '');
@@ -87,6 +89,8 @@ psql_run --file "$ROOT_DIR/servsync-help-studio-recording-package-validation-for
 psql_run --file "$ROOT_DIR/servsync-help-media-ready-video-duration-forward-fix.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/help-studio-foundation-validation.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/help-studio-recording-workflow-validation.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-help-narration-caption-foundation.sql" >/dev/null
+psql_run --file "$ROOT_DIR/tests/sql/help-narration-caption-foundation-validation.sql" >/dev/null
 
 psql_run --file "$ROOT_DIR/servsync-help-studio-usage-state-forward-fix.sql" >/dev/null
 
@@ -102,6 +106,11 @@ fi
 
 if psql_run --file "$ROOT_DIR/servsync-help-media-ready-video-duration-forward-fix.sql" >/dev/null 2>&1; then
   echo "Repeated Help ready-video duration validation unexpectedly succeeded." >&2
+  exit 1
+fi
+
+if psql_run --file "$ROOT_DIR/servsync-help-narration-caption-foundation.sql" >/dev/null 2>&1; then
+  echo "Repeated Help narration/caption foundation unexpectedly succeeded." >&2
   exit 1
 fi
 

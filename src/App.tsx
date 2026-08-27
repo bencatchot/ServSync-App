@@ -33362,7 +33362,7 @@ function ContractorDashboard({
       })()}
 
       {contractorTab === 'requests' && (
-        <Card title="Service requests" icon={<MessageSquare size={18} />}>
+        <Card title="Service requests" icon={<MessageSquare size={18} />}>{supabase ? <ContextualHelp client={supabase} contextKey="contractor.service_requests" contractorId={contractor?.id} label="Service request walkthrough" /> : null}
           {(() => {
             const renderContractorRequestCard = (request: ServiceRequestSummary, isClosedCard: boolean) => {
               const isExpanded = contractorExpandedRequestIds.has(request.id);

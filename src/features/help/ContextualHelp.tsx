@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { HelpCircle, Loader2, Play, X } from 'lucide-react';
-import { findHelp, helpPlaybackUrl, type HelpSearchResult, type HelpStudioClient } from './helpStudio';
+import {
+  findHelp,
+  helpPlaybackUrl,
+  loadHelpCaptionTrack,
+  type HelpCaptionTrack,
+  type HelpSearchResult,
+  type HelpStudioClient,
+} from './helpStudio';
+import { contextualHelpLookupReady } from './contextualHelpPolicy';
 
 type ContextualHelpProps = {
   client: HelpStudioClient;
@@ -8,6 +16,17 @@ type ContextualHelpProps = {
   contractorId?: string | null;
   label?: string;
 };
+
+function useCaptionUrl(captionsVtt: string | null | undefined) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    if (!captionsVtt) { setUrl(''); return; }
+    const next = URL.createObjectURL(new Blob([captionsVtt], { type: 'text/vtt' }));
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [captionsVtt]);
+  return url;
+}
 
 export function HelpWalkthroughDialog({
   client,
@@ -21,13 +40,16 @@ export function HelpWalkthroughDialog({
   onClose: () => void;
 }) {
   const [url, setUrl] = useState('');
+  const [captionTrack, setCaptionTrack] = useState<HelpCaptionTrack | null>(null);
   const [error, setError] = useState('');
   const closeButton = useRef<HTMLButtonElement>(null);
+  const captionUrl = useCaptionUrl(captionTrack?.captionsVtt);
 
   useEffect(() => {
     let active = true;
-    void helpPlaybackUrl(client, walkthrough.id, contractorId).then(value => {
-      if (active) setUrl(value);
+    const captionRequest = loadHelpCaptionTrack(client, walkthrough.id, contractorId).catch(() => null);
+    void Promise.all([helpPlaybackUrl(client, walkthrough.id, contractorId), captionRequest]).then(([value, captions]) => {
+      if (active) { setUrl(value); setCaptionTrack(captions); }
     }).catch(reason => {
       if (active) setError(reason instanceof Error ? reason.message : 'Unable to open this walkthrough.');
     });
@@ -59,7 +81,9 @@ export function HelpWalkthroughDialog({
           <p className="text-sm leading-6 text-slate-600">{walkthrough.summary}</p>
           <div className="aspect-video w-full overflow-hidden rounded-md bg-slate-950">
             {url ? (
-              <video className="h-full w-full" src={url} controls playsInline preload="metadata" aria-label={walkthrough.title} />
+              <video className="h-full w-full" src={url} controls playsInline preload="metadata" aria-label={walkthrough.title}>
+                {captionUrl && <track kind="captions" src={captionUrl} srcLang={captionTrack?.captionLanguage ?? 'en'} label="English" default />}
+              </video>
             ) : error ? (
               <div className="flex h-full items-center justify-center p-6 text-center text-sm text-rose-200">{error}</div>
             ) : (
@@ -77,7 +101,17 @@ export function HelpWalkthroughDialog({
               ))}
             </ol>
           </section>
-          {walkthrough.narrationDisclosure && <p className="border-t border-slate-200 pt-3 text-xs text-slate-500">{walkthrough.narrationDisclosure}</p>}
+          {captionTrack?.transcript && (
+            <details className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-sm font-bold text-slate-800">Read transcript</summary>
+              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{captionTrack.transcript}</p>
+            </details>
+          )}
+          {(captionTrack?.narrationDisclosure ?? walkthrough.narrationDisclosure) && (
+            <p className="border-t border-slate-200 pt-3 text-xs text-slate-500">
+              {captionTrack?.narrationDisclosure ?? walkthrough.narrationDisclosure}
+            </p>
+          )}
         </div>
       </section>
     </div>
@@ -89,6 +123,10 @@ export function ContextualHelp({ client, contextKey, contractorId, label = 'How-
   const [selected, setSelected] = useState<HelpSearchResult | null>(null);
 
   useEffect(() => {
+    if (!contextualHelpLookupReady(contextKey, contractorId)) {
+      setWalkthroughs([]);
+      return;
+    }
     let active = true;
     void findHelp(client, { routeContext: contextKey, contractorId, limit: 3 }).then(items => {
       if (active) setWalkthroughs(items);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/scenarios/contractor-create-estimate.mjs';
+import { contractorServiceRequestIntakeScenario } from '../../scripts/demo/recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from '../../scripts/demo/recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
 import { servsyncPlatformIntroductionScenario } from '../../scripts/demo/recorder/scenarios/servsync-platform-introduction.mjs';
@@ -49,6 +50,19 @@ test('contractor Estimate scenario is a bounded request-to-draft workflow', () =
   assert.equal(contractorCreateEstimateScenario.estimate.line.unit_price_cents, 189500);
   assert.equal(contractorCreateEstimateScenario.estimate.unitPrice, '1895.00');
   assert.doesNotMatch(JSON.stringify(contractorCreateEstimateScenario), /password|service_role|@example/i);
+});
+
+test('contractor service-request intake is a read-only request-to-estimate handoff', () => {
+  assert.equal(validateScenarioDefinition(contractorServiceRequestIntakeScenario), contractorServiceRequestIntakeScenario);
+  assert.equal(contractorServiceRequestIntakeScenario.initialCheckpoint, 'request_ready');
+  assert.equal(contractorServiceRequestIntakeScenario.finalCheckpoint, 'request_ready');
+  assert.deepEqual(
+    contractorServiceRequestIntakeScenario.scenes.map((scene) => scene.key),
+    ['request-list', 'request-details', 'estimate-handoff'],
+  );
+  assert.deepEqual(contractorServiceRequestIntakeScenario.expectedDurationSeconds, { min: 14, max: 34 });
+  assert.match(contractorServiceRequestIntakeScenario.fixturePolicy, /read-only after the registry-owned fixture seed/i);
+  assert.doesNotMatch(JSON.stringify(contractorServiceRequestIntakeScenario), /password|service_role|@example/i);
 });
 
 test('homeowner Home History scenario is a bounded read-only finalized-report workflow', () => {
@@ -121,10 +135,23 @@ test('operator arguments stay intentionally small', () => {
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=human-paced']).pacing, 'human-paced');
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
+  assert.equal(parseRecorderArgs(['contractor-service-request-intake']).scenarioKey, 'contractor-service-request-intake');
   assert.equal(parseRecorderArgs(['homeowner-home-history']).scenarioKey, 'homeowner-home-history');
   assert.equal(parseRecorderArgs(['servsync-platform-introduction']).scenarioKey, 'servsync-platform-introduction');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--publish']), /Unsupported Demo recorder option/i);
+});
+
+test('contractor intake recorder is registered for Help and stops before business-data mutation', () => {
+  const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
+  const helpSource = readFileSync(resolve(process.cwd(), 'scripts/help/run-help-studio-recording.mjs'), 'utf8');
+  assert.match(recorderSource, /contractorServiceRequestIntakeScenario/);
+  assert.match(recorderSource, /isServiceRequestIntake/);
+  assert.match(recorderSource, /requestCard\.getByRole\('button'\)\.first\(\)/);
+  assert.match(recorderSource, /getByText\(scenario\.request\.description, \{ exact: false \}\)\.first\(\)\.waitFor/);
+  assert.match(recorderSource, /setCaption\(page, scenario\.scenes\[1\]\.caption\);\n\s+await wait\(4000\)/);
+  assert.match(recorderSource, /scenario\.finalState\.startChoiceTitle/);
+  assert.match(helpSource, /'contractor-service-request-intake'/);
 });
 
 test('shared Help and Marketing pacing uses the reviewed human-paced defaults', () => {

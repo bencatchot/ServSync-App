@@ -25,6 +25,11 @@ const validSpec = {
 
 test('Help Studio recorder accepts only a durable job identity, known Demo scenario, and shared pacing preset', () => {
   assert.equal(assertSafeHelpRecordingSpec(validSpec), validSpec);
+  assert.equal(assertSafeHelpRecordingSpec({
+    ...validSpec,
+    scenario: 'contractor-service-request-intake',
+    route_contexts: ['contractor.service_requests'],
+  }).scenario, 'contractor-service-request-intake');
   assert.throws(() => assertSafeHelpRecordingSpec({ ...validSpec, scenario: 'production-walkthrough' }), /Unsupported/);
   assert.throws(() => assertSafeHelpRecordingSpec({ ...validSpec, pacing_profile: 'fast' }), /human-paced/);
   assert.throws(() => assertSafeHelpRecordingSpec({ ...validSpec, recording_job_id: '../job' }), /identity/);

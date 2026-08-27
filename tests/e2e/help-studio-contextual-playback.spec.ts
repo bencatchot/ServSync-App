@@ -29,10 +29,14 @@ const recordingJob = {
   target_screen: 'Drafts', required_starting_state: 'One Demo request is ready.',
   scenario_key: 'contractor-create-estimate', action_steps: ['Open request.', 'Save estimate.'],
   expected_final_state: 'The saved estimate remains visible.', desired_duration_seconds: 30,
-  narration_mode: 'none', talking_points: [], pacing_profile: 'servsync-human-paced-v1',
+  narration_mode: 'ai', talking_points: [], pacing_profile: 'servsync-human-paced-v1',
   source_kind: 'recorder_generated', source_commit: 'a'.repeat(40), source_version: 'Demo Recorder',
   video_asset_id: '20000000-0000-4000-8000-000000000003', poster_asset_id: '20000000-0000-4000-8000-000000000004',
-  recorder_metadata: { validation_status: 'passed' }, failure_category: null, failure_message: null,
+  recorder_metadata: {
+    validation_status: 'passed', narration_script: 'Open the request, review the details, and start the estimate.',
+    narration_disclosure: "AI-generated voiceover using OpenAI's Cedar voice.",
+    captions_vtt: 'WEBVTT\n\n00:00:01.000 --> 00:00:05.000\nOpen the request and review the details.\n',
+  }, failure_category: null, failure_message: null,
   review_notes: null, approved_walkthrough_id: null, approved_revision: null,
   requested_at: '2026-08-18T00:00:00Z', ready_for_review_at: '2026-08-18T00:01:00Z',
   reviewed_at: null, updated_at: '2026-08-18T00:01:00Z',
@@ -72,7 +76,18 @@ async function installContextHarness(page: Page) {
     const Component = module.ContextualHelp as (...args: unknown[]) => unknown;
     const searchRow = { ...item, walkthrough_id: item.walkthrough_id, revision: 1, duration_seconds: 23, width: 1440, height: 900, rank: 5 };
     const client = {
-      rpc: async (name: string) => name === 'servsync_find_help' ? { data: [searchRow], error: null } : { data: null, error: { message: 'Unexpected RPC' } },
+      rpc: async (name: string) => {
+        if (name === 'servsync_find_help') return { data: [searchRow], error: null };
+        if (name === 'servsync_get_help_caption_track') return { data: {
+          walkthrough_id: item.walkthrough_id, revision: 1, tutorial_media_standard: 'narrated_captioned_v1',
+          captions_vtt: 'WEBVTT\n\n00:00:01.000 --> 00:00:05.000\nOpen Drafts and start a new draft.\n',
+          captions_sha256: 'a'.repeat(64), caption_language: 'en',
+          transcript: 'Open Drafts and start a new draft.', narration_provider: 'OpenAI',
+          narration_model: 'gpt-4o-mini-tts', narration_voice: 'cedar',
+          narration_disclosure: "AI-generated voiceover using OpenAI's Cedar voice.",
+        }, error: null };
+        return { data: null, error: { message: 'Unexpected RPC' } };
+      },
       auth: { getSession: async () => ({ data: { session: { access_token: 'fixture-token' } }, error: null }) },
       storage: { from: () => ({ upload: async () => ({ data: null, error: null }) }) },
     };
@@ -112,15 +127,22 @@ test('admin can define a recorder request without engineering identifiers in the
   await expect(page.getByLabel('What should this recording demonstrate?')).toBeVisible();
   await expect(page.getByLabel('Required starting state')).toBeVisible();
   await expect(page.getByLabel('Expected final state')).toBeVisible();
+  await expect(page.getByLabel('Narration')).toHaveValue('ai');
+  await expect(page.getByLabel('Narration')).toContainText('OpenAI Cedar voice + English captions');
   await expect(page.getByLabel('Recorder scenario')).toHaveValue('contractor-create-estimate');
+  await expect(page.getByLabel('Recorder scenario').locator('option')).toContainText([
+    'Contractor creates an estimate',
+    'Contractor reviews a service request',
+    'Homeowner sends a service request',
+  ]);
   await expect(page.getByText(/uuid|asset id|commit sha/i)).toHaveCount(0);
 });
 
-test('ready recording exposes normal-speed review, approve, and return-for-rerecord actions', async ({ page }) => {
+test('ready narrated recording exposes caption-aware review, approve, and return-for-rerecord actions', async ({ page }) => {
   await installAdminHarness(page, walkthrough, [recordingJob]);
   await expect(page.getByText('Ready for review')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review at normal speed' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Approve recording' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve narration + captions' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Return for rerecord' })).toBeVisible();
 });
 
@@ -143,9 +165,12 @@ test('published contextual help opens without admin controls and keeps text step
   await page.getByRole('button', { name: 'How to create an estimate' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'How to create an estimate' })).toBeVisible();
-  await expect(page.getByText('Open Drafts and start a new draft.')).toBeVisible();
+  await expect(page.getByLabel('Steps').getByText('Open Drafts and start a new draft.')).toBeVisible();
   await expect(page.getByRole('button', { name: /publish|edit|archive/i })).toHaveCount(0);
   await expect(page.locator('video')).toHaveAttribute('controls', '');
+  await expect(page.locator('video track[kind="captions"]')).toHaveCount(1);
+  await expect(page.getByText('Read transcript')).toBeVisible();
+  await expect(page.getByText("AI-generated voiceover using OpenAI's Cedar voice.")).toBeVisible();
 });
 
 test('mobile contextual playback remains readable without horizontal overflow', async ({ page }) => {

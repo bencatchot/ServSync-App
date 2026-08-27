@@ -1,8 +1,8 @@
 # ServSync Product Roadmap
 
-Last updated: 2026-08-19
+Last updated: 2026-08-27
 
-Planning base: `origin/main` at `3a902abccf99388c5d2431cde467feb9f5e56d26`
+Planning base: `origin/main` at `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 
 ## Purpose
 
@@ -31,6 +31,7 @@ The long-term advantage is:
 5. Prioritize the core operational loop before marketplace breadth, advanced team operations, or speculative automation.
 6. Protect ServSync's differentiators: one workflow across connected and not-connected Customers, homeowner-controlled property context, Home History, Home Map/Assets & Systems, safe role boundaries, and deliberate Draft-first planning.
 7. Add later capabilities inside the established Product Information Architecture. Avoid repeated global-navigation changes as the feature list grows.
+8. Treat voiceover, synchronized captions, and a durable transcript as one product-wide tutorial standard. Burned-in scene callouts do not replace captions. Protected tutorials use the already established Marketing narration choice—OpenAI `gpt-4o-mini-tts` with the Cedar voice and the disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Preserve exact model/voice/script provenance and a silent source master. This bounded Help use does not authorize runtime generation, another provider, or automatic publication.
 
 ## Planning Inputs Reconciled
 
@@ -83,14 +84,14 @@ Focus rules:
 
 | Field | Current direction |
 | --- | --- |
-| Current release stage | Phase 0 — Launch Foundation |
-| Primary active outcome | FB-039 Launch Foundation UX and Information Architecture Stabilization |
-| Completed control-point evidence | FB-039A audit is complete. FB-039B merged through PR #503 at main commit `3574d2dabb1c962be9eae3d62c5a3ce3689acd09`, establishing coherent Work/Financials ownership. FB-039C merged through PR #505 at main commit `679a948849006afcea7e2701b0df0eee5b58bb7b` after authenticated Demo Preview acceptance across all five contractor roles. FB-039D merged through PR #507 at main commit `3a902abccf99388c5d2431cde467feb9f5e56d26`, freezing the calmer homeowner Properties hierarchy across Overview, Home Map, Access, and Property Settings while preserving Home History ownership and shared-home authority. The reviewed PR head was `bb6484aae74773816f4c3dbb024ca776b54a07cf`; exact application head `f6fb8e687ef3574e4ca853f4f18fc7f3c89dae42` passed protected Demo Preview desktop/390x844 acceptance, and the same source passed resettable Sandbox owner/member/viewer security and presentation checks. All three automatic post-merge Vercel deployments completed successfully. See [the FB-039D acceptance record](../qa/ServSync_Homeowner_Properties_Progressive_Disclosure_Acceptance_2026-08-19.md). |
-| Next recommended assignment | Perform normal owner review of draft PR #521 and give explicit merge approval if the accepted Phase 0.7 result is satisfactory. |
-| Assignment outcome | Phase 0.6 merged through PR #520 at main commit `7470d4e12a7695d93e98269343a834c26555d81d`. Phase 0.7 implementation is reviewable in draft PR #521: homeowner and contractor Help navigation now lead to one role-aware Beta Guide that separates available, manual, and unavailable capability; support remains one click away; and Financials, Calendar, Discover, and homeowner Invoice surfaces state the highest-risk automation boundaries where users encounter them. No provider, payment, notification, dispatch, native/offline, role, or backend authority is added. Source, type, lint-budget, build, architecture, focused navigation, exact-head authenticated Demo desktop/mobile acceptance, focused Production contractor read-only contextual Help smoke, Production Help inventory search, and full revision 3 playback pass. Implementation and acceptance are complete. See [the Phase 0.7 acceptance record](../qa/ServSync_Phase_0_7_Honest_Beta_Boundaries_Acceptance_2026-08-26.md). |
-| Expected following slice | Phase 1 / FB-040 controlled pilot preflight is next only after Phase 0.7 is Preview-accepted, reviewed, and merged. |
+| Current release stage | Phase 1 — Controlled Contractor Pilot Preflight |
+| Primary active outcome | FB-040A Tutorial Readiness |
+| Completed control-point evidence | Phase 0 is complete. PR #521 merged Phase 0.7 at main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`, preserving the accepted role-aware Beta Guide, direct Support handoff, contextual Estimate walkthrough, and truthful automation boundaries. The controlled-pilot tutorial inventory confirms one published walkthrough and five missing protected workflows. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
+| Next recommended assignment | Recheck and merge PR #522 if safe, then verify the normal deployment. After merge, create the narrated/captioned TUT-001 replacement. |
+| Assignment outcome | FB-040A is in progress in draft PR #522 on `codex/fb-040a-tutorial-readiness`. The six-workflow coverage and TUT-001 recorder path are implemented. Exact narration/caption migration SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` is applied and verified in Sandbox, Demo, and Production with exact Help/Marketing/Storage/business/Auth preservation. Production's published Estimate remains legacy-readable at revision 3; job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` remains silent, unapproved, unpublished source evidence. The source adds checksum-bound WebVTT, exact Cedar provenance/disclosure, role-aware caption/transcript playback, sound-off review, and protected publication enforcement. See [the FB-040A acceptance record](../qa/ServSync_FB_040A_Tutorial_Readiness_Acceptance_2026-08-26.md). |
+| Expected following slice | Create and publish the six narrated/captioned protected tutorials in evidence order, then run the first task-based pilot onboarding dry run before recruiting the 3-5-contractor cohort. |
 | Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
-| Roadmap return point | Return directly to PR #521 owner review and explicit merge approval; after merge, start Phase 1 / FB-040 controlled pilot preflight. |
+| Roadmap return point | Return to FB-040 controlled-pilot preflight after each bounded feature or strategic-lane interruption; tutorial readiness is the current launch assignment. |
 
 ### Completion update protocol
 
@@ -146,6 +147,7 @@ Goal: prove that real contractors can adopt the existing product before expandin
 
 | Order | Outcome | Backlog relationship | Acceptance evidence |
 | --- | --- | --- | --- |
+| 1.0 | Protect the minimum pilot tutorial set | FB-040; FB-038 | Six protected workflow definitions; each tutorial has a Demo-safe recorder path, synchronized voiceover and captions, a durable transcript, contextual destination, explicit publication gate, freshness ownership, sound-off usability, and full normal-speed playback acceptance. |
 | 1.1 | Recruit a narrow pilot cohort | FB-040; beta docs | 3-5 solo contractors or very small teams with friendly homeowner participants; initial trade mix is recorded. |
 | 1.2 | Run task-based onboarding | FB-040; FB-038 | Each contractor adds or imports a Customer, creates or receives work, estimates, schedules or records the visit, completes work, invoices, and closes the record. Time-to-first-completed-loop and assistance required are recorded. |
 | 1.3 | Operate a rapid but controlled feedback loop | FB-040; Beta Feedback Triage | Blockers receive immediate attention; repeated confusion receives targeted UX correction; feature requests are logged without automatically changing the roadmap. |
