@@ -66,11 +66,11 @@ test('narrated Help packaging preserves the exact Cedar product decision and tra
   const aiSpec = {
     ...validSpec,
     narration_mode: 'ai',
-    talking_points: ['Open the request.', 'Start the estimate from the request.'],
+    talking_points: ['Open the request.', 'Choose Create Estimate on the request.'],
   };
   assert.deepEqual(narrationScriptFromSpec(aiSpec), {
-    script: 'Open the request. Start the estimate from the request.',
-    sentences: ['Open the request.', 'Start the estimate from the request.'],
+    script: 'Open the request. Choose Create Estimate on the request.',
+    sentences: ['Open the request.', 'Choose Create Estimate on the request.'],
   });
   assert.equal(HELP_NARRATION_MODEL, 'gpt-4o-mini-tts');
   assert.equal(HELP_NARRATION_VOICE, 'cedar');

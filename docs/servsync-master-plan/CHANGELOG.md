@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - TUT-001 exact-label rerecord required
+
+- Owner review finding: The first narrated/captioned candidate failed product-truth review because the visible request action says **Create Estimate**, while the narration said “Start estimate.” The final recorder callout repeated the generic wording. Technical validity does not override this user-facing mismatch.
+- Correction: The protected recorder now says **Choose Create Estimate here to keep the request context attached**, and focused contracts assert that exact label. The corrected narration must say **Next, select Create Estimate on the request** and preserve the matching phrase in its WebVTT transcript.
+- Production boundary: Job `2d989ced-6afd-4976-9977-2af4b4aede3c` remains unapproved and unpublished. Returning it for rerecord, creating a corrected Production request, making another provider request, attaching media, approval, and publication remain separately gated actions.
+- Roadmap: FB-040A stays active. The immediate assignment is the exact-label corrected TUT-001 rerecord and repeat owner review; TUT-003 does not start until TUT-001 is approved, separately published, and contextually verified.
+
 ## 2026-08-27 - Narrated and captioned TUT-001 replacement ready for review
 
 - Authority and boundary: The owner requested the narrated/captioned TUT-001 replacement, approved one temporary OpenAI key for exactly one Cedar request, and approved attachment to the new Production Help recording request. Recording approval, Help publication, merge, manual deployment, provider configuration, and unrelated Production mutations were not authorized.
