@@ -702,7 +702,9 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
   const openAcceptedEstimate = async (page) => {
     await openSidebar(page, /^Work$/i);
     await page.getByRole('heading', { level: 1, name: /^Work$/i }).waitFor({ state: 'visible', timeout: 30_000 });
-    await page.getByRole('button', { name: /Open Estimates/i }).click();
+    const estimatesSummary = page.getByTestId('contractor-jobs-summary-estimates').or(page.getByRole('button', { name: /Open Estimates/i })).first();
+    await estimatesSummary.waitFor({ state: 'visible', timeout: 30_000 });
+    await estimatesSummary.click();
     const estimatesTab = page.getByRole('main').getByRole('tab', { name: /^Estimates\b/i }).first();
     await estimatesTab.waitFor({ state: 'visible', timeout: 30_000 });
     await estimatesTab.click();

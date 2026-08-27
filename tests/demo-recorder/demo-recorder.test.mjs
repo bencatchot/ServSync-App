@@ -145,6 +145,8 @@ test('recorder navigates through the current Work destination, not the retired J
     assert.match(source, /openSidebar\([^\n]+, \/\^Work\$\/i\)/);
     assert.doesNotMatch(source, /openSidebar\([^\n]+, \/\^Jobs\$\/i\)/);
   }
+  const recorder = readFileSync(resolve(process.cwd(), 'scripts/demo/record-demo.mjs'), 'utf8');
+  assert.match(recorder, /contractor-jobs-summary-estimates/);
 });
 
 test('Home History recorder follows the current Properties workspace instead of the retired page heading', () => {
