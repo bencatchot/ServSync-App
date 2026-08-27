@@ -128,6 +128,14 @@ test('recorder adds the explicit non-persistent presentation opt-in', () => {
   assert.equal(url.searchParams.getAll(DEMO_PRESENTATION_QUERY_KEY).length, 1);
 });
 
+test('recorder adds an exact scenario opt-in only when supplied', () => {
+  const generic = addDemoPresentationOptIn('https://servsync-demo.vercel.app/');
+  const completeWork = addDemoPresentationOptIn('https://servsync-demo.vercel.app/', 'contractor-complete-work');
+
+  assert.equal(generic.searchParams.has('servsync-recorder-scenario'), false);
+  assert.equal(completeWork.searchParams.get('servsync-recorder-scenario'), 'contractor-complete-work');
+});
+
 test('recorder navigates through the current Work destination, not the retired Jobs tab', () => {
   for (const path of [
     'scripts/demo/record-demo.mjs',

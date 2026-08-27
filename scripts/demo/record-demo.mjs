@@ -43,8 +43,8 @@ function required(env, name) {
   return value;
 }
 
-function pageUrl(appUrl, role, bypassSecret = '') {
-  const url = addDemoPresentationOptIn(appUrl);
+function pageUrl(appUrl, role, bypassSecret = '', scenarioKey = '') {
+  const url = addDemoPresentationOptIn(appUrl, scenarioKey);
   if (bypassSecret) {
     url.searchParams.set('x-vercel-protection-bypass', bypassSecret);
     url.searchParams.set('x-vercel-set-bypass-cookie', 'true');
@@ -53,8 +53,8 @@ function pageUrl(appUrl, role, bypassSecret = '') {
   return url.toString();
 }
 
-async function login(page, appUrl, role, credentials, bypassSecret = '') {
-  await page.goto(pageUrl(appUrl, role, bypassSecret), { waitUntil: 'domcontentloaded' });
+async function login(page, appUrl, role, credentials, bypassSecret = '', scenarioKey = '') {
+  await page.goto(pageUrl(appUrl, role, bypassSecret, scenarioKey), { waitUntil: 'domcontentloaded' });
   const main = page.getByRole('main');
   await main.getByRole('heading', { name: /^Sign in$/i }).waitFor({ state: 'visible', timeout: 30_000 });
   await main.getByLabel(/^Email$/i).fill(credentials.email);
@@ -717,7 +717,7 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
   try {
     const authContext = await browser.newContext({ viewport: scenario.viewport });
     const authPage = await authContext.newPage();
-    await login(authPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '');
+    await login(authPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key);
     await openAcceptedEstimate(authPage);
     await wait(500);
     const initialFrame = await authPage.screenshot({ type: 'png' });
@@ -753,7 +753,7 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
       if (response.status() >= 500) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
     });
 
-    await page.goto(pageUrl(target.appUrl, 'contractor', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || ''), { waitUntil: 'domcontentloaded' });
+    await page.goto(pageUrl(target.appUrl, 'contractor', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key), { waitUntil: 'domcontentloaded' });
     await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
     const acceptedEstimateCard = await openAcceptedEstimate(page);
     await installRecorderOverlays(page);
