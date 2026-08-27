@@ -41,7 +41,7 @@ Every protected pilot tutorial must ship as one synchronized learning package:
 - The standard tutorial voice is OpenAI `gpt-4o-mini-tts` with the Cedar voice, reusing ServSync's established Marketing narration direction and exact disclosure: **AI-generated voiceover using OpenAI's Cedar voice.** Preserve provider, voice, model/version, script, and disclosure provenance, and show the disclosure during playback.
 - Normal-speed review must check the full picture, narration, caption timing/text, transcript, and disclosure together. A silent master may be retained as source evidence, but it cannot satisfy protected-tutorial publication readiness.
 
-The owner approved bounded Cedar narration preparation for the protected Help package. This does not authorize runtime generation, a different provider/voice, secret or environment changes, schema/storage rollout, approval of an existing recording, or Production publication.
+The owner approved bounded Cedar narration preparation and the PR #522 source foundation for the protected Help package. The locally verified contract stores checksum-bound WebVTT, transcript and provenance on the immutable revision, exposes them through role-aware playback, and blocks future protected publication without caption and sound-off review. Its migration is not applied to Sandbox, Demo, or Production. The approval does not authorize runtime generation, a different provider/voice, secret or environment changes, environment rollout, approval of an existing recording, or Production publication.
 
 ## Publication and verification gates
 

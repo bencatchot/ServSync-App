@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Help narration and caption source foundation approved
+
+- Authority: The owner approved the Help narration/caption foundation for PR #522. This covers source implementation and its migration, not applying the migration to a shared environment, changing provider/secrets, paid narration generation, recording approval, Help publication, merge, or manual Production deployment.
+- Contract: Adds exact OpenAI `gpt-4o-mini-tts` Cedar provenance and disclosure, silent-source and script checksums, immutable checksum-bound English WebVTT, matching transcript, role-aware caption retrieval, native playback captions, transcript display, and caption/sound-off review.
+- Compatibility and safety: Existing published legacy tutorials remain readable. Future protected pilot tutorials cannot publish without the narrated/captioned standard, and the existing silent TUT-001 package cannot be approved. The migration performs no provider call and does not rewrite existing Help revisions.
+- Validation: Local SQL migration/rollback-safety contracts, Help domain tests, TypeScript, exact lint budget, and eight focused desktop/mobile browser checks pass. The exact 620-line migration SHA-256 is `d1dbb672e62ba1463c3a0391b562aca94347a9d641c4ecb0de90e2de801d5740`.
+- Roadmap: The next launch assignment is a separately approved Sandbox rollout and acceptance, followed by separately approved Demo and Production gates, then creation of the narrated/captioned TUT-001 replacement.
+
 ## 2026-08-27 - Protected tutorial voiceover and captions product decision
 
 - Decision: Every protected pilot tutorial must include synchronized voiceover, timed captions/subtitles, and a matching durable transcript. Burned-in recorder scene callouts remain useful orientation aids but do not satisfy the caption requirement.

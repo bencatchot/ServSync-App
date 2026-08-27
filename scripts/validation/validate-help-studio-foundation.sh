@@ -87,6 +87,8 @@ psql_run --file "$ROOT_DIR/servsync-help-studio-recording-package-validation-for
 psql_run --file "$ROOT_DIR/servsync-help-media-ready-video-duration-forward-fix.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/help-studio-foundation-validation.sql" >/dev/null
 psql_run --file "$ROOT_DIR/tests/sql/help-studio-recording-workflow-validation.sql" >/dev/null
+psql_run --file "$ROOT_DIR/servsync-help-narration-caption-foundation.sql" >/dev/null
+psql_run --file "$ROOT_DIR/tests/sql/help-narration-caption-foundation-validation.sql" >/dev/null
 
 psql_run --file "$ROOT_DIR/servsync-help-studio-usage-state-forward-fix.sql" >/dev/null
 
@@ -102,6 +104,11 @@ fi
 
 if psql_run --file "$ROOT_DIR/servsync-help-media-ready-video-duration-forward-fix.sql" >/dev/null 2>&1; then
   echo "Repeated Help ready-video duration validation unexpectedly succeeded." >&2
+  exit 1
+fi
+
+if psql_run --file "$ROOT_DIR/servsync-help-narration-caption-foundation.sql" >/dev/null 2>&1; then
+  echo "Repeated Help narration/caption foundation unexpectedly succeeded." >&2
   exit 1
 fi
 
