@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Help narration and caption Sandbox rollout
+
+- Authority and target: The owner approved applying the PR #522 Help narration/caption foundation to Sandbox `zpzdkoaubyjtsomccxya` only. Demo, Production, merge, provider generation, recording approval, and Help publication were not authorized.
+- Safe correction: The first application attempt failed transactionally before DDL because Supabase exposes trusted `pgcrypto.digest` in `extensions`, while the local fixture had exposed it in `public`. Read-only follow-up proved no partial install. Commit `8b7022e1d7bd705c65363d3ba89f533bf1452320` corrected the source and local harness to the deployed extension contract; exact 621-line SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` then applied once.
+- Catalog and security: Postflight found all nine columns, six constraints, and eight postgres-owned SECURITY DEFINER functions with fixed search paths and recorded definition MD5 values. Only `authenticated` can call the public caption RPC; anon, service_role, and authenticated private-helper execution remain denied. Missing contractor context fails closed and repeat installation is refused.
+- Preservation: Sandbox retained zero Help walkthroughs, revisions, recording jobs, media assets, and publications with exact pre/post identity/state fingerprints. No fixture, provider request, recording, media object, publication, or unrelated data mutation occurred.
+- Roadmap: Sandbox acceptance is complete. The next launch assignment is separately approved Demo rollout and acceptance, followed by a separately approved Production gate and narrated/captioned TUT-001 replacement.
+
 ## 2026-08-27 - Help narration and caption source foundation approved
 
 - Authority: The owner approved the Help narration/caption foundation for PR #522. This covers source implementation and its migration, not applying the migration to a shared environment, changing provider/secrets, paid narration generation, recording approval, Help publication, merge, or manual Production deployment.

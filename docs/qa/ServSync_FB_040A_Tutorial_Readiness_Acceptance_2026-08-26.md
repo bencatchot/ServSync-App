@@ -1,6 +1,6 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Narration/caption source foundation verified in PR #522; environment rollout and narrated TUT-001 replacement still required; nothing approved or published
+Status: Narration/caption foundation applied and verified in Sandbox; Demo/Production rollout and narrated TUT-001 replacement still required; nothing approved or published
 
 Date: 2026-08-27
 
@@ -24,7 +24,7 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 - The explicitly approved managed-ingestion step created one Production Help recording request and two private Help media assets. It changed no Production business record, authentication, role, permission, provider, environment setting, or publication state.
 - Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
 - The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard, then approved reuse of the existing Marketing configuration: OpenAI `gpt-4o-mini-tts` with Cedar and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded narration preparation is authorized; runtime generation, provider/secret changes, schema/storage rollout, approval of the silent package, and publication are not.
-- The owner separately approved implementation of the Help narration/caption foundation in PR #522. That authority covers source and migration creation only; applying the migration to Sandbox, Demo, or Production, paid narration generation, recording approval, publication, merge, and manual deployment remain separate decisions.
+- The owner separately approved implementation of the Help narration/caption foundation in PR #522, then approved applying its exact migration to Sandbox. Demo/Production application, paid narration generation, recording approval, publication, merge, and manual deployment remain separate decisions.
 
 ## Verification
 
@@ -45,7 +45,7 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 | Mobile Demo Preview placement | Pass at `1a7b9c4c55a3f894b0d0857762f38443c6268fdb` and `390x844`: one canonical Request card, visible Service Requests workspace, zero overflow, no browser/HTTP errors, and no unpublished Help control |
 | Job-bound Help package | Pass at source `815b226329f2848c3e7bbc4554081ccf74d8fc6d`: job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e`, 16.04-second 1440×900 MP4, `servsync-human-paced-v1`, Demo provenance, passed technical and sensitive-data validation, MP4 SHA-256 `ea8162c75d276c0c28c5503d5aad9dc5ada7a79fe0f0abe6e1ee2bb5a2b54abf`, and poster SHA-256 `7ae961b0f05721876500fb1f422104f37570fd1825091d5127f23dcba13373b3` |
 | Production managed ingestion | Pass: Help Studio independently accepted the exact job/scenario/checksum/dimensions/duration manifest and moved TUT-001 to `Ready for review`; private Help media inventory increased from 6 to 8 assets and no walkthrough was approved or published |
-| Narration/caption source foundation | Pass: exact Cedar provenance, checksum-bound WebVTT, role-aware captions/transcript, native playback captions, disclosure, sound-off review, protected publication gate, and legacy-read compatibility are implemented and locally verified; migration not applied to a shared environment |
+| Narration/caption Sandbox foundation | Pass: exact 621-line SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` applied once to Sandbox at PR head `8b7022e1d7bd705c65363d3ba89f533bf1452320`; nine columns, six constraints, eight secured functions, grants, role denial, repeat refusal, and zero-data preservation verified |
 
 The first deployed Demo Preview check exposed a transient `403 Contractor context is required` from the Help search before contractor identity hydration. The candidate now waits for that identity before querying and includes a focused policy regression. The replacement exact-head Preview then loaded Service Requests with no console, page, or `4xx`/`5xx` response errors, zero horizontal overflow, and no tutorial control before publication.
 
@@ -57,7 +57,7 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 Before TUT-001 can be published:
 
-1. Apply and verify the exact narration/caption migration in Sandbox, then Demo, then Production, with separate approval at each environment boundary.
+1. Apply and verify the exact narration/caption migration in Demo, then Production, with separate approval at each environment boundary.
 2. Create a narrated/captioned TUT-001 replacement from the protected Demo workflow. The current silent job remains unapproved evidence and is not publication-eligible.
 3. Review the full replacement at normal speed with audio and captions, verify sound-off comprehension and transcript search, then choose **Approve narration + captions** or **Return for rerecord**.
 4. If the replacement is approved, obtain separate explicit owner approval before any Production publication.

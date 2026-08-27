@@ -30,7 +30,7 @@ FB-040A makes synchronized voiceover, timed captions/subtitles, and a durable tr
 
 The approved package contract binds the narration, caption track, and transcript to the exact reviewed video revision. Immutable WebVTT text, its SHA-256, language, transcript/script hash, source-silent hash, and narration provenance live on the immutable Help revision; video and poster objects remain in private Storage. A role-aware RPC returns the caption track and transcript only to the same intended audience that may retrieve the walkthrough. Help playback exposes a native caption track, searchable transcript, and disclosure. Review at normal speed covers the complete picture, audio, caption synchronization/text, transcript, and disclosure, followed by a sound-off comprehension check.
 
-PR #522 contains this source foundation in `servsync-help-narration-caption-foundation.sql`. It preserves existing published legacy tutorials, prevents future protected tutorials from publishing without the narrated/captioned standard, and prevents the existing silent TUT-001 package from being approved. The migration has not been applied to Sandbox, Demo, or Production; each rollout remains separately approved and verified.
+PR #522 contains this source foundation in `servsync-help-narration-caption-foundation.sql`. It preserves existing published legacy tutorials, prevents future protected tutorials from publishing without the narrated/captioned standard, and prevents the existing silent TUT-001 package from being approved. Exact SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` is applied and verified in Sandbox only. Demo and Production remain separately approved rollout gates.
 
 ## Authoring Boundary
 

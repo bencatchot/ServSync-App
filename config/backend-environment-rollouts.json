@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-25",
+  "updatedOn": "2026-08-27",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "help-narration-caption-foundation-v1",
+      "artifact": "servsync-help-narration-caption-foundation.sql (SHA-256 11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "The exact 621-line migration was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-27 from PR #522 head 8b7022e1d7bd705c65363d3ba89f533bf1452320. The first source revision failed transactionally before DDL because Supabase exposes pgcrypto digest through extensions rather than public; post-failure preflight confirmed zero partial install. The corrected commit and local PostgreSQL harness use the deployed extension schema. Postflight verified nine columns, six constraints, eight postgres-owned SECURITY DEFINER functions with fixed search paths and exact definition fingerprints, authenticated-only public caption retrieval, private-helper and anon/service_role denial, role-aware missing-context denial, and repeat-install refusal. Help walkthrough, revision, recording-job, media, publication counts, and identity/state fingerprints remained at their exact zero baseline; no fixture, provider call, recording, publication, or unrelated data mutation occurred."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production rollout requires separate owner approval after Demo acceptance. Existing published legacy Help must remain readable and the silent TUT-001 Production job must remain unapproved and unpublished."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Sandbox catalog/security and zero-data preservation passed. Applying the exact migration to dedicated Demo bdytwgejqnlblhrnqxkp and verifying its existing Help/Marketing/Recorder state require separate owner approval."
+        }
+      }
+    },
     {
       "id": "demo-mode-invoice-payment-checkpoint-reset-v1",
       "artifact": "servsync-demo-mode-invoice-payment-checkpoint-reset.sql (SHA-256 d1454de4d86658f59f06b968a2028e1578cd4a986a55ed1e2db30af0dccf4c3b)",
