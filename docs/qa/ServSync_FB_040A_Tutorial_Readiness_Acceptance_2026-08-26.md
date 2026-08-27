@@ -1,6 +1,6 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Production Help Studio package ready for normal-speed owner review; not approved or published
+Status: Silent Production Help Studio package retained as source evidence; narrated/captioned replacement required; not approved or published
 
 Date: 2026-08-27
 
@@ -23,6 +23,7 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 - The path begins and ends at `request_ready`. After the registry-owned fixture seed, it reads and navigates only; it does not save or adopt an Estimate.
 - The explicitly approved managed-ingestion step created one Production Help recording request and two private Help media assets. It changed no Production business record, authentication, role, permission, provider, environment setting, or publication state.
 - Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
+- The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard. This decision did not select a provider or voice, authorize paid generation, approve the silent package, or authorize publication.
 
 ## Verification
 
@@ -54,9 +55,11 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 Before TUT-001 can be published:
 
-1. Complete the full Help Studio playback at normal speed and choose **Approve recording** or **Return for rerecord**.
-2. If the recording is approved, obtain separate explicit owner approval before any Production publication.
-3. After publication, verify Owner/Admin/Office contextual retrieval and full playback, plus denial for unintended audiences.
+1. Implement and verify a provider-neutral Help package/playback contract for synchronized narration, timed captions, matching transcript, and any required AI provenance/disclosure.
+2. Create a narrated/captioned TUT-001 replacement from the protected Demo workflow. The current silent job remains unapproved evidence and is not publication-eligible.
+3. Review the full replacement at normal speed with audio and captions, verify sound-off comprehension and transcript search, then choose **Approve recording** or **Return for rerecord**.
+4. If the replacement is approved, obtain separate explicit owner approval before any Production publication.
+5. After publication, verify Owner/Admin/Office contextual retrieval, captions, transcript, and full playback, plus denial for unintended audiences.
 
 ## Tutorial Freshness
 
@@ -66,4 +69,4 @@ Tutorial evidence: Phase 0.7 verified the Production Help inventory and complete
 
 Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 
-The existing published **How to create an estimate**, revision 3, is not replaced or changed by this slice. TUT-001 is new and remains unpublished, so the source candidate does not make a stale tutorial visible to users.
+The existing published **How to create an estimate**, revision 3, is not replaced or changed by this slice. Its visible workflow remains current and it stays available, but a narrated/captioned replacement is required before FB-040A is complete. TUT-001 is new and remains unpublished, so the silent source candidate does not make an incomplete tutorial visible to users.

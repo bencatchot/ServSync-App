@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Protected tutorial voiceover and captions product decision
+
+- Decision: Every protected pilot tutorial must include synchronized voiceover, timed captions/subtitles, and a matching durable transcript. Burned-in recorder scene callouts remain useful orientation aids but do not satisfy the caption requirement.
+- Provider boundary: Human and AI narration remain provider-neutral options. AI narration must preserve provider, voice, model/version where available, script, and visible disclosure provenance. This decision does not choose a provider or voice, authorize paid generation, approve a recording, publish Help, or merge PR #522.
+- Existing media: TUT-001's validated 16.04-second silent Production package remains unapproved, unpublished source evidence and is no longer publication-eligible as the protected tutorial. The published **How to create an estimate** revision 3 remains available because its visible workflow is current, but its narration/caption upgrade is required before FB-040A completion.
+- Roadmap: The next launch assignment is the provider-neutral narration/caption package and Help playback contract, followed by a compliant TUT-001 replacement and full audio/caption/transcript/sound-off acceptance.
+
 ## 2026-08-27 - TUT-001 Production Help package ready for review
 
 - Authority: Explicit approval covered creation of the TUT-001 Help Studio recording request and managed MP4/poster attachment. It did not authorize recording approval, Help publication, merge, or provider action.
@@ -11,7 +18,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Managed package: Production recording job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` produced a validated 16.04-second, 1440×900, human-paced Demo package from exact source `815b226329f2848c3e7bbc4554081ccf74d8fc6d`. MP4 SHA-256 is `ea8162c75d276c0c28c5503d5aad9dc5ada7a79fe0f0abe6e1ee2bb5a2b54abf`; poster SHA-256 is `7ae961b0f05721876500fb1f422104f37570fd1825091d5127f23dcba13373b3`. Technical validation, sensitive-data validation, canonical Demo Recorder provenance, exact job/scenario identity, duration, dimensions, and checksums passed.
 - Production state: The managed Help Studio flow accepted the package and moved TUT-001 to **Ready for review**. Private Help media inventory increased from six to eight assets. No walkthrough was approved or published; the existing **How to create an estimate** revision 3 remains the only published Help walkthrough.
 - Boundaries: The PR Preview remained correctly Sandbox-backed. Production authoring used the branch-head UI locally with the existing platform-admin account and confirmed Production project identity; no Vercel or Supabase setting changed. No Production business record, Auth identity, role, permission, provider, external delivery, payment, or publication state changed.
-- Roadmap: The next launch-roadmap action is complete normal-speed owner review and an **Approve recording** or **Return for rerecord** decision. Any Help publication remains a separate explicit approval.
+- Roadmap: This package remains exact historical evidence. The later voiceover/captions product decision supersedes it as a publication candidate; the next launch-roadmap action is the provider-neutral narrated/captioned replacement contract. Any provider use, recording approval, or Help publication remains a separate explicit approval.
 
 ## 2026-08-26 - FB-040A pilot tutorial readiness candidate
 

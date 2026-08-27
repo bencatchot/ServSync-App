@@ -24,6 +24,12 @@ The attachment boundary requires exact job ID, scenario, `servsync-human-paced-v
 
 The shared human-paced defaults are 700 ms nearby, 1100 ms medium, and 1500 ms large cursor travel; 550 ms settle before click; 900 ms post-click hold; 75 ms per typed character; 1300 ms opening hold; at least 3200 ms final hold; and smooth cubic ease-in-out interpolation. Scenario-specific longer reading holds remain allowed.
 
+## Protected Tutorial Media Standard
+
+FB-040A makes synchronized voiceover, timed captions/subtitles, and a durable transcript mandatory for every protected pilot tutorial. Burned-in scene labels remain useful recorder overlays but do not satisfy the caption requirement. Human and AI narration are both valid provider-neutral sources. AI narration must preserve provider, voice, model/version where available, script, and visible disclosure provenance; paid generation remains behind separate cost and owner approval.
+
+The approved package contract must bind the narration, caption track, and transcript to the exact reviewed video revision. Help playback must expose captions to the viewer and keep the transcript available for deterministic retrieval. Review at normal speed covers the complete picture, audio, caption synchronization/text, transcript, and disclosure, followed by a sound-off comprehension check. Until the package and playback contract supports those proofs, a silent recorder package may be retained as immutable source evidence but cannot be approved as the protected tutorial replacement.
+
 ## Authoring Boundary
 
 - Only an authenticated ServSync `platform_admin` can create or change Help Studio records.
@@ -32,7 +38,7 @@ The shared human-paced defaults are 700 ms nearby, 1100 ms medium, and 1500 ms l
 - Draft edits create a new immutable revision. They do not rewrite the published revision.
 - A published walkthrough edited into `needs_review` continues serving its prior published revision until the new revision is explicitly published.
 - Published usage includes only walkthroughs that remain available in `published` or `needs_review`; deprecated and archived records remain preserved but count as unpublished.
-- Publication requires a ready MP4, ready poster, and passed pacing, sensitive-data, product-truth, and overall validation reviews.
+- Publication of a protected pilot tutorial requires a ready MP4, ready poster, synchronized narration, timed captions, matching durable transcript, required narration provenance/disclosure, and passed pacing, sensitive-data, product-truth, sound-off, and overall validation reviews.
 - Unpublish, deprecate, and archive remove the walkthrough from ordinary contextual retrieval. Archived records remain durable history.
 
 ## Durable Media
