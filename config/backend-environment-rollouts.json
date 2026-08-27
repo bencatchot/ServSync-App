@@ -13,11 +13,11 @@
         },
         "production": {
           "status": "Pending",
-          "reason": "Production rollout requires separate owner approval after Demo acceptance. Existing published legacy Help must remain readable and the silent TUT-001 Production job must remain unapproved and unpublished."
+          "reason": "Sandbox and Demo acceptance passed. Production rollout requires separate owner approval. Existing published legacy Help must remain readable and the silent TUT-001 Production job must remain unapproved and unpublished."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Sandbox catalog/security and zero-data preservation passed. Applying the exact migration to dedicated Demo bdytwgejqnlblhrnqxkp and verifying its existing Help/Marketing/Recorder state require separate owner approval."
+          "status": "Applied",
+          "reason": "The same exact 621-line migration was applied once to Demo bdytwgejqnlblhrnqxkp on 2026-08-27 from PR #522 head f716b40f136d48a19028d4ba1978c821122fde33 after Sandbox acceptance. Postflight matched all nine columns, six constraints, eight function definitions/owners/security paths, intended grants, missing-context denial, and repeat refusal. Help remained at zero walkthroughs, revisions, contexts, jobs, events, assets, derivatives, and publications. Marketing remained one workspace, three provider connections, one publishing control, and zero content/directions/assets/pairings/publications/events; Demo Recorder remained one scenario, 326 runs, and seven registered records; Storage remained three objects with zero Help objects. All captured identity fingerprints matched preflight. Read-only Production-to-Demo parity reports the expected staged Help difference until Production rollout plus one separate pre-existing Demo scenario intentional-addition catalog fingerprint mismatch with exact expected counts and key fingerprint; the Help migration did not touch those scenario objects. No fixture, provider call, recording, publication, or unrelated data mutation occurred."
         }
       }
     },

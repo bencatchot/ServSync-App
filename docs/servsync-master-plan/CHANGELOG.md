@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Help narration and caption Demo rollout
+
+- Authority and target: The owner approved applying the exact Sandbox-accepted PR #522 Help narration/caption migration to Demo `bdytwgejqnlblhrnqxkp` only. Production, merge, provider generation, recording approval, and Help publication were not authorized.
+- Application and security: Exact 621-line SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` applied once from PR head `f716b40f136d48a19028d4ba1978c821122fde33`. Nine columns, six constraints, eight postgres-owned fixed-path SECURITY DEFINER functions, exact definition fingerprints, authenticated-only public caption retrieval, private-helper/anon/service_role denial, missing-context denial, and repeat-install refusal match Sandbox.
+- Preservation: Help stayed at zero walkthroughs, revisions, contexts, jobs, events, assets, derivatives, and publications. Marketing stayed at one workspace, three provider connections, one publishing control, and zero content/directions/assets/pairings/publications/events. Demo Recorder stayed at one scenario, 326 runs, and seven records. Storage stayed at three objects with zero Help objects. All captured identity fingerprints matched preflight; no fixture, provider call, recording, publication, or unrelated mutation occurred.
+- Parity: Read-only Production-to-Demo comparison reports the expected 26 staged Help differences until Production rollout. It also reports one separate pre-existing `demo-scenario-infrastructure-v1` catalog fingerprint mismatch with exact expected counts and key fingerprint; this migration did not touch those objects, and the mismatch remains an explicit follow-up rather than being silently allowlisted.
+- Roadmap: Demo acceptance is complete. The next launch assignment is separately approved Production rollout and acceptance, followed by the narrated/captioned TUT-001 replacement.
+
 ## 2026-08-27 - Help narration and caption Sandbox rollout
 
 - Authority and target: The owner approved applying the PR #522 Help narration/caption foundation to Sandbox `zpzdkoaubyjtsomccxya` only. Demo, Production, merge, provider generation, recording approval, and Help publication were not authorized.
