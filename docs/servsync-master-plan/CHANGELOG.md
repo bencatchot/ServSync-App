@@ -4,6 +4,43 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Corrected TUT-001 published and live-verified
+
+- Publication: After separately approving the corrected package, the owner published job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` as **How to handle a homeowner service request**, Production revision 1. Help Studio now reports two published walkthroughs, zero unpublished walkthroughs, 12 private media assets, and 9.4 MB storage.
+- Published package: Platform-admin Preview loaded the 15.641-second secure video grant, enabled English captions through a protected `blob:https://servsync.app/...` URL, expanded the exact transcript, rendered the Cedar disclosure, and retained **Create Estimate** across the summary, steps, transcript, and media. Immutable revision 1 targets `contractor.service_requests` and includes exactly Owner/Admin/Office; Field Technician, Viewer, and Homeowner remain unchecked and excluded.
+- Live Owner verification: Approved read-only Production job `98683781475` in run `33119867072` passed public smoke, homeowner smoke, contractor Owner sign-in, the actual Service Requests contextual button, secure video, protected captions, exact transcript wording, dialog closeout, and the remaining contractor navigation without business-data mutation. The first attempt correctly exposed that captions are deliberately blob-backed rather than direct-URL-backed; the permanent regression now asserts that secure delivery contract.
+- Role evidence: The deployed Help resolver returns a published walkthrough only when the session-derived contractor role appears in the immutable audience. Separate Production Admin/Office credentials are not provisioned, so their equivalent UI replay was not repeated; exact revision metadata and the already accepted deployed resolver are the evidence basis. The excluded Field Technician, Viewer, and Homeowner audience remains fail-closed by the same contract.
+- Maintenance finding: The unrelated Demo portion of manually dispatched recurring-role smoke failed at sign-in for both approved Demo identities, indicating stale Demo smoke credentials or identity state. Production and Sandbox checks are healthy. Track Demo smoke credential repair as bounded maintenance and do not let it displace FB-040A.
+- Roadmap: TUT-001 is complete. PR #523 remains the reusable narration packager and permanent Production regression closeout; after ordinary review and merge, the next tutorial assignment is TUT-003.
+
+## 2026-08-27 - Corrected TUT-001 narration and captions approved
+
+- Owner decision: The owner approved narration and captions for corrected Production Help job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` after reviewing the exact-label package. Help Studio now marks it **Approved** and exposes `Publish for Help`.
+- Boundary: No publication occurred. The first mismatched narrated job remains `Needs rerecord`, the silent job remains evidence only, and the existing published Estimate tutorial remains unchanged.
+- Roadmap: FB-040A remains active. The next assignment is separate explicit approval for Production Help publication, followed by Owner/Admin/Office contextual playback, caption/transcript/full-playback checks, and unintended-audience denial. Merge and deployment remain separate gates.
+
+## 2026-08-27 - Corrected TUT-001 package ready for owner review
+
+- Correction completed: The protected Demo recorder and exact-label regression now use **Create Estimate**. A new 15.641-second, 1440×900 source at commit `2cff9f6d5c7323d8332544309f5683ff9e331357` keeps the visible Request action, final recorder callout, Cedar voiceover, synchronized WebVTT captions, and transcript aligned; it contains no “Start estimate” instruction.
+- Bounded provider use: After explicit approval, one temporary speech-only key made exactly one OpenAI `gpt-4o-mini-tts` Cedar request. The 12.864-second narration begins at 0.75 seconds and leaves a 1.986-second quiet hold. Automated revocation did not persist, so the owner manually revoked the key; the active list returned to the three pre-existing keys.
+- Production Help state: Corrected job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` accepted the narrated MP4, poster, WebVTT, and metadata and moved to **Ready for review**. Private Help media increased from 10 to 12. Full `1x` playback, visible synchronized captions, matching transcript, Cedar disclosure, exact-label product truth, and caption-dependent comprehension passed. The first mismatched job remains `Needs rerecord`; neither candidate is approved or published.
+- Demo and roadmap: Exact postflight retained `request_ready` with one Request/message and zero Estimate, Job, Invoice, payment, Home History, report-document, or report-notification rows. FB-040A remains active; the immediate assignment is the owner's corrected-package decision. Approval, publication, contextual verification, merge, and deployment remain separate gates.
+
+## 2026-08-27 - TUT-001 exact-label rerecord required
+
+- Owner review finding: The first narrated/captioned candidate failed product-truth review because the visible request action says **Create Estimate**, while the narration said “Start estimate.” The final recorder callout repeated the generic wording. Technical validity does not override this user-facing mismatch.
+- Correction: The protected recorder now says **Choose Create Estimate here to keep the request context attached**, and focused contracts assert that exact label. The corrected narration must say **Next, select Create Estimate on the request** and preserve the matching phrase in its WebVTT transcript.
+- Production boundary: Job `2d989ced-6afd-4976-9977-2af4b4aede3c` remains unapproved and unpublished. Returning it for rerecord, creating a corrected Production request, making another provider request, attaching media, approval, and publication remain separately gated actions.
+- Roadmap: FB-040A stays active. The immediate assignment is the exact-label corrected TUT-001 rerecord and repeat owner review; TUT-003 does not start until TUT-001 is approved, separately published, and contextually verified.
+
+## 2026-08-27 - Narrated and captioned TUT-001 replacement ready for review
+
+- Authority and boundary: The owner requested the narrated/captioned TUT-001 replacement, approved one temporary OpenAI key for exactly one Cedar request, and approved attachment to the new Production Help recording request. Recording approval, Help publication, merge, manual deployment, provider configuration, and unrelated Production mutations were not authorized.
+- Protected source: The current merged Demo workflow produced a validated 17.12-second, 1440×900, human-paced H.264 silent master at source `cae7b0bf061e3eee25532f648754b1e23d98ed13`. Exact postflight retained `request_ready` with one Request/message and zero Estimate, Job, Invoice, payment, Home History, report-document, or report-notification rows.
+- Narration package: One OpenAI `gpt-4o-mini-tts` Cedar request produced 14.712 seconds of narration. The 17.134-second H.264/AAC package preserves exact script, provider/model/voice/disclosure, WebVTT/transcript, silent-source provenance, and SHA-256 checksums; narration starts at 0.75 seconds and leaves a 1.658-second final hold. The speech-only temporary key was revoked and did not persist in ServSync, Vercel, Supabase, the artifact manifest, or the repository.
+- Production Help state: New job `2d989ced-6afd-4976-9977-2af4b4aede3c` accepted the exact narrated MP4/poster/WebVTT/metadata package and moved to **Ready for review**. Private Help media increased from eight to ten assets. Full `1x` playback, visible English captions, transcript, Cedar disclosure, sound-off comprehension, and empty browser error logs passed. No walkthrough was approved or published; the old silent job remains evidence only and the published Estimate revision 3 remains unchanged.
+- Roadmap: FB-040A remains active. The next assignment is the owner's **Approve narration + captions** or **Return for rerecord** decision for TUT-001, followed by separately authorized publication and role-aware contextual verification if approved.
+
 ## 2026-08-27 - Help narration and caption Production rollout
 
 - Authority and target: The owner approved applying the exact Sandbox- and Demo-accepted PR #522 Help narration/caption migration to Production `uqgtheclhxqlnjpfmheq`. Merge, manual deployment, provider generation, recording approval, and Help publication were not authorized.

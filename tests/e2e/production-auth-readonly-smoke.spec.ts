@@ -214,6 +214,16 @@ test.describe('production authenticated read-only smoke', () => {
 
       await openSidebarTab(page, /Service Requests/i);
       await expectActiveHeading(page, /^Service Requests$/i);
+      const requestHelp = main.getByTestId('contextual-help-contractor.service_requests');
+      await expect(requestHelp).toBeVisible({ timeout: 30_000 });
+      await requestHelp.click();
+      const requestWalkthrough = page.getByRole('dialog', { name: /How to handle a homeowner service request/i });
+      await expect(requestWalkthrough).toBeVisible();
+      await expect(requestWalkthrough.locator('video[aria-label="How to handle a homeowner service request"]')).toHaveAttribute('src', /^https:\/\//, { timeout: 30_000 });
+      await expect(requestWalkthrough.locator('track[kind="captions"]')).toHaveAttribute('src', /^blob:https:\/\/servsync\.app\//);
+      await requestWalkthrough.getByText('Read transcript', { exact: true }).click();
+      await expect(requestWalkthrough.getByText(/Next, select Create Estimate on the request\./i)).toBeVisible();
+      await requestWalkthrough.getByRole('button', { name: /Close walkthrough/i }).click();
 
       await openSidebarTab(page, /^Work\b/i);
       await expectActiveHeading(page, /^Work$/i);

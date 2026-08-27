@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { assertSafeHelpRecordingSpec } from '../../scripts/help/run-help-studio-recording.mjs';
+import {
+  HELP_NARRATION_DISCLOSURE,
+  HELP_NARRATION_MODEL,
+  HELP_NARRATION_VOICE,
+  assertSilentManifest,
+  buildWebVtt,
+  narrationScriptFromSpec,
+} from '../../scripts/help/prepare-narrated-help-recording.mjs';
 
 const validSpec = {
   schema_version: 1,
@@ -52,4 +60,55 @@ test('Help Studio package keeps WebM provenance and prepares MP4, poster, and sa
   assert.match(source, /mp4_sha256/);
   assert.match(source, /poster_sha256/);
   assert.doesNotMatch(source, /createClient|supabase\.co|\/v1\/audio|\/videos/i);
+});
+
+test('narrated Help packaging preserves the exact Cedar product decision and transcript', () => {
+  const aiSpec = {
+    ...validSpec,
+    narration_mode: 'ai',
+    talking_points: ['Open the request.', 'Choose Create Estimate on the request.'],
+  };
+  assert.deepEqual(narrationScriptFromSpec(aiSpec), {
+    script: 'Open the request. Choose Create Estimate on the request.',
+    sentences: ['Open the request.', 'Choose Create Estimate on the request.'],
+  });
+  assert.equal(HELP_NARRATION_MODEL, 'gpt-4o-mini-tts');
+  assert.equal(HELP_NARRATION_VOICE, 'cedar');
+  assert.equal(HELP_NARRATION_DISCLOSURE, "AI-generated voiceover using OpenAI's Cedar voice.");
+});
+
+test('narrated Help packaging creates ordered English WebVTT cues at the approved audio offset', () => {
+  const vtt = buildWebVtt(['Open the request.', 'Review the details.'], 6, 0.75);
+  assert.match(vtt, /^WEBVTT\n\n00:00:00\.750 --> /);
+  assert.match(vtt, /Open the request\.\n\n00:00:03\./);
+  assert.match(vtt, /Review the details\.\n$/);
+});
+
+test('narrated Help packaging only accepts the matching validated Demo silent source', () => {
+  const aiSpec = { ...validSpec, narration_mode: 'ai', talking_points: ['Open the request.'] };
+  const manifest = {
+    schema_version: 1,
+    recording_job_id: aiSpec.recording_job_id,
+    scenario: aiSpec.scenario,
+    pacing_profile: aiSpec.pacing_profile,
+    environment: 'Demo',
+    validation_status: 'passed',
+    sensitive_data_check: 'passed',
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
+    source_git_commit: 'a'.repeat(40),
+    mp4_sha256: 'b'.repeat(64),
+    poster_sha256: 'c'.repeat(64),
+  };
+  assert.equal(assertSilentManifest(manifest, aiSpec), manifest);
+  assert.throws(() => assertSilentManifest({ ...manifest, environment: 'Production' }, aiSpec), /validated Demo/);
+  assert.throws(() => assertSilentManifest({ ...manifest, recording_job_id: '40000000-0000-4000-8000-000000000002' }, aiSpec), /validated Demo/);
+});
+
+test('narration provider integration makes one Cedar speech request and never persists the API key', async () => {
+  const source = await readFile(new URL('../../scripts/help/prepare-narrated-help-recording.mjs', import.meta.url), 'utf8');
+  assert.match(source, /https:\/\/api\.openai\.com\/v1\/audio\/speech/);
+  assert.match(source, /narration_provider_request_count: 1/);
+  assert.match(source, /source_silent_sha256/);
+  assert.match(source, /captions_vtt/);
+  assert.doesNotMatch(source, /["'](?:openai_)?api_key["']\s*:|writeFile\([^\n]*OPENAI_API_KEY/i);
 });

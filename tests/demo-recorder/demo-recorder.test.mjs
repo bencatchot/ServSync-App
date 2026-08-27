@@ -61,6 +61,10 @@ test('contractor service-request intake is a read-only request-to-estimate hando
     ['request-list', 'request-details', 'estimate-handoff'],
   );
   assert.deepEqual(contractorServiceRequestIntakeScenario.expectedDurationSeconds, { min: 14, max: 34 });
+  assert.equal(
+    contractorServiceRequestIntakeScenario.scenes.find(scene => scene.key === 'estimate-handoff')?.caption,
+    'Choose Create Estimate here to keep the request context attached',
+  );
   assert.match(contractorServiceRequestIntakeScenario.fixturePolicy, /read-only after the registry-owned fixture seed/i);
   assert.doesNotMatch(JSON.stringify(contractorServiceRequestIntakeScenario), /password|service_role|@example/i);
 });

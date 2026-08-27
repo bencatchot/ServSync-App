@@ -45,7 +45,7 @@ export const contractorServiceRequestIntakeScenario = Object.freeze({
     Object.freeze({
       key: 'estimate-handoff',
       identity: 'contractor',
-      caption: 'Start the estimate here to keep the request context attached',
+      caption: 'Choose Create Estimate here to keep the request context attached',
     }),
   ]),
   finalState: Object.freeze({
