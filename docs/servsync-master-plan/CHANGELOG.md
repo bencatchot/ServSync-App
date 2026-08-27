@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Corrected TUT-001 published and live-verified
+
+- Publication: After separately approving the corrected package, the owner published job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` as **How to handle a homeowner service request**, Production revision 1. Help Studio now reports two published walkthroughs, zero unpublished walkthroughs, 12 private media assets, and 9.4 MB storage.
+- Published package: Platform-admin Preview loaded the 15.641-second secure video grant, enabled English captions through a protected `blob:https://servsync.app/...` URL, expanded the exact transcript, rendered the Cedar disclosure, and retained **Create Estimate** across the summary, steps, transcript, and media. Immutable revision 1 targets `contractor.service_requests` and includes exactly Owner/Admin/Office; Field Technician, Viewer, and Homeowner remain unchecked and excluded.
+- Live Owner verification: Approved read-only Production job `98683781475` in run `33119867072` passed public smoke, homeowner smoke, contractor Owner sign-in, the actual Service Requests contextual button, secure video, protected captions, exact transcript wording, dialog closeout, and the remaining contractor navigation without business-data mutation. The first attempt correctly exposed that captions are deliberately blob-backed rather than direct-URL-backed; the permanent regression now asserts that secure delivery contract.
+- Role evidence: The deployed Help resolver returns a published walkthrough only when the session-derived contractor role appears in the immutable audience. Separate Production Admin/Office credentials are not provisioned, so their equivalent UI replay was not repeated; exact revision metadata and the already accepted deployed resolver are the evidence basis. The excluded Field Technician, Viewer, and Homeowner audience remains fail-closed by the same contract.
+- Maintenance finding: The unrelated Demo portion of manually dispatched recurring-role smoke failed at sign-in for both approved Demo identities, indicating stale Demo smoke credentials or identity state. Production and Sandbox checks are healthy. Track Demo smoke credential repair as bounded maintenance and do not let it displace FB-040A.
+- Roadmap: TUT-001 is complete. PR #523 remains the reusable narration packager and permanent Production regression closeout; after ordinary review and merge, the next tutorial assignment is TUT-003.
+
 ## 2026-08-27 - Corrected TUT-001 narration and captions approved
 
 - Owner decision: The owner approved narration and captions for corrected Production Help job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` after reviewing the exact-label package. Help Studio now marks it **Approved** and exposes `Publish for Help`.

@@ -1,6 +1,6 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Corrected exact-label TUT-001 package owner-approved; Production publication not authorized or completed
+Status: Corrected exact-label TUT-001 published and live-verified; reusable source PR remains unmerged
 
 Date: 2026-08-27
 
@@ -22,9 +22,9 @@ Base: merged PR #522 main commit `cae7b0bf061e3eee25532f648754b1e23d98ed13`
 - The recorder targets only dedicated Demo project `bdytwgejqnlblhrnqxkp` and durable Demo origin `https://servsync-demo.vercel.app`.
 - The path begins and ends at `request_ready`. After the registry-owned fixture seed, it reads and navigates only; it does not save or adopt an Estimate.
 - The explicitly approved corrected flow returned the mismatched job for rerecord, created one additional Production Help recording request, made one bounded OpenAI Cedar speech request, and attached one corrected narrated MP4 plus poster and immutable WebVTT/transcript metadata. It changed no Production business record, authentication, role, permission, environment setting, walkthrough approval, or publication state.
-- The owner completed the corrected package's narration-and-caption approval after product-truth review. Production publication remains a separate owner decision through the existing Help Studio flow.
+- The owner completed the corrected package's narration-and-caption approval after product-truth review and then separately published the approved revision through Help Studio.
 - The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard, then approved reuse of the existing Marketing configuration: OpenAI `gpt-4o-mini-tts` with Cedar and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded narration preparation is authorized; runtime generation, provider/secret changes, schema/storage rollout, approval of the silent package, and publication are not.
-- The owner separately approved implementation and rollout of the Help narration/caption foundation in PR #522, then explicitly approved a temporary, speech-only OpenAI key for each bounded Cedar package. The corrected key made exactly one `gpt-4o-mini-tts` request and was manually revoked after automated revocation did not persist; the active-key list returned to the three pre-existing keys. No provider credential was printed by the packaging process or persisted in ServSync, Vercel, Supabase, the artifact manifest, or the repository. Production publication, merge, and manual deployment remain separate decisions.
+- The owner separately approved implementation and rollout of the Help narration/caption foundation in PR #522, then explicitly approved a temporary, speech-only OpenAI key for each bounded Cedar package. The corrected key made exactly one `gpt-4o-mini-tts` request and was manually revoked after automated revocation did not persist; the active-key list returned to the three pre-existing keys. No provider credential was printed by the packaging process or persisted in ServSync, Vercel, Supabase, the artifact manifest, or the repository. Source merge and manual deployment remain separate decisions.
 
 ## Verification
 
@@ -63,6 +63,10 @@ Base: merged PR #522 main commit `cae7b0bf061e3eee25532f648754b1e23d98ed13`
 | Corrected Production managed ingestion | Pass: Help Studio job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` accepted the narrated MP4/poster/WebVTT/metadata package and moved to `Ready for review`; private Help media increased from 10 to 12 assets; neither candidate was approved or published |
 | Corrected Help technical review | Pass: full playback completed at `1x`; English captions were enabled and visibly synchronized; transcript and Cedar disclosure rendered; screen, callout, captions, transcript, and narration use the exact **Create Estimate** label. A caption-visible replay confirmed the workflow remains understandable without relying on narration |
 | Corrected owner product-truth decision | **Approved:** the owner approved narration and captions for job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`; Help Studio now exposes `Publish for Help`. No publication occurred |
+| Production publication | Pass: TUT-001 is published as **How to handle a homeowner service request**, revision 1; Help Studio shows two published walkthroughs, zero unpublished walkthroughs, and 12 private media assets |
+| Published package playback | Pass: the published 15.641-second video grant loads, English captions are enabled through a protected `blob:https://servsync.app/...` URL, the exact transcript expands, the Cedar disclosure renders, and all visible instructions retain **Create Estimate** |
+| Live contractor Owner context | Pass in approved read-only Production smoke run `33119867072`: the actual `contractor.service_requests` page exposed the contextual tutorial; secure video, protected captions, transcript, exact-label assertion, closeout, remaining contractor navigation, homeowner read-only smoke, and Production public smoke all passed without business-data mutation |
+| Published role boundary | Pass: immutable revision 1 includes exactly Owner, Admin, and Office; Field Technician, Viewer, and Homeowner are excluded. The deployed role resolver returns only when the session-derived contractor role appears in that array. A live Owner UI path passed; separate Production Admin/Office credentials are not provisioned, so their equivalent UI replay was not repeated |
 
 The first Sandbox application attempt failed transactionally before DDL because the deployed Supabase projects expose trusted `pgcrypto.digest` through the `extensions` schema. A read-only query confirmed the caption foundation remained absent. The corrected source and local harness use that deployed contract; the exact corrected migration then installed once and the repeat-install guard refused a second application.
 
@@ -74,17 +78,17 @@ The first credential-less run failed closed before seeding. After explicit owner
 
 The source-readiness package remains `servsync-contractor-service-request-intake-v1-2026-08-26T21-46-53-792Z` under the private ServSync Demo Recordings library. After explicit approval to create and attach the Production request, Help Studio job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` produced the exact managed package `contractor-service-request-intake/2026-08-27T12-15-34-530Z` under the private ServSync Help Studio Recordings library. The Production-backed local authoring session used the existing platform-admin account and branch-head UI without changing a deployed environment; the ordinary PR Preview was correctly left on its Sandbox backend.
 
-Before TUT-001 can be published:
+## Publication closeout
 
-1. Obtain separate explicit owner approval for Production publication of approved job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`.
-2. After publication, verify Owner/Admin/Office contextual retrieval, captions, transcript, full playback, and denial for unintended audiences.
-3. Merge the reusable narration-packaging source only after ordinary PR review; merge does not publish the media.
+TUT-001 publication and live Owner-path verification are complete. The immutable published audience is exactly Owner/Admin/Office, with Field Technician, Viewer, and Homeowner excluded through the same deployed session-derived role resolver. Separate Admin/Office Production credentials are not provisioned, so exact deployed policy correspondence—not additional live sign-ins—is the evidence basis for those two equivalent allowed roles.
+
+The reusable narration-packaging source and permanent Production smoke regression still require ordinary PR review and merge. That merge does not change the already published media.
 
 ## Tutorial Freshness
 
-Tutorial impact: `UPDATE REQUIRED`.
+Tutorial impact: `UPDATED`.
 
-Tutorial evidence: The first narrated/captioned TUT-001 package failed owner product-truth review because the voice said “Start estimate” while the visible control says **Create Estimate**. The owner approved corrected job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`, whose screen, recorder callout, voice, captions, and transcript use the exact label. It remains unpublished, so `contractor.service_requests` still has no ordinary-user walkthrough. The next gate is separate Production publication approval followed by post-publication role-aware verification.
+Tutorial evidence: The first narrated/captioned TUT-001 package failed owner product-truth review because the voice said “Start estimate” while the visible control says **Create Estimate**. The corrected package is now published as revision 1 with the screen, recorder callout, voice, captions, transcript, and Service Requests contextual entry aligned on the exact label. Live Production Owner retrieval/playback passed, and the immutable audience is exactly Owner/Admin/Office with unintended roles excluded.
 
 Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 
