@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Corrected TUT-001 narration and captions approved
+
+- Owner decision: The owner approved narration and captions for corrected Production Help job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` after reviewing the exact-label package. Help Studio now marks it **Approved** and exposes `Publish for Help`.
+- Boundary: No publication occurred. The first mismatched narrated job remains `Needs rerecord`, the silent job remains evidence only, and the existing published Estimate tutorial remains unchanged.
+- Roadmap: FB-040A remains active. The next assignment is separate explicit approval for Production Help publication, followed by Owner/Admin/Office contextual playback, caption/transcript/full-playback checks, and unintended-audience denial. Merge and deployment remain separate gates.
+
 ## 2026-08-27 - Corrected TUT-001 package ready for owner review
 
 - Correction completed: The protected Demo recorder and exact-label regression now use **Create Estimate**. A new 15.641-second, 1440×900 source at commit `2cff9f6d5c7323d8332544309f5683ff9e331357` keeps the visible Request action, final recorder callout, Cedar voiceover, synchronized WebVTT captions, and transcript aligned; it contains no “Start estimate” instruction.

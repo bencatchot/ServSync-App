@@ -1,6 +1,6 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Corrected exact-label TUT-001 package ready for owner product-truth review; nothing approved or published
+Status: Corrected exact-label TUT-001 package owner-approved; Production publication not authorized or completed
 
 Date: 2026-08-27
 
@@ -22,9 +22,9 @@ Base: merged PR #522 main commit `cae7b0bf061e3eee25532f648754b1e23d98ed13`
 - The recorder targets only dedicated Demo project `bdytwgejqnlblhrnqxkp` and durable Demo origin `https://servsync-demo.vercel.app`.
 - The path begins and ends at `request_ready`. After the registry-owned fixture seed, it reads and navigates only; it does not save or adopt an Estimate.
 - The explicitly approved corrected flow returned the mismatched job for rerecord, created one additional Production Help recording request, made one bounded OpenAI Cedar speech request, and attached one corrected narrated MP4 plus poster and immutable WebVTT/transcript metadata. It changed no Production business record, authentication, role, permission, environment setting, walkthrough approval, or publication state.
-- Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
+- The owner completed the corrected package's narration-and-caption approval after product-truth review. Production publication remains a separate owner decision through the existing Help Studio flow.
 - The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard, then approved reuse of the existing Marketing configuration: OpenAI `gpt-4o-mini-tts` with Cedar and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded narration preparation is authorized; runtime generation, provider/secret changes, schema/storage rollout, approval of the silent package, and publication are not.
-- The owner separately approved implementation and rollout of the Help narration/caption foundation in PR #522, then explicitly approved a temporary, speech-only OpenAI key for each bounded Cedar package. The corrected key made exactly one `gpt-4o-mini-tts` request and was manually revoked after automated revocation did not persist; the active-key list returned to the three pre-existing keys. No provider credential was printed by the packaging process or persisted in ServSync, Vercel, Supabase, the artifact manifest, or the repository. Recording approval, publication, merge, and manual deployment remain separate decisions.
+- The owner separately approved implementation and rollout of the Help narration/caption foundation in PR #522, then explicitly approved a temporary, speech-only OpenAI key for each bounded Cedar package. The corrected key made exactly one `gpt-4o-mini-tts` request and was manually revoked after automated revocation did not persist; the active-key list returned to the three pre-existing keys. No provider credential was printed by the packaging process or persisted in ServSync, Vercel, Supabase, the artifact manifest, or the repository. Production publication, merge, and manual deployment remain separate decisions.
 
 ## Verification
 
@@ -62,6 +62,7 @@ Base: merged PR #522 main commit `cae7b0bf061e3eee25532f648754b1e23d98ed13`
 | Corrected narrated provenance | Pass: 15.641-second H.264/AAC MP4 SHA-256 `5fddd844389082f79e0ba9d003a4e6ea0e1b79738b4bc7194c68f390a21924d8`, poster SHA-256 `7446c856c2f40e98e2aaf02167196a942b90039ca0e74ef20a9715d47f769922`, WebVTT SHA-256 `4ec79cf2d6b3e4a106622d5b4ac42f2af966e49c0b75c4f1d8b5e984b4e3902e`, metadata SHA-256 `a3d04330a0f36a2004b13549936da82cf67796b42866e495afce975e6bf1c038`, and immutable silent-source SHA-256 `1fd50e89a7a51c964491fb1cf6522f6a3e2291ad7d05352dff24a322b1f9af69` |
 | Corrected Production managed ingestion | Pass: Help Studio job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` accepted the narrated MP4/poster/WebVTT/metadata package and moved to `Ready for review`; private Help media increased from 10 to 12 assets; neither candidate was approved or published |
 | Corrected Help technical review | Pass: full playback completed at `1x`; English captions were enabled and visibly synchronized; transcript and Cedar disclosure rendered; screen, callout, captions, transcript, and narration use the exact **Create Estimate** label. A caption-visible replay confirmed the workflow remains understandable without relying on narration |
+| Corrected owner product-truth decision | **Approved:** the owner approved narration and captions for job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`; Help Studio now exposes `Publish for Help`. No publication occurred |
 
 The first Sandbox application attempt failed transactionally before DDL because the deployed Supabase projects expose trusted `pgcrypto.digest` through the `extensions` schema. A read-only query confirmed the caption foundation remained absent. The corrected source and local harness use that deployed contract; the exact corrected migration then installed once and the repeat-install guard refused a second application.
 
@@ -75,16 +76,15 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 Before TUT-001 can be published:
 
-1. Complete the owner's product-truth review of corrected job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`. Approve narration and captions only if the owner accepts the exact-label package; otherwise return it for rerecord with specific notes.
-2. If approved, obtain separate explicit owner approval before any Production publication.
-3. After publication, verify Owner/Admin/Office contextual retrieval, captions, transcript, full playback, and denial for unintended audiences.
-4. Merge the reusable narration-packaging source only after ordinary PR review; merge does not approve or publish the media.
+1. Obtain separate explicit owner approval for Production publication of approved job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`.
+2. After publication, verify Owner/Admin/Office contextual retrieval, captions, transcript, full playback, and denial for unintended audiences.
+3. Merge the reusable narration-packaging source only after ordinary PR review; merge does not publish the media.
 
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATE REQUIRED`.
 
-Tutorial evidence: The first narrated/captioned TUT-001 package failed owner product-truth review because the voice said “Start estimate” while the visible control says **Create Estimate**. Corrected job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` is now `Ready for review` with the exact label aligned across the screen, recorder callout, voice, captions, and transcript. It remains unapproved and unpublished, so `contractor.service_requests` still has no ordinary-user walkthrough. The next gate is the owner's corrected-package decision, followed by separately approved publication if accepted and post-publication role-aware verification.
+Tutorial evidence: The first narrated/captioned TUT-001 package failed owner product-truth review because the voice said “Start estimate” while the visible control says **Create Estimate**. The owner approved corrected job `58cdc275-86bb-4925-b60f-5ff3e2b70d51`, whose screen, recorder callout, voice, captions, and transcript use the exact label. It remains unpublished, so `contractor.service_requests` still has no ordinary-user walkthrough. The next gate is separate Production publication approval followed by post-publication role-aware verification.
 
 Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 
