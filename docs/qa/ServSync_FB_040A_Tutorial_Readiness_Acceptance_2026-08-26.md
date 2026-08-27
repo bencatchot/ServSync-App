@@ -1,8 +1,8 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Validated Demo recording ready for Help Studio attachment; not published
+Status: Production Help Studio package ready for normal-speed owner review; not approved or published
 
-Date: 2026-08-26
+Date: 2026-08-27
 
 Branch: `codex/fb-040a-tutorial-readiness`
 
@@ -21,8 +21,8 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 
 - The recorder targets only dedicated Demo project `bdytwgejqnlblhrnqxkp` and durable Demo origin `https://servsync-demo.vercel.app`.
 - The path begins and ends at `request_ready`. After the registry-owned fixture seed, it reads and navigates only; it does not save or adopt an Estimate.
-- No SQL, schema, RLS, RPC, role, permission, provider, environment setting, Production data, Help record, media, or publication state is changed.
-- Production publication requires explicit owner approval through the existing Help Studio review flow.
+- The explicitly approved managed-ingestion step created one Production Help recording request and two private Help media assets. It changed no Production business record, authentication, role, permission, provider, environment setting, or publication state.
+- Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
 
 ## Verification
 
@@ -41,6 +41,8 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 | Diff whitespace check | Pass |
 | Deployed Demo Preview Service Requests acceptance | Pass at `c713827124accc2914056cabe311f67265fadb3c`: no console/page/HTTP errors, zero horizontal overflow, and zero unpublished Help controls |
 | Mobile Demo Preview placement | Pass at `1a7b9c4c55a3f894b0d0857762f38443c6268fdb` and `390x844`: one canonical Request card, visible Service Requests workspace, zero overflow, no browser/HTTP errors, and no unpublished Help control |
+| Job-bound Help package | Pass at source `815b226329f2848c3e7bbc4554081ccf74d8fc6d`: job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e`, 16.04-second 1440×900 MP4, `servsync-human-paced-v1`, Demo provenance, passed technical and sensitive-data validation, MP4 SHA-256 `ea8162c75d276c0c28c5503d5aad9dc5ada7a79fe0f0abe6e1ee2bb5a2b54abf`, and poster SHA-256 `7ae961b0f05721876500fb1f422104f37570fd1825091d5127f23dcba13373b3` |
+| Production managed ingestion | Pass: Help Studio independently accepted the exact job/scenario/checksum/dimensions/duration manifest and moved TUT-001 to `Ready for review`; private Help media inventory increased from 6 to 8 assets and no walkthrough was approved or published |
 
 The first deployed Demo Preview check exposed a transient `403 Contractor context is required` from the Help search before contractor identity hydration. The candidate now waits for that identity before querying and includes a focused policy regression. The replacement exact-head Preview then loaded Service Requests with no console, page, or `4xx`/`5xx` response errors, zero horizontal overflow, and no tutorial control before publication.
 
@@ -48,19 +50,19 @@ The first deployed Demo Preview check exposed a transient `403 Contractor contex
 
 The first credential-less run failed closed before seeding. After explicit owner approval, the existing dedicated-Demo keys were obtained through authenticated Vercel/Supabase management paths, injected only into the recorder process, and never printed or committed. Two subsequent duration checks rejected 12.72- and 13.88-second captures; the approved package preserves a four-second reading hold and passed at 15.52 seconds. Rejected captures were not promoted.
 
-Validated local package: `servsync-contractor-service-request-intake-v1-2026-08-26T21-46-53-792Z` under the private ServSync Demo Recordings library.
+The source-readiness package remains `servsync-contractor-service-request-intake-v1-2026-08-26T21-46-53-792Z` under the private ServSync Demo Recordings library. After explicit approval to create and attach the Production request, Help Studio job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` produced the exact managed package `contractor-service-request-intake/2026-08-27T12-15-34-530Z` under the private ServSync Help Studio Recordings library. The Production-backed local authoring session used the existing platform-admin account and branch-head UI without changing a deployed environment; the ordinary PR Preview was correctly left on its Sandbox backend.
 
 Before TUT-001 can be published:
 
-1. Create the matching Help Studio recording request and attach a job-bound package/poster through the managed ingestion flow.
-2. Obtain explicit owner approval before any Production publication.
+1. Complete the full Help Studio playback at normal speed and choose **Approve recording** or **Return for rerecord**.
+2. If the recording is approved, obtain separate explicit owner approval before any Production publication.
 3. After publication, verify Owner/Admin/Office contextual retrieval and full playback, plus denial for unintended audiences.
 
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
 
-Tutorial evidence: Phase 0.7 verified the Production Help inventory and completed full revision 3 playback. That published Estimate tutorial remains current. TUT-001 is a new unpublished path with no matching published `contractor.service_requests` walkthrough; this slice supplies its protected source readiness only.
+Tutorial evidence: Phase 0.7 verified the Production Help inventory and completed full revision 3 playback. That published Estimate tutorial remains current. TUT-001 is a new unpublished path with no matching published `contractor.service_requests` walkthrough; this slice now supplies its protected source, exact Production job binding, and managed media readiness without making it visible to ordinary users.
 
 Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 

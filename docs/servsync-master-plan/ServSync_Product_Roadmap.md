@@ -1,8 +1,8 @@
 # ServSync Product Roadmap
 
-Last updated: 2026-08-19
+Last updated: 2026-08-27
 
-Planning base: `origin/main` at `3a902abccf99388c5d2431cde467feb9f5e56d26`
+Planning base: `origin/main` at `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 
 ## Purpose
 
@@ -86,8 +86,8 @@ Focus rules:
 | Current release stage | Phase 1 — Controlled Contractor Pilot Preflight |
 | Primary active outcome | FB-040A Tutorial Readiness |
 | Completed control-point evidence | Phase 0 is complete. PR #521 merged Phase 0.7 at main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`, preserving the accepted role-aware Beta Guide, direct Support handoff, contextual Estimate walkthrough, and truthful automation boundaries. The controlled-pilot tutorial inventory confirms one published walkthrough and five missing protected workflows. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
-| Next recommended assignment | Create the TUT-001 Help Studio recording request, bind the validated Demo capture to its managed package/poster, and return for explicit owner publication approval. |
-| Assignment outcome | FB-040A is in progress in draft PR #522 on `codex/fb-040a-tutorial-readiness`. The six-workflow pilot coverage matrix, context-preserving Request-to-Estimate recorder, Help Studio allowlist, contextual placement, and freshness contracts are implemented. The protected Demo capture passed at 15.52 seconds with full `1x` review, no sensitive data/browser errors, exact `request_ready` preservation, and clean desktop/mobile Preview placement. Production Help remains unchanged. See [the FB-040A acceptance record](../qa/ServSync_FB_040A_Tutorial_Readiness_Acceptance_2026-08-26.md). |
+| Next recommended assignment | Review the complete TUT-001 Help Studio recording at normal speed and choose **Approve recording** or **Return for rerecord**. If approved, keep Production publication behind a new explicit owner approval. |
+| Assignment outcome | FB-040A is in progress in draft PR #522 on `codex/fb-040a-tutorial-readiness`. The six-workflow pilot coverage matrix, context-preserving Request-to-Estimate recorder, Help Studio allowlist, contextual placement, and freshness contracts are implemented. The source-readiness capture passed at 15.52 seconds with full `1x` review, no sensitive data/browser errors, exact `request_ready` preservation, and clean desktop/mobile Preview placement. After explicit managed-ingestion approval, Production Help Studio job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` accepted its exact 16.04-second job-bound Demo MP4/poster at source `815b226329f2848c3e7bbc4554081ccf74d8fc6d` and is now `Ready for review`. It is not approved or published. See [the FB-040A acceptance record](../qa/ServSync_FB_040A_Tutorial_Readiness_Acceptance_2026-08-26.md). |
 | Expected following slice | Record and publish the remaining protected tutorials in evidence order, then run the first task-based pilot onboarding dry run before recruiting the 3-5-contractor cohort. |
 | Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
 | Roadmap return point | Return to FB-040 controlled-pilot preflight after each bounded feature or strategic-lane interruption; tutorial readiness is the current launch assignment. |

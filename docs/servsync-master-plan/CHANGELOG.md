@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - TUT-001 Production Help package ready for review
+
+- Authority: Explicit approval covered creation of the TUT-001 Help Studio recording request and managed MP4/poster attachment. It did not authorize recording approval, Help publication, merge, or provider action.
+- Product correction: PR #522 now exposes the registered `contractor-service-request-intake` scenario in the ordinary Help Studio recorder menu. The complete Help Studio suite passed 14 domain/foundation checks and eight browser checks before commit `815b226329f2848c3e7bbc4554081ccf74d8fc6d` was pushed; all three Vercel Previews completed successfully.
+- Managed package: Production recording job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` produced a validated 16.04-second, 1440×900, human-paced Demo package from exact source `815b226329f2848c3e7bbc4554081ccf74d8fc6d`. MP4 SHA-256 is `ea8162c75d276c0c28c5503d5aad9dc5ada7a79fe0f0abe6e1ee2bb5a2b54abf`; poster SHA-256 is `7ae961b0f05721876500fb1f422104f37570fd1825091d5127f23dcba13373b3`. Technical validation, sensitive-data validation, canonical Demo Recorder provenance, exact job/scenario identity, duration, dimensions, and checksums passed.
+- Production state: The managed Help Studio flow accepted the package and moved TUT-001 to **Ready for review**. Private Help media inventory increased from six to eight assets. No walkthrough was approved or published; the existing **How to create an estimate** revision 3 remains the only published Help walkthrough.
+- Boundaries: The PR Preview remained correctly Sandbox-backed. Production authoring used the branch-head UI locally with the existing platform-admin account and confirmed Production project identity; no Vercel or Supabase setting changed. No Production business record, Auth identity, role, permission, provider, external delivery, payment, or publication state changed.
+- Roadmap: The next launch-roadmap action is complete normal-speed owner review and an **Approve recording** or **Return for rerecord** decision. Any Help publication remains a separate explicit approval.
+
 ## 2026-08-26 - FB-040A pilot tutorial readiness candidate
 
 - Starting point: Began from clean merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7` on `codex/fb-040a-tutorial-readiness`.
