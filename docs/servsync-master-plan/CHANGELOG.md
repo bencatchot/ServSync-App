@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Narrated and captioned TUT-001 replacement ready for review
+
+- Authority and boundary: The owner requested the narrated/captioned TUT-001 replacement, approved one temporary OpenAI key for exactly one Cedar request, and approved attachment to the new Production Help recording request. Recording approval, Help publication, merge, manual deployment, provider configuration, and unrelated Production mutations were not authorized.
+- Protected source: The current merged Demo workflow produced a validated 17.12-second, 1440×900, human-paced H.264 silent master at source `cae7b0bf061e3eee25532f648754b1e23d98ed13`. Exact postflight retained `request_ready` with one Request/message and zero Estimate, Job, Invoice, payment, Home History, report-document, or report-notification rows.
+- Narration package: One OpenAI `gpt-4o-mini-tts` Cedar request produced 14.712 seconds of narration. The 17.134-second H.264/AAC package preserves exact script, provider/model/voice/disclosure, WebVTT/transcript, silent-source provenance, and SHA-256 checksums; narration starts at 0.75 seconds and leaves a 1.658-second final hold. The speech-only temporary key was revoked and did not persist in ServSync, Vercel, Supabase, the artifact manifest, or the repository.
+- Production Help state: New job `2d989ced-6afd-4976-9977-2af4b4aede3c` accepted the exact narrated MP4/poster/WebVTT/metadata package and moved to **Ready for review**. Private Help media increased from eight to ten assets. Full `1x` playback, visible English captions, transcript, Cedar disclosure, sound-off comprehension, and empty browser error logs passed. No walkthrough was approved or published; the old silent job remains evidence only and the published Estimate revision 3 remains unchanged.
+- Roadmap: FB-040A remains active. The next assignment is the owner's **Approve narration + captions** or **Return for rerecord** decision for TUT-001, followed by separately authorized publication and role-aware contextual verification if approved.
+
 ## 2026-08-27 - Help narration and caption Production rollout
 
 - Authority and target: The owner approved applying the exact Sandbox- and Demo-accepted PR #522 Help narration/caption migration to Production `uqgtheclhxqlnjpfmheq`. Merge, manual deployment, provider generation, recording approval, and Help publication were not authorized.

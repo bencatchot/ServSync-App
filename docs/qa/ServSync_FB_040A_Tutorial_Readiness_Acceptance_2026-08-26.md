@@ -1,12 +1,12 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Narration/caption foundation applied and verified in Sandbox, Demo, and Production; narrated TUT-001 replacement still required; nothing approved or published
+Status: Narrated/captioned TUT-001 replacement is validated and Ready for review in Production Help Studio; nothing approved or published
 
 Date: 2026-08-27
 
-Branch: `codex/fb-040a-tutorial-readiness`
+Branch: `codex/fb-040a-tut-001-narrated-replacement`
 
-Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
+Base: merged PR #522 main commit `cae7b0bf061e3eee25532f648754b1e23d98ed13`
 
 ## Accepted source scope
 
@@ -21,10 +21,10 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 
 - The recorder targets only dedicated Demo project `bdytwgejqnlblhrnqxkp` and durable Demo origin `https://servsync-demo.vercel.app`.
 - The path begins and ends at `request_ready`. After the registry-owned fixture seed, it reads and navigates only; it does not save or adopt an Estimate.
-- The explicitly approved managed-ingestion step created one Production Help recording request and two private Help media assets. It changed no Production business record, authentication, role, permission, provider, environment setting, or publication state.
+- The explicitly approved replacement flow created one new Production Help recording request, made one bounded OpenAI Cedar speech request, and attached one narrated MP4 plus poster and immutable WebVTT/transcript metadata. It changed no Production business record, authentication, role, permission, environment setting, walkthrough approval, or publication state.
 - Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
 - The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard, then approved reuse of the existing Marketing configuration: OpenAI `gpt-4o-mini-tts` with Cedar and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded narration preparation is authorized; runtime generation, provider/secret changes, schema/storage rollout, approval of the silent package, and publication are not.
-- The owner separately approved implementation of the Help narration/caption foundation in PR #522, then approved applying its exact migration to Sandbox, Demo, and Production in separate gates. Paid narration generation, recording approval, publication, merge, and manual deployment remain separate decisions.
+- The owner separately approved implementation and rollout of the Help narration/caption foundation in PR #522, then explicitly approved one temporary, speech-only OpenAI key for this replacement. The key made exactly one `gpt-4o-mini-tts` Cedar request and was revoked; no provider credential was printed by the packaging process, persisted in ServSync, Vercel, Supabase, the artifact manifest, or the repository. Recording approval, publication, merge, and manual deployment remain separate decisions.
 
 ## Verification
 
@@ -49,6 +49,12 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 | Narration/caption Demo foundation | Pass: the same exact migration applied once to Demo at PR head `f716b40f136d48a19028d4ba1978c821122fde33`; catalog/security matched Sandbox and exact Help, Marketing, Demo Recorder, and Storage counts/fingerprints matched preflight |
 | Narration/caption Production foundation | Pass: the same exact migration applied once to Production at PR head `09151d77c3b98871d5b192d12f599be4e4f283a0`; three existing revisions remained legacy-compatible, published Estimate revision 3 retrieved through a real contractor owner, silent TUT-001 remained unapproved, and every captured Help/Marketing/Storage/business/Auth count and fingerprint matched preflight |
 | Production-to-Demo parity | Help aligned: all 26 staged Help differences cleared. One separate pre-existing `demo-scenario-infrastructure-v1` catalog fingerprint mismatch retains exact expected object counts and key fingerprint and was not touched by this migration |
+| Replacement protected Demo recording | Pass at source `cae7b0bf061e3eee25532f648754b1e23d98ed13`: 17.12-second 1440×900 H.264 silent master, `servsync-human-paced-v1`, current Service Requests/Work navigation, passed technical and sensitive-data validation |
+| Replacement final Demo checkpoint | Pass at exact `request_ready`: one Request/message, one connection/home/room/asset, and zero Estimate, Job, Invoice, payment, Home History, report-document, or report-notification records; zero unresolved or zero-record recorder runs |
+| Cedar narration package | Pass: one OpenAI `gpt-4o-mini-tts` request with Cedar produced 14.712 seconds of narration from script SHA-256 `ecf436142c9e8f9552d00a19e0b909a8a845c8b1ac46c763936874a53005117d`; narration begins at 0.75 seconds and leaves a 1.658-second final review hold |
+| Narrated package provenance | Pass: 17.134-second H.264/AAC MP4 SHA-256 `0f3978f37335896b980958d04c93c489ae85a2e15f2f51f5ff5136f8fb54511b`, poster SHA-256 `34ab3c07464d80de02e5df6fea97563cb9afb58e54a0dfff1736028d0bdd49ef`, WebVTT SHA-256 `c97bb5191e8df6273150bfda84eea966edf8546669bce3285a147937b26e5097`, and immutable silent-source SHA-256 `51c902a15d727a7af591298b56948712d7d0852ce038337124b8b9480b960bd2` |
+| Narrated Production managed ingestion | Pass: Help Studio job `2d989ced-6afd-4976-9977-2af4b4aede3c` independently accepted the exact job/scenario/files/checksums/dimensions/duration/provenance and moved to `Ready for review`; private Help media inventory increased from 8 to 10; the old silent job remains evidence only |
+| Narrated Help review | Pass for technical acceptance: complete playback ended at `1x`, visible English captions matched the three-sentence transcript, the exact Cedar disclosure rendered, the action callouts and captions preserved sound-off comprehension, and browser error logs remained empty. Owner approve/return judgment remains open |
 
 The first Sandbox application attempt failed transactionally before DDL because the deployed Supabase projects expose trusted `pgcrypto.digest` through the `extensions` schema. A read-only query confirmed the caption foundation remained absent. The corrected source and local harness use that deployed contract; the exact corrected migration then installed once and the repeat-install guard refused a second application.
 
@@ -62,17 +68,16 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 Before TUT-001 can be published:
 
-1. Merge PR #522 only after separate approval and verify the normal deployment.
-2. Create a narrated/captioned TUT-001 replacement from the protected Demo workflow. The current silent job remains unapproved evidence and is not publication-eligible.
-3. Review the full replacement at normal speed with audio and captions, verify sound-off comprehension and transcript search, then choose **Approve narration + captions** or **Return for rerecord**.
-4. If the replacement is approved, obtain separate explicit owner approval before any Production publication.
-5. After publication, verify Owner/Admin/Office contextual retrieval, captions, transcript, and full playback, plus denial for unintended audiences.
+1. The owner reviews job `2d989ced-6afd-4976-9977-2af4b4aede3c` in Help Studio and chooses **Approve narration + captions** or **Return for rerecord**. Technical acceptance does not make that product decision.
+2. If the replacement is approved, obtain separate explicit owner approval before any Production publication.
+3. After publication, verify Owner/Admin/Office contextual retrieval, captions, transcript, full playback, and denial for unintended audiences.
+4. Merge the reusable narration-packaging source only after ordinary PR review; merge does not approve or publish the media.
 
 ## Tutorial Freshness
 
-Tutorial impact: `UPDATED`.
+Tutorial impact: `UPDATE REQUIRED`.
 
-Tutorial evidence: Phase 0.7 verified the Production Help inventory and completed full revision 3 playback. That published Estimate tutorial remains current. TUT-001 is a new unpublished path with no matching published `contractor.service_requests` walkthrough; this slice now supplies its protected source, exact Production job binding, and managed media readiness without making it visible to ordinary users.
+Tutorial evidence: TUT-001 now has an exact narrated/captioned replacement at `Ready for review`, with complete technical playback, caption, transcript, disclosure, and sound-off evidence. It remains unpublished, so `contractor.service_requests` still has no ordinary-user walkthrough. The bounded follow-up is owner approve/return review, separately approved publication if accepted, and post-publication role-aware verification.
 
 Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 
