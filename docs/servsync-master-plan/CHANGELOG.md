@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Help narration and caption Production rollout
+
+- Authority and target: The owner approved applying the exact Sandbox- and Demo-accepted PR #522 Help narration/caption migration to Production `uqgtheclhxqlnjpfmheq`. Merge, manual deployment, provider generation, recording approval, and Help publication were not authorized.
+- Application and security: Exact 621-line SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` applied once from PR head `09151d77c3b98871d5b192d12f599be4e4f283a0`. Nine columns, six constraints, eight postgres-owned fixed-path SECURITY DEFINER functions, exact definitions/grants, authenticated contractor-owner legacy retrieval, and repeat refusal passed.
+- Help preservation: Production retained one published Estimate walkthrough at current/published revision 3, three legacy-compatible revisions and contexts, two recording jobs, 11 job events, eight Help assets and private Storage objects, zero derivatives/support gaps, and exact pre/post fingerprints. Silent TUT-001 job `e4e6d6dc-7358-44ff-ac8b-f424ece6662e` remains `ready_for_review`, narration mode `none`, unapproved, and unpublished.
+- Broader preservation: Marketing retained one workspace, 21 Content rows, seven Directions, four assets, eight pairings, three provider connections, two publications, seven publication events, and exact identity state. Profiles 18, contractors 7, homes 7, Requests 23/messages 29/media 1, Estimates 23/lines 40, Jobs 9, Invoices 12/lines 33, documents 0, notifications 72, Auth users/identities 18, and 17 Storage objects remained exact. No fixture, provider call, recording approval, publication, environment, Auth, business, Marketing, or Storage mutation occurred.
+- Parity and roadmap: Production and Demo now align for every Help object changed by PR #522. The one separate pre-existing Demo scenario intentional-addition fingerprint mismatch remains explicit. Environment rollout is complete; final PR review/merge is next, followed by the narrated/captioned TUT-001 replacement.
+
 ## 2026-08-27 - Help narration and caption Demo rollout
 
 - Authority and target: The owner approved applying the exact Sandbox-accepted PR #522 Help narration/caption migration to Demo `bdytwgejqnlblhrnqxkp` only. Production, merge, provider generation, recording approval, and Help publication were not authorized.

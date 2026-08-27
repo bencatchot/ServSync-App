@@ -1,6 +1,6 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Narration/caption foundation applied and verified in Sandbox and Demo; Production rollout and narrated TUT-001 replacement still required; nothing approved or published
+Status: Narration/caption foundation applied and verified in Sandbox, Demo, and Production; narrated TUT-001 replacement still required; nothing approved or published
 
 Date: 2026-08-27
 
@@ -24,7 +24,7 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 - The explicitly approved managed-ingestion step created one Production Help recording request and two private Help media assets. It changed no Production business record, authentication, role, permission, provider, environment setting, or publication state.
 - Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
 - The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard, then approved reuse of the existing Marketing configuration: OpenAI `gpt-4o-mini-tts` with Cedar and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded narration preparation is authorized; runtime generation, provider/secret changes, schema/storage rollout, approval of the silent package, and publication are not.
-- The owner separately approved implementation of the Help narration/caption foundation in PR #522, then approved applying its exact migration to Sandbox and Demo in separate gates. Production application, paid narration generation, recording approval, publication, merge, and manual deployment remain separate decisions.
+- The owner separately approved implementation of the Help narration/caption foundation in PR #522, then approved applying its exact migration to Sandbox, Demo, and Production in separate gates. Paid narration generation, recording approval, publication, merge, and manual deployment remain separate decisions.
 
 ## Verification
 
@@ -47,7 +47,8 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 | Production managed ingestion | Pass: Help Studio independently accepted the exact job/scenario/checksum/dimensions/duration manifest and moved TUT-001 to `Ready for review`; private Help media inventory increased from 6 to 8 assets and no walkthrough was approved or published |
 | Narration/caption Sandbox foundation | Pass: exact 621-line SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` applied once to Sandbox at PR head `8b7022e1d7bd705c65363d3ba89f533bf1452320`; nine columns, six constraints, eight secured functions, grants, role denial, repeat refusal, and zero-data preservation verified |
 | Narration/caption Demo foundation | Pass: the same exact migration applied once to Demo at PR head `f716b40f136d48a19028d4ba1978c821122fde33`; catalog/security matched Sandbox and exact Help, Marketing, Demo Recorder, and Storage counts/fingerprints matched preflight |
-| Production-to-Demo parity | Expected temporary fail: 26 staged Help differences remain until Production rollout; one separate pre-existing `demo-scenario-infrastructure-v1` catalog fingerprint mismatch retains exact expected object counts and key fingerprint and was not touched by this migration |
+| Narration/caption Production foundation | Pass: the same exact migration applied once to Production at PR head `09151d77c3b98871d5b192d12f599be4e4f283a0`; three existing revisions remained legacy-compatible, published Estimate revision 3 retrieved through a real contractor owner, silent TUT-001 remained unapproved, and every captured Help/Marketing/Storage/business/Auth count and fingerprint matched preflight |
+| Production-to-Demo parity | Help aligned: all 26 staged Help differences cleared. One separate pre-existing `demo-scenario-infrastructure-v1` catalog fingerprint mismatch retains exact expected object counts and key fingerprint and was not touched by this migration |
 
 The first Sandbox application attempt failed transactionally before DDL because the deployed Supabase projects expose trusted `pgcrypto.digest` through the `extensions` schema. A read-only query confirmed the caption foundation remained absent. The corrected source and local harness use that deployed contract; the exact corrected migration then installed once and the repeat-install guard refused a second application.
 
@@ -61,7 +62,7 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 Before TUT-001 can be published:
 
-1. Apply and verify the exact narration/caption migration in Production after separate approval.
+1. Merge PR #522 only after separate approval and verify the normal deployment.
 2. Create a narrated/captioned TUT-001 replacement from the protected Demo workflow. The current silent job remains unapproved evidence and is not publication-eligible.
 3. Review the full replacement at normal speed with audio and captions, verify sound-off comprehension and transcript search, then choose **Approve narration + captions** or **Return for rerecord**.
 4. If the replacement is approved, obtain separate explicit owner approval before any Production publication.
