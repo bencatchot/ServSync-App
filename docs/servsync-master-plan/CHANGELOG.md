@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - TUT-003 protected source work begins after PR #523 merge
+
+- Merge closeout: The owner approved PR #523 after all required checks and three Vercel previews passed. It merged normally at main commit `6091ea58c4eb22ee6eb39dd9e050de1d68f19190`, closing the reusable TUT-001 narration packager and permanent Production-smoke source work without changing published Help media.
+- TUT-003 source: A fresh post-merge branch introduces the protected `contractor-complete-work` recorder scenario for **How to complete work and save the service record**. It follows the current Work UI from accepted Estimate through **Create Job**, completed work/visit notes, **Complete Job**, and **Finalize Report**.
+- Safety: The Demo fixture starts at exact `estimate_accepted`, adopts only one exact UI-created Job whose lineage/work items/activity event match registered source records, schedules one private registry-owned visit through the existing product RPC, requires exact UI completion at `job_completed`, and reuses the existing SHA-bound report/Home History adoption at `home_history_updated`. Unrelated Demo rows and Storage objects remain outside reset authority.
+- Boundary: No Help recording request, Demo recording, Cedar provider call, temporary key, media attachment, approval, publication, merge, manual deployment, Production mutation, schema, role, permission, or environment change occurred. Those remain separately gated.
+- Roadmap: FB-040A remains the current launch assignment. The immediate completion gate is focused source validation plus a protected Demo recording package suitable for normal-speed product-truth review.
+
 ## 2026-08-27 - Corrected TUT-001 published and live-verified
 
 - Publication: After separately approving the corrected package, the owner published job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` as **How to handle a homeowner service request**, Production revision 1. Help Studio now reports two published walkthroughs, zero unpublished walkthroughs, 12 private media assets, and 9.4 MB storage.

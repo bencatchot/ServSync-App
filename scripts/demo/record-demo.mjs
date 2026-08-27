@@ -6,6 +6,7 @@ import { basename, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runDemoCommand } from './seed-demo-scenario.mjs';
+import { contractorCompleteWorkScenario } from './recorder/scenarios/contractor-complete-work.mjs';
 import { contractorCreateEstimateScenario } from './recorder/scenarios/contractor-create-estimate.mjs';
 import { contractorServiceRequestIntakeScenario } from './recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from './recorder/scenarios/homeowner-home-history.mjs';
@@ -30,6 +31,7 @@ const scenarios = new Map([
   [homeownerServiceRequestScenario.key, homeownerServiceRequestScenario],
   [contractorServiceRequestIntakeScenario.key, contractorServiceRequestIntakeScenario],
   [contractorCreateEstimateScenario.key, contractorCreateEstimateScenario],
+  [contractorCompleteWorkScenario.key, contractorCompleteWorkScenario],
   [homeownerHomeHistoryScenario.key, homeownerHomeHistoryScenario],
   [servsyncPlatformIntroductionScenario.key, servsyncPlatformIntroductionScenario],
 ]);
@@ -664,6 +666,241 @@ async function recordContractorCreateEstimate({ scenario, env, outputDir, pacing
   }
 }
 
+async function recordContractorCompleteWork({ scenario, env, outputDir, pacingName, headed }) {
+  const pacing = pacingFor(pacingName);
+  const target = assertSafeRecorderEnvironment(env, scenario);
+  const contractor = {
+    email: required(env, 'DEMO_CONTRACTOR_EMAIL'),
+    password: required(env, 'DEMO_CONTRACTOR_PASSWORD'),
+  };
+  required(env, 'DEMO_SUPABASE_ANON_KEY');
+  required(env, 'DEMO_SUPABASE_SERVICE_ROLE_KEY');
+  env.DEMO_MODE_ENABLED = 'true';
+  env.DEMO_SUPABASE_PROJECT_REF = target.projectRef;
+  env.DEMO_SUPABASE_URL = target.supabaseUrl;
+
+  const seed = await runDemoCommand(
+    ['seed', scenario.fixtureScenarioKey, `--checkpoint=${scenario.initialCheckpoint}`],
+    env,
+  );
+  if (seed.verification?.ok !== true) {
+    throw new Error('TUT-003 recorder setup did not reach its verified accepted-Estimate checkpoint.');
+  }
+
+  const browser = await chromium.launch({ headless: !headed });
+  const errors = [];
+  let recordedContext;
+  let finalPath = null;
+  let completed = false;
+  let jobCreationStarted = false;
+  let jobAdopted = false;
+  let jobCompletionStarted = false;
+  let jobCompletionAdopted = false;
+  let reportFinalizationStarted = false;
+  let reportAdopted = false;
+  const stagingDir = resolve(outputDir, '.staging', crypto.randomUUID());
+  const openAcceptedEstimate = async (page) => {
+    await openSidebar(page, /^Work$/i);
+    await page.getByRole('heading', { level: 1, name: /^Work$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await page.getByRole('button', { name: /Open Estimates/i }).click();
+    const estimatesTab = page.getByRole('main').getByRole('tab', { name: /^Estimates\b/i }).first();
+    await estimatesTab.waitFor({ state: 'visible', timeout: 30_000 });
+    await estimatesTab.click();
+    await page.getByTestId('contractor-estimate-search').fill(scenario.estimate.title);
+    await page.getByTestId('contractor-estimate-status-filter').selectOption('approved');
+    const card = page.getByTestId('contractor-estimate-card').filter({ hasText: scenario.estimate.title }).first();
+    await card.waitFor({ state: 'visible', timeout: 30_000 });
+    await card.scrollIntoViewIfNeeded();
+    return card;
+  };
+
+  try {
+    const authContext = await browser.newContext({ viewport: scenario.viewport });
+    const authPage = await authContext.newPage();
+    await login(authPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '');
+    await openAcceptedEstimate(authPage);
+    await wait(500);
+    const initialFrame = await authPage.screenshot({ type: 'png' });
+    const storageState = await authContext.storageState();
+    await authContext.close();
+
+    await mkdir(outputDir, { recursive: true });
+    await mkdir(stagingDir, { recursive: true });
+    recordedContext = await browser.newContext({
+      viewport: scenario.viewport,
+      storageState,
+      recordVideo: { dir: stagingDir, size: scenario.viewport },
+    });
+    await recordedContext.addInitScript((src) => {
+      const install = () => {
+        document.getElementById('servsync-recorder-freeze')?.remove();
+        const freeze = document.createElement('img');
+        freeze.id = 'servsync-recorder-freeze';
+        freeze.alt = '';
+        freeze.src = src;
+        freeze.style.cssText = 'position:fixed;inset:0;z-index:2147483645;width:100vw;height:100vh;object-fit:cover;pointer-events:none';
+        document.body.append(freeze);
+      };
+      if (document.body) install();
+      else document.addEventListener('DOMContentLoaded', install, { once: true });
+    }, `data:image/png;base64,${initialFrame.toString('base64')}`);
+    const page = await recordedContext.newPage();
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) errors.push(`console.error: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+    page.on('response', (response) => {
+      if (response.status() >= 500) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
+    });
+
+    await page.goto(pageUrl(target.appUrl, 'contractor', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || ''), { waitUntil: 'domcontentloaded' });
+    await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
+    const acceptedEstimateCard = await openAcceptedEstimate(page);
+    await installRecorderOverlays(page);
+    await setCaption(page, scenario.scenes[0].caption);
+    await removeFreezeFrame(page);
+    await wait(pacing.initialHold);
+
+    const createJob = acceptedEstimateCard.getByTestId('contractor-create-job-from-accepted-estimate');
+    jobCreationStarted = true;
+    await moveAndClick(page, createJob, pacing);
+    await page.getByTestId('contractor-job-operational-detail').waitFor({ state: 'visible', timeout: 30_000 });
+    const jobAdoption = await runDemoCommand(['adopt-job', scenario.fixtureScenarioKey], env);
+    if (jobAdoption.verification?.ok !== true || !jobAdoption.records?.jobId) {
+      throw new Error('UI-created Job did not reach the exact registered job_scheduled checkpoint.');
+    }
+    jobAdopted = true;
+
+    await setCaption(page, scenario.scenes[1].caption);
+    const workCheckboxes = page.getByTestId('contractor-approved-work-checkbox');
+    const workItemCount = await workCheckboxes.count();
+    if (workItemCount < 1) throw new Error('TUT-003 Job did not expose Estimate-derived work items.');
+    for (let index = 0; index < workItemCount; index += 1) {
+      const checkbox = workCheckboxes.nth(index);
+      if (!(await checkbox.isChecked())) await moveAndClick(page, checkbox, pacing);
+    }
+    const workNotes = page.getByPlaceholder('Describe work performed, materials used, open follow-up, or completion notes...');
+    await moveAndType(page, workNotes, scenario.work.completionNote, pacing);
+    await moveAndClick(page, page.getByTestId('contractor-save-job-progress'), pacing);
+    await page.getByText(/^Progress saved\.$/i).waitFor({ state: 'visible', timeout: 30_000 });
+
+    await setCaption(page, scenario.scenes[2].caption);
+    jobCompletionStarted = true;
+    await moveAndClick(page, page.getByTestId('contractor-complete-job'), pacing);
+    await page.getByTestId('contractor-complete-job-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    const completionAdoption = await runDemoCommand(['adopt-job-completion', scenario.fixtureScenarioKey], env);
+    if (completionAdoption.verification?.ok !== true) {
+      throw new Error('UI-completed Job did not reach the exact registered job_completed checkpoint.');
+    }
+    jobCompletionAdopted = true;
+
+    await setCaption(page, scenario.scenes[3].caption);
+    await page.getByTestId('simple-job-report-panel').waitFor({ state: 'visible', timeout: 30_000 });
+    reportFinalizationStarted = true;
+    page.once('dialog', (dialog) => dialog.accept());
+    await moveAndClick(page, page.getByTestId('simple-job-finalize-report'), pacing);
+    await page.getByTestId('contractor-report-finalize-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    const reportAdoption = await runDemoCommand(['adopt-report', scenario.fixtureScenarioKey], env);
+    if (reportAdoption.verification?.ok !== true) {
+      throw new Error('Finalized TUT-003 report did not reach the exact Home History checkpoint.');
+    }
+    reportAdopted = true;
+    await page.getByTestId('simple-job-report-filed-notice').waitFor({ state: 'visible', timeout: 30_000 });
+    await moveCursorToRest(page, pacing);
+    await wait(Math.max(pacing.finalHold, 4500));
+
+    const mainText = await page.getByRole('main').innerText();
+    const expectedFinalText = [
+      scenario.finalState.estimateTitle,
+      scenario.finalState.homeownerLabel,
+      scenario.work.completionNote,
+      scenario.finalState.reportFeedback,
+      'Filed to Documents',
+    ];
+    if (expectedFinalText.some((value) => !mainText.includes(value))) {
+      throw new Error('Final TUT-003 scene did not show the completed Job, visit record, and filed report outcome.');
+    }
+    const sensitiveIssues = scanVisibleTextForSensitiveData(mainText, {
+      'contractor email': contractor.email,
+      'contractor password': contractor.password,
+      'homeowner email': env.DEMO_HOMEOWNER_EMAIL,
+      'homeowner password': env.DEMO_HOMEOWNER_PASSWORD,
+    });
+    if (sensitiveIssues.length > 0) throw new Error(sensitiveIssues.join(' '));
+    if (errors.length > 0) throw new Error(`Recording encountered browser errors:\n${errors.join('\n')}`);
+
+    const verification = await runDemoCommand(
+      ['verify', scenario.fixtureScenarioKey, `--checkpoint=${scenario.finalCheckpoint}`],
+      env,
+    );
+    if (verification.verification?.ok !== true) {
+      throw new Error('TUT-003 final fixture changed after report adoption.');
+    }
+
+    const video = page.video();
+    if (!video) throw new Error('Playwright did not initialize WebM recording.');
+    await recordedContext.close();
+    recordedContext = null;
+    const sourcePath = await video.path();
+    const createdAt = new Date().toISOString();
+    const timestamp = createdAt.replace(/[:.]/g, '-');
+    finalPath = resolve(outputDir, `${scenario.outputBaseName}-${timestamp}.webm`);
+    await rename(sourcePath, finalPath);
+    const fileStat = await stat(finalPath);
+    if (fileStat.size <= 0) throw new Error('Recorded WebM artifact is empty.');
+    const durationSeconds = await probeVideoDuration(browser, finalPath);
+    assertRecordingDuration(durationSeconds, scenario.expectedDurationSeconds);
+    const metadata = buildArtifactMetadata({
+      scenario,
+      sourceCommit: sourceCommit(),
+      pacing: pacingName,
+      durationSeconds,
+      fileName: basename(finalPath),
+      createdAt,
+    });
+    const metadataPath = finalPath.replace(/\.webm$/i, '.json');
+    await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+    completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
+    return {
+      success: true,
+      scenario: scenario.key,
+      environment: scenario.environment.name,
+      projectRef: scenario.environment.projectRef,
+      artifact: finalPath,
+      metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
+      durationSeconds: metadata.duration_seconds,
+      viewport: scenario.viewport,
+      finalCheckpoint: scenario.finalCheckpoint,
+      fixturePolicy: metadata.fixture_policy,
+      sensitiveData: 'none detected',
+    };
+  } finally {
+    if (recordedContext) await recordedContext.close().catch(() => {});
+    if (jobCreationStarted && !jobAdopted) {
+      await runDemoCommand(['adopt-job', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
+    if (jobCompletionStarted && !jobCompletionAdopted) {
+      await runDemoCommand(['adopt-job-completion', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
+    if (reportFinalizationStarted && !reportAdopted) {
+      await runDemoCommand(['adopt-report', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
+    await browser.close();
+    await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    if (!completed && finalPath) await unlink(finalPath).catch(() => {});
+  }
+}
+
 async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName, headed }) {
   const pacing = pacingFor(pacingName);
   const scenePacing = pacing;
@@ -955,6 +1192,9 @@ export async function runRecorder(argv = process.argv.slice(2), processEnv = pro
   const outputDir = resolve(args.outputDir || env.DEMO_RECORDING_OUTPUT_DIR || 'demo-recordings');
   if (scenario.key === homeownerServiceRequestScenario.key) {
     return recordHomeownerServiceRequest({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
+  }
+  if (scenario.key === contractorCompleteWorkScenario.key) {
+    return recordContractorCompleteWork({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
   }
   if (scenario.key === homeownerHomeHistoryScenario.key) {
     return recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });

@@ -3761,6 +3761,232 @@ async function adoptRecorderEstimateDraft(env, target, scenarioKey) {
   };
 }
 
+async function adoptRecorderJobFromAcceptedEstimate(env, target, scenarioKey) {
+  const { service, makeUserClient } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder Job adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'estimate_accepted') {
+    throw new Error(`Recorder Job adoption refused: active checkpoint must be estimate_accepted, found ${run.checkpoint}.`);
+  }
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const contractorId = run.metadata?.contractor_id;
+  const homeId = run.metadata?.home_id;
+  const requestId = run.metadata?.service_request_id;
+  const estimateId = run.metadata?.estimate_id;
+  if (![homeownerId, contractorId, homeId, requestId, estimateId].every(Boolean)) {
+    throw new Error('Recorder Job adoption refused: active run is missing exact homeowner, contractor, home, request, or Estimate identity.');
+  }
+  if (run.records.some((record) => record.table_name === 'inspections')) {
+    throw new Error('Recorder Job adoption refused: estimate_accepted already owns a Job.');
+  }
+
+  const candidates = await ensureOk(
+    await service
+      .from('inspections')
+      .select('id,name,contractor_id,homeowner_user_id,home_id,service_request_id,estimate_id,status,job_status,created_at,completed_at,closed_at,report_storage_path,report_file_name')
+      .eq('contractor_id', contractorId)
+      .eq('homeowner_user_id', homeownerId)
+      .eq('home_id', homeId)
+      .eq('service_request_id', requestId)
+      .eq('estimate_id', estimateId)
+      .eq('name', estimateFixture.title)
+      .eq('status', 'draft')
+      .eq('job_status', 'draft')
+      .gt('created_at', run.completed_at)
+      .order('created_at', { ascending: false }),
+    'Unable to inspect the recorder-created Job'
+  );
+  if (candidates.length !== 1) {
+    throw new Error(`Recorder Job adoption refused: expected exactly one new matching Job, found ${candidates.length}.`);
+  }
+  const job = candidates[0];
+  if (job.completed_at || job.closed_at || job.report_storage_path || job.report_file_name) {
+    throw new Error('Recorder Job adoption refused: the new Job is already completed, closed, or report-bearing.');
+  }
+
+  const estimate = await fetchOneByPrimaryKey(service, 'estimates', 'id', estimateId, 'id,status,inspection_id');
+  if (estimate?.status !== 'accepted' || estimate.inspection_id !== job.id) {
+    throw new Error('Recorder Job adoption refused: the accepted Estimate does not point to the exact new Job.');
+  }
+  const registeredEstimateLineIds = new Set(
+    run.records
+      .filter((record) => record.table_name === 'estimate_line_items' && record.record_role === 'demo_estimate_line_item')
+      .map((record) => record.record_id)
+  );
+  const workItems = await fetchJobWorkItems(service, job.id);
+  if (
+    workItems.length !== estimateLines().length
+    || registeredEstimateLineIds.size !== estimateLines().length
+    || workItems.some((item) => !registeredEstimateLineIds.has(item.source_estimate_line_item_id))
+    || workItems.some((item) => item.completion_status !== 'open' || item.completed_at || item.completed_by)
+  ) {
+    throw new Error('Recorder Job adoption refused: estimate-derived work items do not match the exact accepted Estimate contract.');
+  }
+  const jobEvents = await ensureOk(
+    await service
+      .from('workflow_activity_events')
+      .select('id,event_type,inspection_id,estimate_id,created_at')
+      .eq('inspection_id', job.id),
+    'Unable to inspect recorder Job workflow events'
+  );
+  if (
+    jobEvents.length !== 1
+    || jobEvents[0].event_type !== WORKFLOW_EVENT_TYPES.jobCreated
+    || jobEvents[0].estimate_id !== estimateId
+  ) {
+    throw new Error('Recorder Job adoption refused: expected one exact job_created workflow event.');
+  }
+  const [visitEvents, invoices, historyRows] = await Promise.all([
+    ensureOk(await service.from('contractor_visit_events').select('id').eq('inspection_id', job.id), 'Unable to inspect recorder Job visits'),
+    ensureOk(await service.from('invoices').select('id').eq('job_id', job.id), 'Unable to inspect recorder Job Invoices'),
+    ensureOk(await service.from('home_maintenance_log').select('id').eq('inspection_id', job.id), 'Unable to inspect recorder Job Home History'),
+  ]);
+  if (visitEvents.length || invoices.length || historyRows.length) {
+    throw new Error('Recorder Job adoption refused: the new Job already has visit, Invoice, or Home History descendants.');
+  }
+
+  const dates = buildDatePlan(env.DEMO_ANCHOR_TIMESTAMP || new Date());
+  await ensureOk(
+    await service.from('inspections').update({ created_at: dates.jobCreatedAt, updated_at: dates.jobCreatedAt }).eq('id', job.id),
+    'Unable to normalize recorder Job creation date'
+  );
+  await ensureOk(
+    await service.from('workflow_activity_events').update({ created_at: dates.jobCreatedAt }).eq('id', jobEvents[0].id),
+    'Unable to normalize recorder job_created workflow event date'
+  );
+  await registerRecord(service, run.id, 'inspections', job.id, 'demo_job', 'job_created', { source: 'servsync_demo_recorder' });
+  for (const item of workItems) {
+    await registerRecord(service, run.id, 'job_work_items', item.id, 'demo_job_work_item', 'job_created', { source: 'servsync_demo_recorder' });
+  }
+  await registerRecord(service, run.id, 'workflow_activity_events', jobEvents[0].id, 'demo_job_created_event', 'job_created', {
+    source: 'servsync_demo_recorder',
+  });
+
+  const contractorClient = await signInDemoUser(
+    makeUserClient,
+    requireEnv(env, 'DEMO_CONTRACTOR_EMAIL'),
+    requireEnv(env, 'DEMO_CONTRACTOR_PASSWORD')
+  );
+  const { visitEventId } = await scheduleJobVisit(contractorClient, service, run.id, job.id, dates);
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'job_scheduled' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to job_scheduled'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'job_scheduled',
+    executed_steps: ['identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview', 'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled'],
+    homeowner_user_id: homeownerId,
+    contractor_id: contractorId,
+    home_id: homeId,
+    connection_id: run.metadata?.connection_id,
+    service_request_id: requestId,
+    estimate_id: estimateId,
+    job_id: job.id,
+    visit_event_id: visitEventId,
+    recorder_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'contractor-complete-work',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'job_scheduled');
+  if (!verification.ok) {
+    throw new Error(`Recorder Job adoption verification failed: ${verification.reason || 'job_scheduled state is invalid'}`);
+  }
+  return {
+    operation: 'adopt-job',
+    runId: run.id,
+    checkpoint: 'job_scheduled',
+    records: { jobId: job.id, workItemCount: workItems.length, visitEventId },
+    verification,
+  };
+}
+
+async function adoptRecorderCompletedJob(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder completed-Job adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'job_scheduled') {
+    throw new Error(`Recorder completed-Job adoption refused: active checkpoint must be job_scheduled, found ${run.checkpoint}.`);
+  }
+  const jobId = run.metadata?.job_id;
+  const estimateId = run.metadata?.estimate_id;
+  if (!jobId || !estimateId) {
+    throw new Error('Recorder completed-Job adoption refused: active run is missing exact Job or Estimate identity.');
+  }
+  const job = await fetchOneByPrimaryKey(
+    service,
+    'inspections',
+    'id',
+    jobId,
+    'id,status,job_status,completed_at,closed_at,summary,report_storage_path,report_file_name'
+  );
+  const workItems = await fetchJobWorkItems(service, jobId);
+  const visits = await ensureOk(
+    await service.from('contractor_visit_events').select('id,status').eq('inspection_id', jobId),
+    'Unable to inspect the recorder-completed visit'
+  );
+  if (
+    job?.status !== 'draft'
+    || job.job_status !== 'completed'
+    || !job.completed_at
+    || job.closed_at
+    || job.report_storage_path
+    || job.report_file_name
+    || workItems.length !== estimateLines().length
+    || workItems.some((item) => item.completion_status !== 'completed' || !item.completed_at || !item.completed_by)
+    || visits.length !== 1
+    || visits[0].status !== 'completed'
+  ) {
+    throw new Error('Recorder completed-Job adoption refused: Job, work-item, or visit completion does not match the exact scenario contract.');
+  }
+  const [invoices, historyRows] = await Promise.all([
+    ensureOk(await service.from('invoices').select('id').eq('job_id', jobId), 'Unable to inspect completed recorder Job Invoices'),
+    ensureOk(await service.from('home_maintenance_log').select('id').eq('inspection_id', jobId), 'Unable to inspect completed recorder Job Home History'),
+  ]);
+  if (invoices.length || historyRows.length) {
+    throw new Error('Recorder completed-Job adoption refused: completion created an Invoice or Home History row.');
+  }
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'job_completed' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to job_completed'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'job_completed',
+    executed_steps: ['identities', 'profilesAndCompany', 'property', 'connection', 'request', 'contractorReview', 'estimateDraft', 'estimateSent', 'estimateAccepted', 'jobCreated', 'jobScheduled', 'jobInProgress', 'jobReviewReady', 'jobCompleted'],
+    homeowner_user_id: run.metadata?.homeowner_user_id,
+    contractor_id: run.metadata?.contractor_id,
+    home_id: run.metadata?.home_id,
+    connection_id: run.metadata?.connection_id,
+    service_request_id: run.metadata?.service_request_id,
+    estimate_id: estimateId,
+    job_id: jobId,
+    visit_event_id: run.metadata?.visit_event_id,
+    recorder_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'contractor-complete-work',
+  });
+  const verification = await verifyScenario(service, scenarioKey, env, 'job_completed');
+  if (!verification.ok) {
+    throw new Error(`Recorder completed-Job verification failed: ${verification.reason || 'job_completed state is invalid'}`);
+  }
+  return {
+    operation: 'adopt-job-completion',
+    runId: run.id,
+    checkpoint: 'job_completed',
+    records: { jobId, workItemCount: workItems.length, visitEventId: visits[0].id },
+    verification,
+  };
+}
+
 async function adoptRecorderFinalizedReport(env, target, scenarioKey) {
   const { service } = createSupabaseClients(env, target);
   const runs = await inspectNonResetRuns(service, scenarioKey);
@@ -4208,9 +4434,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-request|adopt-estimate|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-request|adopt-estimate|adopt-job|adopt-job-completion|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -4218,7 +4444,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (['prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
+  if (['prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -4244,6 +4470,14 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'adopt-estimate') {
     return summarize(await adoptRecorderEstimateDraft(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-job') {
+    return summarize(await adoptRecorderJobFromAcceptedEstimate(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-job-completion') {
+    return summarize(await adoptRecorderCompletedJob(env, target, scenarioKey), target, scenarioKey);
   }
 
   if (operation === 'create-flagship-invoice') {

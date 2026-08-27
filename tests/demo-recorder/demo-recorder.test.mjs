@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { contractorCompleteWorkScenario } from '../../scripts/demo/recorder/scenarios/contractor-complete-work.mjs';
 import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/scenarios/contractor-create-estimate.mjs';
 import { contractorServiceRequestIntakeScenario } from '../../scripts/demo/recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from '../../scripts/demo/recorder/scenarios/homeowner-home-history.mjs';
@@ -67,6 +68,21 @@ test('contractor service-request intake is a read-only request-to-estimate hando
   );
   assert.match(contractorServiceRequestIntakeScenario.fixturePolicy, /read-only after the registry-owned fixture seed/i);
   assert.doesNotMatch(JSON.stringify(contractorServiceRequestIntakeScenario), /password|service_role|@example/i);
+});
+
+test('TUT-003 contractor completion scenario preserves accepted Estimate through finalized service record', () => {
+  assert.equal(validateScenarioDefinition(contractorCompleteWorkScenario), contractorCompleteWorkScenario);
+  assert.equal(contractorCompleteWorkScenario.initialCheckpoint, 'estimate_accepted');
+  assert.equal(contractorCompleteWorkScenario.finalCheckpoint, 'home_history_updated');
+  assert.deepEqual(
+    contractorCompleteWorkScenario.scenes.map((scene) => scene.key),
+    ['accepted-estimate', 'job-work', 'job-complete', 'report-finalized'],
+  );
+  assert.deepEqual(contractorCompleteWorkScenario.expectedDurationSeconds, { min: 65, max: 115 });
+  assert.match(contractorCompleteWorkScenario.fixturePolicy, /exact UI-created Job and descendants/i);
+  assert.match(contractorCompleteWorkScenario.scenes[0].caption, /Create the Job from the accepted Estimate/);
+  assert.match(contractorCompleteWorkScenario.scenes[3].caption, /Finalize the report/);
+  assert.doesNotMatch(JSON.stringify(contractorCompleteWorkScenario), /password|service_role|@example/i);
 });
 
 test('homeowner Home History scenario is a bounded read-only finalized-report workflow', () => {
@@ -140,6 +156,7 @@ test('operator arguments stay intentionally small', () => {
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=human-paced']).pacing, 'human-paced');
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
   assert.equal(parseRecorderArgs(['contractor-service-request-intake']).scenarioKey, 'contractor-service-request-intake');
+  assert.equal(parseRecorderArgs(['contractor-complete-work']).scenarioKey, 'contractor-complete-work');
   assert.equal(parseRecorderArgs(['homeowner-home-history']).scenarioKey, 'homeowner-home-history');
   assert.equal(parseRecorderArgs(['servsync-platform-introduction']).scenarioKey, 'servsync-platform-introduction');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
@@ -254,6 +271,17 @@ test('fixture adoption is exact, lineage-bound, and does not broaden reset autho
   assert.match(source, /verifyScenario\(service, scenarioKey, env, 'estimate_draft'\)/);
   assert.match(recorderSource, /estimateSubmissionStarted && !estimateAdopted/);
   assert.match(recorderSource, /runDemoCommand\(\['adopt-estimate', scenario\.fixtureScenarioKey\], env\)\.catch/);
+  assert.match(source, /async function adoptRecorderJobFromAcceptedEstimate/);
+  assert.match(source, /run\.checkpoint !== 'estimate_accepted'/);
+  assert.match(source, /expected exactly one new matching Job/);
+  assert.match(source, /registeredEstimateLineIds\.has\(item\.source_estimate_line_item_id\)/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'job_scheduled'\)/);
+  assert.match(source, /async function adoptRecorderCompletedJob/);
+  assert.match(source, /run\.checkpoint !== 'job_scheduled'/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'job_completed'\)/);
+  assert.match(recorderSource, /runDemoCommand\(\['adopt-job', scenario\.fixtureScenarioKey\], env\)/);
+  assert.match(recorderSource, /runDemoCommand\(\['adopt-job-completion', scenario\.fixtureScenarioKey\], env\)/);
+  assert.match(recorderSource, /runDemoCommand\(\['adopt-report', scenario\.fixtureScenarioKey\], env\)/);
 });
 
 test('Home History fixture patch extends only the exact Demo reset allowlist with dependency-safe ordering', () => {

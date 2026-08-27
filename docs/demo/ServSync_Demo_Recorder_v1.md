@@ -4,7 +4,7 @@
 
 The Demo Recorder creates reproducible browser recordings for ServSync Marketing, support tutorials, and product demonstrations. It is intentionally a small scenario runner, not a video editor or publishing system.
 
-Recorder v1 includes four canonical scenarios:
+Recorder v1 includes six canonical scenarios:
 
 `homeowner-service-request`
 
@@ -13,6 +13,14 @@ The clip shows the fictional Demo homeowner creating one service request for Dem
 `contractor-create-estimate`
 
 The clip starts from the registered Demo request, uses the normal contractor UI to create one priced draft Estimate, and stops on the saved draft. It does not send the Estimate or continue into approval, Job, Invoice, or payment activity.
+
+`contractor-service-request-intake`
+
+The clip opens the registered homeowner Request, preserves the original customer/home/message context, and stops after choosing the exact **Create Estimate** handoff. It remains read-only after fixture setup.
+
+`contractor-complete-work`
+
+The clip starts from one registered accepted Estimate, creates the linked Job through the normal Work UI, records completed work and visit notes, completes the Job, and finalizes the canonical report. Exact-row adoption owns only the UI-created Job and its descendants, and the final checkpoint is the same verified report/Home History lineage used by the product.
 
 `homeowner-home-history`
 
@@ -39,6 +47,10 @@ The reviewable scenario definitions live at:
 `scripts/demo/recorder/scenarios/homeowner-service-request.mjs`
 
 `scripts/demo/recorder/scenarios/contractor-create-estimate.mjs`
+
+`scripts/demo/recorder/scenarios/contractor-service-request-intake.mjs`
+
+`scripts/demo/recorder/scenarios/contractor-complete-work.mjs`
 
 `scripts/demo/recorder/scenarios/homeowner-home-history.mjs`
 
@@ -73,11 +85,13 @@ The homeowner then creates the request through the normal `servsync_create_servi
 
 The operation registers the request and its exact messages, advances the run to `request_ready`, and runs the ordinary checkpoint verifier. It does not broaden the reset table allowlist or delete by title, user, or timestamp.
 
-One verified final fixture remains after a successful recording: `request_ready` for the homeowner request scenario, `estimate_draft` for the contractor scenario, or `home_history_updated` for the Home History scenario. The next run removes only registry-owned disposable records and the exact registered private report object before rebuilding the known baseline. Unrelated Demo records and Storage objects are never reset.
+One verified final fixture remains after a successful recording: `request_ready` for the homeowner request/intake scenarios, `estimate_draft` for contractor Estimate creation, or `home_history_updated` for contractor completion and Home History scenarios. The next run removes only registry-owned disposable records and the exact registered private report object before rebuilding the known baseline. Unrelated Demo records and Storage objects are never reset.
 
 If the browser fails after submission begins but before ordinary adoption completes, failed-run cleanup attempts the same exact adoption contract. It does not broaden ownership or perform a title-, user-, or timestamp-based delete; a request that cannot satisfy the exact contract remains fail-closed for operator investigation.
 
 For `contractor-create-estimate`, setup restores the registered `request_ready` checkpoint. The contractor creates the draft through the real Estimate composer. The private adoption step accepts exactly one new draft only when its contractor, homeowner, home, request, title, scope, total, and single line match the scenario contract and it has no payment schedule, Job, or Invoice. The adopted Estimate and line become ordinary registry-owned records at `estimate_draft`, so the next scenario run can reset them without touching unrelated Demo data.
+
+For `contractor-complete-work`, setup restores the registered `estimate_accepted` checkpoint. The contractor creates the Job through the real accepted-Estimate action. Private adoption accepts exactly one new draft Job only when its Estimate/request/customer/home lineage, generated work items, and `job_created` activity event match the registered source records; it then creates one private fixture-owned visit through the normal scheduling RPC. After the UI saves completed work and completes the Job, a second adoption gate requires the exact Job, all registered work items, and the one visit to be complete with no Invoice, report, or Home History side effects. Final report adoption then uses the existing exact document/history/notification/Storage contract. Compensation retries never widen ownership beyond those exact records.
 
 For `homeowner-home-history`, setup stops at the registry-owned `job_completed` checkpoint. In an offscreen contractor browser context, the recorder opens that exact Job and uses the normal **Finalize Report** product action. The application calls the canonical `generateInspectionPdf` generator, uploads the resulting customer report through the normal private Storage path, and calls `servsync_finalize_field_work`. The private runner then adopts only the exact resulting document, Home History row, notification, and SHA-bound Storage object before homeowner recording begins. Direct seeding of `home_history_updated` is refused so Marketing cannot substitute a fixture-only PDF for the product artifact.
 
@@ -102,6 +116,7 @@ Load the existing approved Demo variables, including the private runner values d
 ```bash
 npm run demo:record -- homeowner-service-request
 npm run demo:record -- contractor-create-estimate
+npm run demo:record -- contractor-complete-work
 npm run demo:record -- homeowner-home-history
 npm run demo:record -- servsync-platform-introduction
 ```
@@ -171,6 +186,8 @@ A run is successful only after:
 - a separate normal-speed review confirms followable cursor motion, visible click intent, understandable UI changes, natural speed/motion, readable text, sufficient reading holds, and an obvious final result before `marketing_candidate_status` may become `passed`.
 
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
+
+The contractor completion scenario additionally requires exact adoption at `job_scheduled`, UI completion verified at `job_completed`, all Estimate-derived work items and the private visit marked complete, zero Invoice descendants, exact canonical report adoption at `home_history_updated`, and a final filed-report notice. Its visible path must preserve **Create Job**, work/visit notes, **Complete Job**, and **Finalize Report** without fixture-only product output.
 
 The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, canonical report text extracted from the downloaded PDF, property-scoped homeowner visibility, a real download, and an 18-32 second final WebM.
 
