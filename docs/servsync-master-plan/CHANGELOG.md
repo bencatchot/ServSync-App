@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-27 - Corrected TUT-001 package ready for owner review
+
+- Correction completed: The protected Demo recorder and exact-label regression now use **Create Estimate**. A new 15.641-second, 1440×900 source at commit `2cff9f6d5c7323d8332544309f5683ff9e331357` keeps the visible Request action, final recorder callout, Cedar voiceover, synchronized WebVTT captions, and transcript aligned; it contains no “Start estimate” instruction.
+- Bounded provider use: After explicit approval, one temporary speech-only key made exactly one OpenAI `gpt-4o-mini-tts` Cedar request. The 12.864-second narration begins at 0.75 seconds and leaves a 1.986-second quiet hold. Automated revocation did not persist, so the owner manually revoked the key; the active list returned to the three pre-existing keys.
+- Production Help state: Corrected job `58cdc275-86bb-4925-b60f-5ff3e2b70d51` accepted the narrated MP4, poster, WebVTT, and metadata and moved to **Ready for review**. Private Help media increased from 10 to 12. Full `1x` playback, visible synchronized captions, matching transcript, Cedar disclosure, exact-label product truth, and caption-dependent comprehension passed. The first mismatched job remains `Needs rerecord`; neither candidate is approved or published.
+- Demo and roadmap: Exact postflight retained `request_ready` with one Request/message and zero Estimate, Job, Invoice, payment, Home History, report-document, or report-notification rows. FB-040A remains active; the immediate assignment is the owner's corrected-package decision. Approval, publication, contextual verification, merge, and deployment remain separate gates.
+
 ## 2026-08-27 - TUT-001 exact-label rerecord required
 
 - Owner review finding: The first narrated/captioned candidate failed product-truth review because the visible request action says **Create Estimate**, while the narration said “Start estimate.” The final recorder callout repeated the generic wording. Technical validity does not override this user-facing mismatch.
