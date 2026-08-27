@@ -32,7 +32,9 @@ create role authenticated nologin;
 create role service_role nologin bypassrls;
 create schema auth authorization postgres;
 create schema storage authorization postgres;
-create extension if not exists pgcrypto;
+create schema extensions authorization postgres;
+create extension if not exists pgcrypto with schema extensions;
+grant usage on schema extensions to anon, authenticated, service_role;
 create function auth.uid() returns uuid language sql stable
   as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid; $$;
 create table public.profiles (id uuid primary key, role text not null, full_name text not null default '');

@@ -116,10 +116,10 @@ begin
     'narration_provider','OpenAI','narration_model','gpt-4o-mini-tts','narration_voice','cedar',
     'narration_disclosure','AI-generated voiceover using OpenAI''s Cedar voice.',
     'narration_script',v_script,
-    'narration_script_sha256',encode(public.digest(convert_to(v_script,'UTF8'),'sha256'),'hex'),
+    'narration_script_sha256',encode(extensions.digest(convert_to(v_script,'UTF8'),'sha256'),'hex'),
     'source_silent_sha256','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     'caption_language','en','captions_vtt',v_captions,
-    'captions_sha256',encode(public.digest(convert_to(v_captions,'UTF8'),'sha256'),'hex')
+    'captions_sha256',encode(extensions.digest(convert_to(v_captions,'UTF8'),'sha256'),'hex')
   );
 
   begin

@@ -12,7 +12,8 @@ begin
   if to_regclass('public.help_walkthrough_revisions') is null
      or to_regclass('public.help_recording_jobs') is null
      or to_regprocedure('public.servsync_transition_help_walkthrough(uuid,integer,text)') is null
-     or to_regprocedure('public.servsync_transition_help_recording_job(uuid,text,text,jsonb)') is null then
+     or to_regprocedure('public.servsync_transition_help_recording_job(uuid,text,text,jsonb)') is null
+     or to_regprocedure('extensions.digest(bytea,text)') is null then
     raise exception 'Help Studio recording workflow must be installed before narration/captions.';
   end if;
   if exists (
@@ -58,11 +59,11 @@ alter table public.help_walkthrough_revisions
         and narration_voice = 'cedar'
         and narration_disclosure = 'AI-generated voiceover using OpenAI''s Cedar voice.'
         and transcript is not null and char_length(btrim(transcript)) between 10 and 20000
-        and narration_script_sha256 = encode(public.digest(convert_to(transcript,'UTF8'),'sha256'),'hex')
+        and narration_script_sha256 = encode(extensions.digest(convert_to(transcript,'UTF8'),'sha256'),'hex')
         and source_silent_sha256 is not null
         and captions_vtt is not null and char_length(captions_vtt) between 16 and 50000
         and captions_vtt ~ E'^WEBVTT(\\r?\\n)'
-        and captions_sha256 = encode(public.digest(convert_to(captions_vtt,'UTF8'),'sha256'),'hex')
+        and captions_sha256 = encode(extensions.digest(convert_to(captions_vtt,'UTF8'),'sha256'),'hex')
         and caption_language = 'en'
         and caption_review <> 'not_applicable'
         and sound_off_review <> 'not_applicable'
@@ -404,9 +405,9 @@ begin
       or coalesce(v_metadata->>'narration_script','') = ''
       or coalesce(v_metadata->>'captions_vtt','') !~ E'^WEBVTT(\\r?\\n)'
       or coalesce(v_metadata->>'narration_script_sha256','')
-         <> encode(public.digest(convert_to(v_metadata->>'narration_script','UTF8'),'sha256'),'hex')
+         <> encode(extensions.digest(convert_to(v_metadata->>'narration_script','UTF8'),'sha256'),'hex')
       or coalesce(v_metadata->>'captions_sha256','')
-         <> encode(public.digest(convert_to(v_metadata->>'captions_vtt','UTF8'),'sha256'),'hex')
+         <> encode(extensions.digest(convert_to(v_metadata->>'captions_vtt','UTF8'),'sha256'),'hex')
       or coalesce(v_metadata->>'source_silent_sha256','') !~ '^[a-f0-9]{64}$'
     ) then
       raise exception 'Cedar narration and exact WebVTT provenance are required.' using errcode = '22023';
