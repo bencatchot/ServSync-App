@@ -23,7 +23,7 @@ Base: merged PR #521 main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 - The path begins and ends at `request_ready`. After the registry-owned fixture seed, it reads and navigates only; it does not save or adopt an Estimate.
 - The explicitly approved managed-ingestion step created one Production Help recording request and two private Help media assets. It changed no Production business record, authentication, role, permission, provider, environment setting, or publication state.
 - Recording approval and Production publication remain separate owner decisions through the existing Help Studio review flow.
-- The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard. This decision did not select a provider or voice, authorize paid generation, approve the silent package, or authorize publication.
+- The owner established voiceover, synchronized captions, and a matching durable transcript as the protected tutorial standard, then approved reuse of the existing Marketing configuration: OpenAI `gpt-4o-mini-tts` with Cedar and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded narration preparation is authorized; runtime generation, provider/secret changes, schema/storage rollout, approval of the silent package, and publication are not.
 
 ## Verification
 
@@ -55,7 +55,7 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 Before TUT-001 can be published:
 
-1. Implement and verify a provider-neutral Help package/playback contract for synchronized narration, timed captions, matching transcript, and any required AI provenance/disclosure.
+1. Implement and verify a Help package/playback contract for synchronized Cedar narration, timed captions, matching transcript, and exact OpenAI model/voice/script/disclosure provenance.
 2. Create a narrated/captioned TUT-001 replacement from the protected Demo workflow. The current silent job remains unapproved evidence and is not publication-eligible.
 3. Review the full replacement at normal speed with audio and captions, verify sound-off comprehension and transcript search, then choose **Approve recording** or **Return for rerecord**.
 4. If the replacement is approved, obtain separate explicit owner approval before any Production publication.

@@ -38,10 +38,10 @@ Every protected pilot tutorial must ship as one synchronized learning package:
 - Voiceover explains the purpose, user decision, and result without merely reading every label on screen.
 - Timed captions/subtitles match the spoken narration and remain usable with sound off. Burned-in recorder scene callouts are helpful orientation overlays but do not satisfy the caption requirement.
 - A durable transcript matches the approved narration and remains searchable through Help.
-- Human or AI narration may be used. An AI-narrated tutorial must preserve provider, voice, model/version where available, script, and disclosure provenance, and show the disclosure during playback.
+- The standard tutorial voice is OpenAI `gpt-4o-mini-tts` with the Cedar voice, reusing ServSync's established Marketing narration direction and exact disclosure: **AI-generated voiceover using OpenAI's Cedar voice.** Preserve provider, voice, model/version, script, and disclosure provenance, and show the disclosure during playback.
 - Normal-speed review must check the full picture, narration, caption timing/text, transcript, and disclosure together. A silent master may be retained as source evidence, but it cannot satisfy protected-tutorial publication readiness.
 
-This product decision does not select a narration provider or voice, authorize paid generation, approve an existing recording, or authorize Production publication.
+The owner approved bounded Cedar narration preparation for the protected Help package. This does not authorize runtime generation, a different provider/voice, secret or environment changes, schema/storage rollout, approval of an existing recording, or Production publication.
 
 ## Publication and verification gates
 

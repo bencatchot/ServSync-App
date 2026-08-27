@@ -7,9 +7,10 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 ## 2026-08-27 - Protected tutorial voiceover and captions product decision
 
 - Decision: Every protected pilot tutorial must include synchronized voiceover, timed captions/subtitles, and a matching durable transcript. Burned-in recorder scene callouts remain useful orientation aids but do not satisfy the caption requirement.
-- Provider boundary: Human and AI narration remain provider-neutral options. AI narration must preserve provider, voice, model/version where available, script, and visible disclosure provenance. This decision does not choose a provider or voice, authorize paid generation, approve a recording, publish Help, or merge PR #522.
+- Voice decision: Reuse the existing Marketing narration configuration—OpenAI `gpt-4o-mini-tts` with the Cedar voice—and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Bounded Help narration preparation is authorized and must retain provider/voice/model/script/disclosure plus silent-master provenance.
+- Provider boundary: This approval does not authorize runtime generation, another provider/voice, provider or secret configuration changes, schema/storage rollout, recording approval, Help publication, or merge of PR #522.
 - Existing media: TUT-001's validated 16.04-second silent Production package remains unapproved, unpublished source evidence and is no longer publication-eligible as the protected tutorial. The published **How to create an estimate** revision 3 remains available because its visible workflow is current, but its narration/caption upgrade is required before FB-040A completion.
-- Roadmap: The next launch assignment is the provider-neutral narration/caption package and Help playback contract, followed by a compliant TUT-001 replacement and full audio/caption/transcript/sound-off acceptance.
+- Roadmap: The next launch assignment is the Cedar narration/caption package and Help playback contract, followed by a compliant TUT-001 replacement and full audio/caption/transcript/sound-off acceptance.
 
 ## 2026-08-27 - TUT-001 Production Help package ready for review
 
