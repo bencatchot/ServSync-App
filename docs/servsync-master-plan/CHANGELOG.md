@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #525 merged; protected TUT-003 rerun exposes overlapping autosave race
+
+- Merge closeout: PR #525 was marked ready after exact-head review and all required GitHub/Vercel checks passed, then merged normally at main commit `e9123800ca6b3018e7d48f35b0ad1a09557262b6`. The automatic ServSync Production, durable Demo, and Stripe Sandbox deployments all completed successfully.
+- Protected rerun: The owner-requested durable Demo rerun used only the previously approved dedicated recorder credentials in the child process. It reset and seeded only the registered fixture, created the exact Job, and showed that PR #525 correctly synchronized completed **Approved Scope** findings into their Estimate-derived durable work items.
+- Runtime blocker: One of five checkbox changes overlapped the preceding 1.2-second autosave. The guarded save correctly refused concurrent persistence, but the autosave callback incorrectly recorded that skipped attempt as saved. Four findings/work items reached **Fixed On Site**/`completed`; the second remained **Monitor**/`open`, so **Complete Job** opened the intentional incomplete-work confirmation and the recorder failed closed while waiting for success feedback. Exact run `cb53b40d-95fb-4bfe-8b11-f4585b1281cc` remained at `job_scheduled`; no artifact was promoted.
+- Product correction: The bounded follow-up makes a skipped overlapping autosave return an explicit non-success result and schedules a retry of the current field-work state instead of marking it persisted. A focused source regression protects that retry contract without changing schema, RPC, role, permission, or environment behavior.
+- Tutorial freshness: `NONE`. Production Help Studio searches for `job progress`, `work items`, `contractor.work`, and `complete job` returned no walkthrough. TUT-003 remains unpublished.
+- Roadmap: FB-040A remains active. Review and normally merge/deploy the autosave reliability correction, then repeat the protected durable Demo TUT-003 workflow before any Cedar generation or Help action.
+
 ## 2026-08-28 - PR #524 merged; protected TUT-003 run exposes work-item completion blocker
 
 - Merge closeout: PR #524 was marked ready only after it remained current with `main`, mergeable, review-clear, and green across the required GitHub and Vercel checks. It merged normally at main commit `7328548e36881d74e02192b37e45332a12db33f4`; the durable Demo Production deployment `dpl_6XFTR53rz2bphpK1Tre5s6vJaUeF` reached Ready.

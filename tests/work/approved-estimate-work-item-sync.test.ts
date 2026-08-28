@@ -80,3 +80,20 @@ test('Job completion synchronizes approved Estimate items before the simple-job-
   assert.ok(syncSource.indexOf('await syncApprovedEstimateJobWorkItems(') < syncSource.indexOf('if (!isSimpleServiceJob(insp))'));
   assert.ok(source.includes('const syncedWorkItems = await syncJobWorkItemsForWorkflow(completedJob);'));
 });
+
+test('field-work autosave retries a skipped overlapping save instead of marking it persisted', () => {
+  const source = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  const saveSource = source.slice(
+    source.indexOf('const saveInspectionProgress = async'),
+    source.indexOf('const finalizeInspection = async'),
+  );
+  const autoSaveSource = source.slice(
+    source.indexOf('const signature = JSON.stringify({', source.indexOf('const saveInspectionProgress = async')),
+    source.indexOf('const handleInspectionPhotoUpload = async'),
+  );
+
+  assert.match(saveSource, /contractorActionGuard\.begin\(actionKey\)[\s\S]*return false;/);
+  assert.match(saveSource, /await persistInspectionRooms\([\s\S]*return true;/);
+  assert.match(autoSaveSource, /\.then\(saved => \{ if \(saved\) autoSaveStateRef\.current\.lastSignature = signature; else [\s\S]*setAutoSaveRetryNonce/);
+  assert.match(autoSaveSource, /canManageJobOperations, autoSaveRetryNonce\]/);
+});
