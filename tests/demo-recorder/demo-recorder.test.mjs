@@ -111,6 +111,21 @@ test('human-paced clicks retain cursor movement but re-resolve the action target
   assert.doesNotMatch(clickHelper, /page\.mouse\.click/);
 });
 
+test('TUT-003 proves transient finalization feedback once and keeps the final scene assertion persistent', () => {
+  const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
+  const flowStart = source.indexOf('async function recordContractorCompleteWork');
+  const start = source.indexOf("await setCaption(page, scenario.scenes[3].caption);", flowStart);
+  const end = source.indexOf('const sensitiveIssues = scanVisibleTextForSensitiveData', start);
+  const finalStep = source.slice(start, end);
+
+  assert.match(finalStep, /getByTestId\('contractor-report-finalize-feedback'\)/);
+  assert.match(finalStep, /innerText\(\)[\s\S]*scenario\.finalState\.reportFeedback/);
+  assert.match(finalStep, /const persistentFinalText = \[/);
+  assert.match(finalStep, /'Filed to Documents'/);
+  assert.match(finalStep, /const missingPersistentText = persistentFinalText\.filter/);
+  assert.doesNotMatch(finalStep, /persistentFinalText = \[[\s\S]*scenario\.finalState\.reportFeedback/);
+});
+
 test('homeowner Home History scenario is a bounded read-only finalized-report workflow', () => {
   assert.equal(validateScenarioDefinition(homeownerHomeHistoryScenario), homeownerHomeHistoryScenario);
   assert.equal(homeownerHomeHistoryScenario.initialCheckpoint, 'job_completed');

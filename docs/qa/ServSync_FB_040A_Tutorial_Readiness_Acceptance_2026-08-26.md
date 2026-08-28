@@ -138,6 +138,20 @@ Tutorial evidence: The change affects protected recorder activation and planning
 
 Affected tutorials: None.
 
+### Fifth protected rerun
+
+PR #528 merged normally at main commit `719c02d550bef8ef5178831fef8d285f759dfbfc`. Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the recorder started.
+
+Exact protected run `2336a05e-b89f-4df4-90d8-bfeab2c7d75c` reset and seeded only the registered fixture, authenticated, created the exact Job, completed all five approved work items, completed the visit and Job, and finalized the report through the normal product UI. Exact post-run verification passed at `home_history_updated`: the Job is `completed`, all five durable work items are `completed`, and exactly one report document, one Home History row, one notification, and the registered private report lineage exist.
+
+The recorder still promoted no artifact because the final aggregate text assertion required the transient **Report finalized** action feedback after the slower private report-adoption step. The recorder had already waited for that exact test-id when UI finalization succeeded. The bounded correction verifies its expected title at that moment, then treats the held final scene as persistent evidence: exact Job title, homeowner, saved completion note, and **Filed to Documents**. Any future failure names the missing persistent value instead of returning a generic final-scene error.
+
+Tutorial impact for the final-scene proof correction: `NOT APPLICABLE`.
+
+Tutorial evidence: The change affects protected recorder validation and planning evidence only. TUT-003 remains unpublished, and no app route, label, control, workflow, role boundary, outcome, or published tutorial changes.
+
+Affected tutorials: None.
+
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
