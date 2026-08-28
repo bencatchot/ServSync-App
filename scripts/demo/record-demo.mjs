@@ -138,6 +138,24 @@ async function moveAndClick(page, locator, pacing) {
   await wait(pacing.postClick);
 }
 
+async function waitForChecked(locator, expected = true, timeout = 5000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await locator.isChecked().catch(() => false) === expected) return;
+    await wait(100);
+  }
+  throw new Error(`Recorder checkbox did not become ${expected ? 'checked' : 'unchecked'}.`);
+}
+
+async function waitForEnabled(locator, timeout = 30_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await locator.isEnabled().catch(() => false)) return;
+    await wait(100);
+  }
+  throw new Error('Recorder action did not become enabled.');
+}
+
 async function moveAndType(page, locator, value, pacing) {
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
@@ -774,16 +792,31 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
     jobAdopted = true;
 
     await setCaption(page, scenario.scenes[1].caption);
-    const workCheckboxes = page.getByTestId('contractor-approved-work-checkbox');
-    const workItemCount = await workCheckboxes.count();
+    const approvedWorkRows = page.getByTestId('contractor-approved-work-item');
+    const workItemCount = await approvedWorkRows.count();
     if (workItemCount < 1) throw new Error('TUT-003 Job did not expose Estimate-derived work items.');
+    const workTitles = [];
     for (let index = 0; index < workItemCount; index += 1) {
-      const checkbox = workCheckboxes.nth(index);
-      if (!(await checkbox.isChecked())) await moveAndClick(page, checkbox, pacing);
+      const title = await approvedWorkRows.nth(index).getAttribute('data-work-title');
+      if (!title || workTitles.includes(title)) throw new Error('TUT-003 Job exposed a missing or duplicate approved-work identity.');
+      workTitles.push(title);
+    }
+    for (const title of workTitles) {
+      const checkbox = page.getByRole('checkbox', { name: `Complete approved work: ${title}`, exact: true });
+      await checkbox.waitFor({ state: 'visible', timeout: 30_000 });
+      if (!(await checkbox.isChecked())) {
+        await moveAndClick(page, checkbox, pacing);
+        await waitForChecked(checkbox);
+      }
+    }
+    if (await page.getByTestId('contractor-approved-work-checkbox').evaluateAll(inputs => inputs.some(input => !input.checked))) {
+      throw new Error('TUT-003 refused to save because an approved work item remained unchecked.');
     }
     const workNotes = page.getByPlaceholder('Describe work performed, materials used, open follow-up, or completion notes...');
     await moveAndType(page, workNotes, scenario.work.completionNote, pacing);
-    await moveAndClick(page, page.getByTestId('contractor-save-job-progress'), pacing);
+    const saveProgress = page.getByTestId('contractor-save-job-progress');
+    await waitForEnabled(saveProgress);
+    await moveAndClick(page, saveProgress, pacing);
     await page.getByText(/^Progress saved\.$/i).waitFor({ state: 'visible', timeout: 30_000 });
 
     await setCaption(page, scenario.scenes[2].caption);

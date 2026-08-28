@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #526 merged; protected TUT-003 rerun isolates recorder checkbox identity
+
+- Merge and deployment: PR #526 merged normally at main commit `fce2c7ea1413421fb851d0aead117cc402e793f2`. GitHub/Vercel recorded the durable Demo Production deployment successful at `2026-08-28T14:26:23Z`, and `https://servsync-demo.vercel.app` returned HTTP 200.
+- Protected rerun: Exact Demo run `6e31ee0d-1347-4d76-8ee1-ffcc49d94945` again failed closed at Job completion with four completed approved-scope findings and the second finding still **Monitor**. No recording artifact was promoted and no Cedar, Help attachment, approval, publication, or Production mutation occurred.
+- Isolation evidence: A bounded follow-up on the same registered Demo Job targeted the missing **Supply and install new 40-gallon water heater** checkbox by its exact accessible label, waited for the Save action to become available, and persisted it successfully. The finding became **Fixed On Site** and its exact durable work item became `completed`, proving the merged app autosave/work-item correction is operating. The remaining defect is recorder action identity: iterating a live checkbox locator through intervening re-renders can skip an item.
+- Bounded correction: The TUT-003 recorder now captures immutable approved-work titles, addresses every checkbox by its exact title, verifies the checked state after each human-paced click, refuses Save while any item remains unchecked, and waits for Save to be enabled. A normal source review/merge remains required before another provenance-valid protected rerun.
+- Tutorial freshness: `NOT APPLICABLE`. The correction changes protected recording automation only and cannot alter a published tutorial or user-facing app behavior. TUT-003 remains unpublished.
+- Roadmap: FB-040A remains active. Review and merge the recorder stability correction, then rerun the protected workflow through finalized report and Home History before Cedar generation or any Help action.
+
 ## 2026-08-28 - PR #525 merged; protected TUT-003 rerun exposes overlapping autosave race
 
 - Merge closeout: PR #525 was marked ready after exact-head review and all required GitHub/Vercel checks passed, then merged normally at main commit `e9123800ca6b3018e7d48f35b0ad1a09557262b6`. The automatic ServSync Production, durable Demo, and Stripe Sandbox deployments all completed successfully.
