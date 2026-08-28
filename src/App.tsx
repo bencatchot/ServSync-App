@@ -21778,8 +21778,8 @@ function ContractorDashboard({
 
   const [workflowJobMessageIndicators, setWorkflowJobMessageIndicators] = useState<Record<string, WorkflowJobMessageIndicator>>({});
   const restoredFieldWorkRef = useRef(false);
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastAutoSaveSignatureRef = useRef('');
+  const [autoSaveRetryNonce, setAutoSaveRetryNonce] = useState(0);
+  const autoSaveStateRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastSignature: string }>({ timer: null, lastSignature: '' });
   const originalInspectionLayoutRef = useRef<InspectionLayoutSnapshot | null>(null);
   const inspectionLayoutDirtyRef = useRef(false);
 
@@ -30249,13 +30249,13 @@ function ContractorDashboard({
     const actionKey = `job-save:${insp.id}`;
     if (!contractorActionGuard.begin(actionKey)) {
       if (!options?.silent) setNotice('Progress is already saving.');
-      return;
+      return false;
     }
     setSavingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
       await persistInspectionRooms(insp, updatedRooms, inspectionSummary, options);
-      return updatedRooms;
+      return true;
     } finally {
       setSavingInspection(false);
       contractorActionGuard.end(actionKey);
@@ -30838,23 +30838,23 @@ function ContractorDashboard({
 
   useEffect(() => {
     if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection || completingInspectionId === activeInspection.id) return;
-    const signature = JSON.stringify({
+    const autoSaveState = autoSaveStateRef.current; const signature = JSON.stringify({
       id: activeInspection.id,
       rooms: activeRooms,
       findings: localFindings,
       summary: inspectionSummary,
     });
-    if (signature === lastAutoSaveSignatureRef.current) return;
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
+    if (signature === autoSaveState.lastSignature) return;
+    if (autoSaveState.timer) clearTimeout(autoSaveState.timer);
+    autoSaveState.timer = setTimeout(() => {
       void saveInspectionProgress(activeInspection, { silent: true })
-        .then(() => { lastAutoSaveSignatureRef.current = signature; })
+        .then(saved => { if (saved) autoSaveState.lastSignature = signature; else autoSaveState.timer = setTimeout(() => setAutoSaveRetryNonce(value => value + 1), 250); })
         .catch(err => setError(readableError(err, 'Unable to auto-save job progress.')));
     }, 1200);
     return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (autoSaveState.timer) clearTimeout(autoSaveState.timer);
     };
-  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection, completingInspectionId, canManageJobOperations]);
+  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection, completingInspectionId, canManageJobOperations, autoSaveRetryNonce]);
 
   const handleInspectionPhotoUpload = async (key: string, file: File) => {
     if (!supabase || !contractor || !activeInspection) return;
@@ -30873,7 +30873,7 @@ function ContractorDashboard({
       const nextRooms = buildInspectionRoomsSnapshot(nextFindings);
       setLocalFindings(nextFindings);
       await persistInspectionRooms(activeInspection, nextRooms, inspectionSummary, { silent: true });
-      lastAutoSaveSignatureRef.current = JSON.stringify({
+      autoSaveStateRef.current.lastSignature = JSON.stringify({
         id: activeInspection.id,
         rooms: activeRooms,
         findings: nextFindings,

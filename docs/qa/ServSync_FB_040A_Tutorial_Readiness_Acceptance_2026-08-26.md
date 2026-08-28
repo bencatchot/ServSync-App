@@ -96,6 +96,20 @@ Tutorial evidence: Production Help Studio searches for `complete work`, `approve
 
 Affected tutorials: None. TUT-003 remains unpublished.
 
+### Second protected rerun
+
+PR #525 merged normally at main commit `e9123800ca6b3018e7d48f35b0ad1a09557262b6`; ServSync Production, durable Demo, and Stripe Sandbox automatic deployments all completed successfully. The owner-requested durable Demo rerun used the previously approved dedicated credentials only in the child process and touched only the exact registered fixture.
+
+The work-item correction behaved as designed for four **Approved Scope** findings. The fifth checkbox change overlapped the preceding autosave: the guarded save refused concurrency, but the autosave callback still recorded that skipped attempt as persisted. The fifth finding remained **Monitor**, its durable Estimate-derived item remained `open`, and **Complete Job** opened the intentional incomplete-work confirmation. The recorder failed closed while waiting for completion feedback. Exact run `cb53b40d-95fb-4bfe-8b11-f4585b1281cc` remains at `job_scheduled` with one scheduled visit, four completed work items, one open work item, no finalized report, and no promoted artifact.
+
+The bounded correction returns explicit non-success for a skipped guarded save and retries the current field-work state instead of marking it persisted. Focused autosave/work-item, Demo-recorder, architecture, typecheck, exact App-size, and diff-hygiene gates pass locally. Normal review/merge and durable Demo deployment remain required before the next protected rerun.
+
+Tutorial impact for the autosave correction: `NONE`.
+
+Tutorial evidence: Production Help Studio searches for `job progress`, `work items`, `contractor.work`, and `complete job` returned no walkthrough.
+
+Affected tutorials: None. TUT-003 remains unpublished.
+
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
