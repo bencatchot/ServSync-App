@@ -835,7 +835,11 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
     reportFinalizationStarted = true;
     page.once('dialog', (dialog) => dialog.accept());
     await moveAndClick(page, page.getByTestId('simple-job-finalize-report'), pacing);
-    await page.getByTestId('contractor-report-finalize-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    const reportFinalizedFeedback = page.getByTestId('contractor-report-finalize-feedback');
+    await reportFinalizedFeedback.waitFor({ state: 'visible', timeout: 30_000 });
+    if (!(await reportFinalizedFeedback.innerText()).includes(scenario.finalState.reportFeedback)) {
+      throw new Error('TUT-003 report finalization feedback did not match the expected product outcome.');
+    }
     const reportAdoption = await runDemoCommand(['adopt-report', scenario.fixtureScenarioKey], env);
     if (reportAdoption.verification?.ok !== true) {
       throw new Error('Finalized TUT-003 report did not reach the exact Home History checkpoint.');
@@ -846,15 +850,15 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
     await wait(Math.max(pacing.finalHold, 4500));
 
     const mainText = await page.getByRole('main').innerText();
-    const expectedFinalText = [
+    const persistentFinalText = [
       scenario.finalState.estimateTitle,
       scenario.finalState.homeownerLabel,
       scenario.work.completionNote,
-      scenario.finalState.reportFeedback,
       'Filed to Documents',
     ];
-    if (expectedFinalText.some((value) => !mainText.includes(value))) {
-      throw new Error('Final TUT-003 scene did not show the completed Job, visit record, and filed report outcome.');
+    const missingPersistentText = persistentFinalText.filter((value) => !mainText.includes(value));
+    if (missingPersistentText.length > 0) {
+      throw new Error(`Final TUT-003 scene is missing persistent evidence: ${missingPersistentText.join(', ')}.`);
     }
     const sensitiveIssues = scanVisibleTextForSensitiveData(mainText, {
       'contractor email': contractor.email,

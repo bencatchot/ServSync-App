@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #528 merged; protected TUT-003 reaches Home History and isolates final-scene assertion
+
+- Merge and deployment: PR #528 merged normally at main commit `719c02d550bef8ef5178831fef8d285f759dfbfc`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.
+- Protected rerun: Exact Demo run `2336a05e-b89f-4df4-90d8-bfeab2c7d75c` completed the real accepted Estimate -> Job -> five completed work items -> completed visit/Job -> finalized report path. Exact verification passed at `home_history_updated` with one report document, one Home History row, one notification, and the registered private report lineage.
+- Artifact boundary: The recorder then rejected the package before promotion because its final aggregate text check required the transient **Report finalized** action feedback after the slower private adoption/verification step. That feedback had already appeared and passed its direct test-id wait when the product finalizer succeeded. No artifact was promoted and no Cedar, Help attachment, approval, publication, or Production mutation occurred.
+- Bounded correction: The recorder now proves the transient finalization feedback once, including its expected title, at the moment it appears. The held final scene validates only persistent Job, homeowner, work-note, and **Filed to Documents** evidence and reports any missing persistent value explicitly.
+- Tutorial freshness: `NOT APPLICABLE`. Recorder automation and planning evidence only; TUT-003 remains unpublished and no user-facing app behavior or published guidance changes.
+- Roadmap: FB-040A remains active. Review and merge the final-scene proof correction, then rerun the protected TUT-003 workflow from exact merged/deployed source before narration or any Help operation.
+
 ## 2026-08-28 - PR #527 merged; protected TUT-003 guard isolates stale coordinate click
 
 - Merge and deployment: PR #527 merged normally at main commit `4de13e96f054f6b1700f87b5c9dc262169752e38`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.
