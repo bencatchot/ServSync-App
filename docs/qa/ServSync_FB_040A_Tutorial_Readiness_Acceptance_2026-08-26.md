@@ -152,6 +152,20 @@ Tutorial evidence: The change affects protected recorder validation and planning
 
 Affected tutorials: None.
 
+### Sixth protected rerun
+
+PR #529 merged normally at main commit `512c1df2410fd89a27372f0b3b972efc7c086ae1`. Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the recorder started.
+
+Exact protected run `c5717aaf-beac-4940-acea-6371a62647aa` completed the full product workflow and passed exact `home_history_updated` verification with all five durable work items complete, the Job and visit complete, and exactly one report document, Home History row, notification, and registered private report lineage. The corrected final-scene proof also passed, along with browser-error and sensitive-visible-text gates.
+
+The generated WebM was 62.36 seconds. It was rejected and removed before promotion only because the scenario's estimated 65-second minimum was 2.64 seconds too high for the complete human-paced flow. The bounded correction sets the accepted range to 60-115 seconds; it does not remove or relax any workflow scene, visible-content proof, final checkpoint, sensitive-data scan, browser-error gate, codec validation, metadata sanitization, or durable promotion rule.
+
+Tutorial impact for the duration-floor correction: `NOT APPLICABLE`.
+
+Tutorial evidence: The change affects protected recorder scenario metadata, its regression expectation, and planning evidence only. TUT-003 remains unpublished, and no app route, label, control, workflow, role boundary, outcome, or published tutorial changes.
+
+Affected tutorials: None.
+
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
