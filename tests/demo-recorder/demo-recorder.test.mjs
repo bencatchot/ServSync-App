@@ -85,6 +85,20 @@ test('TUT-003 contractor completion scenario preserves accepted Estimate through
   assert.doesNotMatch(JSON.stringify(contractorCompleteWorkScenario), /password|service_role|@example/i);
 });
 
+test('TUT-003 records every approved item through a stable title identity before saving', () => {
+  const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
+  const flowStart = source.indexOf('async function recordContractorCompleteWork');
+  const start = source.indexOf("await setCaption(page, scenario.scenes[1].caption);", flowStart);
+  const end = source.indexOf("await setCaption(page, scenario.scenes[2].caption);", start);
+  const workStep = source.slice(start, end);
+
+  assert.match(workStep, /getAttribute\('data-work-title'\)/);
+  assert.match(workStep, /getByRole\('checkbox', \{ name: `Complete approved work: \$\{title\}`, exact: true \}\)/);
+  assert.match(workStep, /await waitForChecked\(checkbox\)/);
+  assert.match(workStep, /inputs\.some\(input => !input\.checked\)/);
+  assert.match(workStep, /await waitForEnabled\(saveProgress\)/);
+});
+
 test('homeowner Home History scenario is a bounded read-only finalized-report workflow', () => {
   assert.equal(validateScenarioDefinition(homeownerHomeHistoryScenario), homeownerHomeHistoryScenario);
   assert.equal(homeownerHomeHistoryScenario.initialCheckpoint, 'job_completed');

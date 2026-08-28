@@ -110,6 +110,20 @@ Tutorial evidence: Production Help Studio searches for `job progress`, `work ite
 
 Affected tutorials: None. TUT-003 remains unpublished.
 
+### Third protected rerun
+
+PR #526 merged normally at main commit `fce2c7ea1413421fb851d0aead117cc402e793f2`. GitHub/Vercel recorded the exact durable Demo Production deployment successful at `2026-08-28T14:26:23Z`, and the durable alias returned HTTP 200 before recording began.
+
+The protected workflow reset and seeded only its registered fixture, authenticated through the dedicated Demo recorder account, created the exact Job through the UI, and failed closed while waiting for Job-completion feedback. Exact run `6e31ee0d-1347-4d76-8ee1-ffcc49d94945` remained at `job_scheduled`: four findings and durable work items were complete, while **Supply and install new 40-gallon water heater** remained **Monitor** and its item remained `open`. No artifact was promoted.
+
+A bounded same-fixture check then addressed that missing checkbox by its exact accessible label, waited for Save to be enabled, and saved through the deployed UI. The finding and its exact durable work item both became complete. This proves the merged application correction is operating and isolates the remaining failure to the recorder's live positional checkbox iteration across intervening re-renders. The bounded recorder correction snapshots stable work titles, targets each exact labeled checkbox, verifies every click, refuses Save if any item is unchecked, and waits for Save availability. Normal review/merge is required before the next provenance-valid protected rerun.
+
+Tutorial impact for the recorder correction: `NOT APPLICABLE`.
+
+Tutorial evidence: TUT-003 remains unpublished, and the correction changes protected recording automation only; it does not change a user-visible route, label, control, workflow order, role boundary, or outcome.
+
+Affected tutorials: None.
+
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
