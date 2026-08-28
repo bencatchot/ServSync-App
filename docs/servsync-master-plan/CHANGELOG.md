@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #524 merged; protected TUT-003 run exposes work-item completion blocker
+
+- Merge closeout: PR #524 was marked ready only after it remained current with `main`, mergeable, review-clear, and green across the required GitHub and Vercel checks. It merged normally at main commit `7328548e36881d74e02192b37e45332a12db33f4`; the durable Demo Production deployment `dpl_6XFTR53rz2bphpK1Tre5s6vJaUeF` reached Ready.
+- Protected runtime: The first post-merge TUT-003 run authenticated, reset and seeded only its registered Demo fixture, created the exact Job through the UI, recorded all five approved-scope findings as **Fixed On Site**, and completed the visit and Job. It then failed closed at `adopt-job-completion`: the visible Job and visit state was complete, but all five Estimate-derived durable billable work items remained `open`. No recorder artifact was promoted and no Cedar, Help approval, publication, or Production mutation occurred.
+- Product correction: A fresh follow-up branch synchronizes only the exact Job's `unbilled`, Estimate-derived work items from its **Approved Scope** findings, maps duplicate titles deterministically, preserves existing completion provenance, and leaves drafted/invoiced, unrelated-Job, and simple-task work items untouched. Focused tests, Demo-recorder contracts, architecture contracts, typecheck, build, exact lint/App-size budgets, and diff hygiene pass locally.
+- Tutorial freshness: `NONE`. Production Help Studio searches for `complete work`, `approved estimate`, and `contractor.work` returned no walkthrough. The related published **How to create an estimate** revision 3 was previewed and ends at Estimate creation, before the corrected Job-completion behavior. TUT-003 remains unpublished and will be created only after the correction merges, reaches durable Demo, and passes the protected recorder.
+- Roadmap: FB-040A remains the launch assignment. The immediate gate is review and normal merge/deployment of the bounded work-item synchronization correction, then rerun TUT-003 from the protected durable Demo workflow.
+
 ## 2026-08-27 - TUT-003 protected source work begins after PR #523 merge
 
 - Merge closeout: The owner approved PR #523 after all required checks and three Vercel previews passed. It merged normally at main commit `6091ea58c4eb22ee6eb39dd9e050de1d68f19190`, closing the reusable TUT-001 narration packager and permanent Production-smoke source work without changing published Help media.

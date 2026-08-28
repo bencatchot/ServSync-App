@@ -84,6 +84,18 @@ TUT-001 publication and live Owner-path verification are complete. The immutable
 
 The reusable narration-packaging source and permanent Production smoke regression merged normally through PR #523 at main commit `6091ea58c4eb22ee6eb39dd9e050de1d68f19190`. That merge did not change the already published media. TUT-003 is the next separately bounded tutorial slice.
 
+## TUT-003 runtime gate
+
+PR #524 merged normally at main commit `7328548e36881d74e02192b37e45332a12db33f4`, and the durable Demo Production deployment reached Ready. The first post-merge protected run authenticated, seeded only the registered fixture, created the exact Job through the UI, recorded all five **Approved Scope** findings as **Fixed On Site**, and completed the visit and Job. Exact adoption then failed closed because all five Estimate-derived durable billable work items remained `open`; no artifact was promoted.
+
+The bounded correction synchronizes only the exact Job's `unbilled`, Estimate-derived work items, maps duplicate titles deterministically, preserves existing completion provenance, and leaves drafted/invoiced, unrelated-Job, and simple-task rows untouched. The next acceptance gate is normal review/merge and durable Demo deployment of that correction, followed by a complete protected TUT-003 rerun through finalized report and Home History.
+
+Tutorial impact for this correction: `NONE`.
+
+Tutorial evidence: Production Help Studio searches for `complete work`, `approved estimate`, and `contractor.work` returned no walkthrough. Preview of the related published **How to create an estimate**, revision 3, confirmed that its three steps end at Estimate creation and do not cover accepted-Estimate Job completion.
+
+Affected tutorials: None. TUT-003 remains unpublished.
+
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
@@ -92,4 +104,4 @@ Tutorial evidence: The first narrated/captioned TUT-001 package failed owner pro
 
 Affected tutorial: TUT-001 **How to handle a homeowner service request**.
 
-The existing published **How to create an estimate**, revision 3, is not replaced or changed by this slice. Its visible workflow remains current and it stays available, but a narrated/captioned replacement is required before FB-040A is complete. TUT-001 is new and remains unpublished, so the silent source candidate does not make an incomplete tutorial visible to users.
+The existing published **How to create an estimate**, revision 3, is not replaced or changed by this slice. Its visible workflow remains current and it stays available, but a narrated/captioned replacement is required before FB-040A is complete. TUT-001 has since completed its corrected narration/caption review, explicit publication, and live contextual verification as Production revision 1; the preserved silent source candidate remains non-public evidence.

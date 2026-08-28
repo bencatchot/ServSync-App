@@ -1,4 +1,5 @@
-import type { FindingStatus, Inspection } from '../../types';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { FindingStatus, Inspection, JobWorkItem } from '../../types';
 import { UNANSWERED_FINDING_STATUS } from '../findings/statusPresentation';
 
 export type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
@@ -65,6 +66,58 @@ export function roomIsApprovedScope(roomName: string) {
 
 export function roomIsSimpleWorkItems(roomName: string) {
   return normalizeJobWorkflowText(roomName) === normalizeJobWorkflowText(SIMPLE_WORK_ITEMS_ROOM);
+}
+
+export type ApprovedEstimateWorkItemCompletionUpdate = Pick<JobWorkItem, 'id' | 'completion_status' | 'completed_at' | 'completed_by'>;
+
+export function approvedEstimateWorkItemCompletionPlan(
+  job: Pick<Inspection, 'id' | 'rooms_with_findings'>,
+  workItems: JobWorkItem[],
+  completedBy: string,
+  completedAt = new Date().toISOString(),
+): ApprovedEstimateWorkItemCompletionUpdate[] {
+  const availableByTitle = new Map<string, JobWorkItem[]>();
+  for (const item of [...workItems].sort((a, b) => a.sort_order - b.sort_order)) {
+    if (item.inspection_id !== job.id || !item.source_estimate_line_item_id || item.billing_status !== 'unbilled') continue;
+    const title = normalizeJobWorkflowText(item.title);
+    availableByTitle.set(title, [...(availableByTitle.get(title) ?? []), item]);
+  }
+
+  return (job.rooms_with_findings ?? [])
+    .filter(room => roomIsApprovedScope(room.room))
+    .flatMap(room => room.findings ?? [])
+    .flatMap(finding => {
+      const matches = availableByTitle.get(normalizeJobWorkflowText(finding.title)) ?? [];
+      const item = matches.shift();
+      if (!item) return [];
+      const completed = finding.status === 'Fixed On Site';
+      return [{
+        id: item.id,
+        completion_status: completed ? 'completed' : 'open',
+        completed_at: completed ? item.completed_at ?? completedAt : null,
+        completed_by: completed ? item.completed_by ?? completedBy : null,
+      } satisfies ApprovedEstimateWorkItemCompletionUpdate];
+    });
+}
+
+export async function syncApprovedEstimateJobWorkItems(
+  client: SupabaseClient,
+  job: Pick<Inspection, 'id' | 'rooms_with_findings'>,
+  workItems: JobWorkItem[],
+  completedBy: string,
+) {
+  const updates = approvedEstimateWorkItemCompletionPlan(job, workItems, completedBy);
+  for (const update of updates) {
+    const { data, error } = await client
+      .from('job_work_items')
+      .update({ completion_status: update.completion_status, completed_at: update.completed_at, completed_by: update.completed_by })
+      .eq('id', update.id)
+      .eq('inspection_id', job.id)
+      .eq('billing_status', 'unbilled')
+      .select('id');
+    if (error) throw error;
+    if (data?.length !== 1) throw new Error('Approved Estimate work item completion did not persist.');
+  }
 }
 
 function cleanServiceTaskTitle(value: string) {
