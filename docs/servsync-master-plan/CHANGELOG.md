@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #529 merged; protected TUT-003 passes workflow and isolates duration floor
+
+- Merge and deployment: PR #529 merged normally at main commit `512c1df2410fd89a27372f0b3b972efc7c086ae1`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.
+- Protected rerun: Exact Demo run `c5717aaf-beac-4940-acea-6371a62647aa` completed and verified the full accepted Estimate -> Job -> five completed work items -> completed visit/Job -> finalized report -> Home History workflow. All transient/persistent visible-content, browser-error, sensitive-data, and exact checkpoint gates passed.
+- Artifact boundary: The resulting 62.36-second WebM passed the complete product workflow but fell 2.64 seconds below the scenario's estimated 65-second duration floor. The recorder removed the rejected working artifact and promoted no durable package; no Cedar, Help attachment, approval, publication, or Production mutation occurred.
+- Bounded correction: The TUT-003 duration range is now 60-115 seconds. This admits the complete observed human-paced workflow without adding artificial padding while retaining the upper bound and every workflow, content, sensitive-data, browser-error, codec, metadata, and durable-checkpoint guard.
+- Tutorial freshness: `NOT APPLICABLE`. Recorder scenario metadata, regression expectation, and planning evidence only; TUT-003 remains unpublished and no user-facing app behavior or published guidance changes.
+- Roadmap: FB-040A remains active. Review and merge the duration-floor correction, then rerun TUT-003 from exact merged/deployed source before narration or any Help operation.
+
 ## 2026-08-28 - PR #528 merged; protected TUT-003 reaches Home History and isolates final-scene assertion
 
 - Merge and deployment: PR #528 merged normally at main commit `719c02d550bef8ef5178831fef8d285f759dfbfc`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.
