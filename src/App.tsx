@@ -313,7 +313,7 @@ import {
   roomIsSimpleWorkItems,
   serviceTasksFromScope,
   SIMPLE_SERVICE_JOB_TYPES,
-  SIMPLE_WORK_ITEMS_ROOM,
+  SIMPLE_WORK_ITEMS_ROOM, syncApprovedEstimateJobWorkItems,
   type FieldWorkflowKind,
   type JobWorkflowMode,
   type SimpleServiceJobType,
@@ -29737,8 +29737,8 @@ function ContractorDashboard({
     }
   };
 
-  const syncSimpleJobWorkItems = async (insp: Inspection) => {
-    if (!supabase || !isSimpleServiceJob(insp)) return workItemsForJob(insp.id);
+  const syncJobWorkItemsForWorkflow = async (insp: Inspection) => {
+    if (!supabase) return workItemsForJob(insp.id); await syncApprovedEstimateJobWorkItems(supabase, insp, workItemsForJob(insp.id), profile.id); if (!isSimpleServiceJob(insp)) return await refreshJobWorkItemsForJob(insp.id);
     const { error } = await supabase.rpc('servsync_sync_simple_job_work_items', {
       p_inspection_id: insp.id,
     });
@@ -29963,7 +29963,7 @@ function ContractorDashboard({
     setActiveInspection(prev => prev ? { ...prev, rooms_with_findings: rooms, summary: cleanedSummary } : prev);
     setInspections(prev => prev.map(i => i.id === insp.id ? { ...i, rooms_with_findings: rooms, summary: cleanedSummary } : i));
     if (isSimpleServiceJob({ ...insp, rooms_with_findings: rooms, summary: cleanedSummary })) {
-      await syncSimpleJobWorkItems({ ...insp, rooms_with_findings: rooms, summary: cleanedSummary });
+      await syncJobWorkItemsForWorkflow({ ...insp, rooms_with_findings: rooms, summary: cleanedSummary });
     }
     if (!options?.silent) setNotice('Progress saved.');
   };
@@ -30202,7 +30202,7 @@ function ContractorDashboard({
       setSelectedChecklistRoom(activeRoomSeed[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
       if (isSimpleJobDraft) {
-        await syncSimpleJobWorkItems(newInspection);
+        await syncJobWorkItemsForWorkflow(newInspection);
       }
       if (scheduledDate && scheduledVisitResult?.visit_event_id) {
         setContractorVisitEvents(prev => [{
@@ -30535,7 +30535,7 @@ function ContractorDashboard({
         ? { ...event, status: 'completed', updated_at: completedAt }
         : event
       ));
-      const syncedWorkItems = await syncSimpleJobWorkItems(completedJob);
+      const syncedWorkItems = await syncJobWorkItemsForWorkflow(completedJob);
       if (syncedWorkItems.length > 0) {
         const readyCount = syncedWorkItems.filter(jobWorkItemCanInvoice).length;
         setNotice(readyCount > 0

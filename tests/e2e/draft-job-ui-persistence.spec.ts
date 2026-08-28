@@ -360,7 +360,7 @@ test.describe('Draft Job UI persistence and resume', () => {
   test('save flow keeps partial-save retries on the same Draft Job while Create Job activates only after scope saves', () => {
     const appSource = sourceFile('src/App.tsx');
     const saveSource = sourceBetween(appSource, 'const saveDraftJobComposer = async', 'const createJobFromDraftComposer = async');
-    const createJobSource = sourceBetween(appSource, 'const createJobFromDraftComposer = async', 'const syncSimpleJobWorkItems = async');
+    const createJobSource = sourceBetween(appSource, 'const createJobFromDraftComposer = async', 'const syncJobWorkItemsForWorkflow = async');
     const composerSource = sourceFile('src/features/jobs/DraftJobComposer.tsx');
 
     expect(saveSource).toContain('draftId = await createDraftJob');
