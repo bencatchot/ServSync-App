@@ -6,6 +6,7 @@ export const DEMO_RECORDER_APP_URL = 'https://servsync-demo.vercel.app';
 export const DEMO_RECORDER_SUPABASE_URL = `https://${DEMO_RECORDER_PROJECT_REF}.supabase.co`;
 export const DEMO_PRESENTATION_QUERY_KEY = 'servsync-presentation';
 export const DEMO_PRESENTATION_QUERY_VALUE = 'recorder-v1';
+export const DEMO_RECORDER_SCENARIO_QUERY_KEY = 'servsync-recorder-scenario';
 export const DEMO_RECORDING_ENV_KEYS = Object.freeze([
   'DEMO_CONTRACTOR_EMAIL',
   'DEMO_CONTRACTOR_PASSWORD',
@@ -52,9 +53,10 @@ const PACING = Object.freeze({
   }),
 });
 
-export function addDemoPresentationOptIn(rawUrl) {
+export function addDemoPresentationOptIn(rawUrl, scenarioKey = '') {
   const url = new URL(rawUrl);
   url.searchParams.set(DEMO_PRESENTATION_QUERY_KEY, DEMO_PRESENTATION_QUERY_VALUE);
+  if (scenarioKey) url.searchParams.set(DEMO_RECORDER_SCENARIO_QUERY_KEY, scenarioKey);
   return url;
 }
 

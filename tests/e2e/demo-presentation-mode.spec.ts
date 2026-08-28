@@ -3,10 +3,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
+  SERVSYNC_DEMO_COMPLETE_WORK_SCENARIO,
   SERVSYNC_DEMO_PRESENTATION_DEDICATED_REF,
   SERVSYNC_DEMO_PRESENTATION_QUERY_KEY,
   SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE,
+  SERVSYNC_DEMO_RECORDER_SCENARIO_QUERY_KEY,
   demoPresentationJobCheckpointLabel,
+  isServSyncDemoCompleteWorkRecorderMode,
   isServSyncDemoPresentationMode,
   parseSupabaseProjectRef,
 } from '../../src/demoPresentation';
@@ -68,6 +71,23 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     }, recorderRuntime)).toBe(false);
   });
 
+  test('opens the accepted-Estimate mutation boundary only for the exact TUT-003 recorder URL', () => {
+    const completeWorkRuntime = {
+      search: `${recorderRuntime.search}&${SERVSYNC_DEMO_RECORDER_SCENARIO_QUERY_KEY}=${SERVSYNC_DEMO_COMPLETE_WORK_SCENARIO}`,
+    };
+
+    expect(isServSyncDemoCompleteWorkRecorderMode(dedicatedEnv, recorderRuntime)).toBe(false);
+    expect(isServSyncDemoCompleteWorkRecorderMode(dedicatedEnv, completeWorkRuntime)).toBe(true);
+    expect(isServSyncDemoCompleteWorkRecorderMode(dedicatedEnv, {
+      search: `${completeWorkRuntime.search}&${SERVSYNC_DEMO_RECORDER_SCENARIO_QUERY_KEY}=${SERVSYNC_DEMO_COMPLETE_WORK_SCENARIO}`,
+    })).toBe(false);
+    expect(isServSyncDemoCompleteWorkRecorderMode({
+      ...dedicatedEnv,
+      VITE_SUPABASE_URL: 'https://uqgtheclhxqlnjpfmheq.supabase.co',
+      VITE_SERVSYNC_DEMO_PROJECT_REF: 'uqgtheclhxqlnjpfmheq',
+    }, completeWorkRuntime)).toBe(false);
+  });
+
   test('does not reference sensitive server-only demo credentials in browser source', () => {
     const source = [
       sourceFile('src/App.tsx'),
@@ -105,6 +125,7 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(app).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && customerProfileDraftAvailable && (');
     expect(app).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && showJobInvoiceAction && (');
     expect(app).toContain("action={!SERVSYNC_DEMO_PRESENTATION_MODE ? (");
+    expect(app).toContain('canCreateJob={(!SERVSYNC_DEMO_PRESENTATION_MODE || isServSyncDemoCompleteWorkRecorderMode()) && financialActionVisibility.canCreateJobFromEstimate}');
 
     expect(app).toContain('Tell us about your home');
     expect(app).toContain('Set up your business profile');

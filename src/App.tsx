@@ -451,7 +451,7 @@ import { FinalizedReportDeliveryPanel } from './features/reports/FinalizedReport
 import {
   demoPresentationJobCheckpointLabel,
   demoPresentationWorkItemProgress,
-  isServSyncDemoPresentationMode,
+  isServSyncDemoCompleteWorkRecorderMode, isServSyncDemoPresentationMode,
 } from './demoPresentation';
 import {
   serviceRequestStatusAccent,
@@ -37609,7 +37609,7 @@ function ContractorDashboard({
                                               estimate={estimate}
                                               nextStep={estimateNextStep}
                                               canManageEstimate={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canLaunchEstimate}
-                                              canCreateJob={!SERVSYNC_DEMO_PRESENTATION_MODE && financialActionVisibility.canCreateJobFromEstimate}
+                                              canCreateJob={(!SERVSYNC_DEMO_PRESENTATION_MODE || isServSyncDemoCompleteWorkRecorderMode()) && financialActionVisibility.canCreateJobFromEstimate}
                                               hasLinkedJob={hasLinkedJob}
                                               converting={convertingEstimateId === estimate.id}
                                               sending={sendingEstimateId === estimate.id}
@@ -39735,7 +39735,7 @@ function ContractorDashboard({
                                   estimate={estimate}
                                   nextStep={estimateNextStep}
                                   canManageEstimate={!SERVSYNC_DEMO_PRESENTATION_MODE && effectiveDurableDraftCapabilities.canLaunchEstimate}
-                                  canCreateJob={!SERVSYNC_DEMO_PRESENTATION_MODE && financialActionVisibility.canCreateJobFromEstimate}
+                                  canCreateJob={(!SERVSYNC_DEMO_PRESENTATION_MODE || isServSyncDemoCompleteWorkRecorderMode()) && financialActionVisibility.canCreateJobFromEstimate}
                                   hasLinkedJob={hasLinkedJob}
                                   converting={convertingEstimateId === estimate.id}
                                   sending={sendingEstimateId === estimate.id}

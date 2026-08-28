@@ -1,6 +1,6 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Corrected exact-label TUT-001 published and live-verified; reusable source PR remains unmerged
+Status: Corrected exact-label TUT-001 published and live-verified; reusable source PR #523 merged
 
 Date: 2026-08-27
 
@@ -82,7 +82,7 @@ The source-readiness package remains `servsync-contractor-service-request-intake
 
 TUT-001 publication and live Owner-path verification are complete. The immutable published audience is exactly Owner/Admin/Office, with Field Technician, Viewer, and Homeowner excluded through the same deployed session-derived role resolver. Separate Admin/Office Production credentials are not provisioned, so exact deployed policy correspondence—not additional live sign-ins—is the evidence basis for those two equivalent allowed roles.
 
-The reusable narration-packaging source and permanent Production smoke regression still require ordinary PR review and merge. That merge does not change the already published media.
+The reusable narration-packaging source and permanent Production smoke regression merged normally through PR #523 at main commit `6091ea58c4eb22ee6eb39dd9e050de1d68f19190`. That merge did not change the already published media. TUT-003 is the next separately bounded tutorial slice.
 
 ## Tutorial Freshness
 

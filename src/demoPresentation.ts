@@ -3,6 +3,8 @@ export const SERVSYNC_PRODUCTION_REF = 'uqgtheclhxqlnjpfmheq';
 export const SERVSYNC_SHARED_SANDBOX_REF = 'zpzdkoaubyjtsomccxya';
 export const SERVSYNC_DEMO_PRESENTATION_QUERY_KEY = 'servsync-presentation';
 export const SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE = 'recorder-v1';
+export const SERVSYNC_DEMO_RECORDER_SCENARIO_QUERY_KEY = 'servsync-recorder-scenario';
+export const SERVSYNC_DEMO_COMPLETE_WORK_SCENARIO = 'contractor-complete-work';
 
 export type PresentationEnv = {
   VITE_SUPABASE_URL?: string;
@@ -41,6 +43,16 @@ export function isServSyncDemoPresentationMode(
   const search = runtime.search ?? (typeof window === 'undefined' ? '' : window.location.search);
   const optIns = new URLSearchParams(search).getAll(SERVSYNC_DEMO_PRESENTATION_QUERY_KEY);
   return optIns.length === 1 && optIns[0] === SERVSYNC_DEMO_PRESENTATION_QUERY_VALUE;
+}
+
+export function isServSyncDemoCompleteWorkRecorderMode(
+  env: PresentationEnv = import.meta.env as unknown as PresentationEnv,
+  runtime: PresentationRuntime = {},
+) {
+  if (!isServSyncDemoPresentationMode(env, runtime)) return false;
+  const search = runtime.search ?? (typeof window === 'undefined' ? '' : window.location.search);
+  const scenarios = new URLSearchParams(search).getAll(SERVSYNC_DEMO_RECORDER_SCENARIO_QUERY_KEY);
+  return scenarios.length === 1 && scenarios[0] === SERVSYNC_DEMO_COMPLETE_WORK_SCENARIO;
 }
 
 export type DemoPresentationJobStatusInput = {
