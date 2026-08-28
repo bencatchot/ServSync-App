@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #530 merged; repeated complete TUT-003 run establishes duration sanity bound
+
+- Merge and deployment: PR #530 merged normally at main commit `0d920af2cbc18f81d88f62947747b0cf9cdc26b7`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.
+- Protected rerun: Exact Demo run `0d6d17a8-8746-4de2-92c7-06fde3e4d6e2` again completed and verified the full accepted Estimate -> Job -> five completed work items -> completed visit/Job -> finalized report -> Home History workflow. All transient/persistent scene, browser-error, sensitive-data, and exact checkpoint gates passed.
+- Runtime variance: The complete WebM was 59.12 seconds, 0.88 seconds below the 60-second floor. Together with the prior complete 62.36-second run, this proves more than three seconds of normal timing variance around a near-observed threshold. The rejected working artifact was removed and no durable package was promoted.
+- Bounded correction: TUT-003 now uses a 50-115-second media-sanity range. The lower bound detects materially truncated output instead of prescribing artificial runtime; exact scenes, feedback, persistent content, browser errors, sensitive data, durable checkpoint, codec, metadata, and promotion checks remain authoritative and unchanged.
+- Tutorial freshness: `NOT APPLICABLE`. Recorder scenario metadata, regression expectation, and planning evidence only; TUT-003 remains unpublished and no user-facing app behavior or published guidance changes.
+- Roadmap: FB-040A remains active. Review and merge the duration sanity-bound correction, then rerun TUT-003 from exact merged/deployed source before narration or any Help operation.
+
 ## 2026-08-28 - PR #529 merged; protected TUT-003 passes workflow and isolates duration floor
 
 - Merge and deployment: PR #529 merged normally at main commit `512c1df2410fd89a27372f0b3b972efc7c086ae1`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.

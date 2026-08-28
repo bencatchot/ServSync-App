@@ -18,7 +18,7 @@ export const contractorCompleteWorkScenario = Object.freeze({
     appUrl: 'https://servsync-demo.vercel.app',
   }),
   viewport: Object.freeze({ width: 1440, height: 900 }),
-  expectedDurationSeconds: Object.freeze({ min: 60, max: 115 }),
+  expectedDurationSeconds: Object.freeze({ min: 50, max: 115 }),
   outputBaseName: 'servsync-contractor-complete-work-v1',
   identities: Object.freeze({
     homeowner: Object.freeze({ role: 'homeowner', label: personas.homeowner.fullName }),

@@ -78,7 +78,7 @@ test('TUT-003 contractor completion scenario preserves accepted Estimate through
     contractorCompleteWorkScenario.scenes.map((scene) => scene.key),
     ['accepted-estimate', 'job-work', 'job-complete', 'report-finalized'],
   );
-  assert.deepEqual(contractorCompleteWorkScenario.expectedDurationSeconds, { min: 60, max: 115 });
+  assert.deepEqual(contractorCompleteWorkScenario.expectedDurationSeconds, { min: 50, max: 115 });
   assert.match(contractorCompleteWorkScenario.fixturePolicy, /exact UI-created Job and descendants/i);
   assert.match(contractorCompleteWorkScenario.scenes[0].caption, /Create the Job from the accepted Estimate/);
   assert.match(contractorCompleteWorkScenario.scenes[3].caption, /Finalize the report/);
