@@ -30838,21 +30838,21 @@ function ContractorDashboard({
 
   useEffect(() => {
     if (!canManageJobOperations || !activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection || completingInspectionId === activeInspection.id) return;
-    const signature = JSON.stringify({
+    const autoSaveState = autoSaveStateRef.current; const signature = JSON.stringify({
       id: activeInspection.id,
       rooms: activeRooms,
       findings: localFindings,
       summary: inspectionSummary,
     });
-    if (signature === autoSaveStateRef.current.lastSignature) return;
-    if (autoSaveStateRef.current.timer) clearTimeout(autoSaveStateRef.current.timer);
-    autoSaveStateRef.current.timer = setTimeout(() => {
+    if (signature === autoSaveState.lastSignature) return;
+    if (autoSaveState.timer) clearTimeout(autoSaveState.timer);
+    autoSaveState.timer = setTimeout(() => {
       void saveInspectionProgress(activeInspection, { silent: true })
-        .then(saved => { if (saved) autoSaveStateRef.current.lastSignature = signature; else autoSaveStateRef.current.timer = setTimeout(() => setAutoSaveRetryNonce(value => value + 1), 250); })
+        .then(saved => { if (saved) autoSaveState.lastSignature = signature; else autoSaveState.timer = setTimeout(() => setAutoSaveRetryNonce(value => value + 1), 250); })
         .catch(err => setError(readableError(err, 'Unable to auto-save job progress.')));
     }, 1200);
     return () => {
-      if (autoSaveStateRef.current.timer) clearTimeout(autoSaveStateRef.current.timer);
+      if (autoSaveState.timer) clearTimeout(autoSaveState.timer);
     };
   }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection, completingInspectionId, canManageJobOperations, autoSaveRetryNonce]);
 

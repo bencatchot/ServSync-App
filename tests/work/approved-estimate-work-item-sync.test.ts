@@ -88,12 +88,12 @@ test('field-work autosave retries a skipped overlapping save instead of marking 
     source.indexOf('const finalizeInspection = async'),
   );
   const autoSaveSource = source.slice(
-    source.indexOf('const signature = JSON.stringify({', source.indexOf('const saveInspectionProgress = async')),
+    source.indexOf('const autoSaveState = autoSaveStateRef.current;', source.indexOf('const saveInspectionProgress = async')),
     source.indexOf('const handleInspectionPhotoUpload = async'),
   );
 
   assert.match(saveSource, /contractorActionGuard\.begin\(actionKey\)[\s\S]*return false;/);
   assert.match(saveSource, /await persistInspectionRooms\([\s\S]*return true;/);
-  assert.match(autoSaveSource, /\.then\(saved => \{ if \(saved\) autoSaveStateRef\.current\.lastSignature = signature; else [\s\S]*setAutoSaveRetryNonce/);
+  assert.match(autoSaveSource, /const autoSaveState = autoSaveStateRef\.current;[\s\S]*\.then\(saved => \{ if \(saved\) autoSaveState\.lastSignature = signature; else [\s\S]*setAutoSaveRetryNonce/);
   assert.match(autoSaveSource, /canManageJobOperations, autoSaveRetryNonce\]/);
 });
