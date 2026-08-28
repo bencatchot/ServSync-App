@@ -99,6 +99,18 @@ test('TUT-003 records every approved item through a stable title identity before
   assert.match(workStep, /await waitForEnabled\(saveProgress\)/);
 });
 
+test('human-paced clicks retain cursor movement but re-resolve the action target after UI updates', () => {
+  const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('async function moveAndClick');
+  const end = source.indexOf('async function waitForChecked', start);
+  const clickHelper = source.slice(start, end);
+
+  assert.match(clickHelper, /await moveCursorHuman\(page, x, y, pacing\)/);
+  assert.match(clickHelper, /await wait\(pacing\.settleBeforeClick\)/);
+  assert.match(clickHelper, /await locator\.click\(\)/);
+  assert.doesNotMatch(clickHelper, /page\.mouse\.click/);
+});
+
 test('homeowner Home History scenario is a bounded read-only finalized-report workflow', () => {
   assert.equal(validateScenarioDefinition(homeownerHomeHistoryScenario), homeownerHomeHistoryScenario);
   assert.equal(homeownerHomeHistoryScenario.initialCheckpoint, 'job_completed');
