@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #527 merged; protected TUT-003 guard isolates stale coordinate click
+
+- Merge and deployment: PR #527 merged normally at main commit `4de13e96f054f6b1700f87b5c9dc262169752e38`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.
+- Protected rerun: Exact Demo run `ae5d8b1e-e971-46ee-8ee5-c17a2850fa9d` failed closed immediately after the first approved item because the next human-paced coordinate click did not produce a checked state. The Job remained `scheduled` with one completed and four open work items; no artifact was promoted and no Cedar, Help attachment, approval, publication, or Production mutation occurred.
+- Runtime isolation: PR #527's stable-title addressing and checked-state guard are working as intended. The remaining failure occurs between the deliberate cursor-settling delay and the raw coordinate click: a React re-render can replace or move the checkbox after its bounding box was captured, so the coordinate click can miss even though the stable locator still identifies the correct item.
+- Bounded correction: Human-paced recording keeps the reviewed cursor interpolation and settling delay, but performs the final activation through the live locator's actionability-checked click. This re-resolves the target after intervening UI updates while preserving visible cursor motion. A focused contract rejects a return to raw coordinate activation.
+- Tutorial freshness: `NOT APPLICABLE`. Recorder automation and planning evidence only; TUT-003 remains unpublished and no user-facing app behavior or published guidance changes.
+- Roadmap: FB-040A remains active. Review and merge the actionable-click correction, then rerun TUT-003 through finalized report and Home History before any narration or Help operation.
+
 ## 2026-08-28 - PR #526 merged; protected TUT-003 rerun isolates recorder checkbox identity
 
 - Merge and deployment: PR #526 merged normally at main commit `fce2c7ea1413421fb851d0aead117cc402e793f2`. GitHub/Vercel recorded the durable Demo Production deployment successful at `2026-08-28T14:26:23Z`, and `https://servsync-demo.vercel.app` returned HTTP 200.

@@ -134,7 +134,7 @@ async function moveAndClick(page, locator, pacing) {
   const y = box.y + box.height / 2;
   await moveCursorHuman(page, x, y, pacing);
   await wait(pacing.settleBeforeClick);
-  await page.mouse.click(x, y);
+  await locator.click();
   await wait(pacing.postClick);
 }
 
@@ -144,7 +144,8 @@ async function waitForChecked(locator, expected = true, timeout = 5000) {
     if (await locator.isChecked().catch(() => false) === expected) return;
     await wait(100);
   }
-  throw new Error(`Recorder checkbox did not become ${expected ? 'checked' : 'unchecked'}.`);
+  const label = await locator.getAttribute('aria-label').catch(() => null);
+  throw new Error(`Recorder checkbox${label ? ` "${label}"` : ''} did not become ${expected ? 'checked' : 'unchecked'}.`);
 }
 
 async function waitForEnabled(locator, timeout = 30_000) {

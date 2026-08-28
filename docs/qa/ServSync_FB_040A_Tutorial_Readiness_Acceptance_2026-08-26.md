@@ -124,6 +124,20 @@ Tutorial evidence: TUT-003 remains unpublished, and the correction changes prote
 
 Affected tutorials: None.
 
+### Fourth protected rerun
+
+PR #527 merged normally at main commit `4de13e96f054f6b1700f87b5c9dc262169752e38`. All three automatic deployments completed successfully, and durable Demo returned HTTP 200 before the recorder started.
+
+Exact protected run `ae5d8b1e-e971-46ee-8ee5-c17a2850fa9d` reset and seeded only the registered fixture, authenticated, created the exact Job, and then failed closed at PR #527's new checked-state guard. The first approved item reached **Fixed On Site**/`completed`; the remaining four stayed **Monitor**/`open`, the visit and Job stayed `scheduled`, and no artifact was promoted.
+
+Stable-title lookup identified the correct second checkbox, but the final raw coordinate activation occurred after the human-paced settling delay. An intervening React update can replace or move the checkbox after its bounding box is captured, causing that coordinate click to miss. The bounded correction preserves human cursor interpolation and settling, then activates the re-resolved live locator through Playwright's actionability checks. A focused source contract prevents returning to `page.mouse.click` in the shared human-paced helper.
+
+Tutorial impact for the actionable-click correction: `NOT APPLICABLE`.
+
+Tutorial evidence: The change affects protected recorder activation and planning evidence only. TUT-003 remains unpublished, and no app route, label, control, workflow, role boundary, outcome, or published tutorial changes.
+
+Affected tutorials: None.
+
 ## Tutorial Freshness
 
 Tutorial impact: `UPDATED`.
