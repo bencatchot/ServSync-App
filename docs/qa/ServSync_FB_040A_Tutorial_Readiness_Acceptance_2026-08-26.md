@@ -90,7 +90,11 @@ PR #524 merged normally at main commit `7328548e36881d74e02192b37e45332a12db33f4
 
 The bounded correction synchronizes only the exact Job's `unbilled`, Estimate-derived work items, maps duplicate titles deterministically, preserves existing completion provenance, and leaves drafted/invoiced, unrelated-Job, and simple-task rows untouched. The next acceptance gate is normal review/merge and durable Demo deployment of that correction, followed by a complete protected TUT-003 rerun through finalized report and Home History.
 
-Tutorial impact for this correction: `NONE`. Production Help Studio searches for `complete work`, `approved estimate`, and `contractor.work` returned no walkthrough. Preview of the related published **How to create an estimate**, revision 3, confirmed that its three steps end at Estimate creation and do not cover accepted-Estimate Job completion. TUT-003 remains unpublished.
+Tutorial impact for this correction: `NONE`.
+
+Tutorial evidence: Production Help Studio searches for `complete work`, `approved estimate`, and `contractor.work` returned no walkthrough. Preview of the related published **How to create an estimate**, revision 3, confirmed that its three steps end at Estimate creation and do not cover accepted-Estimate Job completion.
+
+Affected tutorials: None. TUT-003 remains unpublished.
 
 ## Tutorial Freshness
 
