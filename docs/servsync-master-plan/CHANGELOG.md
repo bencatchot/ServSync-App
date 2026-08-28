@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - PR #531 merged; TUT-003 silent source promoted
+
+- Merge and deployment: PR #531 merged normally at main commit `e4c79fcd41d038d9cb360c5b600f9e40ffa768a0`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before recording.
+- Protected source: Exact Demo run `192c59a8-a3ac-42ee-b21c-d7474570bdac` passed the full accepted Estimate -> Job -> five completed work items -> completed visit/Job -> finalized report -> Home History workflow at exact `home_history_updated`, with one report document, one Home History row, one notification, one registered private report lineage, and no external effects.
+- Durable package: A validated 59.28-second 1440×900 H.264 MP4/WebM package was promoted from exact merged source. Technical, final-scene, browser-error, and sensitive-data checks passed; sampled-frame review confirms every material workflow scene and the final **Filed to Documents** state.
+- Help handoff: Live Production Help Studio inspection found that its ordinary New recording menu omits the already supported `contractor-complete-work` scenario. The bounded follow-up exposes that scenario and preserves a focused menu regression before the TUT-003 request and Cedar package are created.
+- Tutorial impact: `NOT APPLICABLE` for the menu correction. It changes internal Help authoring only; TUT-003 remains unpublished, and no Cedar call, Help attachment, approval, or publication has occurred.
+- Roadmap: FB-040A remains active. Complete the menu correction, create the TUT-003 Help request, prepare one narrated/captioned package, and stop for normal-speed owner review before approval or publication.
+
 ## 2026-08-28 - PR #530 merged; repeated complete TUT-003 run establishes duration sanity bound
 
 - Merge and deployment: PR #530 merged normally at main commit `0d920af2cbc18f81d88f62947747b0cf9cdc26b7`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before the protected rerun.

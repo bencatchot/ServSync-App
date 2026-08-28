@@ -1,12 +1,12 @@
 # ServSync FB-040A Tutorial Readiness Acceptance
 
-Status: Corrected exact-label TUT-001 published and live-verified; reusable source PR #523 merged
+Status: TUT-001 published and live-verified; TUT-003 validated silent source promoted
 
-Date: 2026-08-27
+Date: 2026-08-28
 
-Branch: `codex/fb-040a-tut-001-narrated-replacement`
+Branch: `codex/fb-040a-tut-003-help-request`
 
-Base: merged PR #522 main commit `cae7b0bf061e3eee25532f648754b1e23d98ed13`
+Base: merged PR #531 main commit `e4c79fcd41d038d9cb360c5b600f9e40ffa768a0`
 
 ## Accepted source scope
 
@@ -179,6 +179,22 @@ Tutorial impact for the duration sanity-bound correction: `NOT APPLICABLE`.
 Tutorial evidence: The change affects protected recorder scenario metadata, its regression expectation, and planning evidence only. TUT-003 remains unpublished, and no app route, label, control, workflow, role boundary, outcome, or published tutorial changes.
 
 Affected tutorials: None.
+
+### Eighth protected rerun and durable source promotion
+
+PR #531 merged normally at main commit `e4c79fcd41d038d9cb360c5b600f9e40ffa768a0`. Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and `https://servsync-demo.vercel.app` returned HTTP 200 before the protected recorder started.
+
+Exact protected Demo run `192c59a8-a3ac-42ee-b21c-d7474570bdac` completed and verified the full accepted Estimate -> Job -> five completed work items -> completed visit/Job -> finalized report -> Home History workflow at exact checkpoint `home_history_updated`. The final state contains one report document, one Home History row, one report notification, and one registered private report lineage; no external effects were triggered.
+
+The recorder promoted a 59.28-second, 1440×900, 25 fps H.264 MP4/WebM package from exact source `e4c79fcd41d038d9cb360c5b600f9e40ffa768a0`. Technical validation, final-scene proof, browser-error checks, and sensitive-visible-text checks passed. The durable MP4 is `contractor-complete-work/servsync-contractor-complete-work-v1-2026-08-28T17-20-38-747Z.mp4` with SHA-256 `28ab72c63c7c1423c5a5c1ec139a44d4b86def38a2e7db81df92a81c73beffe8`; the matching WebM SHA-256 is `ce14740dfd0a4cd8836b802955c8d7628e0eb58c166378b381139d1e74b1f107`.
+
+Sampled-frame review confirms the accepted Estimate, Create Job handoff, approved work items, saved completion note, all five completed items, Job completion, report finalization, and **Filed to Documents** outcome are visible and legible. The silent package is source evidence only: no Cedar request, Production Help recording request, media attachment, approval, or publication occurred.
+
+Live Production Help Studio inspection found the next bounded blocker: the ordinary recording-request form omits `contractor-complete-work` even though the protected recorder allowlist supports it. The current narrow follow-up adds that existing scenario to the admin menu and a focused UI contract before creating the TUT-003 request.
+
+Tutorial impact for the Help Studio menu correction: `NOT APPLICABLE`.
+
+Tutorial evidence: The change exposes an existing recorder scenario only to the internal Help Studio authoring form. It does not change a contractor/homeowner route, label, workflow, role boundary, outcome, or published tutorial. TUT-003 remains unpublished.
 
 ## Tutorial Freshness
 
