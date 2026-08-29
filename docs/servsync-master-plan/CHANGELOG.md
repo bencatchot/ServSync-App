@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - TUT-003 corrected package attached and ready for owner review
+
+- Source closeout: PR #533 merged normally at `3618e177f59eca20d50ccb011c07ce3868e5eb9b`; Production, durable Demo, and Stripe Sandbox automatic deployments passed. The merged provider-free retiming command preserves exact one-request Cedar/source-audio provenance and rejects non-pause boundaries, overlap, overrun, and mismatched Demo media.
+- Authorized attachment: The owner explicitly approved attaching only the corrected TUT-003 MP4, poster, English WebVTT, and metadata to existing Production Help request `708a66db-0c34-461f-a512-3ba0dccbc0b2`. The exact package passed client validation and moved from **Requested** to **Ready for review**. Private Help media increased from 12 to 14 assets and storage from 9.4 MB to 12.3 MB, matching one video plus one poster; captions/transcript metadata remain on the job.
+- Playback verification: Secure Production review loads the exact 58.84-second 1440×900 video with an English caption track, the complete five-line transcript, and the exact disclosure **AI-generated voiceover using OpenAI's Cedar voice.** Local cue timing, source pauses, checksums, sampled start/end frames, visible product labels, final filed state, and sensitive-data evidence already pass.
+- Protected boundary: No recording approval, rerecord return, walkthrough revision, publication, unpublication, business-data mutation, provider request, secret/environment change, or schema/permission change occurred.
+- Tutorial impact: `NOT APPLICABLE` for this documentation-only roadmap closeout. It records the already authorized internal Help attachment and does not change a contractor/homeowner screen or published walkthrough.
+- Roadmap: TUT-003 now awaits the owner's complete `1x` playback with captions plus sound-off comprehension review and explicit **Approve narration + captions** or **Return for rerecord** decision. Publication and role-aware contextual verification remain later, separate protected gates.
+
 ## 2026-08-28 - TUT-003 Cedar package corrected with scene-anchored timing
 
 - Protected request and source: Production Help request `708a66db-0c34-461f-a512-3ba0dccbc0b2` is bound to exact merged source `e5ff54c9032d5f272368d2d6da2087e190790d68`. Its 58.84-second 1440×900 protected Demo package passed the accepted Estimate -> Job -> completed work/visit/Job -> finalized report -> Documents/Home History workflow, browser-error, sensitive-data, codec, and checksum gates.
