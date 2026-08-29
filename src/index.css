@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.help-caption-video::cue {
+  font-size: 1.25rem;
+}
+
 :root {
   color: #02132D;
   background: #F7F9FC;

@@ -81,7 +81,7 @@ export function HelpWalkthroughDialog({
           <p className="text-sm leading-6 text-slate-600">{walkthrough.summary}</p>
           <div className="aspect-video w-full overflow-hidden rounded-md bg-slate-950">
             {url ? (
-              <video className="h-full w-full" src={url} controls playsInline preload="metadata" aria-label={walkthrough.title}>
+              <video className="help-caption-video h-full w-full" src={url} controls playsInline preload="metadata" aria-label={walkthrough.title}>
                 {captionUrl && <track kind="captions" src={captionUrl} srcLang={captionTrack?.captionLanguage ?? 'en'} label="English" default />}
               </video>
             ) : error ? (

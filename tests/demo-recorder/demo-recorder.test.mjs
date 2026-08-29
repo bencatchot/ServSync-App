@@ -79,6 +79,7 @@ test('TUT-003 contractor completion scenario preserves accepted Estimate through
     ['accepted-estimate', 'job-work', 'job-complete', 'report-finalized'],
   );
   assert.deepEqual(contractorCompleteWorkScenario.expectedDurationSeconds, { min: 50, max: 115 });
+  assert.equal(contractorCompleteWorkScenario.showSceneCallouts, false);
   assert.match(contractorCompleteWorkScenario.fixturePolicy, /exact UI-created Job and descendants/i);
   assert.match(contractorCompleteWorkScenario.scenes[0].caption, /Create the Job from the accepted Estimate/);
   assert.match(contractorCompleteWorkScenario.scenes[3].caption, /Finalize the report/);
@@ -88,15 +89,34 @@ test('TUT-003 contractor completion scenario preserves accepted Estimate through
 test('TUT-003 records every approved item through a stable title identity before saving', () => {
   const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
   const flowStart = source.indexOf('async function recordContractorCompleteWork');
-  const start = source.indexOf("await setCaption(page, scenario.scenes[1].caption);", flowStart);
-  const end = source.indexOf("await setCaption(page, scenario.scenes[2].caption);", start);
+  const start = source.indexOf('await setScenarioCaption(page, scenario, 1);', flowStart);
+  const end = source.indexOf('await setScenarioCaption(page, scenario, 2);', start);
   const workStep = source.slice(start, end);
 
   assert.match(workStep, /getAttribute\('data-work-title'\)/);
   assert.match(workStep, /getByRole\('checkbox', \{ name: `Complete approved work: \$\{title\}`, exact: true \}\)/);
   assert.match(workStep, /await waitForChecked\(checkbox\)/);
   assert.match(workStep, /inputs\.some\(input => !input\.checked\)/);
+  assert.match(workStep, /originalWorkNotes\.includes\(scenario\.estimate\.scope\)/);
+  assert.match(workStep, /await moveAndAppend\(page, workNotes, scenario\.work\.completionNote, pacing\)/);
   assert.match(workStep, /await waitForEnabled\(saveProgress\)/);
+});
+
+test('TUT-003 keeps one caption system and appends the completion note without clearing accepted scope', () => {
+  const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
+  const flowStart = source.indexOf('async function recordContractorCompleteWork');
+  const flowEnd = source.indexOf('async function recordHomeownerHomeHistory', flowStart);
+  const flow = source.slice(flowStart, flowEnd);
+  const appendStart = source.indexOf('async function moveAndAppend');
+  const appendEnd = source.indexOf('async function setScenarioCaption', appendStart);
+  const appendHelper = source.slice(appendStart, appendEnd);
+
+  assert.match(flow, /setScenarioCaption\(page, scenario, 0\)/);
+  assert.doesNotMatch(flow, /setCaption\(page, scenario\.scenes/);
+  assert.match(appendHelper, /const existingValue = await locator\.inputValue\(\)/);
+  assert.match(appendHelper, /setSelectionRange\(element\.value\.length, element\.value\.length\)/);
+  assert.match(appendHelper, /nextValue\.startsWith\(existingValue\)/);
+  assert.doesNotMatch(appendHelper, /Meta\+A|Control\+A|Backspace/);
 });
 
 test('human-paced clicks retain cursor movement but re-resolve the action target after UI updates', () => {
@@ -114,7 +134,7 @@ test('human-paced clicks retain cursor movement but re-resolve the action target
 test('TUT-003 proves transient finalization feedback once and keeps the final scene assertion persistent', () => {
   const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
   const flowStart = source.indexOf('async function recordContractorCompleteWork');
-  const start = source.indexOf("await setCaption(page, scenario.scenes[3].caption);", flowStart);
+  const start = source.indexOf('await setScenarioCaption(page, scenario, 3);', flowStart);
   const end = source.indexOf('const sensitiveIssues = scanVisibleTextForSensitiveData', start);
   const finalStep = source.slice(start, end);
 

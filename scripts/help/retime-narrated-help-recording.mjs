@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { resolveMediaTools, probeMedia } from '../demo/recorder/output-library.mjs';
 import {
+  HELP_CAPTION_CUE_SETTINGS,
+  HELP_CAPTION_PLACEMENT_VERSION,
   HELP_NARRATION_DISCLOSURE,
   HELP_NARRATION_MODEL,
   HELP_NARRATION_PROVIDER,
@@ -46,7 +48,7 @@ function secondsFromVtt(value) {
 
 export function parseWebVttCues(value) {
   if (typeof value !== 'string' || !value.startsWith('WEBVTT')) throw new Error('The source narration has no valid WebVTT transcript.');
-  const cues = [...value.matchAll(/(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})\n([^\n]+)(?:\n|$)/g)]
+  const cues = [...value.matchAll(/(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})(?: [^\n]+)?\n([^\n]+)(?:\n|$)/g)]
     .map(match => ({ start: secondsFromVtt(match[1]), end: secondsFromVtt(match[2]), text: match[3].trim() }));
   if (cues.length < 1 || cues.some(cue => !cue.text || cue.end <= cue.start)) throw new Error('The source narration WebVTT cues are invalid.');
   return cues;
@@ -67,7 +69,7 @@ export function buildAlignedWebVtt(cues) {
   if (!Array.isArray(cues) || cues.length < 1 || cues.some(cue => !cue.text || cue.end <= cue.start)) {
     throw new Error('Aligned captions require ordered text cues with positive durations.');
   }
-  return `WEBVTT\n\n${cues.map(cue => `${formatVttTime(cue.start)} --> ${formatVttTime(cue.end)}\n${cue.text}`).join('\n\n')}\n`;
+  return `WEBVTT\n\n${cues.map(cue => `${formatVttTime(cue.start)} --> ${formatVttTime(cue.end)} ${HELP_CAPTION_CUE_SETTINGS}\n${cue.text}`).join('\n\n')}\n`;
 }
 
 function runFfmpeg(ffmpegPath, args, label) {
@@ -288,6 +290,8 @@ export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), 
       narration_source_manifest_sha256: sourceManifestSha,
       captions_filename: captionsFilename,
       captions_sha256: captionsSha256,
+      caption_placement_version: HELP_CAPTION_PLACEMENT_VERSION,
+      caption_cue_settings: HELP_CAPTION_CUE_SETTINGS,
       captions_vtt: captionsVtt,
       generated_at: new Date().toISOString(),
     };
