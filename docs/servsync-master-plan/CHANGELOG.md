@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-29 - Corrected TUT-003 narration and captions approved
+
+- Owner decision: The owner approved Production replacement request `41efd0eb-8789-4419-b85b-4240272cd0ff` after reviewing **How to complete work and save the service record**. Help Studio now marks the request **Approved**, exposes **Publish for Help**, and holds walkthrough revision 1 in **Needs Review**.
+- Preserved evidence: Rejected request `708a66db-0c34-461f-a512-3ba0dccbc0b2` remains **Needs rerecord** with the duplicate-caption, obstructive-caption, and misleading Work Notes findings intact. The approved replacement remains the exact 57.32-second truthful package recorded in the preceding closeout.
+- Protected boundary: No publication, contextual rollout, walkthrough unpublication, business-data mutation, provider request, secret/environment change, schema/permission change, merge, or manual deployment occurred.
+- Tutorial impact: `NOT APPLICABLE` for published guidance. TUT-003 is approved internally but remains unpublished.
+- Roadmap: FB-040A remains active. Next: review and merge PR #536, then separately authorize TUT-003 publication and complete role-aware contextual verification before starting TUT-004.
+
 ## 2026-08-29 - Corrected TUT-003 replacement attached for owner review
 
 - Merge closeout: PR #535 merged normally at main commit `43f921f754dacca821160137846b677e254a4eba`; Production, durable Demo, and Stripe Sandbox automatic deployments passed.
