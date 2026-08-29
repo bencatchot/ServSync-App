@@ -4,6 +4,16 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-28 - TUT-003 Cedar package corrected with scene-anchored timing
+
+- Protected request and source: Production Help request `708a66db-0c34-461f-a512-3ba0dccbc0b2` is bound to exact merged source `e5ff54c9032d5f272368d2d6da2087e190790d68`. Its 58.84-second 1440×900 protected Demo package passed the accepted Estimate -> Job -> completed work/visit/Job -> finalized report -> Documents/Home History workflow, browser-error, sensitive-data, codec, and checksum gates.
+- Provider boundary: One explicitly approved restricted temporary key made exactly one `gpt-4o-mini-tts` Cedar request for the five approved talking points. The key is revoked and exact-name search across all statuses returns no result. No credential entered ServSync, Vercel, Supabase, repository files, or media metadata.
+- Review finding: The first narrated derivative played all 28.704 seconds continuously from 0.75 seconds. Although technically valid, it failed product-truth synchronization because Complete Job, Finalize Report, and Home History narration preceded the matching screens. It was not attached, approved, or published.
+- Corrected package: A provider-free scene-anchored derivative reuses the immutable Cedar source audio and places the five spoken/caption cues at 2.0, 10.2, 37.45, 43.0, and 48.0 seconds. Narration ends at 52.937 seconds with a 5.903-second final hold. H.264/AAC 1440×900 media, WebVTT, transcript, one-request/source-audio provenance, pause boundaries, checksums, sampled cue frames, visible labels, and final filed-state evidence pass.
+- Safeguard: The reusable retiming command accepts only a matching validated Demo silent source and one-request Cedar package, requires each manual source boundary to land inside a detected audio pause, rejects overlapping or overlong placements, records exact source/scene timing provenance, needs no provider credential, and makes no provider request.
+- Tutorial impact: `NOT APPLICABLE`. This branch changes internal Help media preparation and roadmap evidence only; no contractor/homeowner app screen or currently published walkthrough changes.
+- Roadmap: Review and merge the fail-closed retiming safeguard, then separately authorize attachment of the exact corrected package to the existing Production request. Normal-speed owner approval/rerecord and publication remain later, separate protected gates.
+
 ## 2026-08-28 - PR #531 merged; TUT-003 silent source promoted
 
 - Merge and deployment: PR #531 merged normally at main commit `e4c79fcd41d038d9cb360c5b600f9e40ffa768a0`; Production, durable Demo, and Stripe Sandbox automatic deployments completed successfully, and durable Demo returned HTTP 200 before recording.

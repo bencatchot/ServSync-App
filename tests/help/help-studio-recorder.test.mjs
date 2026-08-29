@@ -10,6 +10,12 @@ import {
   buildWebVtt,
   narrationScriptFromSpec,
 } from '../../scripts/help/prepare-narrated-help-recording.mjs';
+import {
+  buildAlignedWebVtt,
+  buildSceneAlignment,
+  parseSecondsOption,
+  parseWebVttCues,
+} from '../../scripts/help/retime-narrated-help-recording.mjs';
 
 const validSpec = {
   schema_version: 1,
@@ -116,4 +122,41 @@ test('narration provider integration makes one Cedar speech request and never pe
   assert.match(source, /source_silent_sha256/);
   assert.match(source, /captions_vtt/);
   assert.doesNotMatch(source, /["'](?:openai_)?api_key["']\s*:|writeFile\([^\n]*OPENAI_API_KEY/i);
+});
+
+test('scene-aligned Help retiming anchors existing narration cues without another provider request', () => {
+  const sourceCues = parseWebVttCues('WEBVTT\n\n00:00:00.750 --> 00:00:03.000\nOpen the Estimate.\n\n00:00:03.160 --> 00:00:06.000\nComplete the Job.\n');
+  const segments = buildSceneAlignment({
+    cues: sourceCues,
+    sourceBoundaries: [3.1],
+    cueStarts: [2, 10],
+    silences: [{ start: 3, end: 3.2 }, { start: 5.9, end: 6 }],
+    audioDurationSeconds: 6,
+    videoDurationSeconds: 20,
+  });
+  assert.deepEqual(segments.map(segment => Number(segment.cueStart.toFixed(1))), [2, 10]);
+  assert.deepEqual(segments.map(segment => Number(segment.cueEnd.toFixed(1))), [5, 12.7]);
+  assert.match(buildAlignedWebVtt(segments.map(segment => ({ text: segment.text, start: segment.cueStart, end: segment.cueEnd }))), /00:00:10\.000 --> 00:00:12\.700\nComplete the Job\./);
+});
+
+test('scene-aligned Help retiming rejects guessed boundaries and overlapping output', () => {
+  const cues = [{ text: 'One.', start: 0, end: 2 }, { text: 'Two.', start: 2.2, end: 4 }];
+  assert.deepEqual(parseSecondsOption('1.25, 8', 2, '--cue-starts'), [1.25, 8]);
+  assert.throws(() => parseSecondsOption('8, 1.25', 2, '--cue-starts'), /strictly increasing/);
+  assert.throws(() => buildSceneAlignment({
+    cues, sourceBoundaries: [2.1], cueStarts: [1, 5], silences: [{ start: 2.2, end: 2.4 }],
+    audioDurationSeconds: 4, videoDurationSeconds: 12,
+  }), /detected narration pause/);
+  assert.throws(() => buildSceneAlignment({
+    cues, sourceBoundaries: [2.3], cueStarts: [1, 2], silences: [{ start: 2.2, end: 2.4 }],
+    audioDurationSeconds: 4, videoDurationSeconds: 12,
+  }), /overlaps/);
+});
+
+test('scene-aligned Help retiming source never calls a provider or reads an API key', async () => {
+  const source = await readFile(new URL('../../scripts/help/retime-narrated-help-recording.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /api\.openai\.com|OPENAI_API_KEY|audio\/speech/);
+  assert.match(source, /providerRequestMadeByThisCommand: false/);
+  assert.match(source, /narration_provider_request_count: 1/);
+  assert.match(source, /narration_source_audio_sha256/);
 });
