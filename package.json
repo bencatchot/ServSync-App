@@ -18,6 +18,7 @@
     "demo:qa:matrix": "node scripts/demo/validate-demo-checkpoint-matrix.mjs",
     "help:record": "node scripts/help/run-help-studio-recording.mjs",
     "help:narrate": "node scripts/help/prepare-narrated-help-recording.mjs",
+    "help:retime": "node scripts/help/retime-narrated-help-recording.mjs",
     "demo:approve-marketing": "node scripts/demo/approve-marketing-recording.mjs",
     "qa": "npm run typecheck && npm run build",
     "qa:e2e": "npm run typecheck && npm run build && npm run test:e2e",
