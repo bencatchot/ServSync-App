@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { runRecorder } from '../demo/record-demo.mjs';
@@ -11,6 +11,8 @@ import { resolveMediaTools, probeMedia } from '../demo/recorder/output-library.m
 import { HUMAN_PACED_PROFILE_NAME } from '../demo/recorder/lib.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHA256 = /^[0-9a-f]{64}$/;
+const COMMIT = /^[0-9a-f]{40}$/;
 const SAFE_SCENARIOS = new Set([
   'homeowner-service-request',
   'contractor-service-request-intake',
@@ -43,6 +45,46 @@ export function assertSafeHelpRecordingSpec(spec) {
   return spec;
 }
 
+export function assertValidatedDemoRecordingMetadata(metadata, spec) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)
+    || metadata.schema_version !== 2
+    || metadata.scenario !== spec.scenario
+    || metadata.pacing_profile !== HUMAN_PACED_PROFILE_NAME
+    || metadata.environment !== 'Demo'
+    || metadata.validation_status !== 'passed'
+    || metadata.sensitive_data_check !== 'passed'
+    || metadata.canonical_output_provenance !== 'validated_servsync_demo_recorder'
+    || !COMMIT.test(String(metadata.source_git_commit || ''))
+    || !SHA256.test(String(metadata.mp4_sha256 || ''))
+    || !SHA256.test(String(metadata.webm_sha256 || ''))
+    || basename(String(metadata.mp4_filename || '')) !== metadata.mp4_filename
+    || basename(String(metadata.webm_filename || '')) !== metadata.webm_filename) {
+    throw new Error('The supplied source is not the matching validated durable Demo recording.');
+  }
+  return metadata;
+}
+
+async function validatedDemoRecordingResult(metadataPath, spec) {
+  const resolvedMetadataPath = resolve(metadataPath);
+  const metadata = assertValidatedDemoRecordingMetadata(
+    JSON.parse(await readFile(resolvedMetadataPath, 'utf8')),
+    spec,
+  );
+  const durableMp4 = join(dirname(resolvedMetadataPath), metadata.mp4_filename);
+  const durableWebm = join(dirname(resolvedMetadataPath), metadata.webm_filename);
+  const [mp4Sha256, webmSha256] = await Promise.all([sha256File(durableMp4), sha256File(durableWebm)]);
+  if (mp4Sha256 !== metadata.mp4_sha256 || webmSha256 !== metadata.webm_sha256) {
+    throw new Error('The validated durable Demo media no longer matches its immutable checksums.');
+  }
+  return {
+    success: true,
+    durablePromotion: 'passed',
+    durableMp4,
+    durableWebm,
+    durableMetadata: resolvedMetadataPath,
+  };
+}
+
 function createPoster(mp4Path, destination, ffmpegPath, durationSeconds) {
   const seek = Math.max(1, Math.min(durationSeconds * 0.72, durationSeconds - 1));
   const result = spawnSync(ffmpegPath, [
@@ -54,12 +96,20 @@ function createPoster(mp4Path, destination, ffmpegPath, durationSeconds) {
 
 export async function runHelpStudioRecording(argv = process.argv.slice(2), env = process.env) {
   const [specPath, ...options] = argv;
-  if (!specPath) throw new Error('Usage: npm run help:record -- <recording-spec.json> [--headed]');
-  if (options.some(option => option !== '--headed')) throw new Error('Unsupported Help Studio recording option.');
+  if (!specPath) throw new Error('Usage: npm run help:record -- <recording-spec.json> [--headed | --validated-demo-metadata=<path>]');
+  const validatedMetadataOption = options.find(option => option.startsWith('--validated-demo-metadata='));
+  if (options.some(option => option !== '--headed' && !option.startsWith('--validated-demo-metadata='))
+    || (options.includes('--headed') && validatedMetadataOption)
+    || options.filter(option => option.startsWith('--validated-demo-metadata=')).length > 1
+    || validatedMetadataOption === '--validated-demo-metadata=') {
+    throw new Error('Unsupported Help Studio recording option.');
+  }
   const spec = assertSafeHelpRecordingSpec(JSON.parse(await readFile(resolve(specPath), 'utf8')));
   const recorderArgs = [spec.scenario, '--pacing=human-paced'];
   if (options.includes('--headed')) recorderArgs.push('--headed');
-  const result = await runRecorder(recorderArgs, env);
+  const result = validatedMetadataOption
+    ? await validatedDemoRecordingResult(validatedMetadataOption.slice('--validated-demo-metadata='.length), spec)
+    : await runRecorder(recorderArgs, env);
   if (!result.success || result.durablePromotion !== 'passed') throw new Error('Recorder did not produce a validated canonical package.');
 
   const durableMetadata = JSON.parse(await readFile(result.durableMetadata, 'utf8'));

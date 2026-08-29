@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { assertSafeHelpRecordingSpec } from '../../scripts/help/run-help-studio-recording.mjs';
+import {
+  assertSafeHelpRecordingSpec,
+  assertValidatedDemoRecordingMetadata,
+} from '../../scripts/help/run-help-studio-recording.mjs';
 import {
   HELP_CAPTION_CUE_SETTINGS,
   HELP_CAPTION_PLACEMENT_VERSION,
@@ -15,6 +18,7 @@ import {
 import {
   buildAlignedWebVtt,
   buildSceneAlignment,
+  buildProviderFreeReuseManifestBase,
   parseSecondsOption,
   parseWebVttCues,
 } from '../../scripts/help/retime-narrated-help-recording.mjs';
@@ -73,6 +77,26 @@ test('Help Studio package keeps WebM provenance and prepares MP4, poster, and sa
   assert.match(source, /mp4_sha256/);
   assert.match(source, /poster_sha256/);
   assert.doesNotMatch(source, /createClient|supabase\.co|\/v1\/audio|\/videos/i);
+});
+
+test('Help Studio can package an exact checksum-bound durable Demo source without rerunning it', () => {
+  const metadata = {
+    schema_version: 2,
+    scenario: validSpec.scenario,
+    pacing_profile: validSpec.pacing_profile,
+    environment: 'Demo',
+    validation_status: 'passed',
+    sensitive_data_check: 'passed',
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
+    source_git_commit: 'a'.repeat(40),
+    mp4_filename: 'source.mp4',
+    mp4_sha256: 'b'.repeat(64),
+    webm_filename: 'source.webm',
+    webm_sha256: 'c'.repeat(64),
+  };
+  assert.equal(assertValidatedDemoRecordingMetadata(metadata, validSpec), metadata);
+  assert.throws(() => assertValidatedDemoRecordingMetadata({ ...metadata, environment: 'Production' }, validSpec), /validated durable Demo/);
+  assert.throws(() => assertValidatedDemoRecordingMetadata({ ...metadata, mp4_filename: '../source.mp4' }, validSpec), /validated durable Demo/);
 });
 
 test('narrated Help packaging preserves the exact Cedar product decision and transcript', () => {
@@ -157,6 +181,47 @@ test('scene-aligned Help retiming rejects guessed boundaries and overlapping out
     cues, sourceBoundaries: [2.3], cueStarts: [1, 2], silences: [{ start: 2.2, end: 2.4 }],
     audioDurationSeconds: 4, videoDurationSeconds: 12,
   }), /overlaps/);
+});
+
+test('scene-aligned Help retiming reuses immutable Cedar audio only for an exact replacement request', () => {
+  const narrated = {
+    recording_job_id: validSpec.recording_job_id,
+    scenario: validSpec.scenario,
+    narration_script: 'Open the request.',
+  };
+  const targetSpec = {
+    ...validSpec,
+    recording_job_id: '40000000-0000-4000-8000-000000000002',
+    narration_mode: 'ai',
+    talking_points: ['Open the request.'],
+  };
+  const silent = {
+    schema_version: 1,
+    recording_job_id: targetSpec.recording_job_id,
+    scenario: targetSpec.scenario,
+    pacing_profile: targetSpec.pacing_profile,
+    source_git_commit: 'd'.repeat(40),
+    mp4_sha256: 'e'.repeat(64),
+    poster_sha256: 'f'.repeat(64),
+    validation_status: 'passed',
+    sensitive_data_check: 'passed',
+    canonical_output_provenance: 'validated_servsync_demo_recorder',
+    environment: 'Demo',
+  };
+  assert.deepEqual(buildProviderFreeReuseManifestBase(narrated, silent, targetSpec), {
+    ...narrated,
+    recording_job_id: targetSpec.recording_job_id,
+    title: targetSpec.title,
+    purpose: targetSpec.purpose,
+    source_git_commit: silent.source_git_commit,
+    source_silent_sha256: silent.mp4_sha256,
+    source_silent_manifest_filename: null,
+    narration_reused_from_recording_job_id: narrated.recording_job_id,
+  });
+  assert.throws(() => buildProviderFreeReuseManifestBase(narrated, silent, {
+    ...targetSpec,
+    talking_points: ['Changed narration.'],
+  }), /changed the immutable narration script/);
 });
 
 test('scene-aligned Help retiming source never calls a provider or reads an API key', async () => {
