@@ -20,6 +20,7 @@ export const contractorCompleteWorkScenario = Object.freeze({
   viewport: Object.freeze({ width: 1440, height: 900 }),
   expectedDurationSeconds: Object.freeze({ min: 50, max: 115 }),
   outputBaseName: 'servsync-contractor-complete-work-v1',
+  showSceneCallouts: false,
   identities: Object.freeze({
     homeowner: Object.freeze({ role: 'homeowner', label: personas.homeowner.fullName }),
     contractor: Object.freeze({ role: 'contractor', label: personas.contractor.businessName }),
@@ -39,7 +40,7 @@ export const contractorCompleteWorkScenario = Object.freeze({
     line: Object.freeze({ ...estimateFixture.lines[0] }),
   }),
   work: Object.freeze({
-    completionNote: 'Replaced the leaking water heater, tested the final connections, and recorded the completed service visit.',
+    completionNote: 'Completion note: Replaced the leaking water heater, tested the final connections, and recorded the completed service visit.',
   }),
   scenes: Object.freeze([
     Object.freeze({

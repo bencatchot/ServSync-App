@@ -172,6 +172,36 @@ async function moveAndType(page, locator, value, pacing) {
   await wait(pacing.postClick);
 }
 
+async function moveAndAppend(page, locator, value, pacing) {
+  await locator.scrollIntoViewIfNeeded();
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('Recorder text target has no visible bounding box.');
+  const existingValue = await locator.inputValue();
+  const x = box.x + Math.min(box.width * 0.35, 220);
+  const y = box.y + box.height / 2;
+  await moveCursorHuman(page, x, y, pacing);
+  await wait(pacing.settleBeforeClick);
+  await page.mouse.click(x, y);
+  await locator.evaluate((element) => {
+    element.setSelectionRange(element.value.length, element.value.length);
+  });
+  if (existingValue.trim()) {
+    await locator.press('Enter');
+    await locator.press('Enter');
+  }
+  await locator.pressSequentially(value, { delay: pacing.typing });
+  const nextValue = await locator.inputValue();
+  if (!nextValue.startsWith(existingValue) || !nextValue.includes(value)) {
+    throw new Error('Recorder append did not preserve the existing text before adding the new note.');
+  }
+  await wait(pacing.postClick);
+}
+
+async function setScenarioCaption(page, scenario, sceneIndex) {
+  if (scenario.showSceneCallouts === false) return;
+  await setCaption(page, scenario.scenes[sceneIndex].caption);
+}
+
 async function moveCursorToRest(page, pacing) {
   const viewport = page.viewportSize() || { width: 1440, height: 900 };
   await moveCursorHuman(page, viewport.width * 0.88, viewport.height * 0.86, pacing);
@@ -778,7 +808,7 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
     await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
     const acceptedEstimateCard = await openAcceptedEstimate(page);
     await installRecorderOverlays(page);
-    await setCaption(page, scenario.scenes[0].caption);
+    await setScenarioCaption(page, scenario, 0);
     await removeFreezeFrame(page);
     await wait(pacing.initialHold);
 
@@ -792,7 +822,7 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
     }
     jobAdopted = true;
 
-    await setCaption(page, scenario.scenes[1].caption);
+    await setScenarioCaption(page, scenario, 1);
     const approvedWorkRows = page.getByTestId('contractor-approved-work-item');
     const workItemCount = await approvedWorkRows.count();
     if (workItemCount < 1) throw new Error('TUT-003 Job did not expose Estimate-derived work items.');
@@ -814,13 +844,17 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
       throw new Error('TUT-003 refused to save because an approved work item remained unchecked.');
     }
     const workNotes = page.getByPlaceholder('Describe work performed, materials used, open follow-up, or completion notes...');
-    await moveAndType(page, workNotes, scenario.work.completionNote, pacing);
+    const originalWorkNotes = await workNotes.inputValue();
+    if (!originalWorkNotes.includes(scenario.estimate.scope)) {
+      throw new Error('TUT-003 Work Notes did not preserve the accepted Estimate scope before completion-note entry.');
+    }
+    await moveAndAppend(page, workNotes, scenario.work.completionNote, pacing);
     const saveProgress = page.getByTestId('contractor-save-job-progress');
     await waitForEnabled(saveProgress);
     await moveAndClick(page, saveProgress, pacing);
     await page.getByText(/^Progress saved\.$/i).waitFor({ state: 'visible', timeout: 30_000 });
 
-    await setCaption(page, scenario.scenes[2].caption);
+    await setScenarioCaption(page, scenario, 2);
     jobCompletionStarted = true;
     await moveAndClick(page, page.getByTestId('contractor-complete-job'), pacing);
     await page.getByTestId('contractor-complete-job-feedback').waitFor({ state: 'visible', timeout: 30_000 });
@@ -830,7 +864,7 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
     }
     jobCompletionAdopted = true;
 
-    await setCaption(page, scenario.scenes[3].caption);
+    await setScenarioCaption(page, scenario, 3);
     await page.getByTestId('simple-job-report-panel').waitFor({ state: 'visible', timeout: 30_000 });
     reportFinalizationStarted = true;
     page.once('dialog', (dialog) => dialog.accept());
