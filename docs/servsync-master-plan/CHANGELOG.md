@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-29 - PR #534 merged; truthful TUT-003 Demo source validated
+
+- Merge and deployment: The owner approved PR #534, which merged normally at main commit `9dfff32a940e9a3b1b396253cf3a38eb8dd92c2f`. Production, durable Demo, and Stripe Sandbox automatic deployments succeeded; canonical durable Demo resolves to exact deployment `dpl_3whkb5hHsZzoHDBHXPnZvzY5i5xV`.
+- Protected rerecord: The exact-commit `contractor-complete-work` Demo run passed the accepted Estimate -> Job -> completed work/visit/Job -> finalized report -> Home History workflow at `home_history_updated`. It promoted a 57.32-second 1440×900 H.264 MP4/WebM package; MP4 SHA-256 is `635e8dbed48e70746d5bbc2d87874b16db8f2d5c211ac96dc9af28057dab0ee6`. Browser-error and sensitive-data checks passed.
+- Product-truth review: Full-timeline review confirms the optional recorder callouts are absent, so the later native captions will be the only caption layer. Focused frame review confirms the accepted Estimate scope remains visible before, during, and after the Work Notes click while the labeled completion note is appended. The completed service record ends at **Filed to Documents**.
+- Protected boundary: No new provider request, Production Help return, replacement request, media attachment, recording approval, walkthrough revision, publication, Production business-data mutation, environment/secret change, or schema/permission change occurred. Existing Production request `708a66db-0c34-461f-a512-3ba0dccbc0b2` remains rejected evidence and must not be approved or published.
+- Tutorial impact: `NOT APPLICABLE`. This closeout records a protected Demo source and roadmap status; it does not change a contractor/homeowner screen or a published walkthrough.
+- Roadmap: FB-040A remains active. The next protected assignment is to return the rejected Production request, create its replacement, provider-free align the existing Cedar audio and compact top-safe captions to the fresh source, and attach the exact package for new owner `1x`/sound-off review. Approval and publication remain later, separate gates.
+
 ## 2026-08-29 - TUT-003 truthful caption and Work Notes correction candidate
 
 - Review findings: Owner review found three publication-blocking presentation defects. Native English captions covered the lower recorded action area; those captions duplicated the recorder's optional burned-in scene callouts; and the Work Notes interaction visibly selected and cleared the accepted Estimate scope before typing a completion summary, making an ordinary click appear destructive. The attached Production candidate remains **Ready for review** but must not be approved or published.
