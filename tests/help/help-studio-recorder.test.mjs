@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { assertSafeHelpRecordingSpec } from '../../scripts/help/run-help-studio-recording.mjs';
 import {
+  HELP_CAPTION_CUE_SETTINGS,
+  HELP_CAPTION_PLACEMENT_VERSION,
   HELP_NARRATION_DISCLOSURE,
   HELP_NARRATION_MODEL,
   HELP_NARRATION_VOICE,
@@ -91,8 +93,10 @@ test('narrated Help packaging preserves the exact Cedar product decision and tra
 test('narrated Help packaging creates ordered English WebVTT cues at the approved audio offset', () => {
   const vtt = buildWebVtt(['Open the request.', 'Review the details.'], 6, 0.75);
   assert.match(vtt, /^WEBVTT\n\n00:00:00\.750 --> /);
+  assert.match(vtt, /00:00:00\.750 --> [^\n]+ line:8% position:50% align:center size:90%\n/);
   assert.match(vtt, /Open the request\.\n\n00:00:03\./);
   assert.match(vtt, /Review the details\.\n$/);
+  assert.equal(HELP_CAPTION_PLACEMENT_VERSION, 'top_safe_area_v1');
 });
 
 test('narrated Help packaging only accepts the matching validated Demo silent source', () => {
@@ -125,7 +129,9 @@ test('narration provider integration makes one Cedar speech request and never pe
 });
 
 test('scene-aligned Help retiming anchors existing narration cues without another provider request', () => {
-  const sourceCues = parseWebVttCues('WEBVTT\n\n00:00:00.750 --> 00:00:03.000\nOpen the Estimate.\n\n00:00:03.160 --> 00:00:06.000\nComplete the Job.\n');
+  const legacyCues = parseWebVttCues('WEBVTT\n\n00:00:00.750 --> 00:00:03.000\nOpen the Estimate.\n');
+  assert.equal(legacyCues[0]?.text, 'Open the Estimate.');
+  const sourceCues = parseWebVttCues('WEBVTT\n\n00:00:00.750 --> 00:00:03.000 line:8% position:50% align:center size:90%\nOpen the Estimate.\n\n00:00:03.160 --> 00:00:06.000 line:8% position:50% align:center size:90%\nComplete the Job.\n');
   const segments = buildSceneAlignment({
     cues: sourceCues,
     sourceBoundaries: [3.1],
@@ -136,7 +142,7 @@ test('scene-aligned Help retiming anchors existing narration cues without anothe
   });
   assert.deepEqual(segments.map(segment => Number(segment.cueStart.toFixed(1))), [2, 10]);
   assert.deepEqual(segments.map(segment => Number(segment.cueEnd.toFixed(1))), [5, 12.7]);
-  assert.match(buildAlignedWebVtt(segments.map(segment => ({ text: segment.text, start: segment.cueStart, end: segment.cueEnd }))), /00:00:10\.000 --> 00:00:12\.700\nComplete the Job\./);
+  assert.match(buildAlignedWebVtt(segments.map(segment => ({ text: segment.text, start: segment.cueStart, end: segment.cueEnd }))), /00:00:10\.000 --> 00:00:12\.700 line:8% position:50% align:center size:90%\nComplete the Job\./);
 });
 
 test('scene-aligned Help retiming rejects guessed boundaries and overlapping output', () => {

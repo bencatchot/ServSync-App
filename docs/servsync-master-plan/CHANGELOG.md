@@ -4,6 +4,16 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-29 - TUT-003 caption-safe correction candidate
+
+- Review finding: Owner review found that the browser-rendered English captions covered the lower recorded action area and competed with the visible cursor/callout. The attached Production candidate remains **Ready for review** but must not be approved or published in that form.
+- Correction: Help packaging and scene-aligned retiming now place every WebVTT cue in a versioned top safe area (`line:8% position:50% align:center size:90%`). Both the internal Help review player and role-aware contextual Help player use a compact `1.25rem` native cue style. Existing WebVTT without cue settings remains parseable, while every newly prepared protected package records the exact placement version and cue settings.
+- Candidate evidence: The same immutable 58.84-second MP4 and one-request Cedar/source-audio provenance were reprocessed without a provider request. The replacement English VTT SHA-256 is `f45a2b5688b7ddc73cf01a91377f29c1ddb8d153ce747730b643bfad6b542981`; video SHA-256 remains `449bf8dc4712035ac7fb92ef49f7da9e70704ff20dcae97b8dcc5d3aba6da01b`. Browser playback at the accepted-Estimate and work-item scenes shows compact captions in the top band while the recorded click targets, cursor, and lower orientation callouts remain clear.
+- Validation: Help recorder tests 10/10; focused Help Studio/contextual browser coverage; ESLint on changed JavaScript/TypeScript; TypeScript; `git diff --check`; metadata, checksum, cue, duration, final-hold, and zero-new-provider-request review; and native Chrome caption playback at representative cue scenes.
+- Protected boundary: No Production Help return, replacement request, media attachment, recording approval, walkthrough revision, publication, provider request, secret/environment change, schema/permission change, or merge occurred.
+- Tutorial impact: `NONE`. The Help player presentation becomes less obstructive without changing any published tutorial's labels, steps, role, order, timing, transcript, or outcome. TUT-003 remains unpublished; its current attached candidate is explicitly rejected by review evidence and awaits a separately approved return/replacement operation.
+- Roadmap: FB-040A remains active at TUT-003 correction. After source merge approval, return Production request `708a66db-0c34-461f-a512-3ba0dccbc0b2` for rerecord, create the replacement request, attach this exact top-safe package, and stop for a fresh owner `1x`/sound-off review. Approval and publication remain separate protected gates.
+
 ## 2026-08-28 - TUT-003 corrected package attached and ready for owner review
 
 - Source closeout: PR #533 merged normally at `3618e177f59eca20d50ccb011c07ce3868e5eb9b`; Production, durable Demo, and Stripe Sandbox automatic deployments passed. The merged provider-free retiming command preserves exact one-request Cedar/source-audio provenance and rejects non-pause boundaries, overlap, overrun, and mismatched Demo media.

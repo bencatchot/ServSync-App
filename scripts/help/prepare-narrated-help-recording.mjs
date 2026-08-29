@@ -14,6 +14,8 @@ export const HELP_NARRATION_VOICE = 'cedar';
 export const HELP_NARRATION_DISCLOSURE = "AI-generated voiceover using OpenAI's Cedar voice.";
 export const HELP_TUTORIAL_MEDIA_STANDARD = 'narrated_captioned_v1';
 export const HELP_NARRATION_OFFSET_SECONDS = 0.75;
+export const HELP_CAPTION_PLACEMENT_VERSION = 'top_safe_area_v1';
+export const HELP_CAPTION_CUE_SETTINGS = 'line:8% position:50% align:center size:90%';
 export const HELP_NARRATION_INSTRUCTIONS = 'Speak naturally, like a knowledgeable small-business owner calmly showing someone how the software works. Conversational and understated. Warm but not promotional. Moderate natural pace with small pauses between ideas. Avoid announcer-style emphasis. Do not sound like an advertisement.';
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -71,7 +73,7 @@ export function buildWebVtt(sentences, audioDurationSeconds, offsetSeconds = HEL
       : spokenDuration * (weights[index] / totalWeight);
     const end = start + duration;
     cursor = end + gap;
-    return `${formatVttTime(start)} --> ${formatVttTime(end)}\n${sentence}`;
+    return `${formatVttTime(start)} --> ${formatVttTime(end)} ${HELP_CAPTION_CUE_SETTINGS}\n${sentence}`;
   });
   return `WEBVTT\n\n${cues.join('\n\n')}\n`;
 }
@@ -232,6 +234,8 @@ export async function prepareNarratedHelpRecording(argv = process.argv.slice(2),
       captions_filename: captionsFilename,
       captions_sha256: captionsSha256,
       caption_language: 'en',
+      caption_placement_version: HELP_CAPTION_PLACEMENT_VERSION,
+      caption_cue_settings: HELP_CAPTION_CUE_SETTINGS,
       captions_vtt: captionsVtt,
       generated_at: new Date().toISOString(),
     };

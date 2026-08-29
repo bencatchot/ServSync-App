@@ -43,6 +43,7 @@ const recordingJob = {
 };
 
 async function installAdminHarness(page: Page, item = walkthrough, jobs: Array<typeof recordingJob> = []) {
+  await page.route('**/api/help-walkthrough-media', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ signedUrl: 'data:video/mp4;base64,AAAA' }) }));
   await page.goto('/');
   await page.evaluate(async ({ item, jobs }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
@@ -145,6 +146,8 @@ test('ready narrated recording exposes caption-aware review, approve, and return
   await expect(page.getByRole('button', { name: 'Review at normal speed' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve narration + captions' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Return for rerecord' })).toBeVisible();
+  await page.getByRole('button', { name: 'Review at normal speed' }).click();
+  await expect(page.getByTestId('help-recording-review-video')).toHaveClass(/help-caption-video/);
 });
 
 test('recording review controls remain usable at contractor phone width', async ({ page }) => {
@@ -170,6 +173,7 @@ test('published contextual help opens without admin controls and keeps text step
   await expect(page.getByRole('button', { name: /publish|edit|archive/i })).toHaveCount(0);
   await expect(page.locator('video')).toHaveAttribute('controls', '');
   await expect(page.locator('video track[kind="captions"]')).toHaveCount(1);
+  await expect(page.locator('video.help-caption-video')).toHaveCount(1);
   await expect(page.getByText('Read transcript')).toBeVisible();
   await expect(page.getByText("AI-generated voiceover using OpenAI's Cedar voice.")).toBeVisible();
 });

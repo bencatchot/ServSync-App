@@ -276,7 +276,7 @@ function RecordingPreview({ client, job, onClose }: { client: HelpStudioClient; 
         </div>
         {error ? <div className="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</div> : url ? (
           <>
-            <video className="mt-3 aspect-video w-full bg-black object-contain" controls autoPlay={false} src={url} data-testid="help-recording-review-video">
+            <video className="help-caption-video mt-3 aspect-video w-full bg-black object-contain" controls autoPlay={false} src={url} data-testid="help-recording-review-video">
               {captionUrl && <track kind="captions" src={captionUrl} srcLang="en" label="English" default />}
             </video>
             {transcript && <p className="mt-3 whitespace-pre-line rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700"><strong>Transcript:</strong> {transcript}</p>}
