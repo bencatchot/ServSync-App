@@ -37973,16 +37973,6 @@ function ContractorDashboard({
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{financialsWorkspace ? 'Financials workspace' : 'Work workspace'}</p>
                         <h2 className="mt-1 text-xl font-bold text-slate-950">{financialsWorkspace ? 'Financials' : 'Work'}</h2>
                         <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and manual payment records. Payment collection happens outside ServSync during beta.' : 'Plan, estimate, perform, and document customer work.'}</p>
-                        {!financialsWorkspace && supabase ? (
-                          <div className="mt-3">
-                            <ContextualHelp
-                              client={supabase}
-                              contextKey="contractor.work"
-                              contractorId={contractor?.id}
-                              label="How to complete work and save the service record"
-                            />
-                          </div>
-                        ) : null}
                       </div>
                       {(financialsWorkspace ? contractorFinancialsView !== 'overview' : contractorWorkView !== 'overview') && (canManageFinancialActions || !financialsWorkspace) ? <div
                         role="tablist"
@@ -38029,7 +38019,7 @@ function ContractorDashboard({
                   </section>
                 ) : sharedDraftComposerEnabled ? (
                   <ContractorWorkDashboard
-                    loading={loading}
+                    loading={loading} contextualHelp={supabase ? <ContextualHelp client={supabase} contextKey="contractor.work" contractorId={contractor?.id} label="How to complete work and save the service record" /> : undefined}
                     loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
                     draftSummary={durableDraftSummary}
                     canReadDrafts={Boolean(supabase) && (durableDraftCapabilityLoading || Boolean(durableDraftCapabilityError) || effectiveDurableDraftCapabilities.canReadDrafts)}
