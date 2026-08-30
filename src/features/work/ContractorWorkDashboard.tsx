@@ -100,6 +100,7 @@ function ToolAction({
 
 export type ContractorWorkDashboardProps = {
   loading: boolean;
+  contextualHelp?: ReactNode;
   loadError?: string;
   draftSummary: DurableDraftSummaryState;
   canReadDrafts: boolean;
@@ -122,6 +123,7 @@ export type ContractorWorkDashboardProps = {
 
 export function ContractorWorkDashboard({
   loading,
+  contextualHelp,
   loadError,
   draftSummary,
   canReadDrafts,
@@ -149,6 +151,7 @@ export function ContractorWorkDashboard({
 
   return (
     <section data-testid="contractor-work-dashboard" className="space-y-5">
+      {contextualHelp ? <div className="flex justify-end">{contextualHelp}</div> : null}
       {loadError ? (
         <div data-testid="contractor-work-dashboard-error" role="alert" className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />

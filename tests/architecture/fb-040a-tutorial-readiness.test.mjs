@@ -10,6 +10,14 @@ test('Service Requests owns the contextual intake walkthrough placement', async 
   );
 });
 
+test('Work owns the contextual completion walkthrough placement', async () => {
+  const appSource = await readFile(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(
+    appSource,
+    /contextKey="contractor\.work"[\s\S]{0,200}label="How to complete work and save the service record"/,
+  );
+});
+
 test('pilot tutorial coverage protects the six canonical onboarding workflows', async () => {
   const coverage = await readFile(
     new URL('../../docs/servsync-master-plan/ServSync_Pilot_Tutorial_Coverage.md', import.meta.url),
@@ -28,7 +36,7 @@ test('pilot tutorial coverage protects the six canonical onboarding workflows', 
   ]) {
     assert.ok(coverage.includes(`\`${context}\``), `missing protected context ${context}`);
   }
-  assert.match(coverage, /two published video tutorials/i);
-  assert.match(coverage, /four missing pilot walkthroughs/i);
+  assert.match(coverage, /three published video tutorials/i);
+  assert.match(coverage, /three missing pilot walkthroughs/i);
   assert.match(coverage, /Production publication requires explicit owner approval/i);
 });

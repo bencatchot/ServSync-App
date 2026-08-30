@@ -38019,7 +38019,7 @@ function ContractorDashboard({
                   </section>
                 ) : sharedDraftComposerEnabled ? (
                   <ContractorWorkDashboard
-                    loading={loading}
+                    loading={loading} contextualHelp={supabase ? <ContextualHelp client={supabase} contextKey="contractor.work" contractorId={contractor?.id} label="How to complete work and save the service record" /> : undefined}
                     loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
                     draftSummary={durableDraftSummary}
                     canReadDrafts={Boolean(supabase) && (durableDraftCapabilityLoading || Boolean(durableDraftCapabilityError) || effectiveDurableDraftCapabilities.canReadDrafts)}
