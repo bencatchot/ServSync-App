@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-27",
+  "updatedOn": "2026-08-30",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "uploaded-marketing-video-publishing-eligibility-v1",
+      "artifact": "servsync-uploaded-marketing-video-publishing-eligibility.sql (SHA-256 280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b)",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "The exact reviewed migration is ready for the owner-authorized guarded rollout. No shared-environment mutation has occurred yet."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production remains unchanged until the exact migration passes Sandbox and Demo. The failed open-beta publication never contacted Facebook and remains preserved as non-retryable evidence."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Demo remains unchanged until the exact migration passes Sandbox."
+        }
+      }
+    },
     {
       "id": "help-narration-caption-foundation-v1",
       "artifact": "servsync-help-narration-caption-foundation.sql (SHA-256 11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496)",

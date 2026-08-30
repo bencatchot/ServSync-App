@@ -130,7 +130,11 @@ function validateManagedVideoClaim(claim: PublicationClaim): ProviderPublishFail
     || typeof media.file_size_bytes !== 'number' || !Number.isSafeInteger(media.file_size_bytes)
     || media.file_size_bytes < 1 || media.file_size_bytes > 104_857_600
     || typeof media.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(media.sha256)
-    || !['silent_product_demo_master', 'narrated_marketing_derivative'].includes(String(media.media_variant))) {
+    || ![
+      'silent_product_demo_master',
+      'narrated_marketing_derivative',
+      'uploaded_marketing_source',
+    ].includes(String(media.media_variant))) {
     return {
       category: 'content_validation', message: 'The approved managed video snapshot is invalid.',
       retryEligible: false, requestStarted: false,

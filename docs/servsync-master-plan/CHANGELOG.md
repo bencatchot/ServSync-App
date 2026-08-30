@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-30 - Approved uploaded Marketing MP4 publishing correction
+
+- Finding: The ordinary Marketing upload and approval flow produced valid `uploaded_marketing_source` MP4 assets, but the Facebook worker and database authorization still admitted only the earlier recorder-generated media variants. An approved uploaded commercial therefore failed before provider contact with **The approved managed video snapshot is invalid.** No duplicate or partial Facebook post exists.
+- Correction: The managed-video path now admits only an exact approved uploaded MP4 whose original consumed Marketing intake retains the required `marketing_media_rights_v1` acknowledgement. Existing private Storage, immutable snapshot, size, checksum, exact-copy, destination, and duplicate-safety checks remain. Job media derivatives and unfinished compositions remain excluded.
+- Validation: Focused provider tests prove exact uploaded MP4 byte delivery and continued rejection of excluded variants. Disposable PostgreSQL validation proves approval plus rights-bound intake eligibility, removal of that consumed lineage fails closed, repeat install is rejected, and existing Marketing media lifecycle tests remain green. TypeScript and the Production build pass.
+- Rollout boundary: The owner approved guarded application of exact migration `servsync-uploaded-marketing-video-publishing-eligibility.sql` at SHA-256 `280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b` through Sandbox -> Demo -> Production. Rollout evidence will be recorded without creating a publication or contacting Facebook. Merge remains a separate owner gate.
+- Tutorial impact: `NONE`. The visible upload, rights acknowledgement, approval, Preview, and Publish controls do not change; this restores the server behavior those screens already promise. Production Help Studio search evidence is required before PR closeout.
+
 ## 2026-08-30 - TUT-003 published in Production
 
 - Publication: With explicit owner authorization, Help Studio published **How to complete work and save the service record** as Production walkthrough revision 1. Published Help increased from two to three walkthroughs and unpublished Help decreased from one to zero.
