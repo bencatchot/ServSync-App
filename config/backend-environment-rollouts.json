@@ -8,16 +8,16 @@
       "artifact": "servsync-uploaded-marketing-video-publishing-eligibility.sql (SHA-256 280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b)",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "The exact reviewed migration is ready for the owner-authorized guarded rollout. No shared-environment mutation has occurred yet."
+          "status": "Applied",
+          "reason": "Exact SHA-256 280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-30 after local SQL and provider-worker validation. The installed function has definition SHA-256 856601c80d3506dd58b2fc84e4509a8e5fc7227aef87ed336cc131eb1d455bc6, postgres ownership, SECURITY DEFINER, fixed search path, service-role-only execution, and the exact installation marker. Content 1, intakes 0, assets 0, pairings 0, publications 0, events 0, active publications 0, and provider-request starts 0 remained unchanged."
         },
         "production": {
-          "status": "Pending",
-          "reason": "Production remains unchanged until the exact migration passes Sandbox and Demo. The failed open-beta publication never contacted Facebook and remains preserved as non-retryable evidence."
+          "status": "Applied",
+          "reason": "The same exact migration was applied once to Production uqgtheclhxqlnjpfmheq on 2026-08-30 after Sandbox and Demo passed. The installed function fingerprint and security contract match both prior environments. Content 23, intakes 3, assets 6, pairings 9, publications 3, events 10, active publications 0, and historical provider-request starts 2 remained unchanged. The failed open-beta publication remains preserved; no publication, worker claim, gate change, or Facebook request occurred during rollout."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Demo remains unchanged until the exact migration passes Sandbox."
+          "status": "Applied",
+          "reason": "The same exact migration was applied once to Demo bdytwgejqnlblhrnqxkp on 2026-08-30 after Sandbox passed. The installed function fingerprint and security contract match Sandbox. Content, intakes, assets, pairings, publications, events, active publications, and provider-request starts all remained zero; no recorder or provider action occurred."
         }
       }
     },
