@@ -14,7 +14,9 @@ import {
   HELP_NARRATION_PROVIDER,
   HELP_NARRATION_VOICE,
   HELP_TUTORIAL_MEDIA_STANDARD,
+  narrationScriptFromSpec,
 } from './prepare-narrated-help-recording.mjs';
+import { assertSafeHelpRecordingSpec } from './run-help-studio-recording.mjs';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
@@ -171,7 +173,28 @@ function requireNarratedSource(manifest) {
   return manifest;
 }
 
-function requireSilentSource(manifest, narrated) {
+function requireSilentSource(manifest, narrated, targetSpec = null) {
+  if (targetSpec) {
+    if (!manifest || manifest.schema_version !== 1
+      || manifest.recording_job_id !== targetSpec.recording_job_id
+      || manifest.scenario !== targetSpec.scenario
+      || manifest.scenario !== narrated.scenario
+      || manifest.pacing_profile !== targetSpec.pacing_profile
+      || !COMMIT.test(String(manifest.source_git_commit || ''))
+      || !SHA256.test(String(manifest.mp4_sha256 || ''))
+      || !SHA256.test(String(manifest.poster_sha256 || ''))
+      || manifest.validation_status !== 'passed'
+      || manifest.sensitive_data_check !== 'passed'
+      || manifest.canonical_output_provenance !== 'validated_servsync_demo_recorder'
+      || manifest.environment !== 'Demo') {
+      throw new Error('The replacement silent source does not match the target Help request.');
+    }
+    const { script } = narrationScriptFromSpec(targetSpec);
+    if (script !== narrated.narration_script) {
+      throw new Error('The target Help request changed the immutable narration script.');
+    }
+    return manifest;
+  }
   if (!manifest || manifest.schema_version !== 1
     || manifest.recording_job_id !== narrated.recording_job_id
     || manifest.scenario !== narrated.scenario
@@ -185,19 +208,52 @@ function requireSilentSource(manifest, narrated) {
   return manifest;
 }
 
+export function buildProviderFreeReuseManifestBase(narrated, silent, targetSpec = null) {
+  if (!targetSpec) return narrated;
+  assertSafeHelpRecordingSpec(targetSpec);
+  requireSilentSource(silent, narrated, targetSpec);
+  return {
+    ...narrated,
+    recording_job_id: targetSpec.recording_job_id,
+    title: targetSpec.title,
+    purpose: targetSpec.purpose,
+    source_git_commit: silent.source_git_commit,
+    source_silent_sha256: silent.mp4_sha256,
+    source_silent_manifest_filename: null,
+    narration_reused_from_recording_job_id: narrated.recording_job_id,
+  };
+}
+
 function parseArgs(argv) {
   const positional = argv.filter(value => !value.startsWith('--'));
   const option = name => argv.find(value => value.startsWith(`${name}=`))?.slice(name.length + 1);
-  if (positional.length !== 2 || argv.some(value => value.startsWith('--') && !value.startsWith('--source-boundaries=') && !value.startsWith('--cue-starts='))) {
-    throw new Error('Usage: npm run help:retime -- <narrated-metadata.json> <silent-metadata.json> --source-boundaries=<seconds,...> --cue-starts=<seconds,...>');
+  const targetSpecOptions = argv.filter(value => value.startsWith('--target-spec='));
+  if (positional.length !== 2 || argv.some(value => value.startsWith('--')
+    && !value.startsWith('--source-boundaries=')
+    && !value.startsWith('--cue-starts=')
+    && !value.startsWith('--target-spec='))
+    || targetSpecOptions.length > 1
+    || targetSpecOptions[0] === '--target-spec=') {
+    throw new Error('Usage: npm run help:retime -- <narrated-metadata.json> <silent-metadata.json> --source-boundaries=<seconds,...> --cue-starts=<seconds,...> [--target-spec=<recording-spec.json>]');
   }
-  return { narratedManifestPath: resolve(positional[0]), silentManifestPath: resolve(positional[1]), sourceBoundaries: option('--source-boundaries'), cueStarts: option('--cue-starts') };
+  const targetSpec = option('--target-spec');
+  return {
+    narratedManifestPath: resolve(positional[0]),
+    silentManifestPath: resolve(positional[1]),
+    sourceBoundaries: option('--source-boundaries'),
+    cueStarts: option('--cue-starts'),
+    targetSpecPath: targetSpec ? resolve(targetSpec) : null,
+  };
 }
 
 export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), env = process.env) {
   const args = parseArgs(argv);
   const narrated = requireNarratedSource(JSON.parse(await readFile(args.narratedManifestPath, 'utf8')));
-  const silent = requireSilentSource(JSON.parse(await readFile(args.silentManifestPath, 'utf8')), narrated);
+  const targetSpec = args.targetSpecPath
+    ? assertSafeHelpRecordingSpec(JSON.parse(await readFile(args.targetSpecPath, 'utf8')))
+    : null;
+  const silent = requireSilentSource(JSON.parse(await readFile(args.silentManifestPath, 'utf8')), narrated, targetSpec);
+  const outputBase = buildProviderFreeReuseManifestBase(narrated, silent, targetSpec);
   const sourceCues = parseWebVttCues(narrated.captions_vtt);
   if (sourceCues.map(cue => cue.text).join(' ') !== narrated.narration_script) {
     throw new Error('The source captions no longer match the immutable narration script.');
@@ -267,7 +323,7 @@ export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), 
     ]);
     const narrationEndSeconds = alignedCues.at(-1).end;
     const manifest = {
-      ...narrated,
+      ...outputBase,
       mp4_filename: mp4Filename,
       mp4_size_bytes: mp4Info.size,
       mp4_sha256: mp4Sha256,
@@ -288,6 +344,8 @@ export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), 
       narration_source_audio_sha256: sourceAudioSha,
       narration_source_manifest_filename: basename(args.narratedManifestPath),
       narration_source_manifest_sha256: sourceManifestSha,
+      source_silent_sha256: silent.mp4_sha256,
+      source_silent_manifest_filename: basename(args.silentManifestPath),
       captions_filename: captionsFilename,
       captions_sha256: captionsSha256,
       caption_placement_version: HELP_CAPTION_PLACEMENT_VERSION,

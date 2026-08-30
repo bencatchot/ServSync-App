@@ -4,6 +4,25 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-29 - Corrected TUT-003 narration and captions approved
+
+- Owner decision: The owner approved Production replacement request `41efd0eb-8789-4419-b85b-4240272cd0ff` after reviewing **How to complete work and save the service record**. Help Studio now marks the request **Approved**, exposes **Publish for Help**, and holds walkthrough revision 1 in **Needs Review**.
+- Preserved evidence: Rejected request `708a66db-0c34-461f-a512-3ba0dccbc0b2` remains **Needs rerecord** with the duplicate-caption, obstructive-caption, and misleading Work Notes findings intact. The approved replacement remains the exact 57.32-second truthful package recorded in the preceding closeout.
+- Protected boundary: No publication, contextual rollout, walkthrough unpublication, business-data mutation, provider request, secret/environment change, schema/permission change, merge, or manual deployment occurred.
+- Tutorial impact: `NOT APPLICABLE` for published guidance. TUT-003 is approved internally but remains unpublished.
+- Roadmap: FB-040A remains active. Next: review and merge PR #536, then separately authorize TUT-003 publication and complete role-aware contextual verification before starting TUT-004.
+
+## 2026-08-29 - Corrected TUT-003 replacement attached for owner review
+
+- Merge closeout: PR #535 merged normally at main commit `43f921f754dacca821160137846b677e254a4eba`; Production, durable Demo, and Stripe Sandbox automatic deployments passed.
+- Production correction: With explicit owner authorization, rejected request `708a66db-0c34-461f-a512-3ba0dccbc0b2` moved to **Needs rerecord** with the duplicate-caption, obstructive-caption, and misleading Work Notes findings preserved. Replacement request `41efd0eb-8789-4419-b85b-4240272cd0ff` was created with the same five approved talking points and exact Owner/Admin/Office/Field Technician audience.
+- Provider-free package: The exact validated 57.32-second Demo source was checksum-bound into the replacement request. The immutable one-request Cedar audio was reused without a provider call and scene-aligned at 2, 8.5, 34, 40, and 45 seconds. The package uses compact top-safe native WebVTT, contains no recorder callouts, preserves accepted Work Notes scope, appends the completion note, and ends **Filed to Documents**. Narrated MP4 SHA-256 is `392cb73b44bb357f7f4a45855a5fdc3d99ec6e274b733e96f6074e7546ba52b4`.
+- Production attachment: Exact client and server validation accepted the narrated MP4, poster, VTT, and metadata. Production Help media increased from 14 to 16 assets and 12.3 MB to 15.4 MB, matching one video plus one poster. The replacement is **Ready for review**; complete playback ended at 57.32 seconds at 1x with one caption track showing, the exact transcript, and the Cedar disclosure.
+- Safeguard: The local Help packager can now consume an exact checksum-bound durable Demo source without rerunning the workflow, and scene retiming can bind reused immutable narration to a different replacement request only when scenario, pacing, Demo provenance, silent package, and talking-point script match exactly. It never reads an API key or calls a provider.
+- Protected boundary: No recording approval, walkthrough revision, publication, unpublication, business-record mutation, provider request, secret/environment change, schema/permission change, or manual deployment occurred.
+- Tutorial impact: `NOT APPLICABLE` for published guidance. TUT-003 remains unpublished; the change advances its internal protected package and tooling only.
+- Roadmap: FB-040A remains active. The next assignment is the owner's fresh 1x/sound-on and sound-off review decision for replacement request `41efd0eb-8789-4419-b85b-4240272cd0ff`; approval and publication remain separate gates.
+
 ## 2026-08-29 - PR #534 merged; truthful TUT-003 Demo source validated
 
 - Merge and deployment: The owner approved PR #534, which merged normally at main commit `9dfff32a940e9a3b1b396253cf3a38eb8dd92c2f`. Production, durable Demo, and Stripe Sandbox automatic deployments succeeded; canonical durable Demo resolves to exact deployment `dpl_3whkb5hHsZzoHDBHXPnZvzY5i5xV`.
