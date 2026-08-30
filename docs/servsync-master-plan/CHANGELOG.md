@@ -4,6 +4,16 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-30 - TUT-003 published in Production
+
+- Publication: With explicit owner authorization, Help Studio published **How to complete work and save the service record** as Production walkthrough revision 1. Published Help increased from two to three walkthroughs and unpublished Help decreased from one to zero.
+- Live verification: Production Help Studio loaded the exact 57.32-second video completely with audio enabled, one showing English caption track, the matching transcript, eight current workflow steps, and the Cedar AI-voice disclosure. Immutable revision metadata binds the walkthrough to `contractor.work` for Owner/Admin/Office/Field Technician and excludes Viewer/Homeowner.
+- Durable regression: The Production authenticated read-only smoke now verifies Owner contextual retrieval, secure video, protected captions, and transcript content for TUT-003 without mutating Production data.
+- Preserved evidence: Rejected request `708a66db-0c34-461f-a512-3ba0dccbc0b2` remains **Needs rerecord** with the duplicate-caption, obstructive-caption, and misleading Work Notes findings intact. Approved request `41efd0eb-8789-4419-b85b-4240272cd0ff` remains the publication source.
+- Protected boundary: No walkthrough unpublication, archive, deprecation, business-data mutation, provider request, secret/environment change, schema/permission change, or manual deployment occurred. The documentation and smoke closeout remains unmerged pending normal owner review.
+- Tutorial impact: `UPDATED`. TUT-003 revision 1 is published and its Production Help Studio media, captions, transcript, disclosure, context, and audience metadata are verified.
+- Roadmap: FB-040A remains active. After the permanent Production smoke passes and its closeout PR merges, begin TUT-004 **How to deliver an invoice and record an outside payment**.
+
 ## 2026-08-29 - Corrected TUT-003 narration and captions approved
 
 - Owner decision: The owner approved Production replacement request `41efd0eb-8789-4419-b85b-4240272cd0ff` after reviewing **How to complete work and save the service record**. Help Studio now marks the request **Approved**, exposes **Publish for Help**, and holds walkthrough revision 1 in **Needs Review**.

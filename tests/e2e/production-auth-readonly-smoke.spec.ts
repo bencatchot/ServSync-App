@@ -229,6 +229,17 @@ test.describe('production authenticated read-only smoke', () => {
       await expectActiveHeading(page, /^Work$/i);
       await expect(main.getByTestId('contractor-jobs-at-a-glance')).toBeVisible();
       await expect(main.getByTestId('contractor-work-start-draft')).toBeVisible();
+      const workHelp = main.getByTestId('contextual-help-contractor.work');
+      await expect(workHelp).toBeVisible({ timeout: 30_000 });
+      await workHelp.click();
+      const workWalkthrough = page.getByRole('dialog', { name: /How to complete work and save the service record/i });
+      await expect(workWalkthrough).toBeVisible();
+      await expect(workWalkthrough.locator('video[aria-label="How to complete work and save the service record"]')).toHaveAttribute('src', /^https:\/\//, { timeout: 30_000 });
+      await expect(workWalkthrough.locator('track[kind="captions"]')).toHaveAttribute('src', /^blob:https:\/\/servsync\.app\//);
+      await workWalkthrough.getByText('Read transcript', { exact: true }).click();
+      await expect(workWalkthrough.getByText(/When a customer accepts an Estimate, open it and select Create Job/i)).toBeVisible();
+      await workWalkthrough.getByRole('button', { name: /Close walkthrough/i }).click();
+
       await main.getByRole('button', { name: /^Drafts\b/i }).first().click();
       const estimateHelp = main.getByTestId('contextual-help-contractor.drafts');
       await expect(estimateHelp).toBeVisible({ timeout: 30_000 });
