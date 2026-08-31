@@ -13,6 +13,7 @@ import type {
   MarketingQueueAsset,
   MarketingQueuePairing,
 } from './marketingPublishing';
+import { canRetireUnattachedMedia } from './marketingPublishing';
 
 const PACKAGE_LABELS: Record<MarketingPublicationPackage['status'], string> = {
   needs_review: 'Needs Review', ready: 'Ready - not published', scheduled: 'Scheduled', publishing: 'Publishing',
@@ -41,6 +42,14 @@ const canRetireMedia = (item: MarketingPublicationPackage | null, asset: Marketi
   && ['uploaded', 'needs_review', 'ready'].includes(asset.lifecycleState)
   && asset.retirementEligible
 );
+
+const assetDetailLabel = (asset: MarketingQueueAsset) => {
+  const details = [asset.type === 'video' ? 'Uploaded video' : 'Uploaded image'];
+  if (asset.durationSeconds !== null) details.push(`${asset.durationSeconds.toFixed(1)} seconds`);
+  if (asset.width !== null && asset.height !== null) details.push(`${asset.width} × ${asset.height}`);
+  details.push(`uploaded ${formatDate(asset.createdAt)}`);
+  return details.join(' · ');
+};
 
 function QueueThumbnail({ asset }: { asset: MarketingQueueAsset | null }) {
   return (
@@ -167,6 +176,27 @@ function RetireMediaDialog({ item, busy, onClose, onRetire }: {
   </div>;
 }
 
+function RetireUnattachedMediaDialog({ asset, busy, onClose, onRetire }: {
+  asset: MarketingQueueAsset;
+  busy: boolean;
+  onClose: () => void;
+  onRetire: () => Promise<void>;
+}) {
+  const details = assetDetailLabel(asset);
+  return <div role="dialog" aria-modal="true" aria-label={`Retire ${details}`} className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-3 sm:p-8">
+    <div className="mx-auto mt-16 max-w-lg rounded-md bg-white p-5 shadow-xl sm:p-6">
+      <h2 className="text-lg font-bold text-slate-950">Retire upload?</h2>
+      <p className="mt-3 text-sm font-semibold text-slate-900">Retire this unattached {asset.type}?</p>
+      <p className="mt-1 text-sm text-slate-600">{details}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">This unpublished upload will be retired and its active media slot will be released. Audit and publication history are preserved. The media may later be purged under the retention policy.</p>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" disabled={busy} onClick={onClose} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Keep upload</button>
+        <button type="button" disabled={busy} onClick={() => void onRetire()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-rose-700 px-4 text-sm font-bold text-white disabled:opacity-50">{busy && <Loader2 size={15} className="animate-spin" />}Retire upload</button>
+      </div>
+    </div>
+  </div>;
+}
+
 export type MarketingPublishingWorkspaceProps = {
   state: MarketingPublishingState | null;
   contentItems: MarketingContentItem[];
@@ -187,7 +217,7 @@ export type MarketingPublishingWorkspaceProps = {
   onReschedule: (publication: MarketingPublication, scheduledAt: string, timezone: string) => Promise<void>;
   onRetry: (publication: MarketingPublication) => Promise<void>;
   onPrepareReplacement: (publication: MarketingPublication) => Promise<void>;
-  onRetireMedia: (item: MarketingPublicationPackage, asset: MarketingQueueAsset) => Promise<void>;
+  onRetireMedia: (asset: MarketingQueueAsset, item?: MarketingPublicationPackage) => Promise<void>;
   onConnectFacebook: () => Promise<void>;
   onSelectFacebookPage: (sessionId: string, pageId: string) => Promise<void>;
   onRecheckFacebook: () => Promise<void>;
@@ -203,12 +233,14 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [retiringPackageId, setRetiringPackageId] = useState<string | null>(null);
+  const [retiringUnattachedAssetId, setRetiringUnattachedAssetId] = useState<string | null>(null);
   const facebook = state?.providers.find(item => item.provider === 'facebook') ?? null;
   const selectedContent = contentItems.find(item => item.id === props.selectedContentId) ?? null;
   const preview = state?.packages.find(item => item.id === previewId) ?? null;
   const previewAsset = preview ? state?.assets.find(asset => asset.id === mediaAssetId(preview)) ?? null : null;
   const retiringPackage = state?.packages.find(item => item.id === retiringPackageId) ?? null;
   const retiringAsset = retiringPackage ? state?.assets.find(asset => asset.id === mediaAssetId(retiringPackage)) ?? null : null;
+  const retiringUnattachedAsset = state?.assets.find(asset => asset.id === retiringUnattachedAssetId) ?? null;
   const currentPairing = selectedContent ? state?.pairings.find(pairing => pairing.contentId === selectedContent.id
     && pairing.contentRevision === selectedContent.revisionNumber && pairing.status !== 'rejected') ?? null : null;
   const selectedPackage = selectedContent ? state?.packages.find(item => item.contentId === selectedContent.id
@@ -217,6 +249,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
     && item.channelCategory === 'social' && ['needs_approval', 'approved'].includes(item.status)), [contentItems]);
   const activePublications = state?.publications.filter(item => ['scheduled', 'publishing', 'failed'].includes(item.status)) ?? [];
   const history = state?.publications.filter(item => item.status === 'published') ?? [];
+  const unattachedRetirementCandidates = state?.assets.filter(asset => canRetireUnattachedMedia(asset, state)) ?? [];
 
   const openPreview = useCallback(async (item: MarketingPublicationPackage) => {
     setActionError(null);
@@ -244,7 +277,13 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
       setPreviewMediaUrl(null);
     }
     if (retiringPackageId && !canRetireMedia(retiringPackage, retiringAsset)) setRetiringPackageId(null);
-  }, [preview, previewAsset, retiringAsset, retiringPackage, retiringPackageId]);
+    if (retiringUnattachedAssetId && (!state || !retiringUnattachedAsset || !canRetireUnattachedMedia(retiringUnattachedAsset, state))) {
+      setRetiringUnattachedAssetId(null);
+    }
+    if (mediaChoice && !state?.assets.some(asset => asset.id === mediaChoice && !['purging', 'purged', 'abandoned'].includes(asset.lifecycleState))) {
+      setMediaChoice('');
+    }
+  }, [mediaChoice, preview, previewAsset, retiringAsset, retiringPackage, retiringPackageId, retiringUnattachedAsset, retiringUnattachedAssetId, state]);
 
   const prepareSelected = async () => {
     if (!selectedContent || !facebook) return;
@@ -264,6 +303,11 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
       {actionNotice && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{actionNotice}</p>}
 
       <section aria-label="Prepared post allowance" className="flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3"><div><p className="text-sm font-bold text-slate-900">Prepared / scheduled</p><p className="text-xs text-slate-500">Published history does not count toward this limit.</p></div><p className="text-sm font-bold text-slate-800">{state?.preparedCount ?? 0} of {state?.preparedLimit ?? 5}</p></section>
+
+      {unattachedRetirementCandidates.length > 0 && <section aria-labelledby="unattached-uploads-heading" data-testid="unattached-media-retirement" className="rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4">
+        <div><h3 id="unattached-uploads-heading" className="text-sm font-bold text-slate-950">Unattached uploads</h3><p className="mt-1 text-xs leading-5 text-slate-600">Uploaded media not attached to a post can be retired here to release an active media slot.</p></div>
+        <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">{unattachedRetirementCandidates.map(asset => <article key={asset.id} data-testid={`unattached-media-${asset.id}`} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-900">{asset.type === 'video' ? 'Uploaded video' : 'Uploaded image'}</p><p className="mt-1 text-xs leading-5 text-slate-600">{assetDetailLabel(asset)}</p></div><button type="button" disabled={saving} onClick={() => setRetiringUnattachedAssetId(asset.id)} className="min-h-10 rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700 disabled:opacity-50">Retire upload</button></article>)}</div>
+      </section>}
 
       {facebook && <section data-testid="marketing-facebook-connection" className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700"><Facebook size={19} /></span><div className="min-w-0"><p className="font-bold text-slate-950">Facebook</p><p className="truncate text-sm text-slate-600">{facebook.status === 'connected' ? `${facebook.destinationLabel} · Ready` : facebook.readinessNote}</p></div></div><div className="flex flex-wrap gap-2">{facebook.status === 'connected' ? <><button type="button" disabled={saving} onClick={() => void props.onRecheckFacebook()} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Recheck</button><button type="button" disabled={saving} onClick={() => void props.onDisconnectFacebook()} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Unplug size={15} />Disconnect</button></> : <button type="button" disabled={saving} onClick={() => void props.onConnectFacebook()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-bold text-white"><Link2 size={15} />Connect Facebook</button>}</div></section>}
 
@@ -303,13 +347,24 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
       {retiringPackage && retiringAsset && canRetireMedia(retiringPackage, retiringAsset) && <RetireMediaDialog item={retiringPackage} busy={saving} onClose={() => setRetiringPackageId(null)} onRetire={async () => {
         setActionError(null);
         try {
-          await props.onRetireMedia(retiringPackage, retiringAsset);
+          await props.onRetireMedia(retiringAsset, retiringPackage);
           setActionNotice(`“${retiringPackage.snapshot.title}” media retired. Its active media slot is now available.`);
           setPreviewId(null);
           setPreviewMediaUrl(null);
           setRetiringPackageId(null);
         } catch (cause) {
           setActionError(cause instanceof Error ? cause.message : 'ServSync could not retire this media.');
+        }
+      }} />}
+      {retiringUnattachedAsset && state && canRetireUnattachedMedia(retiringUnattachedAsset, state) && <RetireUnattachedMediaDialog asset={retiringUnattachedAsset} busy={saving} onClose={() => setRetiringUnattachedAssetId(null)} onRetire={async () => {
+        setActionError(null);
+        try {
+          await props.onRetireMedia(retiringUnattachedAsset);
+          setActionNotice(`${assetDetailLabel(retiringUnattachedAsset)} retired. Its active media slot is now available.`);
+          setMediaChoice(current => current === retiringUnattachedAsset.id ? '' : current);
+          setRetiringUnattachedAssetId(null);
+        } catch (cause) {
+          setActionError(cause instanceof Error ? cause.message : 'ServSync could not retire this upload.');
         }
       }} />}
     </section>

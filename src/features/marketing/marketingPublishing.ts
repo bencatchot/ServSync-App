@@ -127,6 +127,20 @@ export type MarketingPublishingState = {
   pairings: MarketingQueuePairing[];
 };
 
+const RETIRABLE_LIFECYCLE_STATES = new Set(['uploaded', 'needs_review', 'ready']);
+
+export function canRetireUnattachedMedia(asset: MarketingQueueAsset, state: MarketingPublishingState) {
+  if (asset.source !== 'marketing_upload' || asset.mediaVariant !== 'uploaded_marketing_source') return false;
+  if (!asset.retirementEligible || !RETIRABLE_LIFECYCLE_STATES.has(asset.lifecycleState)) return false;
+  if (state.pairings.some(pairing => pairing.assetId === asset.id && pairing.status !== 'rejected')) return false;
+  return !state.packages.some(item => {
+    if (item.status === 'retired') return false;
+    if (item.mediaSnapshot?.asset_id === asset.id) return true;
+    if (!item.mediaPairingId) return false;
+    return state.pairings.some(pairing => pairing.id === item.mediaPairingId && pairing.assetId === asset.id);
+  });
+}
+
 type RpcResult = { data: unknown; error: unknown };
 type SignedUrlResult = PromiseLike<{ data: { signedUrl?: string } | null; error: unknown }>;
 export interface MarketingPublishingRpcClient {

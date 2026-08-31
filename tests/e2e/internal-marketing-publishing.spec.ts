@@ -6,6 +6,9 @@ const contentId = '62000000-0000-4000-8000-000000000001';
 const packageId = '63000000-0000-4000-8000-000000000001';
 const pairingId = '64000000-0000-4000-8000-000000000001';
 const assetId = '65000000-0000-4000-8000-000000000001';
+const unattachedAssetId = '65000000-0000-4000-8000-000000000002';
+const unattachedPairingId = '64000000-0000-4000-8000-000000000002';
+const unattachedPackageId = '63000000-0000-4000-8000-000000000002';
 const connectionId = '66000000-0000-4000-8000-000000000001';
 const workspaceId = '00000000-0000-4000-8000-000000000037';
 const contractorId = '20000000-0000-4000-8000-000000000001';
@@ -90,9 +93,59 @@ async function install(page: Page, options: {
   contentStatus?: 'draft' | 'approved';
   assetLifecycleState?: string;
   retirementEligible?: boolean;
+  includeUnattachedAsset?: boolean;
+  unattachedLifecycleState?: string;
+  unattachedRetirementEligible?: boolean;
+  unattachedPairingStatus?: 'candidate' | 'approved' | 'rejected';
+  unattachedPackageStatus?: PackageStatus;
+  unattachedConcurrentError?: 'dependency' | 'stale';
+  basePairingStatus?: 'candidate' | 'approved' | 'rejected';
 } = {}) {
+  const unattachedAsset = {
+    ...catalog.assets[0], asset_id: unattachedAssetId, source: 'marketing_upload',
+    storage_path: `${workspaceId}/${unattachedAssetId}/upload.mp4`,
+    poster_path: `${workspaceId}/${unattachedAssetId}/poster.jpg`,
+    duration_seconds: 27.9, width: 1440, height: 900,
+    media_variant: 'uploaded_marketing_source', lifecycle_state: options.unattachedLifecycleState ?? 'uploaded',
+    retirement_eligible: options.unattachedRetirementEligible ?? true, created_at: '2026-08-31T16:15:00.000Z',
+  };
+  const nextCatalog = {
+    ...catalog,
+    assets: [
+      ...catalog.assets.map(asset => ({
+        ...asset,
+        lifecycle_state: options.assetLifecycleState ?? asset.lifecycle_state,
+        retirement_eligible: options.retirementEligible ?? asset.retirement_eligible,
+      })),
+      ...(options.includeUnattachedAsset ? [unattachedAsset] : []),
+    ],
+    pairings: [
+      ...catalog.pairings.map(pairing => ({
+        ...pairing,
+        status: options.basePairingStatus ?? pairing.status,
+        reviewed_at: options.basePairingStatus === 'candidate' ? null : pairing.reviewed_at,
+      })),
+      ...(options.includeUnattachedAsset && options.unattachedPairingStatus ? [{
+        ...catalog.pairings[0], pairing_id: unattachedPairingId, asset_id: unattachedAssetId,
+        status: options.unattachedPairingStatus, reviewed_at: options.unattachedPairingStatus === 'candidate' ? null : now,
+      }] : []),
+    ],
+  };
+  const nextState = options.stalePairingUntilRefresh
+    ? { ...publishingState(options.status, options.facebookSetup, options.operationAvailable), packages: [] }
+    : {
+      ...publishingState(options.status, options.facebookSetup, options.operationAvailable),
+      packages: [
+        ...publishingState(options.status, options.facebookSetup, options.operationAvailable).packages,
+        ...(options.includeUnattachedAsset && options.unattachedPackageStatus ? [{
+          ...publishingState(options.status, options.facebookSetup, options.operationAvailable).packages[0],
+          package_id: unattachedPackageId, media_pairing_id: null,
+          media_snapshot: { asset_id: unattachedAssetId }, status: options.unattachedPackageStatus,
+        }] : []),
+      ],
+    };
   await page.goto('/');
-  await page.evaluate(async ({ content, state, catalog, options, contractorId }) => {
+  await page.evaluate(async ({ content, state, catalog, options, unattachedAssetId, workspaceId, now, contractorId }) => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const React = (await dynamicImport('/node_modules/.vite/deps/react.js')).default as { createElement: (...args: unknown[]) => unknown };
     const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as {
@@ -112,6 +165,7 @@ async function install(page: Page, options: {
       pairings: Array<Record<string, unknown>>;
     } & Record<string, unknown>;
     let mediaCatalogReads = 0;
+    let activeMediaSlots = options.includeUnattachedAsset ? 2 : 1;
     (window as unknown as { __marketingRpcCalls: typeof calls }).__marketingRpcCalls = calls;
     const client = {
       rpc: async (name: string, args: Record<string, unknown>) => {
@@ -135,9 +189,17 @@ async function install(page: Page, options: {
         }
         if (name === 'servsync_abandon_marketing_media') {
           const target = currentCatalog.assets.find(asset => asset.asset_id === args.p_asset_id);
+          if (args.p_asset_id === unattachedAssetId && options.unattachedConcurrentError) {
+            target.lifecycle_state = options.unattachedConcurrentError === 'dependency' ? 'scheduled' : 'protected';
+            target.retirement_eligible = false;
+            return { data: null, error: { code: '40001', message: options.unattachedConcurrentError === 'dependency'
+              ? 'Marketing media has a publishing dependency and cannot be retired.'
+              : 'Marketing media is no longer eligible for retirement; reload and try again.' } };
+          }
           if (!target?.retirement_eligible) return { data: null, error: { code: '40001', message: 'Marketing media is no longer eligible for retirement; reload and try again.' } };
           target.lifecycle_state = 'abandoned';
           target.retirement_eligible = false;
+          activeMediaSlots -= 1;
           currentCatalog.pairings = currentCatalog.pairings.map(pairing => pairing.asset_id === args.p_asset_id
             ? { ...pairing, status: 'rejected', reviewed_at: '2026-08-17T20:00:00.000Z' }
             : pairing);
@@ -147,6 +209,20 @@ async function install(page: Page, options: {
           currentState.prepared_count = 0;
           return { data: { asset_id: args.p_asset_id, state: 'abandoned', retired_package_count: 1, replayed: false }, error: null };
         }
+        if (name === 'servsync_get_marketing_usage_summary') return { data: {
+          workspace: { workspace_id: workspaceId, workspace_kind: 'internal', display_name: 'ServSync Marketing' },
+          entitlements: { plan_key: 'beta', active_media_slots: 3, monthly_video_generations: 3, ready_scheduled_post_limit: 5,
+            max_generated_video_seconds: 75, published_media_retention_hours: 48, abandoned_media_expiration_days: 7,
+            generation_enabled: true, usage_period: 'rolling_30_days' },
+          usage: { video_generations_rolling_30_days: 0, ai_text_drafts_rolling_30_days: 0,
+            active_media_slots: activeMediaSlots, active_media_bytes: activeMediaSlots * 4096, ready_scheduled_posts: currentState.prepared_count },
+          generation: { enabled: true, global_budget_configured: false, global_warning: false, global_hard_stop: false, recent_text_draft: null },
+          recent_media: [],
+        }, error: null };
+        if (name === 'servsync_get_marketing_cost_controls') return { data: {
+          generation_enabled: true, monthly_budget_microusd: null, warning_percent: 80, hard_stop_percent: 100,
+          current_spend_microusd: 0, stop_reason: null, updated_at: now,
+        }, error: null };
         if (name === 'servsync_get_marketing_media_access') return { data: {
           state: 'protected', storage_bucket: selectedAsset.storage_bucket,
           storage_path: selectedAsset.storage_path,
@@ -176,17 +252,9 @@ async function install(page: Page, options: {
       submitted_at: null, submitted_by: null, submitted_by_name: null,
       reviewed_at: null, reviewed_by: null, reviewed_by_name: null,
     } : content,
-    state: options.stalePairingUntilRefresh
-      ? { ...publishingState(options.status, options.facebookSetup, options.operationAvailable), packages: [] }
-      : publishingState(options.status, options.facebookSetup, options.operationAvailable),
-    catalog: {
-      ...catalog,
-      assets: catalog.assets.map(asset => ({
-        ...asset,
-        lifecycle_state: options.assetLifecycleState ?? asset.lifecycle_state,
-        retirement_eligible: options.retirementEligible ?? asset.retirement_eligible,
-      })),
-    }, options,
+    state: nextState,
+    catalog: nextCatalog,
+    options, unattachedAssetId, workspaceId, now,
     contractorId: options.contractor ? contractorId : null,
   });
   await expect(page.getByTestId('marketing-workspace')).toBeVisible();
@@ -260,6 +328,78 @@ test('eligible Ready media requires exact retirement confirmation and refreshes 
   expect(calls.filter(call => call.name === 'servsync_get_marketing_media_catalog')).toHaveLength(2);
 });
 
+test('eligible unattached upload retires by exact details, releases one slot, and disappears from media selection', async ({ page }) => {
+  await install(page, { includeUnattachedAsset: true, basePairingStatus: 'rejected' });
+  await page.getByTestId('marketing-nav-campaigns').click();
+  await page.getByRole('button', { name: /Approved social post/ }).click();
+  await expect(page.getByRole('option', { name: 'Uploaded video' })).toHaveCount(1);
+  const upload = page.getByTestId(`unattached-media-${unattachedAssetId}`);
+  await expect(upload).toContainText('Uploaded video');
+  await expect(upload).toContainText('27.9 seconds');
+  await expect(upload).toContainText('1440 × 900');
+  await upload.getByRole('button', { name: 'Retire upload' }).click();
+  const dialog = page.getByRole('dialog', { name: /Retire Uploaded video · 27\.9 seconds · 1440 × 900 · uploaded/ });
+  await expect(dialog).toContainText('Retire this unattached video?');
+  await expect(dialog).toContainText('active media slot will be released');
+  await expect(dialog).toContainText('Audit and publication history are preserved');
+  await expect(dialog).toContainText('may later be purged under the retention policy');
+  await dialog.getByRole('button', { name: 'Retire upload' }).click();
+  await expect(page.getByRole('status')).toContainText('active media slot is now available');
+  await expect(page.getByTestId(`unattached-media-${unattachedAssetId}`)).toHaveCount(0);
+
+  await expect(page.getByRole('option', { name: 'Uploaded video' })).toHaveCount(0);
+  await page.getByTestId('marketing-nav-settings').click();
+  await expect(page.getByTestId('marketing-usage-active-media')).toContainText('1 of 3');
+
+  const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string; args: Record<string, unknown> }> }).__marketingRpcCalls);
+  expect(calls.filter(call => call.name === 'servsync_abandon_marketing_media')).toEqual([{
+    name: 'servsync_abandon_marketing_media', args: { p_contractor_id: null, p_asset_id: unattachedAssetId },
+  }]);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_publishing')).toHaveLength(2);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_media_catalog')).toHaveLength(2);
+  expect(calls.filter(call => call.name === 'servsync_list_marketing_content')).toHaveLength(2);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_usage_summary')).toHaveLength(1);
+});
+
+test('unattached retirement fails closed when the server reports a concurrent dependency', async ({ page }) => {
+  await install(page, { includeUnattachedAsset: true, unattachedConcurrentError: 'dependency' });
+  await page.getByTestId('marketing-nav-campaigns').click();
+  await page.getByTestId(`unattached-media-${unattachedAssetId}`).getByRole('button', { name: 'Retire upload' }).click();
+  await page.getByRole('dialog', { name: /Retire Uploaded video/ }).getByRole('button', { name: 'Retire upload' }).click();
+  await expect(page.getByRole('alert')).toContainText('now scheduled, publishing, or otherwise tied to a publishing result');
+  await expect(page.getByTestId(`unattached-media-${unattachedAssetId}`)).toHaveCount(0);
+  const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string }> }).__marketingRpcCalls);
+  expect(calls.filter(call => call.name === 'servsync_abandon_marketing_media')).toHaveLength(1);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_media_catalog')).toHaveLength(2);
+});
+
+test('unattached retirement is hidden for forbidden lifecycle and dependency states', async ({ page }) => {
+  for (const scenario of [
+    { lifecycle: 'protected', eligible: false },
+    { lifecycle: 'retention', eligible: false },
+    { lifecycle: 'purging', eligible: false },
+    { lifecycle: 'purged', eligible: false },
+    { lifecycle: 'abandoned', eligible: false },
+    { lifecycle: 'provider_processing', eligible: false },
+  ]) {
+    await install(page, { includeUnattachedAsset: true, unattachedLifecycleState: scenario.lifecycle, unattachedRetirementEligible: scenario.eligible });
+    await page.getByTestId('marketing-nav-campaigns').click();
+    await expect(page.getByTestId('unattached-media-retirement')).toHaveCount(0);
+  }
+  for (const dependency of [
+    { unattachedPairingStatus: 'candidate' as const },
+    { unattachedPairingStatus: 'approved' as const },
+    { unattachedPackageStatus: 'needs_attention' as const },
+    { unattachedPackageStatus: 'scheduled' as const },
+    { unattachedPackageStatus: 'publishing' as const },
+    { unattachedPackageStatus: 'published' as const },
+  ]) {
+    await install(page, { includeUnattachedAsset: true, ...dependency });
+    await page.getByTestId('marketing-nav-campaigns').click();
+    await expect(page.getByTestId('unattached-media-retirement')).toHaveCount(0);
+  }
+});
+
 test('retirement control is absent for protected, published, scheduled, publishing, and abandoned media', async ({ page }) => {
   for (const scenario of [
     { status: 'ready' as const, lifecycle: 'protected', eligible: false },
@@ -316,9 +456,12 @@ test('Facebook setup requires explicit eligible Page selection', async ({ page }
 
 test('shared queue has no horizontal overflow at 390x844', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await install(page, { contractor: true, status: 'ready' });
+  await install(page, { contractor: true, status: 'ready', includeUnattachedAsset: true });
   await page.getByTestId('marketing-nav-campaigns').click();
   await expect(page.getByTestId('marketing-publishing-workspace')).toBeVisible();
+  await expect(page.getByTestId('unattached-media-retirement')).toBeVisible();
+  await page.getByTestId(`unattached-media-${unattachedAssetId}`).getByRole('button', { name: 'Retire upload' }).click();
+  await expect(page.getByRole('dialog', { name: /Retire Uploaded video/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 

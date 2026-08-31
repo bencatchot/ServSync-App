@@ -4,6 +4,17 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-31 - Unattached Marketing upload retirement follow-up
+
+- Pull request: PR #541 carries this bounded source-only follow-up; merge and deployment remain separately authorized.
+- User-facing behavior: Campaigns now shows a compact **Unattached uploads** section only when the authenticated media catalog returns a server-eligible upload that has no candidate/approved pairing and no non-retired package dependency. The owner can retire that upload directly without creating fake Content or pairing it to a post.
+- Exact confirmation: The dialog identifies the real upload as an image or video and includes available duration, dimensions, and upload date. It explains that the unpublished upload is retired, one active-media slot is released, audit/publication history is preserved, and retained media may later be purged. It does not invent a post title.
+- Authority and safety: The browser continues to call only authenticated `servsync_abandon_marketing_media`. There is no table mutation, service-role browser path, new permission boundary, or migration. Server-derived `retirement_eligible` remains mandatory; client cross-checks additionally hide the control for active pairings and Needs Attention, scheduled, publishing, published, or other non-retired package dependencies. Concurrent server rejection refreshes catalog, queue, Content, and selection state while presenting the exact safe error.
+- Refresh behavior: Success refreshes the publishing/catalog read, Content state, Marketing usage key, and optional-media choices. The abandoned upload disappears from the unattached list and cannot remain selectable for a post.
+- Production boundary: The follow-up was prompted by read-only Production inventory showing one eligible non-permanent unpaired uploaded video consuming an active-media slot. No Production asset, Marketing row, provider state, SQL, setting, or environment was mutated, and the discovered upload was not retired.
+- Backlog/roadmap impact: This is bounded FB-037 maintenance. PR #537 already merged the permanent TUT-003 owner contextual smoke closeout at `48c18d4699a5d3149214f01c6823299b8f5110b6`; the primary launch assignment is TUT-004 **How to deliver an invoice and record an outside payment**.
+- Tutorial impact: `NONE`. No published walkthrough covers Marketing, Campaigns, uploaded-media management, or retirement; the existing contractor workflow tutorials are unaffected.
+
 ## 2026-08-31 - Guarded Marketing media retirement control rollout complete
 
 - User-facing behavior: Eligible unpublished managed-media posts in the Marketing Publishing Queue gain **Retire media**. The exact confirmation names the post and explains that the unpublished package is retired, its active media slot is released, publication history is preserved, and the media may later be purged under retention policy. The action is absent for published, scheduled, publishing/provider-processing, protected/permanent, purging/purged/abandoned, terminal, text-only, and otherwise ineligible media.
