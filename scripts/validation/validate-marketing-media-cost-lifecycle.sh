@@ -175,11 +175,18 @@ for migration in \
   servsync-marketing-beta-entitlements-cost-metering.sql \
   servsync-marketing-media-intake-ephemeral-lifecycle.sql \
   servsync-marketing-abandoned-upload-cleanup.sql \
-  servsync-marketing-storage-policy-helper-execute.sql; do
+  servsync-marketing-storage-policy-helper-execute.sql \
+  servsync-uploaded-marketing-video-publishing-eligibility.sql; do
   psql_run --file "$ROOT_DIR/$migration" >/dev/null
 done
 
 psql_run --file "$ROOT_DIR/tests/sql/marketing-media-cost-lifecycle-validation.sql" >/dev/null
+psql_run --file "$ROOT_DIR/tests/sql/uploaded-marketing-video-publishing-eligibility-validation.sql" >/dev/null
+
+if psql_run --file "$ROOT_DIR/servsync-uploaded-marketing-video-publishing-eligibility.sql" >/dev/null 2>&1; then
+  echo "Repeated uploaded Marketing video publishing eligibility migration unexpectedly succeeded." >&2
+  exit 1
+fi
 
 if [[ -n "${SERVSYNC_MARKETING_QUEUE_MIGRATION:-}" ]]; then
   if [[ -n "${SERVSYNC_MARKETING_QUEUE_COMPATIBILITY:-}" ]]; then

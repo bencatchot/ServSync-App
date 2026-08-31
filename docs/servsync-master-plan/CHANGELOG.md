@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-30 - Approved uploaded Marketing MP4 publishing correction
+
+- Finding: The ordinary Marketing upload and approval flow produced valid `uploaded_marketing_source` MP4 assets, but the Facebook worker and database authorization still admitted only the earlier recorder-generated media variants. An approved uploaded commercial therefore failed before provider contact with **The approved managed video snapshot is invalid.** No duplicate or partial Facebook post exists.
+- Correction: The managed-video path now admits only an exact approved uploaded MP4 whose original consumed Marketing intake retains the required `marketing_media_rights_v1` acknowledgement. Existing private Storage, immutable snapshot, size, checksum, exact-copy, destination, and duplicate-safety checks remain. Job media derivatives and unfinished compositions remain excluded.
+- Validation: Focused provider tests prove exact uploaded MP4 byte delivery and continued rejection of excluded variants. Disposable PostgreSQL validation proves approval plus rights-bound intake eligibility, removal of that consumed lineage fails closed, repeat install is rejected, and existing Marketing media lifecycle tests remain green. TypeScript and the Production build pass.
+- Rollout: With explicit owner approval, exact migration `servsync-uploaded-marketing-video-publishing-eligibility.sql` at SHA-256 `280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b` passed Sandbox -> Demo -> Production. All three installed functions share definition SHA-256 `856601c80d3506dd58b2fc84e4509a8e5fc7227aef87ed336cc131eb1d455bc6`, postgres ownership, fixed security path, and service-role-only execution. Every captured Marketing and publication count remained exact; no publication, worker claim, gate change, or Facebook request occurred. Merge remains a separate owner gate.
+- Tutorial impact: `NONE`. The visible upload, rights acknowledgement, approval, Preview, and Publish controls do not change; this restores the server behavior those screens already promise. Production Help Studio has three published walkthroughs, and exact searches for Marketing, Campaigns, Publishing, Upload media, and Facebook each returned **No walkthroughs found**, so no published tutorial requires replacement or Preview review.
+
 ## 2026-08-30 - TUT-003 published in Production
 
 - Publication: With explicit owner authorization, Help Studio published **How to complete work and save the service record** as Production walkthrough revision 1. Published Help increased from two to three walkthroughs and unpublished Help decreased from one to zero.

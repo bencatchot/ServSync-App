@@ -178,6 +178,37 @@ test('managed Page video uses exact preview copy and exact MP4 bytes, then confi
   assert.equal(calls[1].url.searchParams.get('fields'), 'id,created_time,description');
 });
 
+test('approved uploaded Marketing MP4 uses the same exact managed-video path', async () => {
+  const calls: Array<{ url: URL; init?: RequestInit }> = [];
+  const adapter = enabledAdapter([json({ id: videoId })], calls);
+  const publication = claim({
+    media_snapshot: {
+      ...claim().media_snapshot,
+      media_variant: 'uploaded_marketing_source',
+      ai_narration_disclosure_text: undefined,
+    },
+  });
+  assert.equal(adapter.validatePublication(publication), null);
+  const accepted = await adapter.publish(await adapter.preparePublication(publication));
+  assert.equal(accepted.state, 'accepted');
+  assert.equal(accepted.providerPublicationId, videoId);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(
+    new Uint8Array(await ((calls[0].init?.body as FormData).get('source') as Blob).arrayBuffer()),
+    videoBytes,
+  );
+});
+
+test('job media and unfinished compositions remain outside managed-video publishing', () => {
+  const adapter = enabledAdapter([], []);
+  for (const mediaVariant of ['job_media_derivative', 'marketing_composition']) {
+    const publication = claim({
+      media_snapshot: { ...claim().media_snapshot, media_variant: mediaVariant },
+    });
+    assert.equal(adapter.validatePublication(publication)?.category, 'content_validation');
+  }
+});
+
 test('required media never falls back to a text-only Facebook feed post', async () => {
   const calls: Array<{ url: URL; init?: RequestInit }> = [];
   const adapter = enabledAdapter([], calls, {

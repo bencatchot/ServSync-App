@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-27",
+  "updatedOn": "2026-08-30",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "uploaded-marketing-video-publishing-eligibility-v1",
+      "artifact": "servsync-uploaded-marketing-video-publishing-eligibility.sql (SHA-256 280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-30 after local SQL and provider-worker validation. The installed function has definition SHA-256 856601c80d3506dd58b2fc84e4509a8e5fc7227aef87ed336cc131eb1d455bc6, postgres ownership, SECURITY DEFINER, fixed search path, service-role-only execution, and the exact installation marker. Content 1, intakes 0, assets 0, pairings 0, publications 0, events 0, active publications 0, and provider-request starts 0 remained unchanged."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied once to Production uqgtheclhxqlnjpfmheq on 2026-08-30 after Sandbox and Demo passed. The installed function fingerprint and security contract match both prior environments. Content 23, intakes 3, assets 6, pairings 9, publications 3, events 10, active publications 0, and historical provider-request starts 2 remained unchanged. The failed open-beta publication remains preserved; no publication, worker claim, gate change, or Facebook request occurred during rollout."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied once to Demo bdytwgejqnlblhrnqxkp on 2026-08-30 after Sandbox passed. The installed function fingerprint and security contract match Sandbox. Content, intakes, assets, pairings, publications, events, active publications, and provider-request starts all remained zero; no recorder or provider action occurred."
+        }
+      }
+    },
     {
       "id": "help-narration-caption-foundation-v1",
       "artifact": "servsync-help-narration-caption-foundation.sql (SHA-256 11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496)",

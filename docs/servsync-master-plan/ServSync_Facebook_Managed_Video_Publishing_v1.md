@@ -44,6 +44,8 @@ Before marking any provider request as started, the worker:
 
 The provider adapter accepts MP4 only and enforces ServSync's existing 100 MB managed-asset ceiling. The raw video is not persisted again. Browser code never receives provider credentials or private Storage bytes. Required media can never fall back to a text-only feed post.
 
+The eligible managed-video set includes recorder-validated silent masters, narrated derivatives with their required disclosure, and an ordinary Marketing MP4 upload only after the uploader acknowledges the media-rights statement and an owner approves its exact Content/media pairing. The worker rechecks that the uploaded asset still has its original consumed Marketing intake, rights acknowledgement, immutable Storage identity, size, and checksum. Job media derivatives and unfinished Marketing compositions remain ineligible; approval does not silently broaden their publishing authority.
+
 ## Provider State And Duplicate Safety
 
 Meta documents `id` and `video_id` response fields for Page video creation. ServSync accepts either numeric Video ID, rejects conflicting fields as uncertain, records which field was returned, and persists the resulting ID with an `accepted` provider state before confirmation. The stored provider identifier is explicitly a Video ID, not an assumed Page feed-post ID.
