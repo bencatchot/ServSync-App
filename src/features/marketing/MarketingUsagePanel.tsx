@@ -105,10 +105,11 @@ function CostControlsForm({ controls, saving, onSave }: {
   );
 }
 
-export function MarketingUsagePanel({ client, contractorId, platformControls = false }: {
+export function MarketingUsagePanel({ client, contractorId, platformControls = false, refreshKey = 0 }: {
   client: MarketingUsageClient;
   contractorId: string | null;
   platformControls?: boolean;
+  refreshKey?: number;
 }) {
   const adapter = useMemo(() => createMarketingUsageAdapter(client, contractorId), [client, contractorId]);
   const [summary, setSummary] = useState<MarketingUsageSummary | null>(null);
@@ -138,7 +139,7 @@ export function MarketingUsagePanel({ client, contractorId, platformControls = f
     }
   }, [adapter, platformControls]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, refreshKey]);
 
   return (
     <section className="space-y-4" data-testid="marketing-usage-panel">

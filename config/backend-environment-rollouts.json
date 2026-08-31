@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-30",
+  "updatedOn": "2026-08-31",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "marketing-media-retirement-control-v1",
+      "artifact": "servsync-marketing-media-retirement-control.sql (SHA-256 f04267c23dcb3a7d868cb510b17097a68d07422ffa6c40a38870fe3a9815c777)",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Source and disposable PostgreSQL/browser validation are complete. Exact migration bytes still require an authorized Sandbox application plus eligible unpublished fixture, quota-release, stale-package, forbidden-state, role, audit, zero-provider-action, and cleanup acceptance."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Production remains unchanged. Apply only after Sandbox and Demo correspondence pass and a zero-active-publication/provider preflight. The originally named Your work, connected — Free ServSync beta item is now Published and intentionally ineligible; Production acceptance must use another exact eligible unpublished asset or remain read-only."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Apply the same exact bytes only after Sandbox acceptance, then repeat catalog/RPC/package-retirement/quota-refresh/forbidden-state validation with Demo-safe fixture data before Production is considered."
+        }
+      }
+    },
     {
       "id": "marketing-pre-provider-replacement-recovery-v1",
       "artifact": "servsync-marketing-pre-provider-replacement-recovery.sql (SHA-256 e31c47cf63505a9f51d11d0317c518365c270cf1434cf571f4a6d80fbae990a3)",

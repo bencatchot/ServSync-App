@@ -33,6 +33,15 @@ const assetLabel = (asset: MarketingQueueAsset) => {
   return asset.type === 'video' ? 'Uploaded video' : 'Uploaded image';
 };
 
+const canRetireMedia = (item: MarketingPublicationPackage | null, asset: MarketingQueueAsset | null) => (
+  item !== null
+  && asset !== null
+  && item.mediaPairingId !== null
+  && ['needs_review', 'ready'].includes(item.status)
+  && ['uploaded', 'needs_review', 'ready'].includes(asset.lifecycleState)
+  && asset.retirementEligible
+);
+
 function QueueThumbnail({ asset }: { asset: MarketingQueueAsset | null }) {
   return (
     <div className="flex aspect-video w-28 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100 sm:w-36">
@@ -139,6 +148,25 @@ function PreviewDialog({ item, asset, mediaUrl, busy, operationAvailable, onClos
   );
 }
 
+function RetireMediaDialog({ item, busy, onClose, onRetire }: {
+  item: MarketingPublicationPackage;
+  busy: boolean;
+  onClose: () => void;
+  onRetire: () => Promise<void>;
+}) {
+  return <div role="dialog" aria-modal="true" aria-label={`Retire media for ${item.snapshot.title}`} className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-3 sm:p-8">
+    <div className="mx-auto mt-16 max-w-lg rounded-md bg-white p-5 shadow-xl sm:p-6">
+      <h2 className="text-lg font-bold text-slate-950">Retire media?</h2>
+      <p className="mt-3 text-sm font-semibold text-slate-900">Retire the unpublished media package for “{item.snapshot.title}”?</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">The unpublished package will be retired and its active media slot will be released. Publication history is preserved. The media may later be purged under the retention policy.</p>
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" disabled={busy} onClick={onClose} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold">Keep media</button>
+        <button type="button" disabled={busy} onClick={() => void onRetire()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-rose-700 px-4 text-sm font-bold text-white disabled:opacity-50">{busy && <Loader2 size={15} className="animate-spin" />}Retire media</button>
+      </div>
+    </div>
+  </div>;
+}
+
 export type MarketingPublishingWorkspaceProps = {
   state: MarketingPublishingState | null;
   contentItems: MarketingContentItem[];
@@ -159,6 +187,7 @@ export type MarketingPublishingWorkspaceProps = {
   onReschedule: (publication: MarketingPublication, scheduledAt: string, timezone: string) => Promise<void>;
   onRetry: (publication: MarketingPublication) => Promise<void>;
   onPrepareReplacement: (publication: MarketingPublication) => Promise<void>;
+  onRetireMedia: (item: MarketingPublicationPackage, asset: MarketingQueueAsset) => Promise<void>;
   onConnectFacebook: () => Promise<void>;
   onSelectFacebookPage: (sessionId: string, pageId: string) => Promise<void>;
   onRecheckFacebook: () => Promise<void>;
@@ -173,10 +202,13 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
   const [mediaChoice, setMediaChoice] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [retiringPackageId, setRetiringPackageId] = useState<string | null>(null);
   const facebook = state?.providers.find(item => item.provider === 'facebook') ?? null;
   const selectedContent = contentItems.find(item => item.id === props.selectedContentId) ?? null;
   const preview = state?.packages.find(item => item.id === previewId) ?? null;
   const previewAsset = preview ? state?.assets.find(asset => asset.id === mediaAssetId(preview)) ?? null : null;
+  const retiringPackage = state?.packages.find(item => item.id === retiringPackageId) ?? null;
+  const retiringAsset = retiringPackage ? state?.assets.find(asset => asset.id === mediaAssetId(retiringPackage)) ?? null : null;
   const currentPairing = selectedContent ? state?.pairings.find(pairing => pairing.contentId === selectedContent.id
     && pairing.contentRevision === selectedContent.revisionNumber && pairing.status !== 'rejected') ?? null : null;
   const selectedPackage = selectedContent ? state?.packages.find(item => item.contentId === selectedContent.id
@@ -205,6 +237,14 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
     const timer = window.setInterval(() => { void props.onReload(); }, 15000);
     return () => window.clearInterval(timer);
   }, [props.onReload, state?.publications]);
+
+  useEffect(() => {
+    if (preview && (!canRetireMedia(preview, previewAsset) && preview.status === 'retired')) {
+      setPreviewId(null);
+      setPreviewMediaUrl(null);
+    }
+    if (retiringPackageId && !canRetireMedia(retiringPackage, retiringAsset)) setRetiringPackageId(null);
+  }, [preview, previewAsset, retiringAsset, retiringPackage, retiringPackageId]);
 
   const prepareSelected = async () => {
     if (!selectedContent || !facebook) return;
@@ -235,7 +275,7 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
           const pairing = state?.pairings.find(candidate => candidate.contentId === content.id && candidate.contentRevision === content.revisionNumber && candidate.status !== 'rejected') ?? null;
           const asset = pairing ? state?.assets.find(candidate => candidate.id === pairing.assetId) ?? null : null;
           const status = item?.status ?? 'needs_review';
-          return <article key={content.id} data-testid={`publishing-queue-card-${content.id}`} className={`py-4 ${props.selectedContentId === content.id ? 'bg-blue-50/60' : ''}`}><div className="flex min-w-0 flex-col gap-3 px-2 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><button type="button" onClick={() => props.onSelectContent(content)} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-bold text-slate-950">{content.title}</span><StatusPill status={status} /></span><span className="mt-1 block line-clamp-2 text-sm text-slate-600">{content.body}</span><span className="mt-1 block text-xs text-slate-500">{facebook?.destinationLabel ?? 'Facebook not connected'} · {asset ? assetLabel(asset) : 'Text only'}</span>{status === 'ready' && <span className="mt-1 block text-xs font-medium text-slate-600">Approval is complete. Publishing requires a separate action.</span>}</button><button type="button" onClick={() => item ? void openPreview(item) : (props.onSelectContent(content), undefined)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Eye size={15} />{item ? 'Preview' : 'Select'}</button></div></article>;
+          return <article key={content.id} data-testid={`publishing-queue-card-${content.id}`} className={`py-4 ${props.selectedContentId === content.id ? 'bg-blue-50/60' : ''}`}><div className="flex min-w-0 flex-col gap-3 px-2 sm:flex-row sm:items-center"><QueueThumbnail asset={asset} /><button type="button" onClick={() => props.onSelectContent(content)} className="min-w-0 flex-1 text-left"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-bold text-slate-950">{content.title}</span><StatusPill status={status} /></span><span className="mt-1 block line-clamp-2 text-sm text-slate-600">{content.body}</span><span className="mt-1 block text-xs text-slate-500">{facebook?.destinationLabel ?? 'Facebook not connected'} · {asset ? assetLabel(asset) : 'Text only'}</span>{status === 'ready' && <span className="mt-1 block text-xs font-medium text-slate-600">Approval is complete. Publishing requires a separate action.</span>}</button><div className="flex flex-wrap gap-2"><button type="button" onClick={() => item ? void openPreview(item) : (props.onSelectContent(content), undefined)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-bold"><Eye size={15} />{item ? 'Preview' : 'Select'}</button>{canRetireMedia(item, asset) && <button type="button" disabled={saving} onClick={() => setRetiringPackageId(item!.id)} className="min-h-10 rounded-md border border-rose-300 px-3 text-sm font-bold text-rose-700 disabled:opacity-50">Retire media</button>}</div></div></article>;
         })}</div>}
       </section>
 
@@ -260,6 +300,18 @@ export function MarketingPublishingWorkspace(props: MarketingPublishingWorkspace
       {!state?.operationAvailable && <div className="flex items-start gap-2 rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-600"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><p>The shared queue is operational in non-publishing mode. Existing history and previews remain available while new provider submissions are stopped.</p></div>}
 
       {preview && <PreviewDialog item={preview} asset={previewAsset} mediaUrl={previewMediaUrl} busy={saving} operationAvailable={state?.operationAvailable === true} onClose={() => { setPreviewId(null); setPreviewMediaUrl(null); }} onApprove={async () => { await props.onApprove(preview); setActionNotice(`"${preview.snapshot.title}" is Ready. Publishing still requires Publish Now or Schedule.`); setPreviewId(null); }} onAuthorize={async (mode, scheduledAt, timezone) => { await props.onAuthorize(preview, mode, scheduledAt, timezone); setActionNotice(mode === 'publish_now' ? `Publishing authorized for "${preview.snapshot.title}". ServSync is sending this exact post to Facebook.` : `Schedule saved for "${preview.snapshot.title}" at ${formatDate(scheduledAt)}.`); setPreviewId(null); }} />}
+      {retiringPackage && retiringAsset && canRetireMedia(retiringPackage, retiringAsset) && <RetireMediaDialog item={retiringPackage} busy={saving} onClose={() => setRetiringPackageId(null)} onRetire={async () => {
+        setActionError(null);
+        try {
+          await props.onRetireMedia(retiringPackage, retiringAsset);
+          setActionNotice(`“${retiringPackage.snapshot.title}” media retired. Its active media slot is now available.`);
+          setPreviewId(null);
+          setPreviewMediaUrl(null);
+          setRetiringPackageId(null);
+        } catch (cause) {
+          setActionError(cause instanceof Error ? cause.message : 'ServSync could not retire this media.');
+        }
+      }} />}
     </section>
   );
 }

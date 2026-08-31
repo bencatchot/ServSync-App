@@ -41,6 +41,7 @@ export type MarketingQueueAsset = {
   sha256: string;
   mediaVariant: string;
   lifecycleState: string;
+  retirementEligible: boolean;
   storageBucket: string | null;
   storagePath: string | null;
   posterBucket: string | null;
@@ -155,6 +156,9 @@ function errorFor(value: unknown, mutation: boolean) {
   const server = record(value) ? String(value.message ?? '') : '';
   const code = record(value) ? String(value.code ?? '') : '';
   if (code === '42501') return new MarketingPublishingAdapterError('unauthorized', 'Marketing publishing is unavailable for this account.');
+  if (server.includes('publishing dependency')) return new MarketingPublishingAdapterError('stale', 'This media is now scheduled, publishing, or otherwise tied to a publishing result. Reload before continuing.');
+  if (server.includes('no longer eligible for retirement')) return new MarketingPublishingAdapterError('stale', 'This media changed and is no longer eligible to retire. Reload before continuing.');
+  if (server.includes('protected or permanent')) return new MarketingPublishingAdapterError('rpc', 'Protected or permanent media cannot be retired.');
   if (code === '40001' || server.includes('changed; reload')) return new MarketingPublishingAdapterError('stale', 'This post changed. Reload before continuing.');
   if (server.includes('allowance is full')) return new MarketingPublishingAdapterError('rpc', 'The beta prepared-post limit is full. Publish or cancel an active item first.');
   if (server.includes('Provider setup is required')) return new MarketingPublishingAdapterError('rpc', 'Connect the selected destination before publishing.');
@@ -290,6 +294,7 @@ function parseAsset(value: unknown): MarketingQueueAsset {
     height: typeof value.height === 'number' ? value.height : null,
     durationSeconds: typeof value.duration_seconds === 'number' ? value.duration_seconds : null,
     sha256: value.sha256, mediaVariant: value.media_variant, lifecycleState: value.lifecycle_state,
+    retirementEligible: value.retirement_eligible === true,
     storageBucket: typeof value.storage_bucket === 'string' ? value.storage_bucket : null,
     storagePath: typeof value.storage_path === 'string' ? value.storage_path : null,
     posterBucket: typeof value.poster_bucket === 'string' ? value.poster_bucket : null,
@@ -427,6 +432,17 @@ export function createMarketingPublishingAdapter(client: MarketingPublishingRpcC
         p_contractor_id: contractorId, p_publication_id: publicationId,
         p_recovery_request_id: crypto.randomUUID(),
       }, true));
+    },
+    async retireMedia(assetId: string) {
+      const result = await rpc(client, 'servsync_abandon_marketing_media', {
+        p_contractor_id: contractorId, p_asset_id: assetId,
+      }, true);
+      if (!record(result) || result.asset_id !== assetId || result.state !== 'abandoned') malformed();
+      return {
+        assetId,
+        retiredPackageCount: typeof result.retired_package_count === 'number' ? result.retired_package_count : 0,
+        replayed: result.replayed === true,
+      };
     },
     async mediaUrl(assetId: string) {
       const access = await rpc(client, 'servsync_get_marketing_media_access', {

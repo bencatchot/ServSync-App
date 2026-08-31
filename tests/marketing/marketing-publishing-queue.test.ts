@@ -99,6 +99,7 @@ const catalog = {
     sha256: 'b'.repeat(64),
     media_variant: 'uploaded_marketing_media',
     lifecycle_state: 'protected',
+    retirement_eligible: false,
     storage_bucket: 'marketing-assets',
     storage_path: `${workspaceId}/${assetId}/photo.jpg`,
     poster_bucket: 'marketing-assets',
@@ -127,6 +128,9 @@ test('shared queue adapter scopes reads and exact-package mutations to contracto
       calls.push({ name, args });
       if (name === 'servsync_get_marketing_publishing') return { data: state, error: null };
       if (name === 'servsync_get_marketing_media_catalog') return { data: catalog, error: null };
+      if (name === 'servsync_abandon_marketing_media') return { data: {
+        asset_id: assetId, state: 'abandoned', retired_package_count: 1, replayed: false,
+      }, error: null };
       return { data: {
         package_id: packageId,
         publication_id: publicationId,
@@ -157,6 +161,7 @@ test('shared queue adapter scopes reads and exact-package mutations to contracto
   });
   await adapter.cancel(publicationId);
   await adapter.prepareReplacement(publicationId);
+  const retirement = await adapter.retireMedia(assetId);
 
   assert.equal(calls.every(call => call.args.p_contractor_id === contractorId), true);
   assert.deepEqual(calls.slice(0, 2).map(call => call.name), [
@@ -164,6 +169,8 @@ test('shared queue adapter scopes reads and exact-package mutations to contracto
   ]);
   assert.equal(calls.find(call => call.name === 'servsync_authorize_marketing_publication')?.args.p_expected_fingerprint, fingerprint);
   assert.equal(calls.find(call => call.name === 'servsync_prepare_marketing_pre_provider_replacement')?.args.p_publication_id, publicationId);
+  assert.deepEqual(retirement, { assetId, retiredPackageCount: 1, replayed: false });
+  assert.equal(calls.find(call => call.name === 'servsync_abandon_marketing_media')?.args.p_asset_id, assetId);
 });
 
 test('queue presentation requires explicit selection, preview, confirmation, and truthful provider links', async () => {
@@ -183,6 +190,8 @@ test('queue presentation requires explicit selection, preview, confirmation, and
   assert.match(source, /Prepare replacement/);
   assert.match(source, /Facebook was not contacted/);
   assert.match(source, /exact approved package is Ready again/);
+  assert.match(source, /Retire the unpublished media package for/);
+  assert.match(source, /Publication history is preserved/);
   assert.match(source, /Processing on Facebook/);
   assert.match(source, /window\.setInterval\(\(\) => \{ void props\.onReload\(\); \}, 15000\)/);
   assert.match(source, /publication\.status === 'scheduled' && publication\.mode === 'scheduled'/);
@@ -206,6 +215,18 @@ test('owner queue distinguishes publishing, provider processing, schedules, and 
   assert.equal(publicationStatusLabel({ ...publication, status: 'failed', retryEligible: false }), 'Needs Attention');
   assert.equal(publication.replacementEligible, true);
   assert.match(publicationStatusLabel(publication), /^Scheduled /);
+});
+
+test('retirement adapter explains concurrent publishing and lifecycle changes', async () => {
+  const messages = [
+    'Marketing media has a publishing dependency and cannot be retired.',
+    'Marketing media is no longer eligible for retirement; reload and try again.',
+  ];
+  const adapter = createMarketingPublishingAdapter({
+    rpc: async () => ({ data: null, error: { code: '40001', message: messages.shift() } }),
+  }, contractorId);
+  await assert.rejects(adapter.retireMedia(assetId), /scheduled, publishing, or otherwise tied to a publishing result/);
+  await assert.rejects(adapter.retireMedia(assetId), /changed and is no longer eligible to retire/);
 });
 
 test('queue SQL keeps the global kill switch default-off and claims reconciliation without reopening submission', async () => {

@@ -1,6 +1,6 @@
 # ServSync Product Roadmap
 
-Last updated: 2026-08-27
+Last updated: 2026-08-31
 
 Planning base: `origin/main` at `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
 
@@ -90,7 +90,7 @@ Focus rules:
 | Next recommended assignment | Close out TUT-003 by merging its permanent Production owner contextual-playback smoke after the branch run passes, then begin TUT-004 **How to deliver an invoice and record an outside payment**. Keep the Demo smoke credential repair as bounded maintenance rather than interrupting FB-040A. |
 | Assignment outcome | PR #536 merged at `995219497678edc966e736cd9c99bf611d043b4d`, and Production, Demo, and Stripe Sandbox automatic deployments passed. With explicit owner authorization, Production published TUT-003 walkthrough revision 1. Help Studio now reports three published and zero unpublished walkthroughs; the exact 57.32-second video loaded completely with one showing English caption track, matching transcript and Cedar disclosure. Immutable metadata binds it to `contractor.work` for Owner/Admin/Office/Field Technician and excludes Viewer/Homeowner. The rejected prior request remains **Needs rerecord** as preserved evidence. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
 | Expected following slice | After the TUT-003 Production owner smoke is merged, continue with TUT-004, then TUT-005, TUT-006, and the TUT-002 standards upgrade before the pilot onboarding dry run. |
-| Parallel strategic lane | FB-037 Marketing may continue in bounded slices under its existing approval, provider, publication, cost, and cohort gates. |
+| Parallel strategic lane | FB-037 Marketing has a source-complete guarded media-retirement candidate: eligible unpublished managed media can retire through the existing authenticated lifecycle RPC, atomically invalidating Ready/Needs Review packages and releasing quota while preserving audit/publication history. Its migration is unapplied and must follow Sandbox -> Demo -> Production. Read-only Production verification on 2026-08-31 found the originally named **Your work, connected — Free ServSync beta** item is now Published with preserved history, so it is intentionally ineligible and must not be used as rollout acceptance data. Selected-contractor beta work remains separately governed. |
 | Roadmap return point | Return to FB-040 controlled-pilot preflight after each bounded feature or strategic-lane interruption; tutorial readiness is the current launch assignment. |
 
 ### Completion update protocol

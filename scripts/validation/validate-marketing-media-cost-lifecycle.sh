@@ -197,6 +197,14 @@ if [[ -n "${SERVSYNC_MARKETING_QUEUE_MIGRATION:-}" ]]; then
     psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_FORWARD_FIX" >/dev/null
   fi
   psql_run --file "$ROOT_DIR/${SERVSYNC_MARKETING_QUEUE_VALIDATION:?Marketing queue validation is required.}" >/dev/null
+  if [[ -n "${SERVSYNC_MARKETING_RETIREMENT_MIGRATION:-}" ]]; then
+    psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_RETIREMENT_MIGRATION" >/dev/null
+    psql_run --file "$ROOT_DIR/${SERVSYNC_MARKETING_RETIREMENT_VALIDATION:?Marketing retirement validation is required.}" >/dev/null
+    if psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_RETIREMENT_MIGRATION" >/dev/null 2>&1; then
+      echo "Repeated Marketing media retirement migration unexpectedly succeeded." >&2
+      exit 1
+    fi
+  fi
   if psql_run --file "$ROOT_DIR/$SERVSYNC_MARKETING_QUEUE_MIGRATION" >/dev/null 2>&1; then
     echo "Repeated Marketing publishing queue migration unexpectedly succeeded." >&2
     exit 1

@@ -427,6 +427,7 @@ function AuthorizedMarketingWorkspace({
   const [publishingError, setPublishingError] = useState<string | null>(null);
   const [previewContentId, setPreviewContentId] = useState<string | null>(null);
   const [createdContentId, setCreatedContentId] = useState<string | null>(null);
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -697,6 +698,18 @@ function AuthorizedMarketingWorkspace({
         setPublishingSaving(false);
       }
     },
+    onRetireMedia: async (item: import('./marketingPublishing').MarketingPublicationPackage, asset: import('./marketingPublishing').MarketingQueueAsset) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await publishingAdapter.retireMedia(asset.id);
+        setPreviewContentId(current => current === item.contentId ? null : current);
+        await Promise.all([loadPublishing(), load()]);
+        setUsageRefreshKey(current => current + 1);
+      } finally {
+        setPublishingSaving(false);
+      }
+    },
     onReschedule: async (publication: MarketingPublication, scheduledAt: string, timezone: string) => {
       setPublishingSaving(true);
       setPublishingError(null);
@@ -746,7 +759,7 @@ function AuthorizedMarketingWorkspace({
       }} />}
       planning={planningEnabled ? planning : null}
       publishing={publishing}
-      settingsUsage={<MarketingUsagePanel client={client} contractorId={contractorId} platformControls={contractorId === null} />}
+      settingsUsage={<MarketingUsagePanel client={client} contractorId={contractorId} platformControls={contractorId === null} refreshKey={usageRefreshKey} />}
     />
   </>;
 }
