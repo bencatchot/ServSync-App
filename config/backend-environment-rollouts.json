@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "marketing-pre-provider-replacement-recovery-v1",
+      "artifact": "servsync-marketing-pre-provider-replacement-recovery.sql (SHA-256 e31c47cf63505a9f51d11d0317c518365c270cf1434cf571f4a6d80fbae990a3)",
+      "environments": {
+        "sandbox": {
+          "status": "Applied",
+          "reason": "Exact SHA-256 e31c47cf63505a9f51d11d0317c518365c270cf1434cf571f4a6d80fbae990a3 was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-30 after disposable PostgreSQL lifecycle/security validation and focused app/provider tests. Installed RPC/helper/reader definition SHA-256 values are 89ba8a2079443ad8961f555072b6d49d88db22c3203414a36c81e23262532331, 90b0d439551aa522820775f47a599312bd5576c7935a931c930e124b8c045945, and e4ae498d9ad44c0989632602c98a43c96e6223698a0e844069a39eca62f45744. Content 1, packages 0, publications 0, events 0, active publications 0, and provider-request starts 0 remained exact; provider submissions stayed false."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied once to Demo bdytwgejqnlblhrnqxkp after Sandbox passed. All three installed function hashes and security/grant settings match Sandbox. Content, packages, publications, events, active publications, and provider-request starts remained zero; provider submissions stayed false. Production-to-Demo supported objects match, with only the separately tracked Demo scenario catalog fingerprint mismatch remaining."
+        },
+        "production": {
+          "status": "Applied",
+          "reason": "The same exact migration was applied once to Production uqgtheclhxqlnjpfmheq after Sandbox and Demo passed. All three installed function hashes and security/grant settings match. Content 23, packages 6, publications 3, events 10, active publications 0, published publications 2, and historical provider-request starts 2 remained exact. The open-beta commercial remains failed with a Needs Attention package, no provider-start timestamp, and no provider ID; only its derived replacement eligibility is now true. Provider submissions remained true, but no recovery RPC, worker claim, Facebook request, publication, or event occurred during rollout."
+        }
+      }
+    },
+    {
       "id": "uploaded-marketing-video-publishing-eligibility-v1",
       "artifact": "servsync-uploaded-marketing-video-publishing-eligibility.sql (SHA-256 280c366d1d245f198c9cf7ee680ebe73bcb2f33b8e0b71dde9d9e2f5fae73f9b)",
       "environments": {

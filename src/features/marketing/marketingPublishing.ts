@@ -102,6 +102,7 @@ export type MarketingPublication = {
   attemptCount: number;
   maxAttempts: number;
   retryEligible: boolean;
+  replacementEligible: boolean;
   providerPublicationId: string | null;
   providerPermalink: string | null;
   failureCategory: string | null;
@@ -249,7 +250,8 @@ function parsePublication(value: unknown): MarketingPublication {
     || !timestamp(value.scheduled_at) || typeof value.authorization_timezone !== 'string'
     || !MARKETING_PUBLICATION_STATUSES.includes(value.status as MarketingPublicationStatus)
     || typeof value.attempt_count !== 'number' || typeof value.max_attempts !== 'number'
-    || typeof value.retry_eligible !== 'boolean' || !nullableString(value.provider_publication_id)
+    || typeof value.retry_eligible !== 'boolean' || typeof value.replacement_eligible !== 'boolean'
+    || !nullableString(value.provider_publication_id)
     || !nullableString(value.provider_permalink) || !nullableString(value.failure_category)
     || !nullableString(value.failure_message) || !timestamp(value.created_at)
     || !nullableTimestamp(value.publishing_started_at) || !nullableTimestamp(value.published_at)
@@ -263,6 +265,7 @@ function parsePublication(value: unknown): MarketingPublication {
     scheduledAt: value.scheduled_at, timezone: value.authorization_timezone,
     status: value.status as MarketingPublicationStatus, attemptCount: value.attempt_count,
     maxAttempts: value.max_attempts, retryEligible: value.retry_eligible,
+    replacementEligible: value.replacement_eligible,
     providerPublicationId: value.provider_publication_id, providerPermalink: value.provider_permalink,
     failureCategory: value.failure_category, failureMessage: value.failure_message,
     createdAt: value.created_at, publishingStartedAt: value.publishing_started_at,
@@ -417,6 +420,12 @@ export function createMarketingPublishingAdapter(client: MarketingPublishingRpcC
     async retry(publicationId: string) {
       return receipt(await rpc(client, 'servsync_retry_marketing_publication', {
         p_contractor_id: contractorId, p_publication_id: publicationId, p_retry_request_id: crypto.randomUUID(),
+      }, true));
+    },
+    async prepareReplacement(publicationId: string) {
+      return receipt(await rpc(client, 'servsync_prepare_marketing_pre_provider_replacement', {
+        p_contractor_id: contractorId, p_publication_id: publicationId,
+        p_recovery_request_id: crypto.randomUUID(),
       }, true));
     },
     async mediaUrl(assetId: string) {
