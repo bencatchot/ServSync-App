@@ -64,7 +64,7 @@ Facebook is the only operational provider adapter. Connected Facebook destinatio
 
 ## Needs Attention And History
 
-Needs Attention provides sanitized, action-oriented failures. Explicit retry is available only for an existing retry-eligible publication whose prior result proves no uncertain provider submission occurred. Ambiguous provider outcomes remain non-retryable.
+Needs Attention provides sanitized, action-oriented failures. Explicit retry is available only for an existing retry-eligible publication whose prior result proves no uncertain provider submission occurred. A separate guarded **Prepare replacement** path is available only when the database proves the provider was never contacted, the failed attempt has no provider ID, no conflicting active or published attempt exists, and the immutable package still matches the current approved Content, media, destination, permissions, and prepared-post allowance. That action preserves the failed publication and audit event, returns only the exact package to Ready, and still requires a new explicit Publish Now or Schedule decision. Ambiguous or provider-started outcomes remain non-retryable and replacement-ineligible.
 
 Published cards retain immutable Content/media/provider lineage, provider ID, timestamps, poster/history metadata, and an actual provider permalink when one exists. The UI never constructs a link from an assumed provider URL pattern.
 
@@ -79,6 +79,8 @@ The exact primary migration and forward fix were applied Sandbox -> Demo -> Prod
 Production retained one publication, four events, exact Content revision 9, pairing, asset, Facebook Video ID `1616577883220910`, and Page `1199023349954773`. The new global provider-submission control is false and the Production deployment environment flag remains absent. This rollout made no provider request and authorizes no public post.
 
 The G-B cleanup Cron remains configured for 05:43 UTC daily. As of this rollout, no qualifying natural successful execution was observable; a later unauthenticated 401 is not acceptance evidence. This is a non-blocking operational follow-up.
+
+The guarded recovery addition is implemented by the 325-line `servsync-marketing-pre-provider-replacement-recovery.sql` at SHA-256 `e31c47cf63505a9f51d11d0317c518365c270cf1434cf571f4a6d80fbae990a3`. It does not contact a provider, alter the failed authorization snapshot, or authorize publication.
 
 ## Deferred
 

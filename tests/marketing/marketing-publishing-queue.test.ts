@@ -73,6 +73,7 @@ const state = {
     attempt_count: 0,
     max_attempts: 3,
     retry_eligible: false,
+    replacement_eligible: true,
     provider_publication_id: null,
     provider_permalink: null,
     failure_category: null,
@@ -155,12 +156,14 @@ test('shared queue adapter scopes reads and exact-package mutations to contracto
     mode: 'scheduled', scheduledAt: '2026-08-18T20:00:00.000Z', timezone: 'America/Chicago',
   });
   await adapter.cancel(publicationId);
+  await adapter.prepareReplacement(publicationId);
 
   assert.equal(calls.every(call => call.args.p_contractor_id === contractorId), true);
   assert.deepEqual(calls.slice(0, 2).map(call => call.name), [
     'servsync_get_marketing_publishing', 'servsync_get_marketing_media_catalog',
   ]);
   assert.equal(calls.find(call => call.name === 'servsync_authorize_marketing_publication')?.args.p_expected_fingerprint, fingerprint);
+  assert.equal(calls.find(call => call.name === 'servsync_prepare_marketing_pre_provider_replacement')?.args.p_publication_id, publicationId);
 });
 
 test('queue presentation requires explicit selection, preview, confirmation, and truthful provider links', async () => {
@@ -177,6 +180,9 @@ test('queue presentation requires explicit selection, preview, confirmation, and
   assert.match(source, /no Facebook request will be sent/);
   assert.match(source, /Publish Now/);
   assert.match(source, /Review Schedule/);
+  assert.match(source, /Prepare replacement/);
+  assert.match(source, /Facebook was not contacted/);
+  assert.match(source, /exact approved package is Ready again/);
   assert.match(source, /Processing on Facebook/);
   assert.match(source, /window\.setInterval\(\(\) => \{ void props\.onReload\(\); \}, 15000\)/);
   assert.match(source, /publication\.status === 'scheduled' && publication\.mode === 'scheduled'/);
@@ -198,6 +204,7 @@ test('owner queue distinguishes publishing, provider processing, schedules, and 
   assert.equal(publicationStatusLabel({ ...publication, status: 'publishing', providerPublicationId: null }), 'Publishing...');
   assert.equal(publicationStatusLabel({ ...publication, status: 'publishing', providerPublicationId: '123456789' }), 'Processing on Facebook');
   assert.equal(publicationStatusLabel({ ...publication, status: 'failed', retryEligible: false }), 'Needs Attention');
+  assert.equal(publication.replacementEligible, true);
   assert.match(publicationStatusLabel(publication), /^Scheduled /);
 });
 

@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-08-30 - Guarded pre-provider Marketing replacement recovery
+
+- Branch: `codex/marketing-pre-provider-recovery-v1` from main `7302b2a6f2e914c9b9499d2a570caa17351beff6`.
+- Files changed: additive guarded-recovery migration and disposable PostgreSQL validation; Marketing publishing adapter/workspace wiring and focused tests; publishing specification, FB-037 master-plan/backlog governance, rollout ledger, and this changelog.
+- Summary of change: Adds **Prepare replacement** only when the database proves a failed publication never contacted the provider, has no provider ID or conflicting active/published attempt, and the immutable package still matches current approved Content, media, destination, permissions, disclosures, and prepared-post allowance. The original failed publication and append-only audit history remain intact; the exact package alone returns to Ready and a new explicit Publish Now/Schedule decision is still required.
+- Reason for change: The approved uploaded open-beta commercial failed before Facebook contact under the earlier managed-video eligibility rule. PR #538 corrected future worker eligibility, but the existing immutable failure correctly remained Needs Attention and had no safe product recovery action.
+- Tests/checks run: disposable PostgreSQL compile/lifecycle/security/role/tenant/idempotency/ambiguity tests; 39 focused publishing/provider tests; strict TypeScript; Production build; lint warning budget; architecture budget; `git diff --check`; and changed-file sensitive-value scan.
+- Known risks or follow-ups: The source change and rollout do not authorize or perform a Facebook post. After normal merge/deployment, the Production owner must use Prepare replacement, review the exact Preview, and separately confirm Publish. Provider-started or otherwise ambiguous failures remain blocked.
+- Tutorial impact: `NONE`. This changes an internal Marketing Needs Attention recovery action. Production Help Studio has no published Marketing/Campaigns/Publishing walkthrough, so no published tutorial is made stale.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Records the guarded failure-recovery boundary while keeping every publication decision explicit and FB-037 active.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Adds a bounded publication-recovery workflow without changing provider authority or automatic publishing policy.
+
 ## 2026-08-30 - Approved uploaded Marketing MP4 publishing correction
 
 - Finding: The ordinary Marketing upload and approval flow produced valid `uploaded_marketing_source` MP4 assets, but the Facebook worker and database authorization still admitted only the earlier recorder-generated media variants. An approved uploaded commercial therefore failed before provider contact with **The approved managed video snapshot is invalid.** No duplicate or partial Facebook post exists.

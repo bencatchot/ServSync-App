@@ -684,6 +684,19 @@ function AuthorizedMarketingWorkspace({
         setPublishingSaving(false);
       }
     },
+    onPrepareReplacement: async (publication: MarketingPublication) => {
+      setPublishingSaving(true);
+      setPublishingError(null);
+      try {
+        await publishingAdapter.prepareReplacement(publication.id);
+        await loadPublishing();
+      } catch (saveError) {
+        setPublishingError(saveError instanceof Error ? saveError.message : 'ServSync could not prepare the replacement.');
+        throw saveError;
+      } finally {
+        setPublishingSaving(false);
+      }
+    },
     onReschedule: async (publication: MarketingPublication, scheduledAt: string, timezone: string) => {
       setPublishingSaving(true);
       setPublishingError(null);
