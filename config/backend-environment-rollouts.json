@@ -8,8 +8,8 @@
       "artifact": "servsync-marketing-media-retirement-control.sql (SHA-256 f04267c23dcb3a7d868cb510b17097a68d07422ffa6c40a38870fe3a9815c777)",
       "environments": {
         "sandbox": {
-          "status": "Pending",
-          "reason": "Source and disposable PostgreSQL/browser validation are complete. Exact migration bytes still require an authorized Sandbox application plus eligible unpublished fixture, quota-release, stale-package, forbidden-state, role, audit, zero-provider-action, and cleanup acceptance."
+          "status": "Applied",
+          "reason": "Exact SHA-256 f04267c23dcb3a7d868cb510b17097a68d07422ffa6c40a38870fe3a9815c777 was applied once to Sandbox zpzdkoaubyjtsomccxya on 2026-08-31 under owner authorization. Postflight verified postgres ownership, SECURITY DEFINER, fixed search_path=pg_catalog, public, auth, authenticated-only execution, service-role/anon denial, installation marker, abandon-RPC definition SHA-256 2b158f1931a6dbf12d999a5879a39c20ffc27d9b97b122f261e7f8d461e00d81, and catalog-RPC definition SHA-256 758d4e8502b54dcd21f8731db4f358980fbc2a4914fd4361bd780eb06a65ffac. A fresh authenticated contractor-owner fixture proved eligible-video-only UI visibility, exact named confirmation, authenticated RPC authority with direct-table denial, asset abandonment, active-media 1-to-0 and prepared-post 2-to-1 release, Ready package retirement, pairing rejection, stale authorization denial, append-only lifecycle/pairing history, replay idempotency, and UI catalog/queue/usage refresh. Protected, permanent, scheduled, publishing, provider-processing, published, text-only, and already-retired states were absent or denied as designed. Publications, publication events, active publications, and provider starts remained zero. Exact fixture rows and Storage objects were removed, the bounded setup-only provider fixture state was restored, forbidden probes rolled back with zero residue, and final business counts returned to content 1, assets/lifecycles/pairings/packages/publications/events/intakes 0, usage events 1."
         },
         "production": {
           "status": "Pending",
@@ -17,7 +17,7 @@
         },
         "demo": {
           "status": "Pending",
-          "reason": "Apply the same exact bytes only after Sandbox acceptance, then repeat catalog/RPC/package-retirement/quota-refresh/forbidden-state validation with Demo-safe fixture data before Production is considered."
+          "reason": "Sandbox acceptance passed for the exact committed bytes with complete fixture cleanup and zero provider action. Demo rollout is safe to begin only under separate owner authorization; repeat catalog/RPC/package-retirement/quota-refresh/forbidden-state validation with a newly created Demo-only fixture before Production is considered."
         }
       }
     },
