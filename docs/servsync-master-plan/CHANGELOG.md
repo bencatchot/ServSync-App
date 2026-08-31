@@ -6,6 +6,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-31 - Unattached Marketing upload retirement follow-up
 
+- Pull request: PR #541 carries this bounded source-only follow-up; merge and deployment remain separately authorized.
 - User-facing behavior: Campaigns now shows a compact **Unattached uploads** section only when the authenticated media catalog returns a server-eligible upload that has no candidate/approved pairing and no non-retired package dependency. The owner can retire that upload directly without creating fake Content or pairing it to a post.
 - Exact confirmation: The dialog identifies the real upload as an image or video and includes available duration, dimensions, and upload date. It explains that the unpublished upload is retired, one active-media slot is released, audit/publication history is preserved, and retained media may later be purged. It does not invent a post title.
 - Authority and safety: The browser continues to call only authenticated `servsync_abandon_marketing_media`. There is no table mutation, service-role browser path, new permission boundary, or migration. Server-derived `retirement_eligible` remains mandatory; client cross-checks additionally hide the control for active pairings and Needs Attention, scheduled, publishing, published, or other non-retired package dependencies. Concurrent server rejection refreshes catalog, queue, Content, and selection state while presenting the exact safe error.
