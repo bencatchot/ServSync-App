@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { createMarketingPublishingAdapter } from '../../src/features/marketing/marketingPublishing.ts';
+import { canRetireUnattachedMedia, createMarketingPublishingAdapter } from '../../src/features/marketing/marketingPublishing.ts';
 import { publicationStatusLabel } from '../../src/features/marketing/MarketingPublishingWorkspace.tsx';
 
 const contractorId = '20000000-0000-4000-8000-000000000001';
@@ -227,6 +227,32 @@ test('retirement adapter explains concurrent publishing and lifecycle changes', 
   }, contractorId);
   await assert.rejects(adapter.retireMedia(assetId), /scheduled, publishing, or otherwise tied to a publishing result/);
   await assert.rejects(adapter.retireMedia(assetId), /changed and is no longer eligible to retire/);
+});
+
+test('unattached retirement candidate requires server eligibility and no live pairing or package dependency', async () => {
+  const adapter = createMarketingPublishingAdapter({
+    rpc: async name => ({ data: name === 'servsync_get_marketing_publishing' ? state : catalog, error: null }),
+  }, contractorId);
+  const loaded = await adapter.get();
+  const asset = { ...loaded.assets[0]!, source: 'marketing_upload', mediaVariant: 'uploaded_marketing_source', lifecycleState: 'uploaded', retirementEligible: true };
+  const clean = { ...loaded, assets: [asset], pairings: [], packages: [] };
+  assert.equal(canRetireUnattachedMedia(asset, clean), true);
+
+  for (const lifecycleState of ['protected', 'retention', 'scheduled', 'publishing', 'provider_processing', 'purging', 'purged', 'abandoned']) {
+    assert.equal(canRetireUnattachedMedia({ ...asset, lifecycleState }, clean), false, lifecycleState);
+  }
+  assert.equal(canRetireUnattachedMedia({ ...asset, retirementEligible: false }, clean), false);
+  assert.equal(canRetireUnattachedMedia({ ...asset, source: 'demo_recorder' }, clean), false);
+  assert.equal(canRetireUnattachedMedia({ ...asset, mediaVariant: 'marketing_composition' }, clean), false);
+  assert.equal(canRetireUnattachedMedia(asset, {
+    ...clean, pairings: [{ ...loaded.pairings[0]!, id: pairingId, assetId, status: 'candidate' }],
+  }), false);
+  assert.equal(canRetireUnattachedMedia(asset, {
+    ...clean, packages: [{ ...loaded.packages[0]!, mediaPairingId: null, mediaSnapshot: { asset_id: assetId }, status: 'needs_attention' }],
+  }), false);
+  assert.equal(canRetireUnattachedMedia(asset, {
+    ...clean, packages: [{ ...loaded.packages[0]!, mediaPairingId: null, mediaSnapshot: { asset_id: assetId }, status: 'retired' }],
+  }), true);
 });
 
 test('queue SQL keeps the global kill switch default-off and claims reconciliation without reopening submission', async () => {

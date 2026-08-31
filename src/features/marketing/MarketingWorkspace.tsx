@@ -698,14 +698,17 @@ function AuthorizedMarketingWorkspace({
         setPublishingSaving(false);
       }
     },
-    onRetireMedia: async (item: import('./marketingPublishing').MarketingPublicationPackage, asset: import('./marketingPublishing').MarketingQueueAsset) => {
+    onRetireMedia: async (asset: import('./marketingPublishing').MarketingQueueAsset, item?: import('./marketingPublishing').MarketingPublicationPackage) => {
       setPublishingSaving(true);
       setPublishingError(null);
       try {
         await publishingAdapter.retireMedia(asset.id);
-        setPreviewContentId(current => current === item.contentId ? null : current);
+        if (item) setPreviewContentId(current => current === item.contentId ? null : current);
         await Promise.all([loadPublishing(), load()]);
         setUsageRefreshKey(current => current + 1);
+      } catch (saveError) {
+        await Promise.all([loadPublishing(), load()]);
+        throw saveError;
       } finally {
         setPublishingSaving(false);
       }
