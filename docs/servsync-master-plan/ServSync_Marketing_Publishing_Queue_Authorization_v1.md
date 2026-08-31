@@ -80,7 +80,7 @@ Production retained one publication, four events, exact Content revision 9, pair
 
 The G-B cleanup Cron remains configured for 05:43 UTC daily. As of this rollout, no qualifying natural successful execution was observable; a later unauthenticated 401 is not acceptance evidence. This is a non-blocking operational follow-up.
 
-The guarded recovery addition is implemented by the 325-line `servsync-marketing-pre-provider-replacement-recovery.sql` at SHA-256 `e31c47cf63505a9f51d11d0317c518365c270cf1434cf571f4a6d80fbae990a3`. It does not contact a provider, alter the failed authorization snapshot, or authorize publication.
+The guarded recovery addition is implemented by the 325-line `servsync-marketing-pre-provider-replacement-recovery.sql` at SHA-256 `e31c47cf63505a9f51d11d0317c518365c270cf1434cf571f4a6d80fbae990a3`. Exact bytes are applied in Sandbox, Demo, and Production. The rollout preserved every captured Marketing/package/publication/event/provider-start count; Production's open-beta failure remains failed/Needs Attention and only its derived replacement eligibility became true. The migration did not contact a provider, alter the failed authorization snapshot, invoke recovery, or authorize publication.
 
 ## Deferred
 
