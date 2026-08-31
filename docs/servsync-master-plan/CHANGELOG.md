@@ -6,7 +6,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-08-30 - Guarded pre-provider Marketing replacement recovery
 
-- Branch: `codex/marketing-pre-provider-recovery-v1` from main `7302b2a6f2e914c9b9499d2a570caa17351beff6`.
+- PR #539 / branch `codex/marketing-pre-provider-recovery-v1` from main `7302b2a6f2e914c9b9499d2a570caa17351beff6`.
 - Files changed: additive guarded-recovery migration and disposable PostgreSQL validation; Marketing publishing adapter/workspace wiring and focused tests; publishing specification, FB-037 master-plan/backlog governance, rollout ledger, and this changelog.
 - Summary of change: Adds **Prepare replacement** only when the database proves a failed publication never contacted the provider, has no provider ID or conflicting active/published attempt, and the immutable package still matches current approved Content, media, destination, permissions, disclosures, and prepared-post allowance. The original failed publication and append-only audit history remain intact; the exact package alone returns to Ready and a new explicit Publish Now/Schedule decision is still required.
 - Reason for change: The approved uploaded open-beta commercial failed before Facebook contact under the earlier managed-video eligibility rule. PR #538 corrected future worker eligibility, but the existing immutable failure correctly remained Needs Attention and had no safe product recovery action.
