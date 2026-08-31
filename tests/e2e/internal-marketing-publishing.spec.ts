@@ -26,10 +26,13 @@ const content = {
   source_direction_topic: null, source_direction_status: null,
 };
 
-function publishingState(status: 'needs_review' | 'ready' = 'needs_review', facebookSetup = false, operationAvailable = false) {
+type PackageStatus = 'needs_review' | 'ready' | 'scheduled' | 'publishing' | 'published' | 'needs_attention' | 'retired';
+
+function publishingState(status: PackageStatus = 'needs_review', facebookSetup = false, operationAvailable = false) {
   return {
     workspace: { workspace_id: workspaceId, workspace_kind: 'internal', display_name: 'ServSync Marketing' },
-    operation_available: operationAvailable, prepared_limit: 5, prepared_count: status === 'ready' ? 1 : 0,
+    operation_available: operationAvailable, prepared_limit: 5,
+    prepared_count: ['ready', 'scheduled', 'publishing'].includes(status) ? 1 : 0,
     providers: [{
       connection_id: connectionId, provider: 'facebook', priority: 1,
       connection_status: facebookSetup ? 'setup_required' : 'connected',
@@ -52,8 +55,10 @@ function publishingState(status: 'needs_review' | 'ready' = 'needs_review', face
       content_snapshot: { title: content.title, body: content.body, content_type: 'social_post', content_revision: 4 },
       media_pairing_id: pairingId, media_snapshot: { asset_id: assetId }, provider: 'facebook',
       connection_id: connectionId, connection_revision: 2, destination_label: 'ServSync', status,
-      previewed_at: status === 'ready' ? now : null, approved_at: status === 'ready' ? now : null,
-      required_disclosures: [], retired_reason: null, created_at: now, updated_at: now,
+      previewed_at: status === 'needs_review' ? null : now,
+      approved_at: ['ready', 'scheduled', 'publishing', 'published', 'needs_attention'].includes(status) ? now : null,
+      required_disclosures: [], retired_reason: status === 'retired' ? 'Managed media retired before publication.' : null,
+      created_at: now, updated_at: now,
     }],
     publications: [],
   };
@@ -67,6 +72,7 @@ const catalog = {
     poster_bucket: 'marketing-assets', poster_path: `${workspaceId}/${assetId}/poster.jpg`,
     mime_type: 'video/mp4', file_size_bytes: 4096, width: 1440, height: 900, duration_seconds: 29.24,
     sha256: 'b'.repeat(64), media_variant: 'silent_product_demo_master', lifecycle_state: 'protected',
+    retirement_eligible: false,
     purged_at: null, ai_narration_disclosure_required: false, ai_narration_disclosure_text: null, created_at: now,
   }],
   pairings: [{
@@ -76,12 +82,14 @@ const catalog = {
 };
 
 async function install(page: Page, options: {
-  status?: 'needs_review' | 'ready';
+  status?: PackageStatus;
   contractor?: boolean;
   facebookSetup?: boolean;
   stalePairingUntilRefresh?: boolean;
   operationAvailable?: boolean;
   contentStatus?: 'draft' | 'approved';
+  assetLifecycleState?: string;
+  retirementEligible?: boolean;
 } = {}) {
   await page.goto('/');
   await page.evaluate(async ({ content, state, catalog, options, contractorId }) => {
@@ -95,13 +103,21 @@ async function install(page: Page, options: {
     const preparedPackage = (state as { packages: Array<{ package_id: string; package_fingerprint: string }> }).packages[0];
     const selectedAsset = (catalog as { assets: Array<{ storage_bucket: string; storage_path: string }> }).assets[0];
     const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const currentState = structuredClone(state) as {
+      prepared_count: number;
+      packages: Array<Record<string, unknown>>;
+    } & Record<string, unknown>;
+    const currentCatalog = structuredClone(catalog) as {
+      assets: Array<Record<string, unknown>>;
+      pairings: Array<Record<string, unknown>>;
+    } & Record<string, unknown>;
     let mediaCatalogReads = 0;
     (window as unknown as { __marketingRpcCalls: typeof calls }).__marketingRpcCalls = calls;
     const client = {
       rpc: async (name: string, args: Record<string, unknown>) => {
         calls.push({ name, args });
         if (name === 'servsync_list_marketing_content') return { data: [content], error: null };
-        if (name === 'servsync_get_marketing_publishing') return { data: state, error: null };
+        if (name === 'servsync_get_marketing_publishing') return { data: currentState, error: null };
         if (name === 'servsync_get_marketing_media_catalog') {
           mediaCatalogReads += 1;
           if (options.stalePairingUntilRefresh && mediaCatalogReads === 1) {
@@ -115,7 +131,21 @@ async function install(page: Page, options: {
             }));
             return { data: { ...(catalog as Record<string, unknown>), pairings }, error: null };
           }
-          return { data: catalog, error: null };
+          return { data: currentCatalog, error: null };
+        }
+        if (name === 'servsync_abandon_marketing_media') {
+          const target = currentCatalog.assets.find(asset => asset.asset_id === args.p_asset_id);
+          if (!target?.retirement_eligible) return { data: null, error: { code: '40001', message: 'Marketing media is no longer eligible for retirement; reload and try again.' } };
+          target.lifecycle_state = 'abandoned';
+          target.retirement_eligible = false;
+          currentCatalog.pairings = currentCatalog.pairings.map(pairing => pairing.asset_id === args.p_asset_id
+            ? { ...pairing, status: 'rejected', reviewed_at: '2026-08-17T20:00:00.000Z' }
+            : pairing);
+          currentState.packages = currentState.packages.map(item => item.media_snapshot && (item.media_snapshot as Record<string, unknown>).asset_id === args.p_asset_id
+            ? { ...item, status: 'retired', retired_reason: 'Managed media retired before publication.' }
+            : item);
+          currentState.prepared_count = 0;
+          return { data: { asset_id: args.p_asset_id, state: 'abandoned', retired_package_count: 1, replayed: false }, error: null };
         }
         if (name === 'servsync_get_marketing_media_access') return { data: {
           state: 'protected', storage_bucket: selectedAsset.storage_bucket,
@@ -149,7 +179,14 @@ async function install(page: Page, options: {
     state: options.stalePairingUntilRefresh
       ? { ...publishingState(options.status, options.facebookSetup, options.operationAvailable), packages: [] }
       : publishingState(options.status, options.facebookSetup, options.operationAvailable),
-    catalog, options,
+    catalog: {
+      ...catalog,
+      assets: catalog.assets.map(asset => ({
+        ...asset,
+        lifecycle_state: options.assetLifecycleState ?? asset.lifecycle_state,
+        retirement_eligible: options.retirementEligible ?? asset.retirement_eligible,
+      })),
+    }, options,
     contractorId: options.contractor ? contractorId : null,
   });
   await expect(page.getByTestId('marketing-workspace')).toBeVisible();
@@ -197,6 +234,44 @@ test('ready exact package cannot authorize while provider operation is paused', 
   await expect(page.getByRole('button', { name: 'Publish Now' })).toBeDisabled();
   const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string }> }).__marketingRpcCalls);
   expect(calls.map(call => call.name)).not.toContain('servsync_authorize_marketing_publication');
+});
+
+test('eligible Ready media requires exact retirement confirmation and refreshes the stale package away', async ({ page }) => {
+  await install(page, { status: 'ready', assetLifecycleState: 'ready', retirementEligible: true, operationAvailable: true });
+  await page.getByTestId('marketing-nav-campaigns').click();
+  const card = page.getByTestId(`publishing-queue-card-${contentId}`);
+  await expect(card).toContainText('Ready - not published');
+  await card.getByRole('button', { name: 'Retire media' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Retire media for Approved social post' });
+  await expect(dialog).toContainText('Retire the unpublished media package for “Approved social post”?');
+  await expect(dialog).toContainText('active media slot will be released');
+  await expect(dialog).toContainText('Publication history is preserved');
+  await expect(dialog).toContainText('may later be purged under the retention policy');
+  await dialog.getByRole('button', { name: 'Retire media' }).click();
+  await expect(page.getByRole('status')).toContainText('media retired. Its active media slot is now available.');
+  await expect(card).not.toContainText('Ready - not published');
+  await expect(card.getByRole('button', { name: 'Retire media' })).toHaveCount(0);
+  const calls = await page.evaluate(() => (window as unknown as { __marketingRpcCalls: Array<{ name: string; args: Record<string, unknown> }> }).__marketingRpcCalls);
+  expect(calls.filter(call => call.name === 'servsync_abandon_marketing_media')).toEqual([{
+    name: 'servsync_abandon_marketing_media',
+    args: { p_contractor_id: null, p_asset_id: assetId },
+  }]);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_publishing')).toHaveLength(2);
+  expect(calls.filter(call => call.name === 'servsync_get_marketing_media_catalog')).toHaveLength(2);
+});
+
+test('retirement control is absent for protected, published, scheduled, publishing, and abandoned media', async ({ page }) => {
+  for (const scenario of [
+    { status: 'ready' as const, lifecycle: 'protected', eligible: false },
+    { status: 'published' as const, lifecycle: 'retention', eligible: false },
+    { status: 'scheduled' as const, lifecycle: 'scheduled', eligible: false },
+    { status: 'publishing' as const, lifecycle: 'provider_processing', eligible: false },
+    { status: 'retired' as const, lifecycle: 'abandoned', eligible: false },
+  ]) {
+    await install(page, { status: scenario.status, assetLifecycleState: scenario.lifecycle, retirementEligible: scenario.eligible });
+    await page.getByTestId('marketing-nav-campaigns').click();
+    await expect(page.getByRole('button', { name: 'Retire media' })).toHaveCount(0);
+  }
 });
 
 test('ready package confirmation names the exact post, Page, and media before one authorization', async ({ page }) => {
