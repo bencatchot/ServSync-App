@@ -2,7 +2,7 @@
 
 ## Status
 
-Source candidate ready for review. TUT-004 is not recorded, narrated, approved, or published. The durable Demo media step requires the merged source on the dedicated Demo deployment and the existing protected recorder credentials; those credentials are absent from this worktree and were not retrieved.
+Runtime correction ready for review. The first protected durable Demo run against `dded6f958e326bf3b8603bbba2a7341115db3733` failed closed before delivery and promoted no media because the private Invoice-adoption query did not select the two reservation fields its unchanged exactness rule validates. The bounded correction adds those existing fields and a focused regression. TUT-004 is not recorded, narrated, approved, or published.
 
 ## Scope accepted
 
@@ -31,6 +31,14 @@ The target guard accepts only the protected durable Demo project. The scenario u
 | App architecture budget | Passed at 50,824 lines |
 | Script syntax and diff whitespace | Passed |
 
+### Protected runtime evidence
+
+- The repaired credential bundle resolved exactly two Demo-owned recorder identities with the intended homeowner and contractor-owner metadata, preserved their existing profile/tenant ownership, and passed both rotated password logins. The ignored local bundle is owner-readable only and contains no OpenAI key.
+- Exact durable Demo commit `dded6f958e326bf3b8603bbba2a7341115db3733` and its successful `servsync-demo` deployment were confirmed before the run.
+- The live UI-created draft contained five Invoice lines and five completed Job work items, all drafted and reserved to that Invoice, with zero premature payment events, `$2,165.00` total, and `$0.00` paid.
+- The adoption helper had omitted `reserved_invoice_id` and `invoiced_invoice_id` from `fetchJobWorkItems`, so those required values were always unavailable to the validator. The corrected query preserved every validation rule; the complete Demo Recorder suite passed 49/49, architecture passed 25/25, and TypeScript passed.
+- The exact failed Invoice was adopted only to regain registry ownership, then guarded reset removed 27 disposable registered rows. Zero registered disposable records remain. No source media, payment-provider traffic, or external effect was produced.
+
 ## Tutorial freshness
 
 Tutorial impact: `UPDATE REQUIRED`.
@@ -39,4 +47,4 @@ Affected tutorial: TUT-004 **How to deliver an invoice and record an outside pay
 
 ## Owner gate
 
-Minimum owner action when ready: provide or authorize access to the existing protected Demo recorder credentials through the established project process after the source is merged and deployed. Separate explicit owner decisions remain required for Help approval and Production publication. No fresh credential retrieval, provider request, approval, or publication is authorized by this source PR.
+Minimum owner action when ready: approve merge of the bounded Invoice-adoption correction after ordinary review. A provenance-valid protected silent rerun must use the resulting exact merged source and durable Demo deployment. Separate explicit owner decisions remain required for Cedar/OpenAI use, Help approval, and Production publication. No provider request, approval, or publication is authorized by this correction.

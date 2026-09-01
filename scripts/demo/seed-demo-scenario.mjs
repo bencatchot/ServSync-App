@@ -1637,7 +1637,7 @@ async function fetchJobWorkItems(service, jobId) {
   return ensureOk(
     await service
       .from('job_work_items')
-      .select('id, title, completion_status, completed_at, completed_by, billing_status, billable, unit_price_cents, sort_order, source_estimate_line_item_id')
+      .select('id, title, completion_status, completed_at, completed_by, billing_status, billable, unit_price_cents, sort_order, source_estimate_line_item_id, reserved_invoice_id, invoiced_invoice_id')
       .eq('inspection_id', jobId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true }),
