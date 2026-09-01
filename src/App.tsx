@@ -18509,9 +18509,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-slate-950">Service Requests</h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {homeownerHasMultipleProperties ? `Showing ${homeownerRequestScopeLabel}.` : `Requests for ${homeownerRequestScopeLabel}.`}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">{homeownerHasMultipleProperties ? `Showing ${homeownerRequestScopeLabel}.` : `Requests for ${homeownerRequestScopeLabel}.`}</p>
+                    {supabase ? <div className="mt-3"><ContextualHelp client={supabase} contextKey="homeowner.service"
+                      label="How to connect and request service" /></div> : null}
                   </div>
                   {homeownerHasMultipleProperties && (
                     <Field label="Property">

@@ -14,6 +14,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const SHA256 = /^[0-9a-f]{64}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 const SAFE_SCENARIOS = new Set([
+  'homeowner-connect-service-request',
   'homeowner-service-request',
   'contractor-service-request-intake',
   'contractor-create-estimate',

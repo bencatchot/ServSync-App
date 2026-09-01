@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - FB-040A TUT-005 source preparation
+
+- Roadmap reconciliation: PR #548 is merged at `1940394a78561ec67cad4b727e770e0e4b67f24b`. The Product Roadmap no longer treats that merge as pending, Pilot Tutorial Coverage now truthfully reports four published walkthroughs and two missing protected workflows, and TUT-005 is the primary active launch outcome without being represented as recorded or published.
+- Protected scenario: Adds `homeowner-connect-service-request` from `contractor_discovery_ready` through `request_ready`. The fictional homeowner selects Demo Bay Home, submits a contextual connection request, the fictional contractor accepts through the real UI behind a frozen homeowner frame, and the homeowner submits the exact service Request through the real UI.
+- Durable lineage: A new Demo-only adoption operation accepts only the exact active `homeowner_request` connection, selected home permissions, original message, submission and acceptance audit events, then advances to the established request adoption. The final unrecorded contractor check requires the same Request title, work details, and home after acceptance. Guarded cleanup also recognizes an interrupted pending or active recorder-created connection.
+- Help placement: Help Studio exposes the new recorder scenario, and homeowner Service Requests owns the future `homeowner.service` contextual entry. No Help request, media, narration, approval, or publication is created by this source slice.
+- Protected boundary: No OpenAI credential was retrieved or created; no media was recorded; no Production workflow data, SQL, RLS, RPC, Storage policy, auth/permission, environment, provider, or deployment setting changed; and no PR was merged.
+- Tutorial impact: `UPDATE REQUIRED`. TUT-005 is the named bounded replacement and remains missing until its validated narrated/captioned revision is separately approved, published, and verified.
+
 ## 2026-09-01 - TUT-004 published and verified in Production
 
 - Authorized publication: After exact request/spec/hash/transcript/disclosure re-verification, owner-authorized **Publish for Help** published only TUT-004 request `29766df4-5080-4b9a-9025-c871bed06e17` as immutable Production revision 1. Help Studio now shows four published walkthroughs, zero unpublished walkthroughs, 18 media assets, and one exact TUT-004 published entry; the originating request remains Approved with no duplicate active or published TUT-004.

@@ -11,6 +11,7 @@ import { contractorCreateEstimateScenario } from './recorder/scenarios/contracto
 import { contractorInvoiceOutsidePaymentScenario } from './recorder/scenarios/contractor-invoice-outside-payment.mjs';
 import { contractorServiceRequestIntakeScenario } from './recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from './recorder/scenarios/homeowner-home-history.mjs';
+import { homeownerConnectServiceRequestScenario } from './recorder/scenarios/homeowner-connect-service-request.mjs';
 import { homeownerServiceRequestScenario } from './recorder/scenarios/homeowner-service-request.mjs';
 import { servsyncPlatformIntroductionScenario } from './recorder/scenarios/servsync-platform-introduction.mjs';
 import { recordServsyncPlatformIntroduction } from './recorder/flagship-introduction.mjs';
@@ -31,6 +32,7 @@ import { promoteValidatedRecording } from './recorder/output-library.mjs';
 
 const scenarios = new Map([
   [homeownerServiceRequestScenario.key, homeownerServiceRequestScenario],
+  [homeownerConnectServiceRequestScenario.key, homeownerConnectServiceRequestScenario],
   [contractorServiceRequestIntakeScenario.key, contractorServiceRequestIntakeScenario],
   [contractorCreateEstimateScenario.key, contractorCreateEstimateScenario],
   [contractorCompleteWorkScenario.key, contractorCompleteWorkScenario],
@@ -506,6 +508,258 @@ async function recordHomeownerServiceRequest({ scenario, env, outputDir, pacingN
     };
   } finally {
     if (recordedContext) await recordedContext.close().catch(() => {});
+    if (requestSubmissionStarted && !requestAdopted) {
+      await runDemoCommand(['adopt-request', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
+    await browser.close();
+    await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    if (!completed && finalPath) await unlink(finalPath).catch(() => {});
+  }
+}
+
+async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, pacingName, headed }) {
+  const pacing = pacingFor(pacingName);
+  const target = assertSafeRecorderEnvironment(env, scenario);
+  const homeowner = {
+    email: required(env, 'DEMO_HOMEOWNER_EMAIL'),
+    password: required(env, 'DEMO_HOMEOWNER_PASSWORD'),
+  };
+  const contractor = {
+    email: required(env, 'DEMO_CONTRACTOR_EMAIL'),
+    password: required(env, 'DEMO_CONTRACTOR_PASSWORD'),
+  };
+  required(env, 'DEMO_SUPABASE_ANON_KEY');
+  required(env, 'DEMO_SUPABASE_SERVICE_ROLE_KEY');
+  env.DEMO_MODE_ENABLED = 'true';
+  env.DEMO_SUPABASE_PROJECT_REF = target.projectRef;
+  env.DEMO_SUPABASE_URL = target.supabaseUrl;
+
+  const seed = await runDemoCommand(
+    ['seed', scenario.fixtureScenarioKey, `--checkpoint=${scenario.initialCheckpoint}`],
+    env,
+  );
+  if (seed.verification?.ok !== true) throw new Error('TUT-005 setup did not reach contractor_discovery_ready.');
+
+  const browser = await chromium.launch({ headless: !headed });
+  const errors = [];
+  let recordedContext;
+  let contractorContext;
+  let finalPath = null;
+  let completed = false;
+  let connectionSubmissionStarted = false;
+  let connectionAdopted = false;
+  let requestSubmissionStarted = false;
+  let requestAdopted = false;
+  const stagingDir = resolve(outputDir, '.staging', crypto.randomUUID());
+  const observePage = (page, label) => {
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) errors.push(`${label} console.error: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => errors.push(`${label} pageerror: ${error.message}`));
+    page.on('response', (response) => {
+      if (response.status() >= 500) errors.push(`${label} HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
+    });
+  };
+
+  try {
+    const authContext = await browser.newContext({ viewport: scenario.viewport });
+    const authPage = await authContext.newPage();
+    await login(authPage, target.appUrl, 'homeowner', homeowner, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key);
+    await openSidebar(authPage, /^Service Requests/);
+    await authPage.getByRole('heading', { level: 1, name: /^Service Requests$/i }).waitFor({ state: 'visible' });
+    const initialFrame = await authPage.screenshot({ type: 'png' });
+    const storageState = await authContext.storageState();
+    await authContext.close();
+
+    await mkdir(outputDir, { recursive: true });
+    await mkdir(stagingDir, { recursive: true });
+    recordedContext = await browser.newContext({
+      viewport: scenario.viewport,
+      storageState,
+      recordVideo: { dir: stagingDir, size: scenario.viewport },
+    });
+    await recordedContext.addInitScript((src) => {
+      const install = () => {
+        document.getElementById('servsync-recorder-freeze')?.remove();
+        const freeze = document.createElement('img');
+        freeze.id = 'servsync-recorder-freeze';
+        freeze.alt = '';
+        freeze.src = src;
+        freeze.style.cssText = 'position:fixed;inset:0;z-index:2147483645;width:100vw;height:100vh;object-fit:cover;pointer-events:none';
+        document.body.append(freeze);
+      };
+      if (document.body) install();
+      else document.addEventListener('DOMContentLoaded', install, { once: true });
+    }, `data:image/png;base64,${initialFrame.toString('base64')}`);
+    const page = await recordedContext.newPage();
+    observePage(page, 'homeowner');
+    await page.goto(pageUrl(target.appUrl, 'homeowner', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key), { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /^Properties$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await openSidebar(page, /^Service Requests/);
+    await installRecorderOverlays(page);
+    await removeFreezeFrame(page);
+    await wait(pacing.initialHold);
+
+    await moveAndClick(page, page.getByRole('button', { name: /^New request$/i }), pacing);
+    const firstPropertySelect = fieldControl(page, 'Request for', 'select');
+    if (await firstPropertySelect.isVisible().catch(() => false)) {
+      const propertyOption = firstPropertySelect.locator('option').filter({ hasText: scenario.property.nickname });
+      const propertyValue = await propertyOption.getAttribute('value');
+      if (!propertyValue) throw new Error('TUT-005 could not resolve the exact Demo home.');
+      await firstPropertySelect.selectOption(propertyValue);
+      await moveAndClick(page, page.getByRole('button', { name: /^Continue$/i }).last(), pacing);
+    }
+    await moveAndType(page, fieldControl(page, 'What do you need help with?', 'textarea'), scenario.request.description, pacing);
+    await fieldControl(page, 'Who should this go to?', 'select').selectOption({ label: scenario.request.category });
+    await moveAndClick(page, page.getByRole('button', { name: /^Continue$/i }).last(), pacing);
+
+    const unconnectedCard = page
+      .getByText(scenario.identities.contractor.label, { exact: true })
+      .locator('xpath=ancestor::div[.//button[normalize-space()="Request connection"]][1]');
+    await moveAndClick(page, unconnectedCard.getByRole('button', { name: /^Request connection$/i }), pacing);
+    const connectionDialog = page.getByRole('dialog', { name: new RegExp(`Share property access with ${scenario.identities.contractor.label}`, 'i') });
+    await connectionDialog.waitFor({ state: 'visible' });
+    await moveAndType(page, connectionDialog.getByLabel(/^Optional message$/i), scenario.connection.message, pacing);
+    const shareContact = connectionDialog.getByLabel(/^Share my contact info with this contractor/i);
+    if (!(await shareContact.isChecked())) await moveAndClick(page, shareContact, pacing);
+    const addressPermission = connectionDialog.getByLabel(/^Address/i);
+    if (!(await addressPermission.isChecked())) await moveAndClick(page, addressPermission, pacing);
+    connectionSubmissionStarted = true;
+    await moveAndClick(page, connectionDialog.getByRole('button', { name: /^Send connection request$/i }), pacing);
+    await page.getByTestId('homeowner-connection-request-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    await wait(1200);
+    await addFreezeFrame(page);
+
+    contractorContext = await browser.newContext({ viewport: scenario.viewport });
+    const contractorPage = await contractorContext.newPage();
+    observePage(contractorPage, 'contractor');
+    await login(contractorPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key);
+    await openSidebar(contractorPage, /^Customers$/);
+    const waitingNotice = contractorPage.getByRole('button', { name: /connection request needs review/i });
+    await waitingNotice.waitFor({ state: 'visible', timeout: 30_000 });
+    await waitingNotice.click();
+    await contractorPage.getByRole('button', { name: /^Accept request$/i }).click();
+    await contractorPage.getByText(/Connection request accepted/i).waitFor({ state: 'visible', timeout: 30_000 });
+    const connectionAdoption = await runDemoCommand(['adopt-connection', scenario.fixtureScenarioKey], env);
+    if (connectionAdoption.verification?.ok !== true) throw new Error('TUT-005 connection adoption did not reach connected_request_ready.');
+    connectionAdopted = true;
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /^Properties$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    await openSidebar(page, /^Service Requests/);
+    await installRecorderOverlays(page);
+    await removeFreezeFrame(page);
+    await wait(1600);
+
+    await moveAndClick(page, page.getByRole('button', { name: /^New request$/i }), pacing);
+    const propertySelect = fieldControl(page, 'Request for', 'select');
+    if (await propertySelect.isVisible().catch(() => false)) {
+      const propertyOption = propertySelect.locator('option').filter({ hasText: scenario.property.nickname });
+      const propertyValue = await propertyOption.getAttribute('value');
+      if (!propertyValue) throw new Error('TUT-005 could not reselect the exact Demo home.');
+      await propertySelect.selectOption(propertyValue);
+      await moveAndClick(page, page.getByRole('button', { name: /^Continue$/i }).last(), pacing);
+    }
+    await moveAndType(page, fieldControl(page, 'What do you need help with?', 'textarea'), scenario.request.description, pacing);
+    await fieldControl(page, 'Who should this go to?', 'select').selectOption({ label: scenario.request.category });
+    await moveAndClick(page, page.getByRole('button', { name: /^Continue$/i }).last(), pacing);
+    const connectedCard = page
+      .getByText(scenario.identities.contractor.label, { exact: true })
+      .locator('xpath=ancestor::div[.//button[normalize-space()="Select contractor"]][1]');
+    await moveAndClick(page, connectedCard.getByRole('button', { name: /^Select contractor$/i }), pacing);
+    await moveAndClick(page, page.getByRole('button', { name: /^Continue$/i }).last(), pacing);
+    await moveAndType(page, fieldControl(page, 'Request title', 'input'), scenario.request.title, pacing);
+    await moveAndType(page, fieldControl(page, 'Message to contractor', 'textarea'), scenario.request.description, pacing);
+    requestSubmissionStarted = true;
+    await moveAndClick(page, page.getByRole('button', { name: /^Send Request$/i }), pacing);
+    await page.getByTestId('homeowner-service-request-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    const homeownerCard = page.getByTestId('homeowner-service-request-card').filter({ hasText: scenario.request.title }).first();
+    await homeownerCard.waitFor({ state: 'visible' });
+    const requestAdoption = await runDemoCommand(['adopt-request', scenario.fixtureScenarioKey], env);
+    if (requestAdoption.verification?.ok !== true) throw new Error('TUT-005 request adoption did not reach request_ready.');
+    requestAdopted = true;
+    await homeownerCard.scrollIntoViewIfNeeded();
+    await moveCursorToRest(page, pacing);
+    await wait(pacing.finalHold);
+
+    await openSidebar(contractorPage, /^Service Requests/);
+    const contractorCard = contractorPage.getByTestId('contractor-service-request-card').filter({ hasText: scenario.request.title }).first();
+    await contractorCard.waitFor({ state: 'visible', timeout: 30_000 });
+    await contractorCard.getByRole('button').first().click();
+    await contractorCard.getByText(scenario.request.description, { exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
+    await contractorCard.getByText(new RegExp(scenario.property.nickname, 'i')).first().waitFor({ state: 'visible', timeout: 30_000 });
+    const contractorText = await contractorCard.innerText();
+    for (const expected of [scenario.request.title, scenario.request.description, scenario.property.nickname]) {
+      if (!contractorText.includes(expected)) throw new Error(`TUT-005 contractor verification did not preserve ${expected}.`);
+    }
+
+    const mainText = await page.getByRole('main').innerText();
+    const sensitiveIssues = scanVisibleTextForSensitiveData(mainText, {
+      'homeowner email': homeowner.email,
+      'contractor email': contractor.email,
+      'homeowner password': homeowner.password,
+      'contractor password': contractor.password,
+    });
+    if (sensitiveIssues.length > 0) throw new Error(sensitiveIssues.join(' '));
+    for (const expected of [scenario.request.title, scenario.identities.contractor.label, scenario.property.nickname]) {
+      if (!mainText.includes(expected)) throw new Error(`TUT-005 final homeowner scene did not show ${expected}.`);
+    }
+    if (errors.length > 0) throw new Error(`TUT-005 encountered browser errors:\n${errors.join('\n')}`);
+
+    const video = page.video();
+    if (!video) throw new Error('Playwright did not initialize TUT-005 WebM recording.');
+    await recordedContext.close();
+    recordedContext = null;
+    const sourcePath = await video.path();
+    const createdAt = new Date().toISOString();
+    const timestamp = createdAt.replace(/[:.]/g, '-');
+    finalPath = resolve(outputDir, `${scenario.outputBaseName}-${timestamp}.webm`);
+    await rename(sourcePath, finalPath);
+    const fileStat = await stat(finalPath);
+    if (fileStat.size <= 0) throw new Error('TUT-005 WebM artifact is empty.');
+    const durationSeconds = await probeVideoDuration(browser, finalPath);
+    assertRecordingDuration(durationSeconds, scenario.expectedDurationSeconds);
+    const metadata = buildArtifactMetadata({
+      scenario,
+      sourceCommit: sourceCommit(),
+      pacing: pacingName,
+      durationSeconds,
+      fileName: basename(finalPath),
+      createdAt,
+    });
+    const metadataPath = finalPath.replace(/\.webm$/i, '.json');
+    await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+    completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
+    return {
+      success: true,
+      scenario: scenario.key,
+      environment: scenario.environment.name,
+      projectRef: scenario.environment.projectRef,
+      artifact: finalPath,
+      metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
+      durationSeconds: metadata.duration_seconds,
+      viewport: scenario.viewport,
+      finalCheckpoint: scenario.finalCheckpoint,
+      fixturePolicy: metadata.fixture_policy,
+      sensitiveData: 'none detected',
+      contractorLineageVerification: 'passed',
+    };
+  } finally {
+    if (recordedContext) await recordedContext.close().catch(() => {});
+    if (contractorContext) await contractorContext.close().catch(() => {});
+    if (connectionSubmissionStarted && !connectionAdopted) {
+      await runDemoCommand(['adopt-connection', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
     if (requestSubmissionStarted && !requestAdopted) {
       await runDemoCommand(['adopt-request', scenario.fixtureScenarioKey], env).catch(() => {});
     }
@@ -1563,6 +1817,9 @@ export async function runRecorder(argv = process.argv.slice(2), processEnv = pro
   const outputDir = resolve(args.outputDir || env.DEMO_RECORDING_OUTPUT_DIR || 'demo-recordings');
   if (scenario.key === homeownerServiceRequestScenario.key) {
     return recordHomeownerServiceRequest({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
+  }
+  if (scenario.key === homeownerConnectServiceRequestScenario.key) {
+    return recordHomeownerConnectServiceRequest({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
   }
   if (scenario.key === contractorCompleteWorkScenario.key) {
     return recordContractorCompleteWork({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });

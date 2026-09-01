@@ -26,6 +26,14 @@ test('Financials owns the contextual Invoice and outside-payment walkthrough pla
   );
 });
 
+test('Homeowner Service Requests owns the contextual connect-and-request walkthrough placement', async () => {
+  const appSource = await readFile(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(
+    appSource,
+    /contextKey="homeowner\.service"[\s\S]{0,180}label="How to connect and request service"/,
+  );
+});
+
 test('pilot tutorial coverage protects the six canonical onboarding workflows', async () => {
   const coverage = await readFile(
     new URL('../../docs/servsync-master-plan/ServSync_Pilot_Tutorial_Coverage.md', import.meta.url),
@@ -44,7 +52,7 @@ test('pilot tutorial coverage protects the six canonical onboarding workflows', 
   ]) {
     assert.ok(coverage.includes(`\`${context}\``), `missing protected context ${context}`);
   }
-  assert.match(coverage, /three published video tutorials/i);
-  assert.match(coverage, /three missing pilot walkthroughs/i);
+  assert.match(coverage, /four published video tutorials/i);
+  assert.match(coverage, /two missing protected workflows/i);
   assert.match(coverage, /Production publication requires explicit owner approval/i);
 });

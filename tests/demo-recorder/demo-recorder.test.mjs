@@ -7,6 +7,7 @@ import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/sc
 import { contractorInvoiceOutsidePaymentScenario } from '../../scripts/demo/recorder/scenarios/contractor-invoice-outside-payment.mjs';
 import { contractorServiceRequestIntakeScenario } from '../../scripts/demo/recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from '../../scripts/demo/recorder/scenarios/homeowner-home-history.mjs';
+import { homeownerConnectServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-connect-service-request.mjs';
 import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
 import { servsyncPlatformIntroductionScenario } from '../../scripts/demo/recorder/scenarios/servsync-platform-introduction.mjs';
 import {
@@ -39,6 +40,43 @@ test('canonical scenario is bounded, reviewable, and Demo-only', () => {
   assert.equal(homeownerServiceRequestScenario.viewport.height, 900);
   assert.equal(homeownerServiceRequestScenario.finalState.contractorTab, 'Service Requests');
   assert.ok(homeownerServiceRequestScenario.property.addressLine1);
+});
+
+test('TUT-005 starts before connection and preserves contextual home-to-request lineage', () => {
+  assert.equal(validateScenarioDefinition(homeownerConnectServiceRequestScenario), homeownerConnectServiceRequestScenario);
+  assert.equal(homeownerConnectServiceRequestScenario.initialCheckpoint, 'contractor_discovery_ready');
+  assert.equal(homeownerConnectServiceRequestScenario.finalCheckpoint, 'request_ready');
+  assert.deepEqual(
+    homeownerConnectServiceRequestScenario.scenes.map((scene) => scene.key),
+    ['choose-contractor', 'share-home', 'connection-active', 'request-details', 'request-sent'],
+  );
+  assert.equal(homeownerConnectServiceRequestScenario.showSceneCallouts, false);
+  assert.match(homeownerConnectServiceRequestScenario.fixturePolicy, /contextual connection through the real product UI/i);
+  assert.doesNotMatch(JSON.stringify(homeownerConnectServiceRequestScenario), /password|service_role|@example/i);
+});
+
+test('TUT-005 uses real connection/request actions and exact guarded adoption', () => {
+  const recorderSource = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
+  const start = recorderSource.indexOf('async function recordHomeownerConnectServiceRequest');
+  const end = recorderSource.indexOf('async function recordContractorCreateEstimate', start);
+  const flow = recorderSource.slice(start, end);
+  const fixtureSource = readFileSync(new URL('../../scripts/demo/seed-demo-scenario.mjs', import.meta.url), 'utf8');
+  const adoptionStart = fixtureSource.indexOf('async function adoptRecorderContextualConnection');
+  const adoptionEnd = fixtureSource.indexOf('async function adoptRecorderServiceRequest', adoptionStart);
+  const adoption = fixtureSource.slice(adoptionStart, adoptionEnd);
+
+  assert.match(flow, /Send connection request/);
+  assert.match(flow, /Accept request/);
+  assert.match(flow, /runDemoCommand\(\['adopt-connection'/);
+  assert.match(flow, /runDemoCommand\(\['adopt-request'/);
+  assert.match(flow, /contractorLineageVerification: 'passed'/);
+  assert.match(adoption, /connection_shared_properties/);
+  assert.match(adoption, /connection_request_contexts/);
+  assert.match(adoption, /contextual_connection_request_submitted/);
+  assert.match(adoption, /connection_request_accepted/);
+  assert.match(adoption, /actor_user_id/);
+  assert.match(adoption, /contractor_user_id/);
+  assert.match(adoption, /recorder_connection_source: 'homeowner_request'/);
 });
 
 test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {
@@ -286,6 +324,7 @@ test('operator arguments stay intentionally small', () => {
   });
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=tutorial', '--headed']).pacing, 'tutorial');
   assert.equal(parseRecorderArgs(['homeowner-service-request', '--pacing=human-paced']).pacing, 'human-paced');
+  assert.equal(parseRecorderArgs(['homeowner-connect-service-request']).scenarioKey, 'homeowner-connect-service-request');
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
   assert.equal(parseRecorderArgs(['contractor-service-request-intake']).scenarioKey, 'contractor-service-request-intake');
   assert.equal(parseRecorderArgs(['contractor-complete-work']).scenarioKey, 'contractor-complete-work');
@@ -461,7 +500,7 @@ test('flagship preparation and adoption stay exact-row, Demo-only, and product-p
   const recorderSource = readFileSync(resolve(process.cwd(), 'scripts/demo/recorder/flagship-introduction.mjs'), 'utf8');
   assert.match(seedSource, /FLAGSHIP_DISCOVER_CONTRACTORS/);
   assert.match(seedSource, /demo_flagship_discover_post/);
-  assert.doesNotMatch(seedSource, /adopt-connection|pending_connection_id/);
+  assert.doesNotMatch(recorderSource, /adopt-connection|pending_connection_id/);
   assert.match(recorderSource, /Share property access with Gulf Coast Home Services/);
   assert.match(seedSource, /expected exactly one new canonical draft/);
   assert.match(recorderSource, /simple-job-finalize-report/);

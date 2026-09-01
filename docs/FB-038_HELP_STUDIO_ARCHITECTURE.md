@@ -34,6 +34,8 @@ PR #522 contains this source foundation in `servsync-help-narration-caption-foun
 
 The TUT-004 authoring candidate adds `contractor-invoice-outside-payment` to the ordinary Help Studio recorder menu and places its future published entry at `contractor.financials`. The protected recorder uses only durable Demo and fictional registered lineage: one completed Job becomes an exact Invoice, the fictional homeowner opens the delivered Invoice, and a `$400.00` external bank transfer is recorded through the offline ledger. It visibly states that ServSync does not process or contact a payment provider, rejects any online-payment/provider request, and ends at the exact partially-paid checkpoint. This source placement creates no Production Help record and does not approve or publish media.
 
+The TUT-005 source candidate adds `homeowner-connect-service-request` to the ordinary Help Studio recorder menu and places any future published entry at `homeowner.service`. It starts from the durable Demo discovery checkpoint with no contractor connection, records the homeowner's real contextual connection request and selected home, performs real contractor acceptance behind a frozen homeowner frame, and then records the exact home-scoped service Request. Exact registry adoption and an unrecorded contractor check preserve and verify homeowner/contractor/home/request lineage plus the original submitted details. This source placement creates no Production Help record and does not authorize Cedar credentials, recording, approval, or publication.
+
 ## Authoring Boundary
 
 - Only an authenticated ServSync `platform_admin` can create or change Help Studio records.
