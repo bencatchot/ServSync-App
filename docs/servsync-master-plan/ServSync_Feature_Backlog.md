@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-01
 
-Last reconciled against `origin/main` at `c0a27b92ed977109c59c8960364a08cfe1626c8e`.
+Last reconciled against `origin/main` at `5fea4c9a839a695917234dd5d40edd2fd49ff58c`.
 
 ## Purpose
 
@@ -42,6 +42,7 @@ Current repository evidence through PR #372 shows these relevant states:
 - PR #371 merged the contractor Customer terminology/status foundation through commit `6221bd9935b490a797b526881551faf48a1a7623`: contractor navigation and the combined workspace use one `Customer` category, while connection remains visible status and canonical connected/local subject models remain unchanged.
 - PR #372 merged Unified Draft Customer Selection and Customer Profile Entry v1 through normal two-parent commit `854372c8609a67d7de16dac33550762d9d750d74`. Automatic Production deployment `dpl_3jkDZ6MKxyLZd9qCxCxi7YQGEqTY` reached `READY` from that exact commit. Draft creation now uses one Customer selector, derives the existing connected/local subject internally, preserves saved historical subject types and authorized property context, auto-selects only one eligible property, leaves multiple-property selection explicit, and routes eligible connected/not-connected customer-profile initial work through neutral `Create Draft` with no preselected output. Exact-head authenticated Sandbox Preview evidence covers connected/local profiles, property variants, saved Drafts, Viewer denial, desktop/mobile, accessibility, and runtime health. Bounded Production smoke confirmed the merged generic composer and mobile layout without mutation; its approved account had zero customers, so profile/property/Viewer scenarios were not repeated there.
 - Draft-first Work is now the standard Production Jobs experience for authorized contractor contexts. Production serves main SHA `854372c8609a67d7de16dac33550762d9d750d74`, all three global gates remain enabled, and the server rollout mode remains `all_contractors`; the original all-contractors public smoke passed 7/7, and subsequent bounded authenticated Production checks confirmed the Draft-first Jobs landing and unified Customer composer on desktop and mobile. This does not broaden output-specific permissions or prove mutating Production save/launch paths for every role.
+- PR #544 merged the focused controlled-pilot New Draft customer-entry fix through normal two-parent commit `df229ae1b7bc2d3a39027c9044f255562b883c28`. Owner/Admin/Office can open the existing contractor-local customer form next to the Customer selector, save through the canonical transactional RPC, and return to the same unfinished Draft with the new customer and its single property selected. The flow does not auto-save or launch the Draft, create an Estimate/Job/Invoice, change connected-customer behavior, or broaden Field Technician/Viewer authority. Automatic Production app, durable Demo, and Stripe Sandbox deployments completed successfully; the launch-roadmap return point remains FB-040A tutorial readiness.
 - Provider-neutral foundations for accounting, payments, communication, delivery, Demo Mode, Project Collaboration, and operations readiness are foundations only unless a later entry explicitly says the user-facing capability is live.
 
 Important guardrails:
