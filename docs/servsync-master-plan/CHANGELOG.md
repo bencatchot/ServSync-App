@@ -6,7 +6,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-09-01 - TUT-004 protected Demo recorder source candidate
 
-- Launch slice: FB-040A TUT-004 **How to deliver an invoice and record an outside payment** now has a protected durable Demo-only recorder scenario and exact fixture-adoption lifecycle.
+- Launch slice: Draft PR #542 gives FB-040A TUT-004 **How to deliver an invoice and record an outside payment** a protected durable Demo-only recorder scenario and exact fixture-adoption lifecycle.
 - Workflow truth: Ordinary product UI creates an Invoice from one fictional completed Job, sends it, opens it as the fictional homeowner, and records a fictional `$400.00` external bank transfer through the canonical offline ledger. The final card proves **Partially Paid**, `$400.00` paid, `$1,765.00` due, and complete Customer/Home/Request/Estimate/Job/Invoice/payment lineage.
 - Payment boundary: The recorder requires the visible ServSync disclaimer that no payment is processed or provider contacted and fails if either browser leg reaches an online-payment/provider path. Console/page errors, `5xx` responses, visible secrets, duration drift, and checkpoint drift also fail closed.
 - Help integration: Help Studio exposes the scenario in its ordinary recorder menu, and the future published walkthrough is contextually placed at `contractor.financials` for the intended Owner/Admin/Office audience. No Production Help row or media was created.
