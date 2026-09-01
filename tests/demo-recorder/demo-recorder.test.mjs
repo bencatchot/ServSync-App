@@ -27,6 +27,8 @@ import {
   isPaymentProviderRequest,
   pacingFor,
   parseRecorderArgs,
+  pendingConnectionReviewCount,
+  PENDING_CONNECTION_REVIEW_BUTTON_NAME,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from '../../scripts/demo/recorder/lib.mjs';
@@ -67,6 +69,7 @@ test('TUT-005 uses real connection/request actions and exact guarded adoption', 
 
   assert.match(flow, /Send connection request/);
   assert.match(flow, /Accept request/);
+  assert.match(flow, /pendingConnectionCount !== 1/);
   assert.match(flow, /runDemoCommand\(\['adopt-connection'/);
   assert.match(flow, /runDemoCommand\(\['adopt-request'/);
   assert.match(flow, /contractorLineageVerification: 'passed'/);
@@ -77,6 +80,21 @@ test('TUT-005 uses real connection/request actions and exact guarded adoption', 
   assert.match(adoption, /actor_user_id/);
   assert.match(adoption, /contractor_user_id/);
   assert.match(adoption, /recorder_connection_source: 'homeowner_request'/);
+});
+
+test('TUT-005 pending-review locator accepts current count grammar without weakening exact-count validation', () => {
+  for (const label of [
+    '1 connection request need review',
+    '1 connection request needs review',
+    '2 connection requests need review',
+    '2 connection requests needs review',
+  ]) {
+    assert.match(label, PENDING_CONNECTION_REVIEW_BUTTON_NAME);
+  }
+  assert.equal(pendingConnectionReviewCount('  1 connection request\nneed review  '), 1);
+  assert.equal(pendingConnectionReviewCount('2 connection requests need review'), 2);
+  assert.throws(() => pendingConnectionReviewCount('connection request needs review'), /Unexpected pending connection review label/);
+  assert.throws(() => pendingConnectionReviewCount('1 request needs review'), /Unexpected pending connection review label/);
 });
 
 test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {

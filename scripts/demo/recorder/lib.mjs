@@ -7,6 +7,7 @@ export const DEMO_RECORDER_SUPABASE_URL = `https://${DEMO_RECORDER_PROJECT_REF}.
 export const DEMO_PRESENTATION_QUERY_KEY = 'servsync-presentation';
 export const DEMO_PRESENTATION_QUERY_VALUE = 'recorder-v1';
 export const DEMO_RECORDER_SCENARIO_QUERY_KEY = 'servsync-recorder-scenario';
+export const PENDING_CONNECTION_REVIEW_BUTTON_NAME = /^(\d+)\s+connection requests?\s+needs?\s+review$/i;
 export const DEMO_RECORDING_ENV_KEYS = Object.freeze([
   'DEMO_CONTRACTOR_EMAIL',
   'DEMO_CONTRACTOR_PASSWORD',
@@ -58,6 +59,13 @@ export function addDemoPresentationOptIn(rawUrl, scenarioKey = '') {
   url.searchParams.set(DEMO_PRESENTATION_QUERY_KEY, DEMO_PRESENTATION_QUERY_VALUE);
   if (scenarioKey) url.searchParams.set(DEMO_RECORDER_SCENARIO_QUERY_KEY, scenarioKey);
   return url;
+}
+
+export function pendingConnectionReviewCount(label) {
+  const normalized = String(label || '').trim().replace(/\s+/g, ' ');
+  const match = normalized.match(PENDING_CONNECTION_REVIEW_BUTTON_NAME);
+  if (!match) throw new Error(`Unexpected pending connection review label: ${normalized || '(empty)'}.`);
+  return Number.parseInt(match[1], 10);
 }
 
 const PAYMENT_ACTION_PATTERN = /stripe|payment[-_]?intent|online[-_]?payment|checkout/i;

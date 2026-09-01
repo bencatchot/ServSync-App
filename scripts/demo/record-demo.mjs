@@ -25,6 +25,8 @@ import {
   loadKnownLocalEnv,
   pacingFor,
   parseRecorderArgs,
+  pendingConnectionReviewCount,
+  PENDING_CONNECTION_REVIEW_BUTTON_NAME,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from './recorder/lib.mjs';
@@ -635,8 +637,12 @@ async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, 
     observePage(contractorPage, 'contractor');
     await login(contractorPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key);
     await openSidebar(contractorPage, /^Customers$/);
-    const waitingNotice = contractorPage.getByRole('button', { name: /connection request needs review/i });
+    const waitingNotice = contractorPage.getByRole('button', { name: PENDING_CONNECTION_REVIEW_BUTTON_NAME });
     await waitingNotice.waitFor({ state: 'visible', timeout: 30_000 });
+    const pendingConnectionCount = pendingConnectionReviewCount(await waitingNotice.textContent());
+    if (pendingConnectionCount !== 1) {
+      throw new Error(`TUT-005 expected exactly one pending connection request; found ${pendingConnectionCount}.`);
+    }
     await waitingNotice.click();
     await contractorPage.getByRole('button', { name: /^Accept request$/i }).click();
     await contractorPage.getByText(/Connection request accepted/i).waitFor({ state: 'visible', timeout: 30_000 });
