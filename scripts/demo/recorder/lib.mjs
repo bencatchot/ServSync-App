@@ -60,6 +60,23 @@ export function addDemoPresentationOptIn(rawUrl, scenarioKey = '') {
   return url;
 }
 
+const PAYMENT_ACTION_PATTERN = /stripe|payment[-_]?intent|online[-_]?payment|checkout/i;
+const INVOICE_ONLINE_PAYMENT_HISTORY_RPC = '/rest/v1/rpc/servsync_list_invoice_online_payments';
+
+export function isPaymentProviderRequest(rawUrl, {
+  appUrl = DEMO_RECORDER_APP_URL,
+  supabaseUrl = DEMO_RECORDER_SUPABASE_URL,
+} = {}) {
+  const url = new URL(rawUrl);
+  const appOrigin = new URL(appUrl).origin;
+  const supabaseOrigin = new URL(supabaseUrl).origin;
+
+  if (url.origin === appOrigin && url.pathname.startsWith('/assets/')) return false;
+  if (url.origin === supabaseOrigin && url.pathname === INVOICE_ONLINE_PAYMENT_HISTORY_RPC) return false;
+
+  return PAYMENT_ACTION_PATTERN.test(`${url.hostname}${url.pathname}${url.search}`);
+}
+
 function unquote(value) {
   if (value.length < 2) return value;
   const first = value[0];

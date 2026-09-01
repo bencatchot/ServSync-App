@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-004 provider-traffic guard correction
+
+- Protected runtime finding: The single authorized TUT-004 rerun used exact durable Demo commit `067fe3f947d2e37a7aa720fbf9053e3b9fac0791` and completed the ordinary UI workflow through Invoice delivery, fictional homeowner view, and a `$400.00` external bank-transfer entry in the canonical offline ledger. Exact verification passed at `$2,165.00` total, `$400.00` paid, and `$1,765.00` due with intact Customer/Home/Request/Estimate/Job/Invoice/payment lineage.
+- Fail-closed result: Media promotion rejected the first-party `InvoiceOnlinePaymentButton` JavaScript chunk and internal read-only `servsync_list_invoice_online_payments` RPC because the provider detector matched path names without considering origin or mutability. No artifact, checksum, duration, or dimensions were promoted or claimed.
+- Bounded correction: The guard now exempts only inert assets served from the exact durable Demo app origin and that exact read-only payment-history RPC on the dedicated Demo Supabase origin. Stripe hosts, checkout paths, payment-intent paths, online-payment actions, browser errors, `5xx` responses, and visible secrets remain failures, with focused positive and negative regression coverage.
+- Cleanup and authority: Guarded reset removed 28 registered disposable rows, and direct registry audit found zero registered disposable records. The one-run authorization is consumed. No second recording, OpenAI request, narration packaging, Help approval/publication, Production mutation, credential change, or environment change occurred.
+- Tutorial impact: `NOT APPLICABLE` for published guidance. TUT-004 remains unpublished and `UPDATE REQUIRED`; merge and exact durable Demo deployment of this correction plus a new exact-commit one-run authorization are required before silent-source validation can resume.
+
 ## 2026-09-01 - TUT-004 Invoice-adoption runtime correction
 
 - Protected runtime finding: The first owner-authorized TUT-004 durable Demo run reached the normal UI-created `$2,165.00` draft Invoice, then failed closed before delivery because the private adoption validator read neither `reserved_invoice_id` nor `invoiced_invoice_id` from the same work-item query whose values it required. No media was promoted.

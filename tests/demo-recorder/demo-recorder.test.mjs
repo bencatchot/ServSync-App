@@ -23,6 +23,7 @@ import {
   DEMO_PRESENTATION_QUERY_VALUE,
   HUMAN_PACED_PROFILE_NAME,
   HUMAN_PACED_RECORDING_PRESET,
+  isPaymentProviderRequest,
   pacingFor,
   parseRecorderArgs,
   scanVisibleTextForSensitiveData,
@@ -119,6 +120,21 @@ test('TUT-004 uses the real delivery and canonical outside-payment UI before exa
   assert.match(flow, /online payment path instead of the offline ledger/);
   assert.match(flow, /runDemoCommand\(\['adopt-invoice-payment'/);
   assert.match(flow, /scenario\.finalState\.balanceDueLabel/);
+});
+
+test('TUT-004 provider guard allows only inert first-party payment presentation and history reads', () => {
+  assert.equal(
+    isPaymentProviderRequest('https://servsync-demo.vercel.app/assets/InvoiceOnlinePaymentButton-DKjDtgK9.js'),
+    false,
+  );
+  assert.equal(
+    isPaymentProviderRequest('https://bdytwgejqnlblhrnqxkp.supabase.co/rest/v1/rpc/servsync_list_invoice_online_payments'),
+    false,
+  );
+  assert.equal(isPaymentProviderRequest('https://servsync-demo.vercel.app/api/stripe-invoice-checkout'), true);
+  assert.equal(isPaymentProviderRequest('https://servsync-demo.vercel.app/api/payment-intent'), true);
+  assert.equal(isPaymentProviderRequest('https://checkout.stripe.com/c/pay/cs_test_example'), true);
+  assert.equal(isPaymentProviderRequest('https://api.stripe.com/v1/payment_intents'), true);
 });
 
 test('TUT-004 Invoice adoption reads the reservation fields it validates', () => {

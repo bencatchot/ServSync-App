@@ -20,6 +20,7 @@ import {
   buildArtifactMetadata,
   cursorInterpolation,
   addDemoPresentationOptIn,
+  isPaymentProviderRequest,
   loadKnownLocalEnv,
   pacingFor,
   parseRecorderArgs,
@@ -1082,7 +1083,7 @@ async function recordContractorInvoiceOutsidePayment({ scenario, env, outputDir,
     page.on('response', (response) => {
       const responseUrl = new URL(response.url());
       if (response.status() >= 500) errors.push(`HTTP ${response.status()}: ${responseUrl.pathname}`);
-      if (/stripe|payment[-_]?intent|online[-_]?payment|checkout/i.test(`${responseUrl.hostname}${responseUrl.pathname}`)) {
+      if (isPaymentProviderRequest(response.url(), { appUrl: target.appUrl, supabaseUrl: target.supabaseUrl })) {
         paymentProviderRequests.push(responseUrl.pathname);
       }
     });
@@ -1130,7 +1131,7 @@ async function recordContractorInvoiceOutsidePayment({ scenario, env, outputDir,
       homeownerPage.on('response', (response) => {
         const responseUrl = new URL(response.url());
         if (response.status() >= 500) errors.push(`homeowner HTTP ${response.status()}: ${responseUrl.pathname}`);
-        if (/stripe|payment[-_]?intent|online[-_]?payment|checkout/i.test(`${responseUrl.hostname}${responseUrl.pathname}`)) {
+        if (isPaymentProviderRequest(response.url(), { appUrl: target.appUrl, supabaseUrl: target.supabaseUrl })) {
           paymentProviderRequests.push(responseUrl.pathname);
         }
       });
