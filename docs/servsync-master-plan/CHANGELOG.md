@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - PR #547 merged and deployed
+
+- Merge: Owner-approved PR #547 merged normally at exact two-parent commit `ab542a5c08bebfb226d5d5fc5934372a16d2695d`, preserving reviewed head `29f485ed1f09213b47595a60ca160d9deb7727af` over base `067fe3f947d2e37a7aa720fbf9053e3b9fac0791`.
+- Deployment: Automatic Production app, durable Demo, and Stripe Sandbox deployments completed successfully from that exact merge commit. GitHub's durable Demo deployment record `6205667588` resolves to `https://servsync-demo-ak80y1h4m-bencatchots-projects.vercel.app`; the canonical `https://servsync-demo.vercel.app` alias and the Production and Stripe Sandbox aliases each returned HTTP 200. No manual deployment, promotion, retry, alias, credential, environment, data, or configuration change occurred.
+- Next gate: TUT-004 remains unpublished and `UPDATE REQUIRED`. The minimum next owner action is one protected silent rerun authorization naming exact durable Demo commit `ab542a5c08bebfb226d5d5fc5934372a16d2695d` and the repaired local Demo recorder bundle. OpenAI/Cedar, Help approval, and Production publication remain separate gates.
+
 ## 2026-09-01 - TUT-004 provider-traffic guard correction
 
 - Protected runtime finding: The single authorized TUT-004 rerun used exact durable Demo commit `067fe3f947d2e37a7aa720fbf9053e3b9fac0791` and completed the ordinary UI workflow through Invoice delivery, fictional homeowner view, and a `$400.00` external bank-transfer entry in the canonical offline ledger. Exact verification passed at `$2,165.00` total, `$400.00` paid, and `$1,765.00` due with intact Customer/Home/Request/Estimate/Job/Invoice/payment lineage.
