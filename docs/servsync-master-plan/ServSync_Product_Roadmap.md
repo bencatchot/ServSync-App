@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-01
 
-Planning base: `origin/main` at `5fea4c9a839a695917234dd5d40edd2fd49ff58c`
+Planning base: `origin/main` at `1940394a78561ec67cad4b727e770e0e4b67f24b`
 
 ## Purpose
 
@@ -87,9 +87,9 @@ Focus rules:
 | Current release stage | Phase 1 — Controlled Contractor Pilot Preflight |
 | Primary active outcome | FB-040A Tutorial Readiness — TUT-005 homeowner connection/request tutorial |
 | Completed control-point evidence | Phase 0 is complete. PR #521 merged Phase 0.7 at main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`, preserving the accepted role-aware Beta Guide, direct Support handoff, contextual Estimate walkthrough, and truthful automation boundaries. TUT-001, TUT-003, and TUT-004 are published under the narration/caption standard; TUT-004 Production revision 1 passed full playback, Owner contextual retrieval, immutable Owner/Admin/Office audience, homeowner exclusion, and browser/provider safety verification. TUT-002 remains visually current but still needs its standards upgrade. The controlled-pilot inventory now contains four published walkthroughs and two missing protected workflows. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
-| Next recommended assignment | Obtain separate owner approval to merge documentation-only PR #548 after exact-head re-verification, then start TUT-005 **How to connect and request service** at `homeowner.service`. |
+| Next recommended assignment | Build and validate TUT-005 **How to connect and request service** at `homeowner.service`; Production Help approval/publication and any Cedar credential action remain separate owner gates. |
 | Assignment outcome | TUT-004 is published and verified as Production revision 1 from Help Studio request `29766df4-5080-4b9a-9025-c871bed06e17`. The exact 57.96-second 1440×900 scene-synced H.264/AAC MP4 SHA-256 is `fda7f742f0838b360e200400c6190ec030a5e357bce7c531b692d5efbefb2b2c`; top-safe WebVTT, matching transcript, exact Cedar disclosure, and one-request/source provenance remain intact. Full Production playback, `contractor.financials` Owner retrieval, immutable Owner/Admin/Office audience, homeowner exclusion, no duplicates, empty browser diagnostics, zero `5xx`, and zero payment/provider traffic passed. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
-| Expected following slice | Complete PR #548 canonical closeout, then TUT-005, TUT-006, and the TUT-002 standards upgrade before the pilot onboarding dry run. |
+| Expected following slice | Complete TUT-005, then TUT-006 and the TUT-002 standards upgrade before the pilot onboarding dry run. |
 | Parallel strategic lane | FB-037 Marketing has a source-complete guarded media-retirement control: eligible unpublished managed media can retire through the existing authenticated lifecycle RPC, atomically invalidating Ready/Needs Review packages and releasing quota while preserving audit/publication history. A bounded UI follow-up also surfaces server-eligible unattached uploads in Campaigns only when they have no active pairing or non-retired package dependency, without creating fake Content. No new migration or permission boundary is required. Production verification preserved the originally named **Your work, connected — Free ServSync beta** item as Published with exact history and retirement eligibility false, so it remains intentionally unavailable to the control. Selected-contractor beta work remains separately governed. |
 | Roadmap return point | Return to FB-040 controlled-pilot preflight after each bounded feature or strategic-lane interruption; tutorial readiness is the current launch assignment. |
 

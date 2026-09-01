@@ -4,7 +4,11 @@
 
 The Demo Recorder creates reproducible browser recordings for ServSync Marketing, support tutorials, and product demonstrations. It is intentionally a small scenario runner, not a video editor or publishing system.
 
-Recorder v1 includes seven canonical scenarios:
+Recorder v1 includes eight canonical scenarios:
+
+`homeowner-connect-service-request`
+
+The protected TUT-005 clip starts with the fictional homeowner and Demo Bay Home but no contractor connection. It submits the contextual connection request through the real homeowner UI, uses the real contractor acceptance path behind a frozen homeowner frame, then chooses the same home and submits the exact service Request. Final verification proves the contractor can still retrieve the selected home, original connection message, and submitted work details after acceptance.
 
 `homeowner-service-request`
 
@@ -49,6 +53,8 @@ Do not record Production or real customer information. Do not paste recorder cre
 The reviewable scenario definitions live at:
 
 `scripts/demo/recorder/scenarios/homeowner-service-request.mjs`
+
+`scripts/demo/recorder/scenarios/homeowner-connect-service-request.mjs`
 
 `scripts/demo/recorder/scenarios/contractor-create-estimate.mjs`
 
@@ -122,6 +128,7 @@ The visible pointer is a reusable DOM overlay driven by Playwright mouse movemen
 Load the existing approved Demo variables, including the private runner values documented in [ServSync Demo Mode Runbook](ServSync_Demo_Mode_Runbook.md), then run from the repository root:
 
 ```bash
+npm run demo:record -- homeowner-connect-service-request
 npm run demo:record -- homeowner-service-request
 npm run demo:record -- contractor-create-estimate
 npm run demo:record -- contractor-complete-work
@@ -195,6 +202,8 @@ A run is successful only after:
 - a separate normal-speed review confirms followable cursor motion, visible click intent, understandable UI changes, natural speed/motion, readable text, sufficient reading holds, and an obvious final result before `marketing_candidate_status` may become `passed`.
 
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
+
+The protected homeowner connection/request scenario additionally requires exact contextual-connection adoption at `connected_request_ready`, one selected Demo home with the approved service-relevant permissions, one original connection message, one submission event, one contractor acceptance event, and exact Request adoption at `request_ready`. An unrecorded contractor verification must retrieve the same Request title, work description, and Demo home after acceptance.
 
 The contractor completion scenario additionally requires exact adoption at `job_scheduled`, UI completion verified at `job_completed`, all Estimate-derived work items and the private visit marked complete, zero Invoice descendants, exact canonical report adoption at `home_history_updated`, and a final filed-report notice. Its visible path must preserve **Create Job**, work/visit notes, **Complete Job**, and **Finalize Report** without fixture-only product output.
 

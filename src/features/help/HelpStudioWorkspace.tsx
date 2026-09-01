@@ -51,6 +51,7 @@ const AUDIENCES = [
 ] as const;
 
 const RECORDER_SCENARIOS = [
+  ['homeowner-connect-service-request', 'Homeowner connects and requests service'],
   ['contractor-create-estimate', 'Contractor creates an estimate'],
   ['contractor-service-request-intake', 'Contractor reviews a service request'],
   ['contractor-complete-work', 'Contractor completes work'],

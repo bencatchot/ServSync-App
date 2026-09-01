@@ -1079,28 +1079,28 @@ async function reconcileDiscoveryRecordingConnection(service, run) {
     return [];
   }
 
-  const pendingConnections = await ensureOk(
+  const contextualConnections = await ensureOk(
     await service
       .from('homeowner_contractor_connections')
       .select('id, status, source')
       .eq('homeowner_user_id', homeownerId)
       .eq('contractor_id', contractorId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'active'])
       .eq('source', 'homeowner_request'),
     'Unable to inspect discovery recording connection request residue'
   );
 
-  if (pendingConnections.length > 1) {
+  if (contextualConnections.length > 1) {
     throw new Error(
-      `Discovery checkpoint ${run.id} has multiple pending recording-created connection rows and cannot be reset safely.`
+      `Discovery checkpoint ${run.id} has multiple recording-created connection rows and cannot be reset safely.`
     );
   }
-  const connection = pendingConnections[0] || null;
+  const connection = contextualConnections[0] || null;
   if (!connection) {
     return [];
   }
 
-  await registerRecord(service, run.id, 'homeowner_contractor_connections', connection.id, 'demo_recording_connection_request', 'contractor_discovery_ready', {
+  await registerRecord(service, run.id, 'homeowner_contractor_connections', connection.id, 'demo_connection', 'contractor_discovery_ready', {
     source: 'homeowner_request',
     reconciled_from: 'presentation_recording',
   });
@@ -1114,7 +1114,7 @@ async function reconcileDiscoveryRecordingConnection(service, run) {
     'Unable to inspect discovery recording connection permissions'
   );
   if (permissions?.connection_id) {
-    await registerRecord(service, run.id, 'connection_permissions', permissions.connection_id, 'demo_recording_connection_permissions', 'contractor_discovery_ready', {
+    await registerRecord(service, run.id, 'connection_permissions', permissions.connection_id, 'demo_connection_permissions', 'contractor_discovery_ready', {
       source: 'homeowner_request',
       reconciled_from: 'presentation_recording',
     });
@@ -2744,9 +2744,9 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     (connection.homeowner_user_id !== homeownerUser.id ||
       connection.contractor_id !== contractor.id ||
       connection.status !== 'active' ||
-      connection.source !== 'demo_seed')
+      connection.source !== (run.metadata?.recorder_connection_source || 'demo_seed'))
   ) {
-    issues.push('Demo connection does not link the expected homeowner, contractor, and active demo source.');
+    issues.push('Demo connection does not link the expected homeowner, contractor, and active source.');
   }
   if (requiresConnection && (!permissions || !permissions.share_contact || !permissions.share_home_overview || !permissions.share_address)) {
     issues.push('Demo connection permissions are missing required workflow sharing.');
@@ -3525,6 +3525,143 @@ async function verifyDemoScenario(env, target, scenarioKey, checkpointKey = null
   return { operation: 'verify', verification };
 }
 
+async function adoptRecorderContextualConnection(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder connection adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'contractor_discovery_ready') {
+    throw new Error(`Recorder connection adoption refused: active checkpoint must be contractor_discovery_ready, found ${run.checkpoint}.`);
+  }
+  if (run.records.some((record) => record.table_name === 'homeowner_contractor_connections')) {
+    throw new Error('Recorder connection adoption refused: contractor_discovery_ready already owns a connection.');
+  }
+
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const contractorUserId = run.metadata?.contractor_user_id;
+  const contractorId = run.metadata?.contractor_id;
+  const homeId = run.metadata?.home_id
+    || run.records.find((record) => record.table_name === 'homes' && record.record_role === 'demo_home')?.record_id;
+  if (![homeownerId, contractorUserId, contractorId, homeId].every(Boolean)) {
+    throw new Error('Recorder connection adoption refused: active run is missing exact homeowner, contractor user, contractor, or home identity.');
+  }
+
+  const connections = await ensureOk(
+    await service.from('homeowner_contractor_connections')
+      .select('id,status,source,created_at')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('contractor_id', contractorId)
+      .eq('status', 'active')
+      .eq('source', 'homeowner_request'),
+    'Unable to inspect the recorder-created contextual connection'
+  );
+  if (connections.length !== 1) {
+    throw new Error(`Recorder connection adoption refused: expected exactly one accepted contextual connection, found ${connections.length}.`);
+  }
+  const connection = connections[0];
+
+  const permissions = await maybeSingle(
+    await service.from('connection_permissions')
+      .select('connection_id,share_contact,share_home_overview,share_address,share_preferred_vendors,share_photos')
+      .eq('connection_id', connection.id)
+      .maybeSingle(),
+    'Unable to inspect recorder contextual connection permissions'
+  );
+  if (!permissions?.share_contact || !permissions.share_home_overview || !permissions.share_address
+    || permissions.share_preferred_vendors || permissions.share_photos) {
+    throw new Error('Recorder connection adoption refused: accepted connection permissions do not match the tutorial contract.');
+  }
+
+  const sharedProperties = await ensureOk(
+    await service.from('connection_shared_properties')
+      .select('connection_id,home_id,share_home_overview,share_address,share_preferred_vendors,share_photos,sharing_source')
+      .eq('connection_id', connection.id),
+    'Unable to inspect recorder contextual shared-property lineage'
+  );
+  if (sharedProperties.length !== 1
+    || sharedProperties[0].home_id !== homeId
+    || !sharedProperties[0].share_home_overview
+    || !sharedProperties[0].share_address
+    || sharedProperties[0].share_preferred_vendors
+    || sharedProperties[0].share_photos
+    || sharedProperties[0].sharing_source !== 'contextual') {
+    throw new Error('Recorder connection adoption refused: the selected Demo home or its contextual permissions do not match.');
+  }
+
+  const requestContext = await maybeSingle(
+    await service.from('connection_request_contexts')
+      .select('connection_id,message,created_at')
+      .eq('connection_id', connection.id)
+      .maybeSingle(),
+    'Unable to inspect recorder connection-request context'
+  );
+  const expectedMessage = 'I need help with a leaking water heater at Demo Bay Home.';
+  if (requestContext?.message !== expectedMessage) {
+    throw new Error('Recorder connection adoption refused: the original homeowner connection message does not match.');
+  }
+
+  const auditEvents = await ensureOk(
+    await service.from('connection_audit_events')
+      .select('id,event_type,actor_user_id,created_at')
+      .eq('connection_id', connection.id),
+    'Unable to inspect recorder connection audit lineage'
+  );
+  for (const [eventType, actorUserId] of [
+    ['contextual_connection_request_submitted', homeownerId],
+    ['connection_request_accepted', contractorUserId],
+  ]) {
+    const matchingEvents = auditEvents.filter((event) => event.event_type === eventType);
+    if (matchingEvents.length !== 1 || matchingEvents[0].actor_user_id !== actorUserId) {
+      throw new Error(`Recorder connection adoption refused: expected one ${eventType} audit event from the exact actor.`);
+    }
+  }
+
+  await registerRecord(service, run.id, 'homeowner_contractor_connections', connection.id, 'demo_connection', 'connected_request_ready', {
+    source: 'homeowner_request', recorder_scenario: 'homeowner-connect-service-request',
+  });
+  await registerRecord(service, run.id, 'connection_permissions', connection.id, 'demo_connection_permissions', 'connected_request_ready', {
+    source: 'contextual_connection_request',
+  });
+  for (const event of auditEvents) {
+    await registerRecord(service, run.id, 'connection_audit_events', event.id, 'demo_recording_connection_audit_event', 'connected_request_ready', {
+      event_type: event.event_type,
+    });
+  }
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'connected_request_ready' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to connected_request_ready'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'connected_request_ready',
+    executed_steps: ['identities', 'profilesAndCompany', 'property', 'contractorDiscovery', 'connection'],
+    homeowner_user_id: homeownerId,
+    contractor_user_id: contractorUserId,
+    contractor_id: contractorId,
+    home_id: homeId,
+    connection_id: connection.id,
+    recorder_connection_source: 'homeowner_request',
+    recorder_connection_message: expectedMessage,
+    recorder_connection_adopted_at: new Date().toISOString(),
+    recorder_scenario: 'homeowner-connect-service-request',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'connected_request_ready');
+  if (!verification.ok) {
+    throw new Error(`Recorder connection adoption verification failed: ${verification.reason || 'connected_request_ready state is invalid'}`);
+  }
+  return {
+    operation: 'adopt-connection',
+    runId: run.id,
+    checkpoint: 'connected_request_ready',
+    records: { connectionId: connection.id, homeId, auditEventCount: auditEvents.length },
+    verification,
+  };
+}
+
 async function adoptRecorderServiceRequest(env, target, scenarioKey) {
   const { service } = createSupabaseClients(env, target);
   const runs = await inspectNonResetRuns(service, scenarioKey);
@@ -3613,7 +3750,10 @@ async function adoptRecorderServiceRequest(env, target, scenarioKey) {
   );
   await finishRun(service, run.id, 'succeeded', {
     selected_checkpoint: 'request_ready',
-    executed_steps: ['identities', 'profilesAndCompany', 'property', 'connection', 'request'],
+    executed_steps: [...new Set([
+      ...(run.metadata?.executed_steps || ['identities', 'profilesAndCompany', 'property', 'connection']),
+      'request',
+    ])],
     homeowner_user_id: homeownerId,
     contractor_id: contractorId,
     home_id: homeId,
@@ -4634,9 +4774,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'adopt-invoice', 'adopt-invoice-payment', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-connection', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'adopt-invoice', 'adopt-invoice-payment', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-request|adopt-estimate|adopt-job|adopt-job-completion|adopt-invoice|adopt-invoice-payment|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-connection|adopt-request|adopt-estimate|adopt-job|adopt-job-completion|adopt-invoice|adopt-invoice-payment|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -4644,7 +4784,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (['prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'adopt-invoice', 'adopt-invoice-payment', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
+  if (['prepare-flagship-discover', 'adopt-connection', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'adopt-invoice', 'adopt-invoice-payment', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -4662,6 +4802,10 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'prepare-flagship-discover') {
     return summarize(await prepareFlagshipDiscover(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-connection') {
+    return summarize(await adoptRecorderContextualConnection(env, target, scenarioKey), target, scenarioKey);
   }
 
   if (operation === 'adopt-request') {

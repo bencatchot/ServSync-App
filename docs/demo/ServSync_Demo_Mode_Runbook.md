@@ -134,6 +134,7 @@ The reusable Demo Recorder builds on the same private fixture boundary. See [Ser
 
 ```bash
 npm run demo:record -- homeowner-service-request
+npm run demo:record -- homeowner-connect-service-request
 ```
 
 The second bounded scenario uses the same guarded runner and creates one draft Estimate from the registered request through the normal contractor UI:
