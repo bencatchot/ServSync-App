@@ -37972,7 +37972,7 @@ function ContractorDashboard({
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{financialsWorkspace ? 'Financials workspace' : 'Work workspace'}</p>
                         <h2 className="mt-1 text-xl font-bold text-slate-950">{financialsWorkspace ? 'Financials' : 'Work'}</h2>
-                        <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and manual payment records. Payment collection happens outside ServSync during beta.' : 'Plan, estimate, perform, and document customer work.'}</p>
+                        <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and manual payment records. Payment collection happens outside ServSync during beta.' : 'Plan, estimate, perform, and document customer work.'}</p>{financialsWorkspace && supabase ? <div className="mt-3"><ContextualHelp client={supabase} contextKey="contractor.financials" contractorId={contractor?.id} label="How to deliver an invoice and record an outside payment" /></div> : null}
                       </div>
                       {(financialsWorkspace ? contractorFinancialsView !== 'overview' : contractorWorkView !== 'overview') && (canManageFinancialActions || !financialsWorkspace) ? <div
                         role="tablist"

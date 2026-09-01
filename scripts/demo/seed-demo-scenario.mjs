@@ -4206,6 +4206,206 @@ async function adoptRecorderFinalizedReport(env, target, scenarioKey) {
   };
 }
 
+async function adoptRecorderInvoiceFromCompletedJob(env, target, scenarioKey) {
+  const { service } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder Invoice adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'job_completed') {
+    throw new Error(`Recorder Invoice adoption refused: active checkpoint must be job_completed, found ${run.checkpoint}.`);
+  }
+  if (run.records.some((record) => ['invoices', 'invoice_line_items', 'invoice_offline_payment_records'].includes(record.table_name))) {
+    throw new Error('Recorder Invoice adoption refused: job_completed already owns Invoice or payment records.');
+  }
+
+  const lineage = {
+    contractorId: run.metadata?.contractor_id,
+    homeownerId: run.metadata?.homeowner_user_id,
+    homeId: run.metadata?.home_id,
+    requestId: run.metadata?.service_request_id,
+    estimateId: run.metadata?.estimate_id,
+    jobId: run.metadata?.job_id,
+  };
+  if (Object.values(lineage).some((value) => !value)) {
+    throw new Error('Recorder Invoice adoption refused: active run is missing exact customer, property, Request, Estimate, or Job lineage.');
+  }
+
+  const invoices = await ensureOk(
+    await service.from('invoices')
+      .select('id,contractor_id,homeowner_user_id,home_id,service_request_id,estimate_id,job_id,status,total_cents,amount_paid_cents,created_at')
+      .eq('contractor_id', lineage.contractorId)
+      .eq('homeowner_user_id', lineage.homeownerId)
+      .eq('home_id', lineage.homeId)
+      .eq('service_request_id', lineage.requestId)
+      .eq('estimate_id', lineage.estimateId)
+      .eq('job_id', lineage.jobId)
+      .eq('status', 'draft')
+      .gt('created_at', run.completed_at),
+    'Unable to inspect the recorder-created Invoice'
+  );
+  if (invoices.length !== 1) {
+    throw new Error(`Recorder Invoice adoption refused: expected exactly one new matching draft Invoice, found ${invoices.length}.`);
+  }
+  const invoice = invoices[0];
+  if (invoice.total_cents !== estimateFixture.subtotalCents + estimateFixture.taxCents || invoice.amount_paid_cents !== 0) {
+    throw new Error('Recorder Invoice adoption refused: total or initial payment state does not match the accepted Estimate.');
+  }
+
+  const [lines, workItems, payments] = await Promise.all([
+    ensureOk(
+      await service.from('invoice_line_items').select('id,invoice_id,job_work_item_id').eq('invoice_id', invoice.id),
+      'Unable to inspect recorder-created Invoice lines'
+    ),
+    fetchJobWorkItems(service, lineage.jobId),
+    ensureOk(
+      await service.from('workflow_activity_events').select('id').eq('invoice_id', invoice.id).eq('event_type', 'invoice_paid'),
+      'Unable to inspect premature Invoice payment events'
+    ),
+  ]);
+  const workItemIds = [...workItems.map((item) => item.id)].sort();
+  const lineWorkItemIds = [...lines.map((line) => line.job_work_item_id).filter(Boolean)].sort();
+  if (
+    lines.length !== workItems.length
+    || JSON.stringify(lineWorkItemIds) !== JSON.stringify(workItemIds)
+    || workItems.some((item) => item.billing_status !== 'drafted' || item.reserved_invoice_id !== invoice.id || item.invoiced_invoice_id)
+    || payments.length > 0
+  ) {
+    throw new Error('Recorder Invoice adoption refused: line ownership, work-item reservation, or initial payment state is not exact.');
+  }
+
+  for (const line of lines) {
+    await registerRecord(service, run.id, 'invoice_line_items', line.id, 'demo_invoice_line_item', 'invoice_draft', {
+      source: 'canonical_contractor_partial_invoice_ui',
+      job_work_item_id: line.job_work_item_id,
+    });
+  }
+  await registerRecord(service, run.id, 'invoices', invoice.id, 'demo_invoice', 'invoice_draft', {
+    source: 'canonical_contractor_partial_invoice_ui',
+  });
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'invoice_draft' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to invoice_draft'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'invoice_draft',
+    executed_steps: [...(run.metadata?.executed_steps || []), 'invoiceDraft'],
+    invoice_id: invoice.id,
+    invoice_line_count: lines.length,
+    invoice_total_cents: invoice.total_cents,
+    invoice_payment_ids: [],
+    recorder_invoice_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'contractor-invoice-outside-payment',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'invoice_draft');
+  if (!verification.ok) {
+    throw new Error(`Recorder Invoice adoption verification failed: ${verification.reason || 'invoice_draft state is invalid'}`);
+  }
+  return {
+    operation: 'adopt-invoice',
+    runId: run.id,
+    checkpoint: 'invoice_draft',
+    records: { invoiceId: invoice.id, lineItemCount: lines.length, totalCents: invoice.total_cents },
+    verification,
+  };
+}
+
+async function adoptRecorderOutsidePayment(env, target, scenarioKey) {
+  const { service, makeUserClient } = createSupabaseClients(env, target);
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const activeRuns = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  if (activeRuns.length !== 1) {
+    throw new Error(`Recorder payment adoption refused: expected one active succeeded scenario run, found ${activeRuns.length}.`);
+  }
+  const run = activeRuns[0];
+  if (run.checkpoint !== 'invoice_draft') {
+    throw new Error(`Recorder payment adoption refused: active checkpoint must be invoice_draft, found ${run.checkpoint}.`);
+  }
+  const invoiceId = run.metadata?.invoice_id;
+  if (!invoiceId || run.records.some((record) => record.table_name === 'invoice_offline_payment_records')) {
+    throw new Error('Recorder payment adoption refused: exact Invoice identity is missing or a payment is already registered.');
+  }
+
+  const invoice = await fetchOneByPrimaryKey(
+    service,
+    'invoices',
+    'id',
+    invoiceId,
+    'id,contractor_id,homeowner_user_id,home_id,service_request_id,estimate_id,job_id,status,total_cents,amount_paid_cents,issued_at,paid_at'
+  );
+  if (
+    !invoice
+    || invoice.contractor_id !== run.metadata?.contractor_id
+    || invoice.homeowner_user_id !== run.metadata?.homeowner_user_id
+    || invoice.home_id !== run.metadata?.home_id
+    || invoice.service_request_id !== run.metadata?.service_request_id
+    || invoice.estimate_id !== run.metadata?.estimate_id
+    || invoice.job_id !== run.metadata?.job_id
+    || invoice.status !== 'partially_paid'
+    || invoice.total_cents !== estimateFixture.subtotalCents + estimateFixture.taxCents
+    || invoice.amount_paid_cents !== 40000
+    || !invoice.issued_at
+    || invoice.paid_at
+  ) {
+    throw new Error('Recorder payment adoption refused: delivered Invoice lineage, status, or balance is not exact.');
+  }
+
+  const contractorClient = await signInDemoUser(
+    makeUserClient,
+    requireEnv(env, 'DEMO_CONTRACTOR_EMAIL'),
+    requireEnv(env, 'DEMO_CONTRACTOR_PASSWORD')
+  );
+  const payments = await listDemoInvoiceOfflinePayments(contractorClient, invoiceId);
+  if (
+    payments.length !== 1
+    || payments[0].invoice_id !== invoiceId
+    || payments[0].amount_cents !== 40000
+    || payments[0].payment_method !== 'bank_transfer'
+    || payments[0].reference !== 'DEMO-PARTIAL'
+    || payments[0].note !== 'Fictional Demo offline payment record. No money was processed.'
+  ) {
+    throw new Error('Recorder payment adoption refused: canonical offline-payment ledger row does not match the tutorial contract.');
+  }
+  const payment = payments[0];
+  await registerRecord(
+    service,
+    run.id,
+    'invoice_offline_payment_records',
+    payment.id,
+    'demo_invoice_partial_payment',
+    'invoice_partially_paid',
+    { source: 'canonical_contractor_offline_payment_ui' }
+  );
+  await ensureOk(
+    await service.from('demo_scenario_runs').update({ checkpoint: 'invoice_partially_paid' }).eq('id', run.id),
+    'Unable to advance the recorder scenario to invoice_partially_paid'
+  );
+  await finishRun(service, run.id, 'succeeded', {
+    selected_checkpoint: 'invoice_partially_paid',
+    executed_steps: [...(run.metadata?.executed_steps || []), 'invoiceSent', 'invoiceViewed', 'invoicePartiallyPaid'],
+    invoice_payment_ids: [payment.id],
+    recorder_payment_adopted_at: new Date().toISOString(),
+    recorder_source: 'servsync_demo_recorder',
+    recorder_scenario: 'contractor-invoice-outside-payment',
+  });
+
+  const verification = await verifyScenario(service, scenarioKey, env, 'invoice_partially_paid');
+  if (!verification.ok) {
+    throw new Error(`Recorder payment adoption verification failed: ${verification.reason || 'invoice_partially_paid state is invalid'}`);
+  }
+  return {
+    operation: 'adopt-invoice-payment',
+    runId: run.id,
+    checkpoint: 'invoice_partially_paid',
+    records: { invoiceId, paymentId: payment.id, amountPaidCents: invoice.amount_paid_cents },
+    verification,
+  };
+}
+
 async function prepareFlagshipDiscover(env, target, scenarioKey) {
   const { service } = createSupabaseClients(env, target);
   const runs = await inspectNonResetRuns(service, scenarioKey);
@@ -4434,9 +4634,9 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
       success: true,
     };
   }
-  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
+  if (!['seed', 'reset', 'verify', 'prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'adopt-invoice', 'adopt-invoice-payment', 'create-flagship-invoice', 'adopt-report'].includes(operation)) {
     throw new Error(
-      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-request|adopt-estimate|adopt-job|adopt-job-completion|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify|prepare-flagship-discover|adopt-request|adopt-estimate|adopt-job|adopt-job-completion|adopt-invoice|adopt-invoice-payment|create-flagship-invoice|adopt-report> water_heater_core_loop [--checkpoint=<key>]'
     );
   }
 
@@ -4444,7 +4644,7 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
-  if (['prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
+  if (['prepare-flagship-discover', 'adopt-request', 'adopt-estimate', 'adopt-job', 'adopt-job-completion', 'adopt-invoice', 'adopt-invoice-payment', 'create-flagship-invoice', 'adopt-report'].includes(operation) && optionArgs.length > 0) {
     throw new Error('Recorder adoption does not accept checkpoint options.');
   }
   const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
@@ -4478,6 +4678,14 @@ export async function runDemoCommand(argv = process.argv.slice(2), env = process
 
   if (operation === 'adopt-job-completion') {
     return summarize(await adoptRecorderCompletedJob(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-invoice') {
+    return summarize(await adoptRecorderInvoiceFromCompletedJob(env, target, scenarioKey), target, scenarioKey);
+  }
+
+  if (operation === 'adopt-invoice-payment') {
+    return summarize(await adoptRecorderOutsidePayment(env, target, scenarioKey), target, scenarioKey);
   }
 
   if (operation === 'create-flagship-invoice') {

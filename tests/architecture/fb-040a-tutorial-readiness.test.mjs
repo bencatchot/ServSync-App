@@ -18,6 +18,14 @@ test('Work owns the contextual completion walkthrough placement', async () => {
   );
 });
 
+test('Financials owns the contextual Invoice and outside-payment walkthrough placement', async () => {
+  const appSource = await readFile(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(
+    appSource,
+    /contextKey="contractor\.financials"[\s\S]{0,220}label="How to deliver an invoice and record an outside payment"/,
+  );
+});
+
 test('pilot tutorial coverage protects the six canonical onboarding workflows', async () => {
   const coverage = await readFile(
     new URL('../../docs/servsync-master-plan/ServSync_Pilot_Tutorial_Coverage.md', import.meta.url),

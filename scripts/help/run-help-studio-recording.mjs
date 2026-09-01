@@ -18,6 +18,7 @@ const SAFE_SCENARIOS = new Set([
   'contractor-service-request-intake',
   'contractor-create-estimate',
   'contractor-complete-work',
+  'contractor-invoice-outside-payment',
   'homeowner-home-history',
   'servsync-platform-introduction',
 ]);

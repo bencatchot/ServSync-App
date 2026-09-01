@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { contractorCompleteWorkScenario } from '../../scripts/demo/recorder/scenarios/contractor-complete-work.mjs';
 import { contractorCreateEstimateScenario } from '../../scripts/demo/recorder/scenarios/contractor-create-estimate.mjs';
+import { contractorInvoiceOutsidePaymentScenario } from '../../scripts/demo/recorder/scenarios/contractor-invoice-outside-payment.mjs';
 import { contractorServiceRequestIntakeScenario } from '../../scripts/demo/recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from '../../scripts/demo/recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-service-request.mjs';
@@ -84,6 +85,40 @@ test('TUT-003 contractor completion scenario preserves accepted Estimate through
   assert.match(contractorCompleteWorkScenario.scenes[0].caption, /Create the Job from the accepted Estimate/);
   assert.match(contractorCompleteWorkScenario.scenes[3].caption, /Finalize the report/);
   assert.doesNotMatch(JSON.stringify(contractorCompleteWorkScenario), /password|service_role|@example/i);
+});
+
+test('TUT-004 contractor Invoice scenario preserves completed work through the outside-payment ledger', () => {
+  assert.equal(validateScenarioDefinition(contractorInvoiceOutsidePaymentScenario), contractorInvoiceOutsidePaymentScenario);
+  assert.equal(contractorInvoiceOutsidePaymentScenario.initialCheckpoint, 'job_completed');
+  assert.equal(contractorInvoiceOutsidePaymentScenario.finalCheckpoint, 'invoice_partially_paid');
+  assert.deepEqual(
+    contractorInvoiceOutsidePaymentScenario.scenes.map((scene) => scene.key),
+    ['completed-job', 'invoice-draft', 'invoice-delivered', 'outside-payment', 'payment-recorded'],
+  );
+  assert.deepEqual(contractorInvoiceOutsidePaymentScenario.expectedDurationSeconds, { min: 38, max: 90 });
+  assert.equal(contractorInvoiceOutsidePaymentScenario.showSceneCallouts, false);
+  assert.equal(contractorInvoiceOutsidePaymentScenario.payment.amountCents, 40000);
+  assert.equal(contractorInvoiceOutsidePaymentScenario.payment.method, 'bank_transfer');
+  assert.match(contractorInvoiceOutsidePaymentScenario.fixturePolicy, /customer, property, Request, Estimate, Job, Invoice, and payment lineage/i);
+  assert.doesNotMatch(JSON.stringify(contractorInvoiceOutsidePaymentScenario), /password|service_role|@example/i);
+});
+
+test('TUT-004 uses the real delivery and canonical outside-payment UI before exact registry adoption', () => {
+  const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
+  const flowStart = source.indexOf('async function recordContractorInvoiceOutsidePayment');
+  const flowEnd = source.indexOf('async function recordHomeownerHomeHistory', flowStart);
+  const flow = source.slice(flowStart, flowEnd);
+
+  assert.match(flow, /confirm-create-partial-invoice/);
+  assert.match(flow, /runDemoCommand\(\['adopt-invoice'/);
+  assert.match(flow, /contractor-send-invoice/);
+  assert.match(flow, /homeowner-invoice-card/);
+  assert.match(flow, /name: \/\^View Invoice\$\/i/);
+  assert.match(flow, /Record money received outside ServSync/);
+  assert.match(flow, /paymentProviderRequests/);
+  assert.match(flow, /online payment path instead of the offline ledger/);
+  assert.match(flow, /runDemoCommand\(\['adopt-invoice-payment'/);
+  assert.match(flow, /scenario\.finalState\.balanceDueLabel/);
 });
 
 test('TUT-003 records every approved item through a stable title identity before saving', () => {
@@ -228,6 +263,7 @@ test('operator arguments stay intentionally small', () => {
   assert.equal(parseRecorderArgs(['contractor-create-estimate']).scenarioKey, 'contractor-create-estimate');
   assert.equal(parseRecorderArgs(['contractor-service-request-intake']).scenarioKey, 'contractor-service-request-intake');
   assert.equal(parseRecorderArgs(['contractor-complete-work']).scenarioKey, 'contractor-complete-work');
+  assert.equal(parseRecorderArgs(['contractor-invoice-outside-payment']).scenarioKey, 'contractor-invoice-outside-payment');
   assert.equal(parseRecorderArgs(['homeowner-home-history']).scenarioKey, 'homeowner-home-history');
   assert.equal(parseRecorderArgs(['servsync-platform-introduction']).scenarioKey, 'servsync-platform-introduction');
   assert.throws(() => parseRecorderArgs(['homeowner-service-request', '--pacing=cinematic']), /Unsupported pacing/i);
@@ -353,6 +389,16 @@ test('fixture adoption is exact, lineage-bound, and does not broaden reset autho
   assert.match(recorderSource, /runDemoCommand\(\['adopt-job', scenario\.fixtureScenarioKey\], env\)/);
   assert.match(recorderSource, /runDemoCommand\(\['adopt-job-completion', scenario\.fixtureScenarioKey\], env\)/);
   assert.match(recorderSource, /runDemoCommand\(\['adopt-report', scenario\.fixtureScenarioKey\], env\)/);
+  assert.match(source, /async function adoptRecorderInvoiceFromCompletedJob/);
+  assert.match(source, /run\.checkpoint !== 'job_completed'/);
+  assert.match(source, /lineWorkItemIds[\s\S]*workItemIds/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'invoice_draft'\)/);
+  assert.match(source, /async function adoptRecorderOutsidePayment/);
+  assert.match(source, /run\.checkpoint !== 'invoice_draft'/);
+  assert.match(source, /servsync_list_invoice_offline_payments/);
+  assert.match(source, /verifyScenario\(service, scenarioKey, env, 'invoice_partially_paid'\)/);
+  assert.match(recorderSource, /invoiceCreationStarted && !invoiceAdopted/);
+  assert.match(recorderSource, /paymentSubmissionStarted && !paymentAdopted/);
 });
 
 test('Home History fixture patch extends only the exact Demo reset allowlist with dependency-safe ordering', () => {

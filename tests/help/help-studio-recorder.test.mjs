@@ -55,6 +55,10 @@ test('Help Studio recorder accepts only a durable job identity, known Demo scena
     scenario: 'contractor-complete-work',
     route_contexts: ['contractor.work'],
   }).scenario, 'contractor-complete-work');
+  assert.equal(assertSafeHelpRecordingSpec({
+    ...validSpec,
+    scenario: 'contractor-invoice-outside-payment',
+  }).scenario, 'contractor-invoice-outside-payment');
   assert.throws(() => assertSafeHelpRecordingSpec({ ...validSpec, scenario: 'production-walkthrough' }), /Unsupported/);
   assert.throws(() => assertSafeHelpRecordingSpec({ ...validSpec, pacing_profile: 'fast' }), /human-paced/);
   assert.throws(() => assertSafeHelpRecordingSpec({ ...validSpec, recording_job_id: '../job' }), /identity/);
