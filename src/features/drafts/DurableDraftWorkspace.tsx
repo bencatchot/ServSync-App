@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
 import type { ContractorPriceBookItem, Estimate, EstimateTemplate, Inspection, Invoice } from '../../types';
 import { isComposerDraftJob } from '../jobs/jobRecordSelectors';
@@ -74,6 +74,7 @@ import { validateDurableDraftLoadedOutput } from './durableDraftOutputValidation
 import type { DraftChecklistSourceOption } from './checklistDraftScope';
 import type { PriceBookLoadState } from '../price-book/priceBookView';
 import {
+  applyDraftCustomerSelection,
   draftCustomerOptionsWithSavedSelection,
   selectedDraftCustomerKey,
   type DraftCustomerOption,
@@ -94,6 +95,12 @@ type DurableDraftWorkspaceProps = {
   priceBookLoadState?: PriceBookLoadState;
   priceBookLoadError?: string;
   canViewPriceBook?: boolean;
+  canCreateCustomer?: boolean;
+  onPrepareCustomerCreation?: () => void;
+  renderCustomerCreation?: (actions: {
+    onCreated: (customer: DraftCustomerOption) => void;
+    onCancel: () => void;
+  }) => ReactNode;
   customerLabel: (draft: Inspection) => string;
   propertyLabel: (draft: Inspection) => string;
   onStartNew: () => void;
@@ -279,6 +286,9 @@ export function DurableDraftWorkspace({
   priceBookLoadState = 'idle',
   priceBookLoadError = '',
   canViewPriceBook = false,
+  canCreateCustomer = false,
+  onPrepareCustomerCreation,
+  renderCustomerCreation,
   customerLabel,
   propertyLabel,
   onStartNew,
@@ -301,6 +311,12 @@ export function DurableDraftWorkspace({
   const canonicalRef = useRef(canonical);
   canonicalRef.current = canonical;
   const [form, setForm] = useState<SharedDraftComposerDraft | null>(null);
+  const [customerCreationOpen, setCustomerCreationOpen] = useState(false);
+  const customerCreationContext = useRef<{
+    contractorId: string | null;
+    targetKey: string | null;
+    editorGeneration: number;
+  } | null>(null);
   const [removedItemIds, setRemovedItemIds] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'clean' | 'dirty' | 'saving' | 'saved' | 'failed'>('clean');
@@ -352,6 +368,11 @@ export function DurableDraftWorkspace({
   const errorSummaryRef = useRef<HTMLDivElement | null>(null);
   const targetKey = openTargetKey(target);
   context.current = { client, contractorId: capabilities.contractorId, mode, target, targetKey, launchEnabled };
+
+  useEffect(() => {
+    customerCreationContext.current = null;
+    setCustomerCreationOpen(false);
+  }, [capabilities.contractorId, mode, targetKey]);
 
   const cancelPostLaunchNavigation = (token?: symbol) => {
     if (token
@@ -692,6 +713,40 @@ export function DurableDraftWorkspace({
     setDirty(true);
     setSaveState('dirty');
     setFeedback(null);
+  };
+
+  const handleOpenCustomerCreation = () => {
+    if (!canCreateCustomer || !renderCustomerCreation || launchOperation.current || saveLock.current) return;
+    onPrepareCustomerCreation?.();
+    setFeedback(null);
+    customerCreationContext.current = {
+      contractorId: capabilities.contractorId,
+      targetKey: context.current.targetKey,
+      editorGeneration: editorGeneration.current,
+    };
+    setCustomerCreationOpen(true);
+  };
+
+  const handleCreatedCustomer = (customer: DraftCustomerOption) => {
+    const creation = customerCreationContext.current;
+    const current = context.current;
+    if (!creation
+      || creation.contractorId !== current.contractorId
+      || creation.targetKey !== current.targetKey
+      || creation.editorGeneration !== editorGeneration.current
+      || customer.subjectType !== 'local'
+      || !durableDraftLaunchAllowsEditing(launchState)) return;
+    setForm(current => current ? applyDraftCustomerSelection(current, customer) : current);
+    setDirty(true);
+    setSaveState('dirty');
+    setCustomerCreationOpen(false);
+    customerCreationContext.current = null;
+    setFeedback({
+      tone: 'success',
+      title: `${customer.label} is selected.`,
+      body: 'Continue this Draft, then use its Create action when you are ready.',
+      testId: 'durable-draft-customer-created',
+    });
   };
 
   const handleSave = async () => {
@@ -1683,6 +1738,9 @@ export function DurableDraftWorkspace({
   const selectedPropertyId = form.subject_type === 'connected' ? form.home_id : form.local_home_id;
   const confirmationCustomer = customerOptionsWithSavedSelection.find(option => option.key === selectedDraftCustomerKey(form));
   const confirmationProperty = confirmationCustomer?.properties.find(property => property.id === selectedPropertyId);
+  const customerCreationAvailable = canCreateCustomer
+    && Boolean(renderCustomerCreation)
+    && (!canonical?.draft.draftId || form.subject_type === 'local');
 
   return (
     <div className="space-y-3">
@@ -1709,6 +1767,17 @@ export function DurableDraftWorkspace({
         launchBusy={launchBusy}
         launchRecoveryLabel={recoveryLabel}
         feedback={feedback}
+        onAddCustomer={customerCreationAvailable ? handleOpenCustomerCreation : undefined}
+        addCustomerDisabled={launchFrozen || saveState === 'saving'}
+        customerCreationPanel={customerCreationOpen && renderCustomerCreation
+          ? renderCustomerCreation({
+              onCreated: handleCreatedCustomer,
+              onCancel: () => {
+                customerCreationContext.current = null;
+                setCustomerCreationOpen(false);
+              },
+            })
+          : undefined}
         onChange={handleChange}
         onSave={() => void handleSave()}
         onLaunch={handleOpenLaunchConfirmation}

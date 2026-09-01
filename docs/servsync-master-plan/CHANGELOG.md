@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - New Draft customer-entry controlled-pilot fix candidate
+
+- Pilot blocker: Work -> New Draft now places **Add new customer** beside the unified Customer selector for authorized contractor Owner/Admin/Office roles. Field Technician, Viewer, unresolved, and read-only contexts receive no new customer-creation control.
+- Canonical behavior: The inline panel reuses the existing local-customer draft state, validation, normalization, and `servsync_create_local_contact` mutation. Success returns to the same mounted Draft, selects the new not-connected Customer and its single returned property, and leaves title, scope, notes, work format, output intent, templates, and line items unchanged.
+- Lifecycle safety: Saving a Customer never saves, launches, sends, or otherwise creates an Estimate, Job, or Invoice. One in-flight guard blocks duplicate local submissions, and the returned selection is accepted only by the contractor/Draft/editor generation that opened the form so late responses cannot overwrite another Draft.
+- Interaction evidence: Focused Chromium coverage passes for existing selection, form open/cancel, error/retry, automatic Customer/property selection, preserved unfinished content, immediate Estimate and draft-Invoice next actions, zero automatic output RPCs, forbidden-role suppression, and exact `390x844` no-overflow behavior. The broader durable launch/workspace/customer suite passed 173/174; its one failing source assertion is unchanged on `origin/main` because `contractor-create-job-from-accepted-estimate` is already absent there.
+- Tutorial impact: `NONE`. Published TUT-002 **How to create an estimate** revision 3 uses the Request -> Create Estimate path and does not show the New Draft Customer selector. Merged TUT-004 source starts from a completed Job and creates an Invoice from completed items in Financials. Neither visible path, label, ordering, role assumption, or outcome changes; no Help media was recorded, approved, or published.
+- Protected boundary: No Production/Demo data, SQL, schema, role/permission, environment, secret, provider, tutorial media, deployment, or merge action occurred.
+
 ## 2026-09-01 - TUT-004 protected Demo recorder source candidate
 
 - Launch slice: Draft PR #542 gives FB-040A TUT-004 **How to deliver an invoice and record an outside payment** a protected durable Demo-only recorder scenario and exact fixture-adoption lifecycle.
