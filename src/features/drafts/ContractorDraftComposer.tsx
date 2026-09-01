@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import { DraftPriceBookPicker } from '../price-book/DraftPriceBookPicker';
@@ -50,6 +50,9 @@ type ContractorDraftComposerProps = {
   launchBusy?: boolean;
   launchRecoveryLabel?: string | null;
   feedback?: (ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null;
+  onAddCustomer?: () => void;
+  addCustomerDisabled?: boolean;
+  customerCreationPanel?: ReactNode;
   onChange: (draft: SharedDraftComposerDraft) => void;
   onSave: () => void;
   onLaunch?: () => void;
@@ -96,6 +99,9 @@ export function ContractorDraftComposer({
   launchBusy = false,
   launchRecoveryLabel = null,
   feedback,
+  onAddCustomer,
+  addCustomerDisabled = false,
+  customerCreationPanel,
   onChange,
   onSave,
   onLaunch,
@@ -330,7 +336,7 @@ export function ContractorDraftComposer({
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
         <DraftCustomerCombobox
           testId="durable-draft-customer"
           options={customerOptions}
@@ -340,6 +346,18 @@ export function ContractorDraftComposer({
             ? applyDraftCustomerSelection(draft, option)
             : clearDraftCustomerSelection(draft))}
         />
+        {onAddCustomer ? (
+          <button
+            type="button"
+            onClick={onAddCustomer}
+            disabled={interactionDisabled || addCustomerDisabled}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+            data-testid="durable-draft-add-customer"
+          >
+            <Plus size={15} />
+            Add new customer
+          </button>
+        ) : null}
         {composerField('Property', (
           <select
             data-testid="durable-draft-property"
@@ -360,6 +378,7 @@ export function ContractorDraftComposer({
           </select>
         ))}
       </div>
+      {customerCreationPanel}
       {subjectTypeLocked ? (
         <p className="text-xs font-medium text-slate-500">
           This saved Draft keeps its original customer connection category so retries update the same Draft safely.
