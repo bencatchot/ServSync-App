@@ -2,7 +2,18 @@
 
 ## Status
 
-Source preparation in progress; not recorded, approved, or published. TUT-005 **How to connect and request service** is the primary active Launch Roadmap outcome at `homeowner.service`.
+Source preparation merged through PR #549 at `2667d3ec1952800faa5e6273888bd09c6227948f`; no validated recording, approval, or publication exists. The first separately authorized silent run failed after the homeowner submitted the exact contextual connection request but before contractor acceptance because the recorder waited for stale text, **connection request needs review**, while the real Customers control says **1 connection request need review**. The authorization was consumed without retry. TUT-005 **How to connect and request service** remains the primary active Launch Roadmap outcome at `homeowner.service`.
+
+## First protected silent run — material failure
+
+- Exact durable Demo deployment `dpl_E6oXJCMuhv9246jbPYoq6vmNhqm9` remained Ready and bound to merge commit `2667d3ec1952800faa5e6273888bd09c6227948f`; the canonical alias returned HTTP 200.
+- The owner-only ignored credential bundle passed target, identity, fictional-fixture, and external-effect preflight without logging values. The isolated recorder process contained zero enabled external-effect flags and zero provider/OpenAI credentials.
+- The one authorized run started disconnected, selected Demo Bay Home, submitted the exact original message and bounded contextual permissions, and created one pending `homeowner_request` connection with one shared property and one submission event.
+- The contractor authenticated successfully. Its pending-request RPC returned exactly one request, but the recorder timed out waiting for the stale accessible-name pattern before any acceptance action. There was no acceptance event, service Request, final WebM, promoted MP4, checksum, or reviewable artifact.
+- No retry occurred. Guarded reset reconciled the exact pending connection, retained only the canonical property graph, and direct post-reset queries returned zero connection, permission, request-context, shared-property, audit-event, matching service-Request, or active-registry residue. The empty local staging directories were removed.
+- The failure produced no visible credential, browser-reported `5xx`, payment/provider action, external effect, OpenAI/Cedar call, Help request, or Production workflow mutation. Full `1x` playback and desktop/mobile final-media validation were not applicable because no artifact was produced.
+
+The bounded remediation is to align the pending-review locator with the current control, add a regression expectation for the exact UI text, merge and deploy that correction normally, and obtain a new explicit one-run silent-recording authorization. The failed authorization cannot be reused.
 
 ## Truthful workflow boundary
 
@@ -39,4 +50,4 @@ Tutorial evidence: The canonical current Production Help inventory and accepted 
 
 Affected tutorials: TUT-005 **How to connect and request service** at `homeowner.service`.
 
-Tutorial follow-up: After source PR #549 is owner-approved and merged to durable Demo, the owner must separately authorize credential-backed recording. TUT-005 remains incomplete until the narrated/captioned revision is approved, published, and verified for role-aware `homeowner.service` retrieval, full playback, homeowner-only audience, desktop/mobile context, transcript/disclosure, browser health, and zero external effects.
+Tutorial follow-up: Correct and merge the stale pending-review locator, verify the durable Demo correction, then obtain a new explicit authorization for exactly one protected silent run. TUT-005 remains incomplete until a validated silent artifact exists and its later narrated/captioned revision is approved, published, and verified for role-aware `homeowner.service` retrieval, full playback, homeowner-only audience, desktop/mobile context, transcript/disclosure, browser health, and zero external effects.
