@@ -1,8 +1,8 @@
 # ServSync Product Roadmap
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
-Planning base: `origin/main` at `0bddbb20682bbcac7945150e6f2d70e57e54aed7`
+Planning base: `origin/main` at `34d4fe9dc2a7b988bb7288faa30f0225fa81315a`
 
 ## Purpose
 
@@ -85,11 +85,11 @@ Focus rules:
 | Field | Current direction |
 | --- | --- |
 | Current release stage | Phase 1 — Controlled Contractor Pilot Preflight |
-| Primary active outcome | FB-040A Tutorial Readiness |
+| Primary active outcome | FB-040A Tutorial Readiness — TUT-004 source and protected-media closeout |
 | Completed control-point evidence | Phase 0 is complete. PR #521 merged Phase 0.7 at main commit `0bddbb20682bbcac7945150e6f2d70e57e54aed7`, preserving the accepted role-aware Beta Guide, direct Support handoff, contextual Estimate walkthrough, and truthful automation boundaries. TUT-001 and TUT-003 are published under the narration/caption standard; PR #537 merged the permanent TUT-003 Production owner contextual-playback smoke closeout at `48c18d4699a5d3149214f01c6823299b8f5110b6`. TUT-002 remains visually current but still needs its standards upgrade. The controlled-pilot inventory now contains three published walkthroughs and three missing protected workflows. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
-| Next recommended assignment | Begin TUT-004 **How to deliver an invoice and record an outside payment**. Keep bounded FB-037 maintenance and the Demo smoke credential repair from interrupting the primary FB-040A launch sequence. |
-| Assignment outcome | PR #536 merged at `995219497678edc966e736cd9c99bf611d043b4d`, and Production, Demo, and Stripe Sandbox automatic deployments passed. With explicit owner authorization, Production published TUT-003 walkthrough revision 1. Help Studio now reports three published and zero unpublished walkthroughs; the exact 57.32-second video loaded completely with one showing English caption track, matching transcript and Cedar disclosure. Immutable metadata binds it to `contractor.work` for Owner/Admin/Office/Field Technician and excludes Viewer/Homeowner. The rejected prior request remains **Needs rerecord** as preserved evidence. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
-| Expected following slice | Complete TUT-004, then TUT-005, TUT-006, and the TUT-002 standards upgrade before the pilot onboarding dry run. |
+| Next recommended assignment | Review and merge the TUT-004 source candidate, allow the normal durable Demo deployment, then run the exact protected recorder with the existing dedicated credentials. Package the validated silent source with one Cedar narration request, synchronized top-safe captions, matching transcript, exact disclosure, and owner review. Credential retrieval, Help approval, and Production publication remain explicit owner gates. |
+| Assignment outcome | Draft PR #542 contains the TUT-004 source candidate. It starts from one registry-owned completed Job, creates and sends the exact lineage-bound Invoice through ordinary UI, opens it as the fictional homeowner, and records a fictional `$400.00` external bank transfer through the canonical offline ledger. The final state is **Partially Paid**, `$400.00` paid, and `$1,765.00` due. The recorder fails on visible secrets, browser errors, `5xx` responses, or any online-payment/provider path, and the contextual entry is at `contractor.financials` for the intended Owner/Admin/Office package. Local source, architecture, desktop/mobile Help, payment presentation, lint, type, and build validation pass. The media is not recorded, narrated, approved, or published; protected Demo credentials are not present in this worktree and were not retrieved. See [Pilot Tutorial Coverage](ServSync_Pilot_Tutorial_Coverage.md). |
+| Expected following slice | Finish TUT-004's merged durable Demo package and owner-gated Help review/publication, then TUT-005, TUT-006, and the TUT-002 standards upgrade before the pilot onboarding dry run. |
 | Parallel strategic lane | FB-037 Marketing has a source-complete guarded media-retirement control: eligible unpublished managed media can retire through the existing authenticated lifecycle RPC, atomically invalidating Ready/Needs Review packages and releasing quota while preserving audit/publication history. A bounded UI follow-up also surfaces server-eligible unattached uploads in Campaigns only when they have no active pairing or non-retired package dependency, without creating fake Content. No new migration or permission boundary is required. Production verification preserved the originally named **Your work, connected — Free ServSync beta** item as Published with exact history and retirement eligibility false, so it remains intentionally unavailable to the control. Selected-contractor beta work remains separately governed. |
 | Roadmap return point | Return to FB-040 controlled-pilot preflight after each bounded feature or strategic-lane interruption; tutorial readiness is the current launch assignment. |
 

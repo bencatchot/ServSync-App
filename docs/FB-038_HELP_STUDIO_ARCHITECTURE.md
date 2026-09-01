@@ -32,6 +32,8 @@ The approved package contract binds the narration, caption track, and transcript
 
 PR #522 contains this source foundation in `servsync-help-narration-caption-foundation.sql`. It preserves existing published legacy tutorials, prevents future protected tutorials from publishing without the narrated/captioned standard, and prevents the existing silent TUT-001 package from being approved. Exact SHA-256 `11e3f5efa5c71c9781880d030ec32ed0e13a4a24840997db166d12b284d5e496` is applied and verified in Sandbox, Demo, and Production.
 
+The TUT-004 authoring candidate adds `contractor-invoice-outside-payment` to the ordinary Help Studio recorder menu and places its future published entry at `contractor.financials`. The protected recorder uses only durable Demo and fictional registered lineage: one completed Job becomes an exact Invoice, the fictional homeowner opens the delivered Invoice, and a `$400.00` external bank transfer is recorded through the offline ledger. It visibly states that ServSync does not process or contact a payment provider, rejects any online-payment/provider request, and ends at the exact partially-paid checkpoint. This source placement creates no Production Help record and does not approve or publish media.
+
 ## Authoring Boundary
 
 - Only an authenticated ServSync `platform_admin` can create or change Help Studio records.

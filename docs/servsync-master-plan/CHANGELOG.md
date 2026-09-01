@@ -4,6 +4,16 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-004 protected Demo recorder source candidate
+
+- Launch slice: Draft PR #542 gives FB-040A TUT-004 **How to deliver an invoice and record an outside payment** a protected durable Demo-only recorder scenario and exact fixture-adoption lifecycle.
+- Workflow truth: Ordinary product UI creates an Invoice from one fictional completed Job, sends it, opens it as the fictional homeowner, and records a fictional `$400.00` external bank transfer through the canonical offline ledger. The final card proves **Partially Paid**, `$400.00` paid, `$1,765.00` due, and complete Customer/Home/Request/Estimate/Job/Invoice/payment lineage.
+- Payment boundary: The recorder requires the visible ServSync disclaimer that no payment is processed or provider contacted and fails if either browser leg reaches an online-payment/provider path. Console/page errors, `5xx` responses, visible secrets, duration drift, and checkpoint drift also fail closed.
+- Help integration: Help Studio exposes the scenario in its ordinary recorder menu, and the future published walkthrough is contextually placed at `contractor.financials` for the intended Owner/Admin/Office audience. No Production Help row or media was created.
+- Validation: 49/49 focused source contracts, 48/48 complete Demo Recorder tests, 23/23 architecture tests, and 19/19 desktop/mobile Help and Invoice-payment browser tests passed. TypeScript, the Production build, script syntax, diff whitespace, exact 50,824-line App budget, and the ESLint 0-error/existing-79-warning baseline passed.
+- Protected boundary: No Demo credential was retrieved, no source recording or Cedar provider request was made, and no Production Help approval/publication, business-data mutation, environment/secret, schema/permission, provider, or deployment change occurred. Durable Demo recording remains gated on normal merge/deployment plus access to the existing protected recorder credentials.
+- Tutorial impact: `UPDATE REQUIRED`. TUT-004 is still missing from Production. The bounded follow-up is exact-head durable Demo recording, one Cedar narration package with synchronized captions/transcript and silent provenance, complete `1x` sound-on/sound-off review, then separate explicit owner approval/publication and contextual audience verification.
+
 ## 2026-08-31 - Unattached Marketing upload retirement follow-up
 
 - Pull request: PR #541 carries this bounded source-only follow-up; merge and deployment remain separately authorized.

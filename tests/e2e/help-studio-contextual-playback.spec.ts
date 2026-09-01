@@ -135,6 +135,7 @@ test('admin can define a recorder request without engineering identifiers in the
     'Contractor creates an estimate',
     'Contractor reviews a service request',
     'Contractor completes work',
+    'Contractor delivers an invoice and records an outside payment',
     'Homeowner sends a service request',
   ]);
   await expect(page.getByText(/uuid|asset id|commit sha/i)).toHaveCount(0);

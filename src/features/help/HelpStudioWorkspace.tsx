@@ -54,6 +54,7 @@ const RECORDER_SCENARIOS = [
   ['contractor-create-estimate', 'Contractor creates an estimate'],
   ['contractor-service-request-intake', 'Contractor reviews a service request'],
   ['contractor-complete-work', 'Contractor completes work'],
+  ['contractor-invoice-outside-payment', 'Contractor delivers an invoice and records an outside payment'],
   ['homeowner-service-request', 'Homeowner sends a service request'],
   ['homeowner-home-history', 'Homeowner opens Home History'],
   ['servsync-platform-introduction', 'ServSync platform introduction'],

@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { runDemoCommand } from './seed-demo-scenario.mjs';
 import { contractorCompleteWorkScenario } from './recorder/scenarios/contractor-complete-work.mjs';
 import { contractorCreateEstimateScenario } from './recorder/scenarios/contractor-create-estimate.mjs';
+import { contractorInvoiceOutsidePaymentScenario } from './recorder/scenarios/contractor-invoice-outside-payment.mjs';
 import { contractorServiceRequestIntakeScenario } from './recorder/scenarios/contractor-service-request-intake.mjs';
 import { homeownerHomeHistoryScenario } from './recorder/scenarios/homeowner-home-history.mjs';
 import { homeownerServiceRequestScenario } from './recorder/scenarios/homeowner-service-request.mjs';
@@ -32,6 +33,7 @@ const scenarios = new Map([
   [contractorServiceRequestIntakeScenario.key, contractorServiceRequestIntakeScenario],
   [contractorCreateEstimateScenario.key, contractorCreateEstimateScenario],
   [contractorCompleteWorkScenario.key, contractorCompleteWorkScenario],
+  [contractorInvoiceOutsidePaymentScenario.key, contractorInvoiceOutsidePaymentScenario],
   [homeownerHomeHistoryScenario.key, homeownerHomeHistoryScenario],
   [servsyncPlatformIntroductionScenario.key, servsyncPlatformIntroductionScenario],
 ]);
@@ -975,6 +977,300 @@ async function recordContractorCompleteWork({ scenario, env, outputDir, pacingNa
   }
 }
 
+async function recordContractorInvoiceOutsidePayment({ scenario, env, outputDir, pacingName, headed }) {
+  const pacing = pacingFor(pacingName);
+  const target = assertSafeRecorderEnvironment(env, scenario);
+  const contractor = {
+    email: required(env, 'DEMO_CONTRACTOR_EMAIL'),
+    password: required(env, 'DEMO_CONTRACTOR_PASSWORD'),
+  };
+  const homeowner = {
+    email: required(env, 'DEMO_HOMEOWNER_EMAIL'),
+    password: required(env, 'DEMO_HOMEOWNER_PASSWORD'),
+  };
+  required(env, 'DEMO_SUPABASE_ANON_KEY');
+  required(env, 'DEMO_SUPABASE_SERVICE_ROLE_KEY');
+  env.DEMO_MODE_ENABLED = 'true';
+  env.DEMO_SUPABASE_PROJECT_REF = target.projectRef;
+  env.DEMO_SUPABASE_URL = target.supabaseUrl;
+
+  const seed = await runDemoCommand(
+    ['seed', scenario.fixtureScenarioKey, `--checkpoint=${scenario.initialCheckpoint}`],
+    env,
+  );
+  if (seed.verification?.ok !== true || !seed.records?.jobId) {
+    throw new Error('TUT-004 recorder setup did not reach its verified completed-Job checkpoint.');
+  }
+
+  const browser = await chromium.launch({ headless: !headed });
+  const errors = [];
+  const paymentProviderRequests = [];
+  let recordedContext;
+  let finalPath = null;
+  let completed = false;
+  let invoiceCreationStarted = false;
+  let invoiceAdopted = false;
+  let paymentSubmissionStarted = false;
+  let paymentAdopted = false;
+  const stagingDir = resolve(outputDir, '.staging', crypto.randomUUID());
+
+  const openCompletedJob = async (page) => {
+    await openSidebar(page, /^Work$/i);
+    await page.getByRole('heading', { level: 1, name: /^Work$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    const completedSummary = page.getByRole('button', { name: /Completed \/ Closed Jobs/i }).first();
+    await completedSummary.waitFor({ state: 'visible', timeout: 30_000 });
+    await completedSummary.click();
+    const row = page.locator(`[data-testid="contractor-job-row"][data-record-id="${seed.records.jobId}"]`);
+    await row.waitFor({ state: 'visible', timeout: 30_000 });
+    await row.scrollIntoViewIfNeeded();
+    return row;
+  };
+
+  const openFinancialsInvoice = async (page, invoiceTitle, status = 'all') => {
+    await openSidebar(page, /^Financials\b/i);
+    await page.getByRole('heading', { level: 2, name: /^Financials$/i }).waitFor({ state: 'visible', timeout: 30_000 });
+    const overviewTab = page.getByTestId('contractor-financials-header-tab-overview');
+    if (await overviewTab.isVisible().catch(() => false)) await overviewTab.click();
+    const dashboard = page.getByTestId('contractor-financials-dashboard');
+    await dashboard.waitFor({ state: 'visible', timeout: 30_000 });
+    await dashboard.getByTestId(status === 'paid' ? 'contractor-financials-summary-closed' : 'contractor-financials-summary-open').click();
+    const search = page.getByTestId('contractor-invoice-search');
+    await search.waitFor({ state: 'visible', timeout: 30_000 });
+    await search.fill(invoiceTitle);
+    await page.getByTestId('contractor-invoice-status-filter').selectOption(status);
+    const card = page.getByTestId('contractor-invoice-card').filter({ hasText: invoiceTitle }).first();
+    await card.waitFor({ state: 'visible', timeout: 30_000 });
+    await card.scrollIntoViewIfNeeded();
+    return card;
+  };
+
+  try {
+    const authContext = await browser.newContext({ viewport: scenario.viewport });
+    const authPage = await authContext.newPage();
+    await login(authPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key);
+    await openCompletedJob(authPage);
+    await wait(500);
+    const initialFrame = await authPage.screenshot({ type: 'png' });
+    const storageState = await authContext.storageState();
+    await authContext.close();
+
+    await mkdir(outputDir, { recursive: true });
+    await mkdir(stagingDir, { recursive: true });
+    recordedContext = await browser.newContext({
+      viewport: scenario.viewport,
+      storageState,
+      recordVideo: { dir: stagingDir, size: scenario.viewport },
+    });
+    await recordedContext.addInitScript((src) => {
+      const install = () => {
+        document.getElementById('servsync-recorder-freeze')?.remove();
+        const freeze = document.createElement('img');
+        freeze.id = 'servsync-recorder-freeze';
+        freeze.alt = '';
+        freeze.src = src;
+        freeze.style.cssText = 'position:fixed;inset:0;z-index:2147483645;width:100vw;height:100vh;object-fit:cover;pointer-events:none';
+        document.body.append(freeze);
+      };
+      if (document.body) install();
+      else document.addEventListener('DOMContentLoaded', install, { once: true });
+    }, `data:image/png;base64,${initialFrame.toString('base64')}`);
+    const page = await recordedContext.newPage();
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) errors.push(`console.error: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+    page.on('response', (response) => {
+      const responseUrl = new URL(response.url());
+      if (response.status() >= 500) errors.push(`HTTP ${response.status()}: ${responseUrl.pathname}`);
+      if (/stripe|payment[-_]?intent|online[-_]?payment|checkout/i.test(`${responseUrl.hostname}${responseUrl.pathname}`)) {
+        paymentProviderRequests.push(responseUrl.pathname);
+      }
+    });
+
+    await page.goto(pageUrl(target.appUrl, 'contractor', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key), { waitUntil: 'domcontentloaded' });
+    await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
+    const completedJob = await openCompletedJob(page);
+    await installRecorderOverlays(page);
+    await setScenarioCaption(page, scenario, 0);
+    await removeFreezeFrame(page);
+    await wait(pacing.initialHold);
+
+    await moveAndClick(page, completedJob.getByRole('button', { name: /^View Job$/i }), pacing);
+    const invoicePanel = page.getByTestId('partial-invoicing-work-items-panel');
+    await invoicePanel.waitFor({ state: 'visible', timeout: 30_000 });
+    await moveAndClick(page, invoicePanel.getByTestId('create-partial-invoice-from-completed-items'), pacing);
+    const invoiceReview = page.getByText(/^Create invoice from completed items$/i).last();
+    await invoiceReview.waitFor({ state: 'visible', timeout: 30_000 });
+    invoiceCreationStarted = true;
+    await moveAndClick(page, page.getByTestId('confirm-create-partial-invoice'), pacing);
+    const focusedInvoice = page.getByTestId('contractor-invoice-card').first();
+    await focusedInvoice.waitFor({ state: 'visible', timeout: 30_000 });
+    const invoiceTitle = await focusedInvoice.getAttribute('data-record-title');
+    if (!invoiceTitle) throw new Error('TUT-004 UI-created Invoice is missing its canonical title.');
+    const invoiceAdoption = await runDemoCommand(['adopt-invoice', scenario.fixtureScenarioKey], env);
+    if (invoiceAdoption.verification?.ok !== true || !invoiceAdoption.records?.invoiceId) {
+      throw new Error('UI-created Invoice did not reach the exact registered invoice_draft checkpoint.');
+    }
+    invoiceAdopted = true;
+
+    await setScenarioCaption(page, scenario, 1);
+    const sendInvoice = focusedInvoice.getByTestId('contractor-send-invoice');
+    await moveAndClick(page, sendInvoice, pacing);
+    await page.getByTestId('contractor-invoice-send-feedback').waitFor({ state: 'visible', timeout: 30_000 });
+    await wait(1600);
+
+    await addFreezeFrame(page);
+    const homeownerContext = await browser.newContext({ viewport: scenario.viewport });
+    try {
+      const homeownerPage = await homeownerContext.newPage();
+      homeownerPage.on('console', (message) => {
+        if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) errors.push(`homeowner console.error: ${message.text()}`);
+      });
+      homeownerPage.on('pageerror', (error) => errors.push(`homeowner pageerror: ${error.message}`));
+      homeownerPage.on('response', (response) => {
+        const responseUrl = new URL(response.url());
+        if (response.status() >= 500) errors.push(`homeowner HTTP ${response.status()}: ${responseUrl.pathname}`);
+        if (/stripe|payment[-_]?intent|online[-_]?payment|checkout/i.test(`${responseUrl.hostname}${responseUrl.pathname}`)) {
+          paymentProviderRequests.push(responseUrl.pathname);
+        }
+      });
+      await login(homeownerPage, target.appUrl, 'homeowner', homeowner, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', scenario.key);
+      await openSidebar(homeownerPage, /Estimates \/ Invoices/i);
+      const homeownerInvoice = homeownerPage.getByTestId('homeowner-invoice-card').filter({ hasText: invoiceTitle }).first();
+      await homeownerInvoice.waitFor({ state: 'visible', timeout: 30_000 });
+      await homeownerInvoice.getByRole('button', { name: /^View Invoice$/i }).click();
+      await homeownerInvoice.getByText(/Invoice total/i).waitFor({ state: 'visible', timeout: 30_000 });
+    } finally {
+      await homeownerContext.close();
+    }
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
+    let invoiceCard = await openFinancialsInvoice(page, invoiceTitle);
+    await installRecorderOverlays(page);
+    await setScenarioCaption(page, scenario, 2);
+    await removeFreezeFrame(page);
+    await wait(2200);
+
+    await setScenarioCaption(page, scenario, 3);
+    await moveAndClick(page, invoiceCard.getByTestId('contractor-record-invoice-payment'), pacing);
+    const paymentDialog = page.getByRole('dialog', { name: /^Record payment$/i });
+    await paymentDialog.waitFor({ state: 'visible', timeout: 30_000 });
+    await paymentDialog.getByText(/Record money received outside ServSync\. This does not process a payment or contact a payment provider\./i).waitFor({ state: 'visible' });
+    await moveAndType(page, paymentDialog.getByLabel(/^Payment amount$/i), scenario.payment.amountInput, pacing);
+    await paymentDialog.locator('select').selectOption(scenario.payment.method);
+    await moveAndType(page, paymentDialog.locator('input[maxlength="120"]'), scenario.payment.reference, pacing);
+    await moveAndType(page, paymentDialog.locator('textarea[maxlength="500"]'), scenario.payment.note, pacing);
+    paymentSubmissionStarted = true;
+    await moveAndClick(page, paymentDialog.getByRole('button', { name: /^Record payment$/i }), pacing);
+    const paymentFeedback = page.getByTestId('contractor-invoice-payment-feedback');
+    await paymentFeedback.waitFor({ state: 'visible', timeout: 30_000 });
+    if (!(await paymentFeedback.innerText()).includes(scenario.finalState.paymentFeedback)) {
+      throw new Error('TUT-004 payment feedback did not match the expected offline-ledger outcome.');
+    }
+    const paymentAdoption = await runDemoCommand(['adopt-invoice-payment', scenario.fixtureScenarioKey], env);
+    if (paymentAdoption.verification?.ok !== true || !paymentAdoption.records?.paymentId) {
+      throw new Error('UI-recorded outside payment did not reach the exact registered invoice_partially_paid checkpoint.');
+    }
+    paymentAdopted = true;
+
+    invoiceCard = await openFinancialsInvoice(page, invoiceTitle);
+    await setScenarioCaption(page, scenario, 4);
+    const paymentSummary = invoiceCard.getByTestId('invoice-payment-summary-detail');
+    const persistentFinalText = `${await invoiceCard.innerText()}\n${await paymentSummary.innerText()}`;
+    for (const expected of [
+      scenario.finalState.statusLabel,
+      scenario.finalState.homeownerLabel,
+      scenario.finalState.amountPaidLabel,
+      scenario.finalState.balanceDueLabel,
+    ]) {
+      if (!persistentFinalText.includes(expected)) throw new Error(`Final TUT-004 scene is missing persistent evidence: ${expected}.`);
+    }
+    await moveCursorToRest(page, pacing);
+    await wait(Math.max(pacing.finalHold, 4500));
+
+    const visibleText = await page.getByRole('main').innerText();
+    const sensitiveIssues = scanVisibleTextForSensitiveData(visibleText, {
+      'contractor email': contractor.email,
+      'contractor password': contractor.password,
+      'homeowner email': homeowner.email,
+      'homeowner password': homeowner.password,
+    });
+    if (sensitiveIssues.length > 0) throw new Error(sensitiveIssues.join(' '));
+    if (errors.length > 0) throw new Error(`Recording encountered browser errors:\n${errors.join('\n')}`);
+    if (paymentProviderRequests.length > 0) {
+      throw new Error(`TUT-004 contacted an online payment path instead of the offline ledger: ${paymentProviderRequests.join(', ')}`);
+    }
+
+    const verification = await runDemoCommand(
+      ['verify', scenario.fixtureScenarioKey, `--checkpoint=${scenario.finalCheckpoint}`],
+      env,
+    );
+    if (verification.verification?.ok !== true) {
+      throw new Error('TUT-004 final fixture changed after outside-payment adoption.');
+    }
+
+    const video = page.video();
+    if (!video) throw new Error('Playwright did not initialize WebM recording.');
+    await recordedContext.close();
+    recordedContext = null;
+    const sourcePath = await video.path();
+    const createdAt = new Date().toISOString();
+    const timestamp = createdAt.replace(/[:.]/g, '-');
+    finalPath = resolve(outputDir, `${scenario.outputBaseName}-${timestamp}.webm`);
+    await rename(sourcePath, finalPath);
+    const fileStat = await stat(finalPath);
+    if (fileStat.size <= 0) throw new Error('Recorded WebM artifact is empty.');
+    const durationSeconds = await probeVideoDuration(browser, finalPath);
+    assertRecordingDuration(durationSeconds, scenario.expectedDurationSeconds);
+    const metadata = buildArtifactMetadata({
+      scenario,
+      sourceCommit: sourceCommit(),
+      pacing: pacingName,
+      durationSeconds,
+      fileName: basename(finalPath),
+      createdAt,
+    });
+    const metadataPath = finalPath.replace(/\.webm$/i, '.json');
+    await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+    completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
+    return {
+      success: true,
+      scenario: scenario.key,
+      environment: scenario.environment.name,
+      projectRef: scenario.environment.projectRef,
+      artifact: finalPath,
+      metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
+      durationSeconds: metadata.duration_seconds,
+      viewport: scenario.viewport,
+      finalCheckpoint: scenario.finalCheckpoint,
+      fixturePolicy: metadata.fixture_policy,
+      sensitiveData: 'none detected',
+    };
+  } finally {
+    if (recordedContext) await recordedContext.close().catch(() => {});
+    if (invoiceCreationStarted && !invoiceAdopted) {
+      await runDemoCommand(['adopt-invoice', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
+    if (paymentSubmissionStarted && !paymentAdopted) {
+      await runDemoCommand(['adopt-invoice-payment', scenario.fixtureScenarioKey], env).catch(() => {});
+    }
+    await browser.close();
+    await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    if (!completed && finalPath) await unlink(finalPath).catch(() => {});
+  }
+}
+
 async function recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName, headed }) {
   const pacing = pacingFor(pacingName);
   const scenePacing = pacing;
@@ -1269,6 +1565,9 @@ export async function runRecorder(argv = process.argv.slice(2), processEnv = pro
   }
   if (scenario.key === contractorCompleteWorkScenario.key) {
     return recordContractorCompleteWork({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
+  }
+  if (scenario.key === contractorInvoiceOutsidePaymentScenario.key) {
+    return recordContractorInvoiceOutsidePayment({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
   }
   if (scenario.key === homeownerHomeHistoryScenario.key) {
     return recordHomeownerHomeHistory({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });

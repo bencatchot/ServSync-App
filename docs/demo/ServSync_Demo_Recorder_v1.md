@@ -4,7 +4,7 @@
 
 The Demo Recorder creates reproducible browser recordings for ServSync Marketing, support tutorials, and product demonstrations. It is intentionally a small scenario runner, not a video editor or publishing system.
 
-Recorder v1 includes six canonical scenarios:
+Recorder v1 includes seven canonical scenarios:
 
 `homeowner-service-request`
 
@@ -21,6 +21,10 @@ The clip opens the registered homeowner Request, preserves the original customer
 `contractor-complete-work`
 
 The clip starts from one registered accepted Estimate, creates the linked Job through the normal Work UI, records completed work and visit notes, completes the Job, and finalizes the canonical report. Exact-row adoption owns only the UI-created Job and its descendants, and the final checkpoint is the same verified report/Home History lineage used by the product.
+
+`contractor-invoice-outside-payment`
+
+The clip starts from one registry-owned completed Job, creates the item-based Invoice through the normal Work UI, sends it to the fictional connected homeowner, opens it once through the normal homeowner UI, and records one fictional $400 bank-transfer payment received outside ServSync. Exact-row adoption owns only the UI-created Invoice, its canonical lines, and the one append-only offline-ledger row. The verified final checkpoint is `invoice_partially_paid`, with $1,765 remaining and no payment-provider contact or money movement.
 
 `homeowner-home-history`
 
@@ -51,6 +55,8 @@ The reviewable scenario definitions live at:
 `scripts/demo/recorder/scenarios/contractor-service-request-intake.mjs`
 
 `scripts/demo/recorder/scenarios/contractor-complete-work.mjs`
+
+`scripts/demo/recorder/scenarios/contractor-invoice-outside-payment.mjs`
 
 `scripts/demo/recorder/scenarios/homeowner-home-history.mjs`
 
@@ -93,6 +99,8 @@ For `contractor-create-estimate`, setup restores the registered `request_ready` 
 
 For `contractor-complete-work`, setup restores the registered `estimate_accepted` checkpoint. The contractor creates the Job through the real accepted-Estimate action. Private adoption accepts exactly one new draft Job only when its Estimate/request/customer/home lineage, generated work items, and `job_created` activity event match the registered source records; it then creates one private fixture-owned visit through the normal scheduling RPC. After the UI saves completed work and completes the Job, a second adoption gate requires the exact Job, all registered work items, and the one visit to be complete with no Invoice, report, or Home History side effects. Final report adoption then uses the existing exact document/history/notification/Storage contract. Compensation retries never widen ownership beyond those exact records.
 
+For `contractor-invoice-outside-payment`, setup restores the registered `job_completed` checkpoint. The contractor creates the Invoice through the normal completed-work item review; private adoption requires one exact new Draft whose Customer, property, Request, Estimate, Job, total, line-to-work-item mapping, and work-item reservations match the active run. The contractor sends that Invoice through the normal UI, and an unrecorded homeowner context opens the exact delivered Invoice through the normal UI before the contractor records a fictional partial bank-transfer payment. Payment adoption reads the append-only ledger only through `servsync_list_invoice_offline_payments`, requires the exact $400 amount, method, reference, and no-money-processed note, and verifies `invoice_partially_paid` with a $1,765 remaining balance. Compensation retries use those same exact adoption contracts and never broaden reset ownership.
+
 For `homeowner-home-history`, setup stops at the registry-owned `job_completed` checkpoint. In an offscreen contractor browser context, the recorder opens that exact Job and uses the normal **Finalize Report** product action. The application calls the canonical `generateInspectionPdf` generator, uploads the resulting customer report through the normal private Storage path, and calls `servsync_finalize_field_work`. The private runner then adopts only the exact resulting document, Home History row, notification, and SHA-bound Storage object before homeowner recording begins. Direct seeding of `home_history_updated` is refused so Marketing cannot substitute a fixture-only PDF for the product artifact.
 
 For `servsync-platform-introduction`, setup first registers exactly five contractor-created Discover posts and the fictional contractor profiles needed to display them. The browser opens the real profile and connection prompt but does not submit a connection. Later registered checkpoints supply the already-connected Service Request and accepted Estimate story. The recorder finalizes the exact completed Job through the normal UI, creates one canonical draft Invoice through the existing Job billing RPC, and adopts the exact finalized report lineage. The reset allowlist covers only those registered Discover, Invoice, and report records in dependency-safe order.
@@ -117,6 +125,7 @@ Load the existing approved Demo variables, including the private runner values d
 npm run demo:record -- homeowner-service-request
 npm run demo:record -- contractor-create-estimate
 npm run demo:record -- contractor-complete-work
+npm run demo:record -- contractor-invoice-outside-payment
 npm run demo:record -- homeowner-home-history
 npm run demo:record -- servsync-platform-introduction
 ```
@@ -188,6 +197,8 @@ A run is successful only after:
 The contractor Estimate scenario additionally requires exact adoption at `estimate_draft`, one matching draft Estimate and line, zero payment-schedule/Job/Invoice descendants, and a final saved card showing the fictional customer, property, scope, and total.
 
 The contractor completion scenario additionally requires exact adoption at `job_scheduled`, UI completion verified at `job_completed`, all Estimate-derived work items and the private visit marked complete, zero Invoice descendants, exact canonical report adoption at `home_history_updated`, and a final filed-report notice. Its visible path must preserve **Create Job**, work/visit notes, **Complete Job**, and **Finalize Report** without fixture-only product output.
+
+The contractor Invoice/outside-payment scenario additionally requires exact UI adoption at `invoice_draft`, normal **Send Invoice** delivery, a real homeowner **View Invoice** transition, one immutable offline-ledger row recorded from the contractor payment dialog, and final verification at `invoice_partially_paid`. The visible path must show the product's statement that money was received outside ServSync and that ServSync does not process the payment or contact a provider. The final card must preserve the fictional Customer/property and Job-derived Invoice lineage, show $400 paid and $1,765 due, and contain no Stripe/provider request.
 
 The Home History scenario additionally requires exact `home_history_updated` verification, matching `home_id` on the generated document and maintenance row, one expected notification, a private PDF whose SHA matches registry evidence, canonical report text extracted from the downloaded PDF, property-scoped homeowner visibility, a real download, and an 18-32 second final WebM.
 
