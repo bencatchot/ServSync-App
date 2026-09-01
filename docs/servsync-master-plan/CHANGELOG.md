@@ -4,6 +4,15 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-004 Invoice-adoption runtime correction
+
+- Protected runtime finding: The first owner-authorized TUT-004 durable Demo run reached the normal UI-created `$2,165.00` draft Invoice, then failed closed before delivery because the private adoption validator read neither `reserved_invoice_id` nor `invoiced_invoice_id` from the same work-item query whose values it required. No media was promoted.
+- Bounded correction: `fetchJobWorkItems` now selects those two existing reservation fields. The adoption rule itself is unchanged: every completed Job work item must remain drafted, reserved to the exact new Invoice, absent from another invoiced Invoice, and represented by one exact Invoice line, with no premature payment event.
+- Live proof and cleanup: The failed run's exact five Invoice lines and five drafted/reserved work items otherwise matched, with zero payment events and the correct total. The corrected query adopted the exact Invoice at `invoice_draft`; guarded reset then removed 27 disposable registered rows and left zero registered disposable records. No payment-provider or other external effect occurred.
+- Credential boundary: With explicit owner authorization, only the two existing fictional Demo recorder passwords were rotated after exact Demo project, scenario metadata, public-role, and contractor-tenant preflight. Both repaired logins passed against the same Auth users. The minimum recorder bundle is stored only in an ignored owner-readable local file; no value was logged or committed, no Vercel/GitHub secret changed, and no OpenAI credential was retrieved.
+- Validation: The complete Demo Recorder suite passes 49/49, architecture passes 25/25, and TypeScript passes. The focused source file contributes 34 passing cases, including a regression that requires the reservation columns to be selected before TUT-004 adoption. The correction must merge and become the exact provenance-valid source before the protected silent recording is retried.
+- Tutorial impact: `NOT APPLICABLE` for published guidance. TUT-004 remains unpublished and `UPDATE REQUIRED`; this correction changes only private recorder adoption, not the visible Invoice or outside-payment workflow.
+
 ## 2026-09-01 - New Draft customer-entry controlled-pilot fix
 
 - Pilot blocker: Work -> New Draft now places **Add new customer** beside the unified Customer selector for authorized contractor Owner/Admin/Office roles. Field Technician, Viewer, unresolved, and read-only contexts receive no new customer-creation control.

@@ -121,6 +121,16 @@ test('TUT-004 uses the real delivery and canonical outside-payment UI before exa
   assert.match(flow, /scenario\.finalState\.balanceDueLabel/);
 });
 
+test('TUT-004 Invoice adoption reads the reservation fields it validates', () => {
+  const source = readFileSync(new URL('../../scripts/demo/seed-demo-scenario.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('async function fetchJobWorkItems');
+  const end = source.indexOf('function inProgressCompletedWorkItemCount', start);
+  const query = source.slice(start, end);
+
+  assert.match(query, /reserved_invoice_id/);
+  assert.match(query, /invoiced_invoice_id/);
+});
+
 test('TUT-003 records every approved item through a stable title identity before saving', () => {
   const source = readFileSync(new URL('../../scripts/demo/record-demo.mjs', import.meta.url), 'utf8');
   const flowStart = source.indexOf('async function recordContractorCompleteWork');
