@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-004 Production Help package ready for review
+
+- Authorized request: Production Help Studio created exactly one TUT-004 request, `29766df4-5080-4b9a-9025-c871bed06e17`, for Support use at `contractor.financials`, scenario `contractor-invoice-outside-payment`, and exactly Contractor Owner/Admin/Office. No duplicate active request exists.
+- Exact attachment: Help Studio accepted the validated 57.96-second 1440×900 narrated MP4 SHA-256 `fda7f742f0838b360e200400c6190ec030a5e357bce7c531b692d5efbefb2b2c`, poster `0c36abf2647b5d9cf5490455a539457403accdd07c6d695c1bdb3790d0e476a4`, English WebVTT `56a0b231af626b127bfa8850f6fb481eba1abc2b42cf82e9444b313d69ef55a8`, and request-bound metadata. The binding changed only `recording_job_id`; its transient metadata SHA-256 was `b61d0fefa4c6ac740f22cb98090a2fe9583c1d5b0c4f1c4048880dc921c907aa`, and the canonical local metadata was restored byte-for-byte at `fc5c7a82cc2f9160363a8164ae620ded039a34c0c32efbf5a78c42a256b1a4fe`. Private Help media increased from 16 to 18 assets and 15.4 MB to 18.6 MB, matching one video plus one poster.
+- Review boundary: Production technical review loaded the media at `1x`, ready state 4, 1440×900, with one English caption track showing, the exact five-sentence transcript, and **AI-generated voiceover using OpenAI's Cedar voice.** The request is **Ready for review**. No approval, publication, walkthrough revision, Production business-data mutation, payment-provider activity, credential/environment change, provider call, merge, or manual deployment occurred.
+- Tutorial impact: `UPDATE REQUIRED` remains correct until an approved revision is published and role-aware contextual retrieval is verified. The next gate is the owner's explicit **Approve narration + captions** or **Return for rerecord** decision; publication remains separate.
+
 ## 2026-09-01 - TUT-004 Cedar narration and caption package validated
 
 - Provider boundary: Owner authorization created only `ServSync TUT-004 Cedar One-Use 2026-09-01`, restricted to text-to-speech requests. It made exactly one successful OpenAI `gpt-4o-mini-tts` Cedar request, was revoked immediately afterward, and Active-status exact-name search returned zero matches. Clipboard, process memory, and temporary source/review files were cleared; no credential entered ServSync, Vercel, Supabase, repository files, or durable metadata.
