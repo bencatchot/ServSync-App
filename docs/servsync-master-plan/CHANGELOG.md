@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-004 validated silent source promoted
+
+- Protected run: The single authorized rerun used exact durable Demo commit `ab542a5c08bebfb226d5d5fc5934372a16d2695d` and promoted `servsync-contractor-invoice-outside-payment-v1-2026-09-01T16-39-10-688Z`. The 57.96-second 1440×900 VP8 WebM SHA-256 is `162db5af977de3b61eb6351bfe202b60f67c4fb80813faf3e26f1c633c72d409`; the H.264/yuv420p MP4 SHA-256 is `f4fb4950f46a92b1622ad9dc9f312db163f1699f106a5dc4ea886b231d2df6d7`.
+- Product truth: Exact Customer/Home/Request/Estimate/Job/Invoice/offline-payment lineage, Invoice delivery and fictional homeowner view, `$2,165.00` total, `$400.00` paid outside ServSync, `$1,765.00` due, and **Partially Paid** all passed. No visible secret, browser error, `5xx`, Stripe, checkout, payment intent, online-payment action, provider traffic, or other external effect was detected.
+- Review and cleanup: Full normal-speed sound-off playback reached 57.96/57.96 at `1x`; cursor/click alignment, persistent field values, the visible no-provider disclosure, and final balances passed frame/contact-sheet review. Desktop durable Demo Financials entry and exact-source desktop/mobile contextual/payment presentation passed, including 390×844 without overflow. Guarded reset removed 28 disposable rows, retained only the intentional reusable revision-backed property graph, and direct registry audit found zero registered disposable records across 254 historical seed runs.
+- Tutorial impact: `UPDATE REQUIRED`. TUT-004 remains unpublished. The next protected gate is one owner-authorized OpenAI `gpt-4o-mini-tts` Cedar narration request bound to the validated silent MP4 checksum, then synchronized top-safe captions, matching transcript, exact disclosure, full sound-on/sound-off review, and separate Help approval/publication.
+
 ## 2026-09-01 - PR #547 merged and deployed
 
 - Merge: Owner-approved PR #547 merged normally at exact two-parent commit `ab542a5c08bebfb226d5d5fc5934372a16d2695d`, preserving reviewed head `29f485ed1f09213b47595a60ca160d9deb7727af` over base `067fe3f947d2e37a7aa720fbf9053e3b9fac0791`.
