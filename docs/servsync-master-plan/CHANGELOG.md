@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-005 first silent run failed before contractor acceptance
+
+- Merge and target: PR #549 merged normally at `2667d3ec1952800faa5e6273888bd09c6227948f`. Automatic Production app, durable Demo, and Stripe Sandbox deployments reached Ready; durable Demo deployment `dpl_E6oXJCMuhv9246jbPYoq6vmNhqm9` remained bound to that commit and its canonical alias returned HTTP 200 before the authorized run.
+- One-run result: The protected credential and external-effect preflight passed without exposing values. The one authorized `homeowner-connect-service-request` run started disconnected and submitted the exact Demo Bay Home contextual connection request with the intended original message and permissions. It then stopped before contractor acceptance because the recorder expected stale text, **connection request needs review**, while the real Customers control says **1 connection request need review**. The contractor pending-request RPC independently returned exactly one request, proving the boundary is the recorder locator rather than missing lineage or access.
+- Artifact and cleanup: No retry, final WebM, durable MP4, checksum, or media review occurred. Guarded reset reconciled and removed the exact pending connection lineage; direct checks found zero connection, permission, context, shared-property, audit-event, matching Request, or active-registry residue, with only the canonical property graph retained. No provider/payment/external effect, OpenAI/Cedar action, Help mutation, Production workflow mutation, environment change, or additional tutorial occurred.
+- Next step: Fix and regression-test the bounded recorder locator, merge and deploy the correction, then obtain a new explicit one-run silent-recording authorization. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-01 - FB-040A TUT-005 source preparation
 
 - Roadmap reconciliation: PR #548 is merged at `1940394a78561ec67cad4b727e770e0e4b67f24b`. The Product Roadmap no longer treats that merge as pending, Pilot Tutorial Coverage now truthfully reports four published walkthroughs and two missing protected workflows, and TUT-005 is the primary active launch outcome without being represented as recorded or published.
