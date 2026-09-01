@@ -2,7 +2,7 @@
 
 ## Status
 
-Runtime correction ready for review. The first protected durable Demo run against `dded6f958e326bf3b8603bbba2a7341115db3733` failed closed before delivery and promoted no media because the private Invoice-adoption query did not select the two reservation fields its unchanged exactness rule validates. The bounded correction adds those existing fields and a focused regression. TUT-004 is not recorded, narrated, approved, or published.
+Second runtime correction ready for review. PR #546's Invoice-adoption fix merged and durable Demo matched exact commit `067fe3f947d2e37a7aa720fbf9053e3b9fac0791`. The single authorized rerun then completed and verified the truthful Invoice delivery and fictional outside-payment workflow, but promoted no media because the provider-traffic detector misclassified an inert first-party JavaScript chunk and the exact internal read-only Invoice payment-history RPC. The bounded correction narrows that detector without allowing any payment action or provider request. TUT-004 is not recorded, narrated, approved, or published.
 
 ## Scope accepted
 
@@ -21,9 +21,9 @@ The target guard accepts only the protected durable Demo project. The scenario u
 
 | Check | Result |
 | --- | --- |
-| TUT-004 recorder, adoption, Help packager, and contextual source contracts | 49/49 passed |
-| Complete Demo Recorder suite | 48/48 passed |
-| Architecture suite | 23/23 passed |
+| Focused recorder and TUT-004 source contracts | 35/35 passed |
+| Complete Demo Recorder suite | 50/50 passed |
+| Architecture suite | 25/25 passed |
 | Help Studio contextual/browser and Invoice payment presentation at desktop/mobile sizes | 19/19 passed |
 | TypeScript | Passed |
 | ESLint warning budget | Passed: 0 errors, existing 79-warning baseline |
@@ -38,13 +38,17 @@ The target guard accepts only the protected durable Demo project. The scenario u
 - The live UI-created draft contained five Invoice lines and five completed Job work items, all drafted and reserved to that Invoice, with zero premature payment events, `$2,165.00` total, and `$0.00` paid.
 - The adoption helper had omitted `reserved_invoice_id` and `invoiced_invoice_id` from `fetchJobWorkItems`, so those required values were always unavailable to the validator. The corrected query preserved every validation rule; the complete Demo Recorder suite passed 49/49, architecture passed 25/25, and TypeScript passed.
 - The exact failed Invoice was adopted only to regain registry ownership, then guarded reset removed 27 disposable registered rows. Zero registered disposable records remain. No source media, payment-provider traffic, or external effect was produced.
+- PR #546 merged at `067fe3f947d2e37a7aa720fbf9053e3b9fac0791`; its durable Demo deployment was successful and exact before the second protected run.
+- The one authorized second run completed ordinary UI Invoice creation and delivery, opened the delivered Invoice as the fictional homeowner, recorded the `$400.00` external bank transfer through the canonical offline ledger, and verified exact Customer/Home/Request/Estimate/Job/Invoice/payment lineage with `$2,165.00` total, `$400.00` paid, and `$1,765.00` due.
+- Media validation rejected `/assets/InvoiceOnlinePaymentButton-*.js` and `/rest/v1/rpc/servsync_list_invoice_online_payments`. Both are first-party, non-mutating application reads: the first is an inert bundled asset and the second loads Invoice payment history. No Stripe hostname, checkout route, payment-intent route, online-payment action, `5xx`, browser error, or visible secret was reported.
+- No WebM, MP4, metadata, checksum, duration, or dimensions were promoted or claimed. Guarded reset removed 28 disposable registered rows; a direct registry audit found zero registered disposable records across 253 historical seed runs. The one-run authorization is consumed, so the corrected source will require merge, exact durable Demo deployment, and a new exact-commit authorization before another recording.
 
 ## Tutorial freshness
 
 Tutorial impact: `UPDATE REQUIRED`.
 
-Affected tutorial: TUT-004 **How to deliver an invoice and record an outside payment**. The protected workflow is intentionally missing from Production, so no current published revision can be previewed or claimed current. The bounded follow-up is to merge and normally deploy this source to durable Demo, use the existing protected recorder credentials for the exact-head run, create one OpenAI `gpt-4o-mini-tts` Cedar narration package with synchronized top-safe captions and matching durable transcript, preserve the silent source/provenance, complete full `1x` sound-on and sound-off review, and return for explicit owner approval and Production publication. After publication, verify desktop/mobile contextual retrieval and the exact Owner/Admin/Office audience.
+Affected tutorial: TUT-004 **How to deliver an invoice and record an outside payment**. The protected workflow is intentionally missing from Production, so no current published revision can be previewed or claimed current. The bounded follow-up is to merge and normally deploy this guard correction to durable Demo, then separately authorize one silent rerun against that exact commit using the repaired local Demo bundle. Only after the silent source passes should the owner separately authorize OpenAI `gpt-4o-mini-tts` Cedar narration with synchronized top-safe captions and matching durable transcript, followed by full `1x` sound-on/sound-off review and separate Help approval/publication. After publication, verify desktop/mobile contextual retrieval and the exact Owner/Admin/Office audience.
 
 ## Owner gate
 
-Minimum owner action when ready: approve merge of the bounded Invoice-adoption correction after ordinary review. A provenance-valid protected silent rerun must use the resulting exact merged source and durable Demo deployment. Separate explicit owner decisions remain required for Cedar/OpenAI use, Help approval, and Production publication. No provider request, approval, or publication is authorized by this correction.
+Minimum owner action when ready: approve merge of the bounded provider-traffic guard correction after ordinary review. A provenance-valid protected silent rerun must use the resulting exact merged source and durable Demo deployment under a new exact-commit one-run authorization. Separate explicit owner decisions remain required for Cedar/OpenAI use, Help approval, and Production publication. No provider request, approval, or publication is authorized by this correction.
