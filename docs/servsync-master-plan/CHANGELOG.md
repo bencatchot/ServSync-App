@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-004 narration and captions approved
+
+- Exact re-verification: Production Help Studio showed one active TUT-004 request, `29766df4-5080-4b9a-9025-c871bed06e17`, at **Ready for review**. Its downloaded specification preserved the exact title, `contractor.financials` screen/context, scenario `contractor-invoice-outside-payment`, AI narration mode, and exactly Owner/Admin/Office. The recorded MP4, poster, WebVTT, and canonical metadata hashes remained unchanged; WebVTT text exactly equaled the script, embedded VTT exactly equaled the file, and the script hash remained `ae3efce556544fd799769ff24ff92dd42eea96f4463d39961789adff386957ff`.
+- Review and decision: Production review loaded the 57.96-second 1440×900 media at `1x`, ready state 4, with one English caption track showing, the exact five-sentence transcript, and **AI-generated voiceover using OpenAI's Cedar voice.** Under explicit owner authorization, **Approve narration + captions** moved only that request to **Approved** and exposed **Publish for Help**.
+- Protected boundary: One exact active TUT-004 request remains. No publication, other request approval, walkthrough revision, Production workflow-data mutation, payment-provider activity, credential/environment change, provider call, PR merge, or manual deployment occurred.
+- Tutorial impact: `UPDATE REQUIRED` remains correct until the approved request is separately published and role-aware contextual retrieval is verified. The next gate is explicit owner authorization to choose **Publish for Help** for request `29766df4-5080-4b9a-9025-c871bed06e17`.
+
 ## 2026-09-01 - TUT-004 Production Help package ready for review
 
 - Authorized request: Production Help Studio created exactly one TUT-004 request, `29766df4-5080-4b9a-9025-c871bed06e17`, for Support use at `contractor.financials`, scenario `contractor-invoice-outside-payment`, and exactly Contractor Owner/Admin/Office. No duplicate active request exists.

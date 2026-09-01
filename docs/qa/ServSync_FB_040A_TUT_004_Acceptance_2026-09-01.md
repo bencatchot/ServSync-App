@@ -2,7 +2,7 @@
 
 ## Status
 
-Validated narrated/captioned package attached to Production Help Studio request `29766df4-5080-4b9a-9025-c871bed06e17` and stopped at **Ready for review**. The exact durable Demo source at commit `ab542a5c08bebfb226d5d5fc5934372a16d2695d` remains the immutable workflow master, and one separately authorized `gpt-4o-mini-tts` Cedar request produced the scene-synchronized derivative with top-safe English WebVTT, matching transcript, exact AI disclosure, and complete `1x` sound-on/sound-off review. TUT-004 is not approved or published.
+Validated narrated/captioned package attached to Production Help Studio request `29766df4-5080-4b9a-9025-c871bed06e17` and narration/captions approved after exact owner-authorized review. The exact durable Demo source at commit `ab542a5c08bebfb226d5d5fc5934372a16d2695d` remains the immutable workflow master, and one separately authorized `gpt-4o-mini-tts` Cedar request produced the scene-synchronized derivative with top-safe English WebVTT, matching transcript, exact AI disclosure, and complete `1x` sound-on/sound-off review. TUT-004 is not published.
 
 ## Scope accepted
 
@@ -53,13 +53,14 @@ The target guard accepts only the protected durable Demo project. The scenario u
 - Complete sound-on playback reached 57.96/57.96 seconds unmuted at `1x`; complete sound-off playback reached 57.96/57.96 muted at `1x` with the English caption track showing. Cue-frame and live caption review matched completed Job/Invoice creation, draft review and delivery, delivered Invoice, outside-payment recording, and final **Partially Paid** balances. Captions stayed in the top safe area without covering the cursor or essential controls, and the sound-off package remained understandable.
 - With separate owner authorization, Production Help Studio created exactly one TUT-004 request, `29766df4-5080-4b9a-9025-c871bed06e17`, for `contractor.financials`, Support use, and exactly Contractor Owner/Admin/Office. The request-bound metadata changed only `recording_job_id` and had transient SHA-256 `b61d0fefa4c6ac740f22cb98090a2fe9583c1d5b0c4f1c4048880dc921c907aa`; the canonical local metadata was restored byte-for-byte to SHA-256 `fc5c7a82cc2f9160363a8164ae620ded039a34c0c32efbf5a78c42a256b1a4fe`. Help Studio independently accepted the exact MP4, poster, WebVTT, script, disclosure, dimensions, duration, and checksums; private Help media increased from 16 to 18 assets and 15.4 MB to 18.6 MB, matching one video plus one poster.
 - Production technical review loaded the 57.96-second 1440×900 media at `1x` with ready state 4, one English caption track showing, the exact five-sentence transcript, and **AI-generated voiceover using OpenAI's Cedar voice.** The request is **Ready for review**; one exact active TUT-004 request exists, and no approval, publication, walkthrough revision, business-data mutation, provider action, environment change, credential change, or payment-provider activity occurred.
+- After re-verifying request `29766df4-5080-4b9a-9025-c871bed06e17`, its exact title, `contractor.financials` context, Owner/Admin/Office audience, scenario, attachment hashes, caption/transcript equality, and Cedar disclosure, the owner-authorized **Approve narration + captions** action moved only this request to **Approved**. Help Studio now exposes **Publish for Help**. One exact active TUT-004 request remains; no publication or other protected mutation occurred.
 
 ## Tutorial freshness
 
 Tutorial impact: `UPDATE REQUIRED`.
 
-Affected tutorial: TUT-004 **How to deliver an invoice and record an outside payment**. Production Help Studio request `29766df4-5080-4b9a-9025-c871bed06e17` now holds the exact validated narrated/captioned package at **Ready for review**, but no approved or published revision exists and no contextual entry can yet resolve it. Owner approval, publication, and post-publication desktop/mobile contextual plus Owner/Admin/Office verification remain later explicit gates.
+Affected tutorial: TUT-004 **How to deliver an invoice and record an outside payment**. Production Help Studio request `29766df4-5080-4b9a-9025-c871bed06e17` is **Approved** with the exact validated narrated/captioned package, but no published revision exists and no contextual entry can yet resolve it. Publication and post-publication desktop/mobile contextual plus Owner/Admin/Office verification remain later explicit gates.
 
 ## Owner gate
 
-Minimum owner action when ready: review Production Help Studio request `29766df4-5080-4b9a-9025-c871bed06e17` and explicitly choose **Approve narration + captions** or **Return for rerecord**. Publication remains a later, separate owner gate.
+Minimum owner action when ready: explicitly authorize **Publish for Help** for Production Help Studio TUT-004 request `29766df4-5080-4b9a-9025-c871bed06e17`. Post-publication role-aware contextual verification may proceed as ordinary read-only acceptance after that separate publication gate.
