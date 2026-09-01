@@ -33,4 +33,10 @@ This source work does not authorize retrieving or creating an OpenAI credential,
 
 ## Tutorial freshness
 
-`UPDATE REQUIRED`. TUT-005 is the named bounded tutorial. It remains incomplete until an approved narrated/captioned revision is published and role-aware `homeowner.service` retrieval, full playback, homeowner-only audience, desktop/mobile context, transcript/disclosure, browser health, and zero external effects are verified.
+Tutorial impact: `UPDATE REQUIRED`.
+
+Tutorial evidence: The canonical current Production Help inventory and accepted TUT-004 closeout establish four published walkthroughs with no TUT-005 or `homeowner.service` entry. Source review also found that existing `homeowner-service-request` starts after connection, so it cannot truthfully cover this workflow. The exact-commit Preview deployment is Ready, while authenticated Preview playback remains behind the separately protected credential gate.
+
+Affected tutorials: TUT-005 **How to connect and request service** at `homeowner.service`.
+
+Tutorial follow-up: After source PR #549 is owner-approved and merged to durable Demo, the owner must separately authorize credential-backed recording. TUT-005 remains incomplete until the narrated/captioned revision is approved, published, and verified for role-aware `homeowner.service` retrieval, full playback, homeowner-only audience, desktop/mobile context, transcript/disclosure, browser health, and zero external effects.
