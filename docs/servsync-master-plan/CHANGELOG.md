@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-02 - TUT-005 third silent run failed at optional-message readback
+
+- Merge and target: PR #553 merged the retained-value replacement correction at `646e3229f306131b38b324c66d05c27ee802ec8d`. Durable Demo deployment `dpl_EnztPVDcVxBQxz4C2ft16LL7HKRB` was successful, GitHub deployment `6223084541` bound it to that exact commit, and the canonical alias returned HTTP 200.
+- One-run preflight: Both owner-only bundles were mode `600`; all required slots, exact Demo-owned identities, project/origin/scenario, fictional home and contractor, clean registry/lineage, media tools, and provider/external-effect prohibitions passed without exposing values. Registry, exact connection, and exact Request counts were zero across 349 historical scenario runs.
+- Failure boundary: The sole authorized invocation restored `contractor_discovery_ready` and reached the real contextual connection dialog. After deterministic clearing and human-paced entry of the original **Optional message**, the new exact-value assertion timed out re-resolving that dialog-scoped controlled field. **Send connection request** was never clicked, so no connection, acceptance, Request, adoption, contractor retrieval, or media artifact occurred. No retry was attempted.
+- Cleanup and next step: Read-only diagnosis found only the canonical retained home graph registered. Guarded reset detached it, and direct audit across 351 historical runs found zero active runs, registry records, exact-lineage connections, exact-lineage Requests, local staging, or durable TUT-005 artifacts. Stabilize the post-entry readback after the controlled optional-message state update without removing exact verification, add focused regression coverage, merge/deploy, and obtain a fresh one-run authorization. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-01 - TUT-005 second silent run failed at exact Request-title adoption
 
 - Merge and target: PR #551 merged the semantic pending-review locator at `a93b63a9d50007a3dcb779590fb66a93ac983697`. Durable Demo deployment `dpl_9KxbpAYfdBgfFdpC7P3q7KsFnogc` remained Ready and canonically bound to that commit before the separately authorized invocation.
