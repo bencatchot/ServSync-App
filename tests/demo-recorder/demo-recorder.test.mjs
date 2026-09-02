@@ -69,6 +69,7 @@ test('TUT-005 uses real connection/request actions and exact guarded adoption', 
   const adoption = fixtureSource.slice(adoptionStart, adoptionEnd);
 
   assert.match(flow, /Send connection request/);
+  assert.match(flow, /\(\) => page\.getByLabel\('Optional message', \{ exact: true \}\)/);
   assert.match(flow, /Accept request/);
   assert.match(flow, /pendingConnectionCount !== 1/);
   assert.match(flow, /runDemoCommand\(\['adopt-connection'/);
@@ -122,6 +123,42 @@ test('recorder field entry replaces a non-empty retained Request title with the 
     ['fill', ''],
     ['pressSequentially', 'Replace leaking water heater', { delay: 75 }],
   ]);
+});
+
+test('TUT-005 re-resolves the Optional message field after controlled updates before exact readback', async () => {
+  const canonicalMessage = homeownerConnectServiceRequestScenario.connection.message;
+  let currentValue = '';
+  let renderVersion = 0;
+  let resolverCalls = 0;
+  const fieldResolver = () => {
+    resolverCalls += 1;
+    const locatorVersion = renderVersion;
+    const assertCurrent = () => {
+      if (locatorVersion !== renderVersion) throw new Error('stale Optional message locator');
+    };
+    return {
+      async fill(value) {
+        assertCurrent();
+        currentValue = value;
+        renderVersion += 1;
+      },
+      async inputValue() {
+        assertCurrent();
+        return currentValue;
+      },
+      async pressSequentially(value, options) {
+        assertCurrent();
+        assert.deepEqual(options, { delay: 75 });
+        currentValue += value;
+        renderVersion += 1;
+      },
+    };
+  };
+
+  await replaceRecorderFieldValue(fieldResolver, canonicalMessage, 75);
+
+  assert.equal(currentValue, canonicalMessage);
+  assert.equal(resolverCalls, 4);
 });
 
 test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {

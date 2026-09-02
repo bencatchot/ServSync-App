@@ -68,12 +68,16 @@ export function pendingConnectionReviewCount(label) {
   return Number.parseInt(match[1], 10);
 }
 
-export async function replaceRecorderFieldValue(locator, value, typingDelay) {
-  await locator.fill('');
-  const clearedValue = await locator.inputValue();
+function resolveRecorderField(locatorOrResolver) {
+  return typeof locatorOrResolver === 'function' ? locatorOrResolver() : locatorOrResolver;
+}
+
+export async function replaceRecorderFieldValue(locatorOrResolver, value, typingDelay) {
+  await resolveRecorderField(locatorOrResolver).fill('');
+  const clearedValue = await resolveRecorderField(locatorOrResolver).inputValue();
   if (clearedValue !== '') throw new Error('Recorder text target did not clear its retained value.');
-  await locator.pressSequentially(value, { delay: typingDelay });
-  const enteredValue = await locator.inputValue();
+  await resolveRecorderField(locatorOrResolver).pressSequentially(value, { delay: typingDelay });
+  const enteredValue = await resolveRecorderField(locatorOrResolver).inputValue();
   if (enteredValue !== value) throw new Error('Recorder text target did not retain the exact requested value.');
 }
 

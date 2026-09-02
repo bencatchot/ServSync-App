@@ -165,7 +165,9 @@ async function waitForEnabled(locator, timeout = 30_000) {
   throw new Error('Recorder action did not become enabled.');
 }
 
-async function moveAndType(page, locator, value, pacing) {
+async function moveAndType(page, locatorOrResolver, value, pacing) {
+  const resolveLocator = () => typeof locatorOrResolver === 'function' ? locatorOrResolver() : locatorOrResolver;
+  const locator = resolveLocator();
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (!box) throw new Error('Recorder text target has no visible bounding box.');
@@ -174,7 +176,7 @@ async function moveAndType(page, locator, value, pacing) {
   await moveCursorHuman(page, x, y, pacing);
   await wait(pacing.settleBeforeClick);
   await page.mouse.click(x, y);
-  await replaceRecorderFieldValue(locator, value, pacing.typing);
+  await replaceRecorderFieldValue(resolveLocator, value, pacing.typing);
   await wait(pacing.postClick);
 }
 
@@ -620,7 +622,12 @@ async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, 
     await moveAndClick(page, unconnectedCard.getByRole('button', { name: /^Request connection$/i }), pacing);
     const connectionDialog = page.getByRole('dialog', { name: new RegExp(`Share property access with ${scenario.identities.contractor.label}`, 'i') });
     await connectionDialog.waitFor({ state: 'visible' });
-    await moveAndType(page, connectionDialog.getByLabel(/^Optional message$/i), scenario.connection.message, pacing);
+    await moveAndType(
+      page,
+      () => page.getByLabel('Optional message', { exact: true }),
+      scenario.connection.message,
+      pacing,
+    );
     const shareContact = connectionDialog.getByLabel(/^Share my contact info with this contractor/i);
     if (!(await shareContact.isChecked())) await moveAndClick(page, shareContact, pacing);
     const addressPermission = connectionDialog.getByLabel(/^Address/i);
