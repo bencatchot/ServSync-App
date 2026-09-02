@@ -30,6 +30,7 @@ import {
   pendingConnectionReviewCount,
   PENDING_CONNECTION_REVIEW_BUTTON_NAME,
   replaceRecorderFieldValue,
+  replaceRecorderSelectedFieldValue,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from '../../scripts/demo/recorder/lib.mjs';
@@ -75,6 +76,7 @@ test('TUT-005 uses real connection/request actions and exact guarded adoption', 
   assert.match(flow, /runDemoCommand\(\['adopt-connection'/);
   assert.match(flow, /runDemoCommand\(\['adopt-request'/);
   assert.match(flow, /contractorLineageVerification: 'passed'/);
+  assert.match(flow, /moveAndReplaceSelectedValue\(page, fieldControl\(page, 'Request title', 'input'\), scenario\.request\.title, pacing\)/);
   assert.match(adoption, /connection_shared_properties/);
   assert.match(adoption, /connection_request_contexts/);
   assert.match(adoption, /contextual_connection_request_submitted/);
@@ -99,7 +101,7 @@ test('TUT-005 pending-review locator accepts current count grammar without weake
   assert.throws(() => pendingConnectionReviewCount('1 request needs review'), /Unexpected pending connection review label/);
 });
 
-test('recorder field entry replaces a non-empty retained Request title with the exact canonical title', async () => {
+test('recorder clear-and-type entry replaces a non-empty retained value', async () => {
   let currentValue = 'Plumbing help needed';
   const calls = [];
   const locator = {
@@ -122,6 +124,63 @@ test('recorder field entry replaces a non-empty retained Request title with the 
   assert.deepEqual(calls, [
     ['fill', ''],
     ['pressSequentially', 'Replace leaking water heater', { delay: 75 }],
+  ]);
+});
+
+test('recorder clear-and-type entry rejects a controlled generated default that returns after empty fill', async () => {
+  const generatedDefault = 'Plumbing help needed';
+  let currentValue = generatedDefault;
+  const locator = {
+    async fill() {
+      currentValue = generatedDefault;
+    },
+    async inputValue() {
+      return currentValue;
+    },
+    async pressSequentially() {
+      assert.fail('typing must not begin after the empty-clear assertion fails');
+    },
+  };
+
+  await assert.rejects(
+    replaceRecorderFieldValue(locator, 'Replace leaking water heater', 75),
+    /did not clear its retained value/,
+  );
+});
+
+test('recorder selection entry replaces a generated Request title with human-paced exact typing', async () => {
+  const canonicalTitle = 'Replace leaking water heater';
+  let currentValue = 'Plumbing help needed';
+  let selectionActive = false;
+  const inputValues = [];
+  const calls = [];
+  const locator = {
+    async inputValue() {
+      return currentValue;
+    },
+    async selectText() {
+      calls.push(['selectText']);
+      selectionActive = true;
+    },
+    async pressSequentially(value, options) {
+      calls.push(['pressSequentially', value, options]);
+      for (const character of value) {
+        currentValue = selectionActive ? character : `${currentValue}${character}`;
+        selectionActive = false;
+        inputValues.push(currentValue);
+      }
+    },
+  };
+
+  await replaceRecorderSelectedFieldValue(locator, canonicalTitle, 75);
+
+  assert.equal(currentValue, canonicalTitle);
+  assert.equal(inputValues.length, canonicalTitle.length);
+  assert.ok(inputValues.every(Boolean));
+  assert.deepEqual(inputValues, [...canonicalTitle].map((_, index) => canonicalTitle.slice(0, index + 1)));
+  assert.deepEqual(calls, [
+    ['selectText'],
+    ['pressSequentially', canonicalTitle, { delay: 75 }],
   ]);
 });
 

@@ -124,6 +124,7 @@ import {
   type NoticeContent,
 } from './features/presentation/CorePresentation';
 import { actionFeedbackMessage } from './features/presentation/presentationFeedback';
+import { HomeownerRequestTitleField } from './features/requests/HomeownerRequestTitleField';
 import type { ActionFeedbackMessage, ActionFeedbackTone } from './features/feedback/ActionFeedback';
 import {
   FINDING_STATUS_ORDER,
@@ -19263,15 +19264,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       </div>
                     </div>
                     <div className="grid gap-3 md:grid-cols-[1fr_160px_160px]">
-                      <Field label="Request title">
-                        <input
-                          className={inputClass()}
-                          {...writingAssistProps}
-                          value={serviceRequestDraft.title || requestDraftTitle}
-                          onChange={event => setServiceRequestDraft(current => ({ ...current, title: event.target.value }))}
-                          onBlur={event => setServiceRequestDraft(current => ({ ...current, title: cleanHumanLabelText(event.target.value) }))}
-                        />
-                      </Field>
+                      <HomeownerRequestTitleField
+                        className={inputClass()}
+                        generatedDefault={requestDraftTitle}
+                        inputProps={writingAssistProps}
+                        onValueBlur={value => setServiceRequestDraft(current => ({ ...current, title: cleanHumanLabelText(value) }))}
+                        onValueChange={value => setServiceRequestDraft(current => ({ ...current, title: value }))}
+                        value={serviceRequestDraft.title}
+                      />
                       <Field label="Service type">
                         <select
                           className={inputClass()}
