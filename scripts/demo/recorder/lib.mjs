@@ -89,6 +89,21 @@ export async function replaceRecorderFieldValue(locatorOrResolver, value, typing
   if (enteredValue !== value) throw new Error('Recorder text target did not retain the exact requested value.');
 }
 
+export async function replaceRecorderSelectedFieldValue(locatorOrResolver, value, typingDelay) {
+  const locator = resolveRecorderField(locatorOrResolver);
+  const readbackField = typeof locator.elementHandle === 'function'
+    ? await locator.elementHandle()
+    : locator;
+  if (!readbackField) throw new Error('Recorder text target could not be pinned before selection replacement.');
+
+  const existingValue = await readbackField.inputValue();
+  if (!existingValue) throw new Error('Recorder selection replacement requires a current field value.');
+  await locator.selectText();
+  await locator.pressSequentially(value, { delay: typingDelay });
+  const enteredValue = await readbackField.inputValue();
+  if (enteredValue !== value) throw new Error('Recorder selection replacement did not retain the exact requested value.');
+}
+
 const PAYMENT_ACTION_PATTERN = /stripe|payment[-_]?intent|online[-_]?payment|checkout/i;
 const INVOICE_ONLINE_PAYMENT_HISTORY_RPC = '/rest/v1/rpc/servsync_list_invoice_online_payments';
 

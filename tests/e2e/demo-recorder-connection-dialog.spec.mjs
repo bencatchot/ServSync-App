@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { replaceRecorderFieldValue } from '../../scripts/demo/recorder/lib.mjs';
+import { replaceRecorderFieldValue, replaceRecorderSelectedFieldValue } from '../../scripts/demo/recorder/lib.mjs';
 import { homeownerConnectServiceRequestScenario } from '../../scripts/demo/recorder/scenarios/homeowner-connect-service-request.mjs';
 
 async function mountConnectionDialog(page) {
@@ -50,6 +50,49 @@ async function mountConnectionDialog(page) {
     ));
   });
 }
+
+async function mountRequestTitleField(page) {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const dynamicImport = new Function('path', 'return import(path)');
+    const reactModule = await dynamicImport('/node_modules/.vite/deps/react.js');
+    const reactDomModule = await dynamicImport('/node_modules/.vite/deps/react-dom_client.js');
+    const requestTitleModule = await dynamicImport('/tests/e2e/fixtures/HomeownerRequestTitleHarness.tsx');
+    const React = reactModule.default;
+    const createRoot = reactDomModule.default.createRoot;
+    document.body.innerHTML = '<main id="request-title-harness"></main>';
+    createRoot(document.getElementById('request-title-harness')).render(React.createElement(requestTitleModule.HomeownerRequestTitleHarness));
+  });
+}
+
+test('rendered Request title immediately restores its generated default after an empty fill', async ({ page }) => {
+  await mountRequestTitleField(page);
+  const requestTitle = page.getByLabel('Request title', { exact: true });
+  await expect(requestTitle).toHaveValue('Plumbing help needed');
+
+  await requestTitle.fill('');
+
+  await expect(requestTitle).toHaveValue('Plumbing help needed');
+});
+
+test('rendered Request title accepts human-paced selection replacement without an empty intermediate', async ({ page }) => {
+  await mountRequestTitleField(page);
+  const requestTitle = page.getByLabel('Request title', { exact: true });
+  const canonicalTitle = homeownerConnectServiceRequestScenario.request.title;
+  await expect(requestTitle).toHaveValue('Plumbing help needed');
+  await requestTitle.evaluate(element => {
+    window.__tut005RequestTitleValues = [];
+    element.addEventListener('input', event => { window.__tut005RequestTitleValues.push(event.currentTarget.value); });
+  });
+
+  await replaceRecorderSelectedFieldValue(requestTitle, canonicalTitle, 25);
+
+  await expect(requestTitle).toHaveValue(canonicalTitle);
+  const enteredValues = await page.evaluate(() => window.__tut005RequestTitleValues);
+  expect(enteredValues).toHaveLength(canonicalTitle.length);
+  expect(enteredValues).not.toContain('');
+  expect(enteredValues).toEqual([...canonicalTitle].map((_, index) => canonicalTitle.slice(0, index + 1)));
+});
 
 test('TUT-005 pins and exactly verifies the rendered controlled Optional message field', async ({ page }) => {
   await mountConnectionDialog(page);

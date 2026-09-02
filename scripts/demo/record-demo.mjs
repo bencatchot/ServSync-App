@@ -28,6 +28,7 @@ import {
   pendingConnectionReviewCount,
   PENDING_CONNECTION_REVIEW_BUTTON_NAME,
   replaceRecorderFieldValue,
+  replaceRecorderSelectedFieldValue,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from './recorder/lib.mjs';
@@ -202,6 +203,19 @@ async function moveAndAppend(page, locator, value, pacing) {
   if (!nextValue.startsWith(existingValue) || !nextValue.includes(value)) {
     throw new Error('Recorder append did not preserve the existing text before adding the new note.');
   }
+  await wait(pacing.postClick);
+}
+
+async function moveAndReplaceSelectedValue(page, locator, value, pacing) {
+  await locator.scrollIntoViewIfNeeded();
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('Recorder selection-replacement target has no visible bounding box.');
+  const x = box.x + Math.min(box.width * 0.35, 220);
+  const y = box.y + box.height / 2;
+  await moveCursorHuman(page, x, y, pacing);
+  await wait(pacing.settleBeforeClick);
+  await page.mouse.click(x, y);
+  await replaceRecorderSelectedFieldValue(locator, value, pacing.typing);
   await wait(pacing.postClick);
 }
 
@@ -680,7 +694,7 @@ async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, 
       .locator('xpath=ancestor::div[.//button[normalize-space()="Select contractor"]][1]');
     await moveAndClick(page, connectedCard.getByRole('button', { name: /^Select contractor$/i }), pacing);
     await moveAndClick(page, page.getByRole('button', { name: /^Continue$/i }).last(), pacing);
-    await moveAndType(page, fieldControl(page, 'Request title', 'input'), scenario.request.title, pacing);
+    await moveAndReplaceSelectedValue(page, fieldControl(page, 'Request title', 'input'), scenario.request.title, pacing);
     await moveAndType(page, fieldControl(page, 'Message to contractor', 'textarea'), scenario.request.description, pacing);
     requestSubmissionStarted = true;
     await moveAndClick(page, page.getByRole('button', { name: /^Send Request$/i }), pacing);
