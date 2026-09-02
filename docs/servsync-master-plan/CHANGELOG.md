@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-01 - TUT-005 second silent run failed at exact Request-title adoption
+
+- Merge and target: PR #551 merged the semantic pending-review locator at `a93b63a9d50007a3dcb779590fb66a93ac983697`. Durable Demo deployment `dpl_9KxbpAYfdBgfFdpC7P3q7KsFnogc` remained Ready and canonically bound to that commit before the separately authorized invocation.
+- One-run result: Target, fictional fixture, clean registry, credential-slot, and external-effect preflight passed without exposing values. The run truthfully completed the disconnected-homeowner contextual request and real contractor acceptance, with exact message, permission, home, source, submission-event, and acceptance-event adoption at `connected_request_ready`.
+- Failure boundary: Request submission retained the title control's existing **Plumbing help needed** value and appended **Replace leaking water heater**, producing **Plumbing help neededReplace leaking water heater**. Contractor, connection, home, category, urgency, description, and timestamp predicates matched, but exact adoption correctly refused the noncanonical title. No retry or media artifact occurred.
+- Cleanup and boundary: The exact malformed Request and one message were registered for compensation, guarded reset removed six disposable rows, and direct audit found zero registered records, connections, matching-lineage Requests, or local staging residue. No provider/payment/external effect, OpenAI/Cedar action, Help mutation, Production workflow mutation, environment change, or other tutorial occurred.
+- Next step: Make the recorder replace the current Request-title field value, add focused regression coverage, merge and deploy the correction, then obtain a fresh one-run authorization. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-01 - TUT-005 first silent run failed before contractor acceptance
 
 - Merge and target: PR #549 merged normally at `2667d3ec1952800faa5e6273888bd09c6227948f`. Automatic Production app, durable Demo, and Stripe Sandbox deployments reached Ready; durable Demo deployment `dpl_E6oXJCMuhv9246jbPYoq6vmNhqm9` remained bound to that commit and its canonical alias returned HTTP 200 before the authorized run.
