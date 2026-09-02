@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-02 - TUT-005 fifth silent run passed connection adoption and exposed the Request-title reset boundary
+
+- Merge and target: PR #557 merged the browser-proven pinned Optional-message readback at `bdd0b9193904666c2d4e3d746883c29964f1f89e`. Immediately before invocation, `https://servsync-demo.vercel.app` resolved to Ready deployment `dpl_E1iFEVpMPWcg6ZBSatxiGmGuTZcw` at that exact commit and returned HTTP 200.
+- One-run preflight: Both owner-readable bundles were mode `600`; the current homeowner and contractor pairs authenticated as two distinct fictional identities; the exact Demo project/origin/scenario, Demo Bay Home, Gulf Coast Home Services, clean registry/lineage, media tools, and provider/external-effect prohibitions passed without exposing values. Registry, exact connection, exact Request, workspace-artifact, and durable TUT-005 artifact counts were zero across 353 historical scenario runs.
+- Failure boundary: The sole authorized invocation passed the pinned Optional-message readback, contextual connection request, corrected pending-review locator, real contractor acceptance, and exact connection adoption at `connected_request_ready`. It then failed before Request submission because the Request-title helper required an empty intermediate while the rendered controlled field immediately restored its 20-character generated default. Read-only browser diagnosis reproduced that restoration after `fill('')`; the description control cleared normally. No retry or media artifact occurred.
+- Cleanup and next step: Guarded reset removed four disposable connection rows and retained only the canonical home, room, asset, and revision. Direct audit across 355 historical runs found zero registry records, exact-lineage connections, exact-lineage Requests, workspace/staging files, or durable TUT-005 files; exact-deployment logs showed no `5xx`, and no provider or external effect occurred. Browser-prove a selection-based human-paced Request-title replacement that never requires an empty intermediate, preserve exact final verification, merge/deploy the bounded correction, and obtain a fresh one-run authorization. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-02 - TUT-005 fourth silent run confirmed optional-message readback remains blocked
 
 - Merge and target: PR #555 merged the page-scoped re-resolution correction at `2ce5eedfc90c370a4f225fde1c4f0e2f81325d6f`. Immediately before invocation, `https://servsync-demo.vercel.app` resolved to Ready deployment `dpl_5xbubt9qnHNHcYvJgv38jhkeZiKf` at that exact commit and returned HTTP 200.
