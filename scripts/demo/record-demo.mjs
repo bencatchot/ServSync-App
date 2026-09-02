@@ -27,6 +27,7 @@ import {
   parseRecorderArgs,
   pendingConnectionReviewCount,
   PENDING_CONNECTION_REVIEW_BUTTON_NAME,
+  replaceRecorderFieldValue,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from './recorder/lib.mjs';
@@ -173,9 +174,7 @@ async function moveAndType(page, locator, value, pacing) {
   await moveCursorHuman(page, x, y, pacing);
   await wait(pacing.settleBeforeClick);
   await page.mouse.click(x, y);
-  await locator.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
-  await locator.press('Backspace');
-  await locator.pressSequentially(value, { delay: pacing.typing });
+  await replaceRecorderFieldValue(locator, value, pacing.typing);
   await wait(pacing.postClick);
 }
 

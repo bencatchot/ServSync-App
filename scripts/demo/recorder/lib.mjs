@@ -68,6 +68,15 @@ export function pendingConnectionReviewCount(label) {
   return Number.parseInt(match[1], 10);
 }
 
+export async function replaceRecorderFieldValue(locator, value, typingDelay) {
+  await locator.fill('');
+  const clearedValue = await locator.inputValue();
+  if (clearedValue !== '') throw new Error('Recorder text target did not clear its retained value.');
+  await locator.pressSequentially(value, { delay: typingDelay });
+  const enteredValue = await locator.inputValue();
+  if (enteredValue !== value) throw new Error('Recorder text target did not retain the exact requested value.');
+}
+
 const PAYMENT_ACTION_PATTERN = /stripe|payment[-_]?intent|online[-_]?payment|checkout/i;
 const INVOICE_ONLINE_PAYMENT_HISTORY_RPC = '/rest/v1/rpc/servsync_list_invoice_online_payments';
 
