@@ -29,6 +29,7 @@ import {
   parseRecorderArgs,
   pendingConnectionReviewCount,
   PENDING_CONNECTION_REVIEW_BUTTON_NAME,
+  replaceRecorderFieldValue,
   scanVisibleTextForSensitiveData,
   validateScenarioDefinition,
 } from '../../scripts/demo/recorder/lib.mjs';
@@ -95,6 +96,32 @@ test('TUT-005 pending-review locator accepts current count grammar without weake
   assert.equal(pendingConnectionReviewCount('2 connection requests need review'), 2);
   assert.throws(() => pendingConnectionReviewCount('connection request needs review'), /Unexpected pending connection review label/);
   assert.throws(() => pendingConnectionReviewCount('1 request needs review'), /Unexpected pending connection review label/);
+});
+
+test('recorder field entry replaces a non-empty retained Request title with the exact canonical title', async () => {
+  let currentValue = 'Plumbing help needed';
+  const calls = [];
+  const locator = {
+    async fill(value) {
+      calls.push(['fill', value]);
+      currentValue = value;
+    },
+    async inputValue() {
+      return currentValue;
+    },
+    async pressSequentially(value, options) {
+      calls.push(['pressSequentially', value, options]);
+      currentValue += value;
+    },
+  };
+
+  await replaceRecorderFieldValue(locator, 'Replace leaking water heater', 75);
+
+  assert.equal(currentValue, 'Replace leaking water heater');
+  assert.deepEqual(calls, [
+    ['fill', ''],
+    ['pressSequentially', 'Replace leaking water heater', { delay: 75 }],
+  ]);
 });
 
 test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {
