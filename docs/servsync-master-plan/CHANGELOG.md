@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-02 - TUT-005 fourth silent run confirmed optional-message readback remains blocked
+
+- Merge and target: PR #555 merged the page-scoped re-resolution correction at `2ce5eedfc90c370a4f225fde1c4f0e2f81325d6f`. Immediately before invocation, `https://servsync-demo.vercel.app` resolved to Ready deployment `dpl_5xbubt9qnHNHcYvJgv38jhkeZiKf` at that exact commit and returned HTTP 200.
+- One-run preflight: Both owner-only bundles were mode `600`; the repaired credential pairs authenticated; the exact Demo project/origin/scenario, fictional identities/home/contractor, clean registry/lineage, media tools, and provider/external-effect prohibitions passed without exposing values. Registry, exact connection, and exact Request counts were zero across 351 historical scenario runs.
+- Failure boundary: The sole authorized invocation restored `contractor_discovery_ready` and reached the real contextual connection dialog. The merged correction still timed out waiting for page-scoped `getByLabel('Optional message', { exact: true })` during exact post-entry readback after human-paced controlled input. **Send connection request** was never clicked; no acceptance, adoption, Request, contractor retrieval, or media artifact occurred, and no retry was attempted.
+- Cleanup and next step: Guarded reset triggered no external effect and direct audit across 353 historical runs found zero registry records, exact-lineage connections, exact-lineage Requests, workspace recording files, or durable TUT-005 files; the canonical home remained intentionally retained. Deployment logs showed no `5xx` in the run window. Replace the unsuccessful semantic re-resolution with a field reference proven against the real controlled dialog, retain exact-value verification, add browser-level regression coverage, merge/deploy, and obtain a fresh one-run authorization. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-02 - TUT-005 third silent run failed at optional-message readback
 
 - Merge and target: PR #553 merged the retained-value replacement correction at `646e3229f306131b38b324c66d05c27ee802ec8d`. Durable Demo deployment `dpl_EnztPVDcVxBQxz4C2ft16LL7HKRB` was successful, GitHub deployment `6223084541` bound it to that exact commit, and the canonical alias returned HTTP 200.
