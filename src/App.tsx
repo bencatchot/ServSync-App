@@ -47727,7 +47727,7 @@ function activeSharingDraftFromConnection(
   return { share_contact: Boolean(permissions.share_contact), properties: [] };
 }
 
-function ContextualConnectionRequestModal({
+export function ContextualConnectionRequestModal({
   contractor,
   homes,
   initialHomeId,
