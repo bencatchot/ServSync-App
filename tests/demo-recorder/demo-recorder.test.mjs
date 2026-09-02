@@ -125,29 +125,31 @@ test('recorder field entry replaces a non-empty retained Request title with the 
   ]);
 });
 
-test('TUT-005 re-resolves the Optional message field after controlled updates before exact readback', async () => {
+test('TUT-005 pins the Optional message field through controlled updates before exact readback', async () => {
   const canonicalMessage = homeownerConnectServiceRequestScenario.connection.message;
   let currentValue = '';
   let renderVersion = 0;
   let resolverCalls = 0;
+  let handleCalls = 0;
+  const fieldHandle = {
+    async inputValue() {
+      return currentValue;
+    },
+  };
   const fieldResolver = () => {
     resolverCalls += 1;
     const locatorVersion = renderVersion;
-    const assertCurrent = () => {
-      if (locatorVersion !== renderVersion) throw new Error('stale Optional message locator');
-    };
     return {
+      async elementHandle() {
+        handleCalls += 1;
+        assert.equal(locatorVersion, renderVersion);
+        return fieldHandle;
+      },
       async fill(value) {
-        assertCurrent();
         currentValue = value;
         renderVersion += 1;
       },
-      async inputValue() {
-        assertCurrent();
-        return currentValue;
-      },
       async pressSequentially(value, options) {
-        assertCurrent();
         assert.deepEqual(options, { delay: 75 });
         currentValue += value;
         renderVersion += 1;
@@ -158,7 +160,9 @@ test('TUT-005 re-resolves the Optional message field after controlled updates be
   await replaceRecorderFieldValue(fieldResolver, canonicalMessage, 75);
 
   assert.equal(currentValue, canonicalMessage);
-  assert.equal(resolverCalls, 4);
+  assert.equal(renderVersion, 2);
+  assert.equal(resolverCalls, 1);
+  assert.equal(handleCalls, 1);
 });
 
 test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {

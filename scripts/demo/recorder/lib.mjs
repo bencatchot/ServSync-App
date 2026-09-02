@@ -73,11 +73,19 @@ function resolveRecorderField(locatorOrResolver) {
 }
 
 export async function replaceRecorderFieldValue(locatorOrResolver, value, typingDelay) {
-  await resolveRecorderField(locatorOrResolver).fill('');
-  const clearedValue = await resolveRecorderField(locatorOrResolver).inputValue();
+  const locator = resolveRecorderField(locatorOrResolver);
+  // Pin readback to the already-resolved control. An implicitly wrapped label can
+  // stop matching the same exact label text after its controlled field has a value.
+  const readbackField = typeof locator.elementHandle === 'function'
+    ? await locator.elementHandle()
+    : locator;
+  if (!readbackField) throw new Error('Recorder text target could not be pinned before entry.');
+
+  await locator.fill('');
+  const clearedValue = await readbackField.inputValue();
   if (clearedValue !== '') throw new Error('Recorder text target did not clear its retained value.');
-  await resolveRecorderField(locatorOrResolver).pressSequentially(value, { delay: typingDelay });
-  const enteredValue = await resolveRecorderField(locatorOrResolver).inputValue();
+  await locator.pressSequentially(value, { delay: typingDelay });
+  const enteredValue = await readbackField.inputValue();
   if (enteredValue !== value) throw new Error('Recorder text target did not retain the exact requested value.');
 }
 
