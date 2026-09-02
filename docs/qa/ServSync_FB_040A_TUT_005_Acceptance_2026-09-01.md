@@ -2,7 +2,18 @@
 
 ## Status
 
-Source preparation merged through PR #549 at `2667d3ec1952800faa5e6273888bd09c6227948f`; no validated recording, approval, or publication exists. The first separately authorized silent run failed after the homeowner submitted the exact contextual connection request but before contractor acceptance because the recorder waited for stale text, **connection request needs review**, while the real Customers control says **1 connection request need review**. The authorization was consumed without retry. TUT-005 **How to connect and request service** remains the primary active Launch Roadmap outcome at `homeowner.service`.
+Source preparation merged through PR #549 at `2667d3ec1952800faa5e6273888bd09c6227948f`, and PR #551 merged the pending-review locator correction at `a93b63a9d50007a3dcb779590fb66a93ac983697`; no validated recording, approval, or publication exists. The second separately authorized silent run passed the disconnected-homeowner connection path and real contractor acceptance, but exact Request adoption failed because the title control retained **Plumbing help needed** and the recorder appended **Replace leaking water heater**, producing **Plumbing help neededReplace leaking water heater**. The authorization was consumed without retry. TUT-005 **How to connect and request service** remains the primary active Launch Roadmap outcome at `homeowner.service`.
+
+## Second protected silent run — material failure
+
+- Durable Demo deployment `dpl_9KxbpAYfdBgfFdpC7P3q7KsFnogc` was Ready and canonically bound to exact merge commit `a93b63a9d50007a3dcb779590fb66a93ac983697`; the canonical alias returned HTTP 200.
+- Owner-readable credential bundles passed exact target, fictional identity/home/contractor, clean-registry, and external-effect preflight without printing values. All 347 historical runs had zero registered records before invocation, with zero connection or matching Request residue.
+- The one authorized run started disconnected, selected Demo Bay Home, submitted the original contextual message and bounded permissions, and used the corrected semantic pending-review locator to complete real contractor acceptance. Exact connection adoption reached `connected_request_ready` with the submission and acceptance events, selected home, original message, and permissions intact.
+- The homeowner returned to Service Requests and submitted a Request whose contractor, home, connection, category, urgency, description, and creation boundary all matched. Exact adoption found zero canonical candidates only because the Request-title field was appended to its retained default, yielding **Plumbing help neededReplace leaking water heater** instead of **Replace leaking water heater**.
+- No retry, final WebM, durable MP4, metadata, checksum, full `1x` review, or desktop/mobile final-media check occurred. The exact malformed Request and its one message were registered for compensation; guarded reset removed six disposable rows. Direct post-reset checks across 349 historical runs found zero registered records, connections, or Requests for the exact lineage, and local staging residue was zero.
+- No credential value, provider/payment/external effect, OpenAI/Cedar call, Help mutation, Production workflow mutation, environment change, or other tutorial action occurred. Browser-error/`5xx` and final contractor-retrieval validation did not reach their terminal recorder assertions because adoption failed first.
+
+The next bounded remediation is to make Request-title entry replace the current field value and regression-test that behavior without weakening exact title adoption. Merge and deploy that correction before requesting another one-run authorization; the failed authorization cannot be reused.
 
 ## First protected silent run — material failure
 
@@ -50,4 +61,4 @@ Tutorial evidence: The canonical current Production Help inventory and accepted 
 
 Affected tutorials: TUT-005 **How to connect and request service** at `homeowner.service`.
 
-Tutorial follow-up: Correct and merge the stale pending-review locator, verify the durable Demo correction, then obtain a new explicit authorization for exactly one protected silent run. TUT-005 remains incomplete until a validated silent artifact exists and its later narrated/captioned revision is approved, published, and verified for role-aware `homeowner.service` retrieval, full playback, homeowner-only audience, desktop/mobile context, transcript/disclosure, browser health, and zero external effects.
+Tutorial follow-up: Correct and regression-test the bounded Request-title replacement, merge and verify its durable Demo deployment, then obtain a new explicit authorization for exactly one protected silent run. TUT-005 remains incomplete until a validated silent artifact exists and its later narrated/captioned revision is approved, published, and verified for role-aware `homeowner.service` retrieval, full playback, homeowner-only audience, desktop/mobile context, transcript/disclosure, browser health, and zero external effects.
