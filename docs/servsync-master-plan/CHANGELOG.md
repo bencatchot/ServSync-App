@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-03 - TUT-005 protected recording stopped at credential preflight
+
+- Merge and target: PR #563 merged all seven bounded recorder corrections through main commit `17aa4ee6e0a78eccd59c50810b24a5112a4fe080`. Canonical `https://servsync-demo.vercel.app` resolved to Ready deployment `dpl_C4xHy37UFMxatrW8CRDBD9RB6f1s` at that exact commit and returned HTTP 200.
+- Fail-closed boundary: The mode-`600` primary homeowner and contractor credential entries both returned `invalid_credentials`, despite the exact Auth users retaining the required Demo-owned scenario/role metadata. Alternate entries authenticated but lacked Demo ownership metadata and were rejected. The recorder was never invoked, so no fixture setup, workflow record, media, checksum, playback, or mobile acceptance occurred; the isolated working output remained empty.
+- Credential incident and next gate: A malformed diagnostic redaction projection emitted the Demo anon/service-role values into the private Codex tool transcript. No secret was committed or included in an artifact, and the ephemeral Vercel pull was deleted. Treat the Demo keys as exposed within the owner-controlled session. Separately approve key rotation and Demo/local input updates plus primary fictional identity-bundle recovery; after independent verification, issue a fresh one-run authorization. No rotation, environment change, retry, provider action, OpenAI/Cedar call, Help mutation, Production workflow mutation, or deployment was performed. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-03 - TUT-005 expanded contractor-description verification correction prepared
 
 - Browser evidence: A credential-free rendered harness now uses the real expanded Request-description and service-request message renderers. It proves the canonical full description truthfully occurs twice inside the expanded card, while the new non-visible expanded-detail identity resolves exactly once and retains the exact canonical text.
