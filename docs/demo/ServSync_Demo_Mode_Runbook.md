@@ -91,6 +91,8 @@ The Demo Playwright target guard requires the selected environment, Supabase URL
 
 Store secret values only in an ignored local environment file or approved secret store. Do not commit credentials or paste them into chat, terminal reports, PR descriptions, screenshots, traces, videos, or logs. The Playwright helpers report missing variable names only and must not print values.
 
+The dedicated Demo project migrated its application/recorder consumers away from the exposed legacy JWT keys on 2026-09-03. For backward-compatible script wiring, `VITE_SUPABASE_ANON_KEY` and `DEMO_SUPABASE_ANON_KEY` now contain the Demo publishable key, while `DEMO_SUPABASE_SERVICE_ROLE_KEY` contains the paired server-only secret key. The variable names remain stable, but operators must not substitute or re-enable the disabled legacy anon/service-role values. The Demo Vercel application has no server-key consumer; the protected private recorder/fixture runner is the server-key consumer. Evidence must use only non-reconstructable fingerprint/length/status results.
+
 The runner also refuses to proceed if these external-effect flags are set to enabled-looking values in the process environment. Rejected values are case-insensitive and include `true`, `1`, `yes`, `on`, and `enabled`. Unrecognized non-empty boolean values also fail closed; unset the flag or use a clear disabled value such as `false`.
 
 - `EMAIL_ENABLED`
