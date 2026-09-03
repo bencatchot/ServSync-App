@@ -77,6 +77,16 @@ test('TUT-005 uses real connection/request actions and exact guarded adoption', 
   assert.match(flow, /runDemoCommand\(\['adopt-request'/);
   assert.match(flow, /contractorLineageVerification: 'passed'/);
   assert.match(flow, /moveAndReplaceSelectedValue\(page, fieldControl\(page, 'Request title', 'input'\), scenario\.request\.title, pacing\)/);
+  const requestAdopted = flow.indexOf('requestAdopted = true;');
+  const contractorReload = flow.indexOf("await contractorPage.reload({ waitUntil: 'domcontentloaded' });", requestAdopted);
+  const contractorReady = flow.indexOf("await contractorPage.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });", contractorReload);
+  const contractorRequests = flow.indexOf('await openSidebar(contractorPage, /^Service Requests/);', contractorReady);
+  const exactContractorCard = flow.indexOf("filter({ hasText: scenario.request.title }).first();", contractorRequests);
+  assert.ok(requestAdopted >= 0 && contractorReload > requestAdopted);
+  assert.ok(contractorReady > contractorReload && contractorRequests > contractorReady);
+  assert.ok(exactContractorCard > contractorRequests);
+  assert.match(flow.slice(exactContractorCard), /getByText\(scenario\.request\.description, \{ exact: true \}\)/);
+  assert.match(flow.slice(exactContractorCard), /new RegExp\(scenario\.property\.nickname, 'i'\)/);
   assert.match(adoption, /connection_shared_properties/);
   assert.match(adoption, /connection_request_contexts/);
   assert.match(adoption, /contextual_connection_request_submitted/);

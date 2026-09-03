@@ -708,6 +708,8 @@ async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, 
     await moveCursorToRest(page, pacing);
     await wait(pacing.finalHold);
 
+    await contractorPage.reload({ waitUntil: 'domcontentloaded' });
+    await contractorPage.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
     await openSidebar(contractorPage, /^Service Requests/);
     const contractorCard = contractorPage.getByTestId('contractor-service-request-card').filter({ hasText: scenario.request.title }).first();
     await contractorCard.waitFor({ state: 'visible', timeout: 30_000 });
