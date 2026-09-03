@@ -4,6 +4,53 @@ import { homeownerConnectServiceRequestScenario } from '../../scripts/demo/recor
 
 const HARNESS_ORIGIN = 'http://tut005-recorder.test';
 
+async function mountExpandedContractorRequest(page) {
+  await page.goto('/');
+  await page.evaluate(async request => {
+    const dynamicImport = new Function('path', 'return import(path)');
+    const reactModule = await dynamicImport('/node_modules/.vite/deps/react.js');
+    const reactDomModule = await dynamicImport('/node_modules/.vite/deps/react-dom_client.js');
+    const appModule = await dynamicImport('/src/App.tsx');
+    const requestDescriptionModule = await dynamicImport('/src/features/requests/ContractorServiceRequestDescription.tsx');
+    const React = reactModule.default;
+    const createRoot = reactDomModule.default.createRoot;
+    document.body.innerHTML = '<main id="contractor-request-harness"></main>';
+    createRoot(document.getElementById('contractor-request-harness')).render(
+      React.createElement('article', { 'data-testid': 'contractor-service-request-card' },
+        React.createElement('h2', null, request.title),
+        React.createElement(requestDescriptionModule.ContractorServiceRequestDescription, { description: request.description }),
+        React.createElement(appModule.ServiceRequestMessages, {
+          messages: [{
+            id: 'request-message',
+            actor_role: 'homeowner',
+            created_at: '2026-09-03T12:00:00.000Z',
+            body: request.description,
+          }],
+          media: [],
+        }),
+        React.createElement('p', null, request.home),
+      ),
+    );
+  }, {
+    title: homeownerConnectServiceRequestScenario.request.title,
+    description: homeownerConnectServiceRequestScenario.request.description,
+    home: homeownerConnectServiceRequestScenario.property.nickname,
+  });
+}
+
+test('TUT-005 scopes exact description verification to the rendered expanded Request detail', async ({ page }) => {
+  const request = homeownerConnectServiceRequestScenario.request;
+  await mountExpandedContractorRequest(page);
+
+  const card = page.getByTestId('contractor-service-request-card').filter({ hasText: request.title });
+  await expect(card.getByText(request.description, { exact: true })).toHaveCount(2);
+
+  const expandedDescription = card.getByTestId('contractor-service-request-description');
+  await expect(expandedDescription).toHaveCount(1);
+  await expect(expandedDescription).toHaveText(request.description, { useInnerText: true });
+  await expect(card).toContainText(homeownerConnectServiceRequestScenario.property.nickname);
+});
+
 test('TUT-005 reloads stale contractor state before exact Request retrieval', async ({ page }) => {
   const scenario = homeownerConnectServiceRequestScenario;
   const request = {
