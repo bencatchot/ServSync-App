@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-03 - TUT-005 expanded contractor-description verification correction prepared
+
+- Browser evidence: A credential-free rendered harness now uses the real expanded Request-description and service-request message renderers. It proves the canonical full description truthfully occurs twice inside the expanded card, while the new non-visible expanded-detail identity resolves exactly once and retains the exact canonical text.
+- Recorder correction: Final contractor retrieval now waits for that one expanded-detail element and compares its complete text exactly. The existing exact Request card, title, Demo home, aggregate description, connection/adoption lineage, browser-error, and `5xx` checks remain intact. The rendered product experience is unchanged.
+- Validation and gate: Focused browser coverage passes alongside the pending-review, pinned Optional-message, selection-based Request-title, stale-state reload, and exact-description cases. Recorder, architecture, type, build, and lint validation pass; the extraction lowers the ratcheted `App.tsx` baseline by one line. Tutorial impact remains `UPDATE REQUIRED`. Review, merge, and deploy the draft correction before any separately authorized protected recording.
+
 ## 2026-09-03 - TUT-005 seventh silent run retrieved the Request and exposed duplicate exact-description rendering
 
 - Merge and target: PR #561 merged the browser-proven deterministic contractor-page reload through main commit `7c8ec14ce500295d007f177b8b89d2685f6554dc`. Immediately before invocation, `https://servsync-demo.vercel.app` resolved to Ready deployment `dpl_FhLWAjyvTL6CPGcG1tBsSJDSRMKB` at that exact commit, carried the canonical alias, and returned HTTP 200.

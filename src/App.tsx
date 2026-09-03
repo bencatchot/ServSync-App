@@ -125,6 +125,7 @@ import {
 } from './features/presentation/CorePresentation';
 import { actionFeedbackMessage } from './features/presentation/presentationFeedback';
 import { HomeownerRequestTitleField } from './features/requests/HomeownerRequestTitleField';
+import { ContractorServiceRequestDescription } from './features/requests/ContractorServiceRequestDescription';
 import type { ActionFeedbackMessage, ActionFeedbackTone } from './features/feedback/ActionFeedback';
 import {
   FINDING_STATUS_ORDER,
@@ -33594,9 +33595,7 @@ function ContractorDashboard({
                           </p>
                         </div>
                       )}
-                      <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
-                        {request.description || 'No request description provided.'}
-                      </p>
+                      <ContractorServiceRequestDescription description={request.description} />
                       {renderContractorHomeMapDraftPanel(request)}
                       <details className="mt-4" open>
                         <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -47596,7 +47595,7 @@ function InspectionPhotoImage({ photo, alt, className }: { photo: string; alt: s
   return <img src={src} alt={alt} className={className} />;
 }
 
-function ServiceRequestMessages({ messages, media }: { messages: ServiceRequestSummary['messages']; media: ServiceRequestMedia[] }) {
+export function ServiceRequestMessages({ messages, media }: { messages: ServiceRequestSummary['messages']; media: ServiceRequestMedia[] }) {
   if (messages.length === 0) {
     return <p className="text-sm text-slate-400">No messages recorded yet.</p>;
   }

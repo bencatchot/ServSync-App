@@ -714,7 +714,11 @@ async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, 
     const contractorCard = contractorPage.getByTestId('contractor-service-request-card').filter({ hasText: scenario.request.title }).first();
     await contractorCard.waitFor({ state: 'visible', timeout: 30_000 });
     await contractorCard.getByRole('button').first().click();
-    await contractorCard.getByText(scenario.request.description, { exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
+    const contractorDescription = contractorCard.getByTestId('contractor-service-request-description');
+    await contractorDescription.waitFor({ state: 'visible', timeout: 30_000 });
+    if (await contractorDescription.textContent() !== scenario.request.description) {
+      throw new Error('TUT-005 contractor verification did not preserve the exact Request description.');
+    }
     await contractorCard.getByText(new RegExp(scenario.property.nickname, 'i')).first().waitFor({ state: 'visible', timeout: 30_000 });
     const contractorText = await contractorCard.innerText();
     for (const expected of [scenario.request.title, scenario.request.description, scenario.property.nickname]) {

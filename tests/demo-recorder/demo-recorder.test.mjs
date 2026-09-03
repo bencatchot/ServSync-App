@@ -85,7 +85,8 @@ test('TUT-005 uses real connection/request actions and exact guarded adoption', 
   assert.ok(requestAdopted >= 0 && contractorReload > requestAdopted);
   assert.ok(contractorReady > contractorReload && contractorRequests > contractorReady);
   assert.ok(exactContractorCard > contractorRequests);
-  assert.match(flow.slice(exactContractorCard), /getByText\(scenario\.request\.description, \{ exact: true \}\)/);
+  assert.match(flow.slice(exactContractorCard), /getByTestId\('contractor-service-request-description'\)/);
+  assert.match(flow.slice(exactContractorCard), /contractorDescription\.textContent\(\) !== scenario\.request\.description/);
   assert.match(flow.slice(exactContractorCard), /new RegExp\(scenario\.property\.nickname, 'i'\)/);
   assert.match(adoption, /connection_shared_properties/);
   assert.match(adoption, /connection_request_contexts/);
