@@ -4,6 +4,13 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-03 - TUT-005 Demo credential recovery completed
+
+- Protected recovery: PR #564 merged the credential-preflight incident record as main commit `e20ed5a16e7b59a216d175a35881f8ab7cffb708`. Under separate Demo-only approval, the exposed legacy anon/service-role keys were replaced by the existing unexposed publishable/secret pair across the Demo Vercel browser consumer and local recorder bundle, then both exposed legacy keys were disabled. No Production or Sandbox setting, credential, data, or environment was changed.
+- Identity recovery: Only the two exact Demo-owned primary fictional account passwords were rotated. User identity, ownership metadata, `water_heater_core_loop` scenario, homeowner/contractor-owner role, profile role, Gulf Coast Home Services company, and Demo Bay Home ownership remained exact; alternate unowned accounts were not used. The owner-readable local bundle was atomically updated and remained mode `600`.
+- Deployment and verification: Redeployment `dpl_92JCtRbghxMX5R1BDg2unej2znFR` reached Ready from exact main commit `e20ed5a16e7b59a216d175a35881f8ab7cffb708`, retained the canonical alias, and returned HTTP 200. After legacy deactivation, fresh application sign-ins reached the correct homeowner and contractor workspaces, the replacement server credential passed protected Auth/admin and database reads, and the exposed legacy keys each returned HTTP 401. Redacted replacement-key fingerprints were recorded only as 12-character SHA-256 prefixes.
+- Safety and next gate: Registry, exact-lineage connection, exact-lineage Request, workspace-output, and durable-output counts remained zero. No recorder, fixture, media, provider/payment effect, OpenAI/Cedar action, Help mutation, Production workflow mutation, or unrelated deployment occurred. Tutorial impact remains `UPDATE REQUIRED`; obtain one fresh owner authorization for exactly one protected TUT-005 silent run against the exact Ready durable Demo deployment.
+
 ## 2026-09-03 - TUT-005 protected recording stopped at credential preflight
 
 - Merge and target: PR #563 merged all seven bounded recorder corrections through main commit `17aa4ee6e0a78eccd59c50810b24a5112a4fe080`. Canonical `https://servsync-demo.vercel.app` resolved to Ready deployment `dpl_C4xHy37UFMxatrW8CRDBD9RB6f1s` at that exact commit and returned HTTP 200.
