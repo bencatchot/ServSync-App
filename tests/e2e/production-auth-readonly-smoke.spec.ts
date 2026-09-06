@@ -179,6 +179,17 @@ test.describe('production authenticated read-only smoke', () => {
 
       await openSidebarTab(page, /Service Requests/i);
       await expectActiveHeading(page, /^Service Requests$/i);
+      const requestHelp = main.getByTestId('contextual-help-homeowner.service');
+      await expect(requestHelp).toBeVisible({ timeout: 30_000 });
+      await requestHelp.click();
+      const requestWalkthrough = page.getByRole('dialog', { name: /How to connect and request service/i });
+      await expect(requestWalkthrough).toBeVisible();
+      await expect(requestWalkthrough.locator('video[aria-label="How to connect and request service"]')).toHaveAttribute('src', /^https:\/\//, { timeout: 30_000 });
+      await expect(requestWalkthrough.locator('track[kind="captions"]')).toHaveAttribute('src', /^blob:https:\/\/servsync\.app\//);
+      await requestWalkthrough.getByText('Read transcript', { exact: true }).click();
+      await expect(requestWalkthrough.getByText(/When everything is accurate, send the request/i)).toBeVisible();
+      await expect(requestWalkthrough.getByText("AI-generated voiceover using OpenAI's Cedar voice.")).toBeVisible();
+      await requestWalkthrough.getByRole('button', { name: /Close walkthrough/i }).click();
 
       await openSidebarTab(page, /Estimates \/ Invoices/i);
       await expectActiveHeading(page, /^Estimates \/ Invoices$/i);

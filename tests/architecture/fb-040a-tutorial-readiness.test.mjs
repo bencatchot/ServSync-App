@@ -52,7 +52,7 @@ test('pilot tutorial coverage protects the six canonical onboarding workflows', 
   ]) {
     assert.ok(coverage.includes(`\`${context}\``), `missing protected context ${context}`);
   }
-  assert.match(coverage, /four published video tutorials/i);
-  assert.match(coverage, /two missing protected workflows/i);
+  assert.match(coverage, /five published video tutorials/i);
+  assert.match(coverage, /one missing protected workflow/i);
   assert.match(coverage, /Production publication requires explicit owner approval/i);
 });

@@ -17,6 +17,7 @@ import {
 } from '../../scripts/help/prepare-narrated-help-recording.mjs';
 import {
   buildAlignedWebVtt,
+  buildReadableCaptionCues,
   buildSceneAlignment,
   buildProviderFreeReuseManifestBase,
   parseSecondsOption,
@@ -171,6 +172,18 @@ test('scene-aligned Help retiming anchors existing narration cues without anothe
   assert.deepEqual(segments.map(segment => Number(segment.cueStart.toFixed(1))), [2, 10]);
   assert.deepEqual(segments.map(segment => Number(segment.cueEnd.toFixed(1))), [5, 12.7]);
   assert.match(buildAlignedWebVtt(segments.map(segment => ({ text: segment.text, start: segment.cueStart, end: segment.cueEnd }))), /00:00:10\.000 --> 00:00:12\.700 line:8% position:50% align:center size:90%\nComplete the Job\./);
+});
+
+test('scene-aligned Help retiming splits long narration into readable caption cues', () => {
+  const text = 'Review the contractor profile, then choose Request connection; select the home that needs service, confirm the contact, home overview, and address details you are comfortable sharing.';
+  const cues = buildReadableCaptionCues([{ text, cueStart: 10, cueEnd: 24 }]);
+  assert.ok(cues.length > 1);
+  assert.ok(cues.every(cue => cue.text.split(/\s+/).length <= 14));
+  assert.ok(cues.every(cue => cue.text.split(/\s+/).length >= 4));
+  assert.equal(cues[0]?.start, 10);
+  assert.equal(cues.at(-1)?.end, 24);
+  assert.equal(cues.map(cue => cue.text).join(' '), text);
+  assert.ok(cues.every((cue, index) => index === 0 || cue.start === cues[index - 1].end));
 });
 
 test('scene-aligned Help retiming rejects guessed boundaries and overlapping output', () => {

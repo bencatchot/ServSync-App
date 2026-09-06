@@ -21,6 +21,7 @@ import { assertSafeHelpRecordingSpec } from './run-help-studio-recording.mjs';
 const SHA256 = /^[0-9a-f]{64}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 const ALIGNMENT_VERSION = 'scene_anchored_v1';
+const MAX_CAPTION_WORDS = 14;
 
 async function sha256File(filePath) {
   const hash = createHash('sha256');
@@ -72,6 +73,46 @@ export function buildAlignedWebVtt(cues) {
     throw new Error('Aligned captions require ordered text cues with positive durations.');
   }
   return `WEBVTT\n\n${cues.map(cue => `${formatVttTime(cue.start)} --> ${formatVttTime(cue.end)} ${HELP_CAPTION_CUE_SETTINGS}\n${cue.text}`).join('\n\n')}\n`;
+}
+
+function splitCaptionText(text, maxWords = MAX_CAPTION_WORDS) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const chunks = [];
+  while (words.length > maxWords) {
+    const chunksLeft = Math.ceil(words.length / maxWords);
+    const target = Math.ceil(words.length / chunksLeft);
+    const minimum = Math.max(4, words.length - (maxWords * (chunksLeft - 1)));
+    const maximum = Math.min(maxWords, words.length - (4 * (chunksLeft - 1)));
+    const punctuationSplits = [];
+    for (let count = minimum; count <= maximum; count += 1) {
+      if (/[,:;.!?]$/.test(words[count - 1])) punctuationSplits.push(count);
+    }
+    const count = punctuationSplits.sort((a, b) => Math.abs(a - target) - Math.abs(b - target))[0]
+      ?? Math.max(minimum, Math.min(maximum, target));
+    chunks.push(words.splice(0, count).join(' '));
+  }
+  if (words.length > 0) chunks.push(words.join(' '));
+  return chunks;
+}
+
+export function buildReadableCaptionCues(segments, maxWords = MAX_CAPTION_WORDS) {
+  if (!Array.isArray(segments) || segments.length < 1 || !Number.isInteger(maxWords) || maxWords < 4) {
+    throw new Error('Readable captions require aligned narration segments and a safe word limit.');
+  }
+  return segments.flatMap(segment => {
+    const chunks = splitCaptionText(segment.text, maxWords);
+    const weights = chunks.map(chunk => chunk.split(/\s+/).length);
+    const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+    let cursor = segment.cueStart;
+    return chunks.map((text, index) => {
+      const start = cursor;
+      const end = index === chunks.length - 1
+        ? segment.cueEnd
+        : start + ((segment.cueEnd - segment.cueStart) * (weights[index] / totalWeight));
+      cursor = end;
+      return { text, start, end };
+    });
+  });
 }
 
 function runFfmpeg(ffmpegPath, args, label) {
@@ -281,7 +322,7 @@ export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), 
     audioDurationSeconds: audioProbe.durationSeconds,
     videoDurationSeconds: videoProbe.durationSeconds,
   });
-  const alignedCues = segments.map(segment => ({ text: segment.text, start: segment.cueStart, end: segment.cueEnd }));
+  const alignedCues = buildReadableCaptionCues(segments);
   const captionsVtt = buildAlignedWebVtt(alignedCues);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const scenarioDir = dirname(narratedDir);
@@ -339,8 +380,11 @@ export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), 
       narration_provider_request_count: 1,
       narration_alignment_version: ALIGNMENT_VERSION,
       narration_source_boundaries_seconds: sourceBoundaries,
-      narration_cue_start_seconds: alignedCues.map(cue => Number(cue.start.toFixed(3))),
-      narration_cue_end_seconds: alignedCues.map(cue => Number(cue.end.toFixed(3))),
+      narration_cue_start_seconds: segments.map(segment => Number(segment.cueStart.toFixed(3))),
+      narration_cue_end_seconds: segments.map(segment => Number(segment.cueEnd.toFixed(3))),
+      caption_max_words_per_cue: MAX_CAPTION_WORDS,
+      caption_cue_start_seconds: alignedCues.map(cue => Number(cue.start.toFixed(3))),
+      caption_cue_end_seconds: alignedCues.map(cue => Number(cue.end.toFixed(3))),
       narration_source_audio_sha256: sourceAudioSha,
       narration_source_manifest_filename: basename(args.narratedManifestPath),
       narration_source_manifest_sha256: sourceManifestSha,
