@@ -50,6 +50,7 @@ test('TUT-005 starts before connection and preserves contextual home-to-request 
   assert.equal(validateScenarioDefinition(homeownerConnectServiceRequestScenario), homeownerConnectServiceRequestScenario);
   assert.equal(homeownerConnectServiceRequestScenario.initialCheckpoint, 'contractor_discovery_ready');
   assert.equal(homeownerConnectServiceRequestScenario.finalCheckpoint, 'request_ready');
+  assert.deepEqual(homeownerConnectServiceRequestScenario.expectedDurationSeconds, { min: 42, max: 125 });
   assert.deepEqual(
     homeownerConnectServiceRequestScenario.scenes.map((scene) => scene.key),
     ['choose-contractor', 'share-home', 'connection-active', 'request-details', 'request-sent'],

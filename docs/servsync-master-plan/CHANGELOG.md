@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-06 - TUT-005 protected workflow passed; silent candidate exceeded duration ceiling
+
+- Protected run: After the allowlisted environment preflight passed, one fresh owner authorization was consumed against exact healthy durable Demo main commit `7a491411af636a019f1d5ec964a149db8d2d7e73`. The recorder completed the real homeowner contextual connection request, unrecorded contractor acceptance, exact connection adoption, homeowner home-scoped Request submission, exact Request adoption, and unrecorded contractor title/description/home retrieval. Read-only postflight verified `request_ready` with zero issues and nine exact registered records; no browser, sensitive-data, lineage, or product-workflow failure was reported.
+- Media gate and cleanup: The silent WebM measured 118.72 seconds against the source contract's 42-110-second range, so the harness rejected and deleted it before metadata or durable promotion. No working or durable TUT-005 media remains. The exact guarded reset removed six disposable connection/Request rows, retained the one canonical home graph, reported no external effects, and returned active succeeded runs with records to zero. No retry, Cedar/OpenAI call, Help mutation, Production action, publication, or unrelated provider effect occurred.
+- Bounded correction and next gate: The first fully completed workflow demonstrates that the original ceiling is narrower than the truthful two-stage human-paced path. The source correction raises only TUT-005's maximum to 125 seconds and adds an exact regression assertion; it does not change cursor/typing pacing, UI actions, fixture authority, lineage validation, sensitive-data checks, caption policy, or publication gates. Review and merge the correction, confirm durable Demo deployment, then obtain one fresh authorization for exactly one protected silent run. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-06 - TUT-005 protected recording stopped at external-credential guard
 
 - Merge and target: PR #565 merged the Demo credential-recovery record as current main commit `7a491411af636a019f1d5ec964a149db8d2d7e73`. GitHub Demo deployment `6295280468` completed successfully from that exact commit, and canonical `https://servsync-demo.vercel.app` returned HTTP 200 for `/`, `/auth`, `/app`, and `/help` with its current application bundle available.
