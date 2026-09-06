@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-06 - TUT-005 Cedar request failed closed at temporary-key authorization
+
+- Local package preparation: PR #567 merged the validated silent-source closeout as current main `97f529db9783fb12c04a9b43b65b9682932bd48c`; all five checks, three automatic deployments, and canonical Demo HTTP checks passed. The existing 119.2-second source was copied into the checksum-bound local Help wrapper with MP4, WebM, poster, schema-1 manifest, and a five-part homeowner narration script. This local preparation made no provider request and created no Production Help record.
+- One-request result: The owner authorized one bounded `gpt-4o-mini-tts` Cedar attempt and separately confirmed creation of `ServSync TUT-005 Cedar One-Use 2026-09-06`. OpenAI's narrowest available key scope was restricted **Model capabilities: Request**, with all other permission groups left at **None**. The key was passed only in process memory and made exactly one `/v1/audio/speech` request immediately after creation. OpenAI returned HTTP 401; the runner failed closed and removed narration staging. No audio, narrated MP4, captions, transcript, provider-success record, or spend resulted, and the authorization was not reused.
+- Credential cleanup and next gate: The clipboard was restored, the secret was cleared from the browser session, and a scan found no key-shaped value in the temporary spec or durable TUT-005 package. With separate action-time confirmation, the exact temporary key was revoked; exact-name search reports **Inactive**, `$0.00`, and no successful use. Preserve the validated local Help wrapper. Review and normally merge this closeout, then obtain a fresh authorization for exactly one new temporary key and one Cedar request after allowing the key to become active. Help Studio request creation/attachment, owner review, approval, and publication remain separate gates. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-06 - TUT-005 validated silent source completed
 
 - Source and deployment: PR #566 merged the scenario-specific 125-second duration correction as main commit `d1a6d9039b406e7d8ca1393e483c2b3a6107e5d4`. Automatic GitHub/Vercel Demo deployment `6295517728` succeeded from that exact commit, its immutable deployment was healthy, and canonical Demo routes returned HTTP 200.
