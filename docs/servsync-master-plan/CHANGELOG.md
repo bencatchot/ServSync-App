@@ -4,6 +4,12 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-06 - TUT-005 protected recording stopped at external-credential guard
+
+- Merge and target: PR #565 merged the Demo credential-recovery record as current main commit `7a491411af636a019f1d5ec964a149db8d2d7e73`. GitHub Demo deployment `6295280468` completed successfully from that exact commit, and canonical `https://servsync-demo.vercel.app` returned HTTP 200 for `/`, `/auth`, `/app`, and `/help` with its current application bundle available.
+- One-run boundary: The mode-`600` owner bundle retained every required Demo credential name, exact commit verification passed, and all 57 Demo Recorder contracts passed. The sole fresh owner-authorized invocation then failed closed immediately because the operator shell sourced the broader local bundle, which also contains `RESEND_API_KEY`. `assertSafeDemoTarget` rejected that forbidden external credential before fixture setup, Supabase client creation, recorder browser creation, or application navigation.
+- Preservation and next gate: No Demo scenario run, fixture, connection, Request, media, provider call, external effect, Help mutation, Production action, or retry occurred. Local working output and the durable TUT-005 library remained empty. The consumed authorization is not reusable. A corrected read-only preflight now passes only the approved `DEMO_RECORDING_ENV_KEYS` from the owner bundle, contains all required Demo inputs, reaches the exact dedicated-Demo target guard, and contains zero forbidden provider credentials. Obtain one fresh authorization before exactly one protected silent run through that allowlisted path. Tutorial impact remains `UPDATE REQUIRED`.
+
 ## 2026-09-03 - TUT-005 Demo credential recovery completed
 
 - Protected recovery: PR #564 merged the credential-preflight incident record as main commit `e20ed5a16e7b59a216d175a35881f8ab7cffb708`. Under separate Demo-only approval, the exposed legacy anon/service-role keys were replaced by the existing unexposed publishable/secret pair across the Demo Vercel browser consumer and local recorder bundle, then both exposed legacy keys were disabled. No Production or Sandbox setting, credential, data, or environment was changed.
