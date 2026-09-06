@@ -17,7 +17,7 @@ export const homeownerConnectServiceRequestScenario = Object.freeze({
     appUrl: 'https://servsync-demo.vercel.app',
   }),
   viewport: Object.freeze({ width: 1440, height: 900 }),
-  expectedDurationSeconds: Object.freeze({ min: 42, max: 110 }),
+  expectedDurationSeconds: Object.freeze({ min: 42, max: 125 }),
   outputBaseName: 'servsync-homeowner-connect-service-request-v1',
   showSceneCallouts: false,
   identities: Object.freeze({
