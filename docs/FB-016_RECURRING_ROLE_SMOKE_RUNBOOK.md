@@ -36,6 +36,12 @@ Natural run `32695447873` at default-branch SHA `38dcb2898e4469ae3f2699787fd7988
 
 The source contract now includes both buckets and tests require the exact nine-bucket inventory while still rejecting an unknown tenth bucket. After merge and automatic deployment, do not manually invoke the backup: wait for the next natural 04:17 UTC run, require HTTP 200, then verify through aggregate read-only health that all nine buckets have zero failures, complete object accounting, a valid manifest SHA, and age no greater than 36 hours. Reverting this source change restores the prior fail-closed seven-bucket behavior without deleting R2 data, but cannot restore healthy backup operation while Production has nine buckets.
 
+### 2026-09-07 Demo Credential-Drift Repair
+
+Natural runs `33615712359`, `33741633276`, `33859860099`, `33957230580`, `34024889211`, and `34111798090` passed Sandbox and Production but failed both Demo role sign-ins. The Demo app and project identity were healthy. The repository's four Demo smoke secrets retained August 14 update timestamps, while the primary Demo identity bundle had been recovered later. Source inspection found that ordinary fixture preparation unconditionally sent its supplied password through Admin Auth for every existing demo-owned user, so recorder activity could silently replace the password expected by the recurring workflow.
+
+Under explicit Demo-only approval, the two exact existing primary identities and four matching repository secrets were synchronized from one approved canonical bundle. User IDs, emails, ownership metadata, scenario roles, profiles, unrelated Demo data, and every Production surface remained unchanged. Both direct authentications passed, and manual dispatch `34122491160` then completed all Sandbox, Demo, and Production jobs successfully. The fixture runner now preserves existing Auth users unchanged; stale operator credentials fail at normal authentication instead of rotating shared passwords. The next natural scheduled run remains the recurring observation, but the manual dispatch closes the bounded incident-repair check.
+
 ## Environment Scope
 
 | Environment | Recurring scope | Mutation |
@@ -113,6 +119,20 @@ Do not auto-repair. Review the failure category and GitHub run, then use the nor
 6. Backup: inspect the 04:17 UTC Vercel Cron and R2 latest-success/manifest evidence. Never substitute a manual run for natural scheduler evidence.
 
 After a restore, verify all logical identities, expected roles/memberships, homeowner profiles/homes, tenant separation, and aggregate fixture presence before declaring authenticated validation ready. Credential values remain in approved secret stores only; they do not belong in Git, docs, chat, logs, screenshots, traces, or recovery artifacts.
+
+### Demo credential reconciliation
+
+The Demo recorder and this workflow share the two approved primary Demo identities. The fixture runner creates a missing, correctly scoped identity, but it does not update an existing identity's password or metadata. Existing identities must already carry the exact demo-owned scenario and role metadata, and the supplied operator credential must authenticate normally. This keeps routine seeding and recording from silently invalidating the recurring-smoke credential set.
+
+When Demo authentication fails for both roles while the app and other environments are healthy:
+
+1. Confirm the target is the dedicated Demo project and that each configured email resolves to exactly one demo-owned identity with the expected scenario, role, and ServSync profile.
+2. Select one approved canonical credential bundle without printing or copying values into logs or artifacts.
+3. Under explicit Demo-only approval, set each of the two existing Auth passwords from that bundle through Admin Auth. Do not change user IDs, email addresses, ownership metadata, roles, profiles, or unrelated Demo data.
+4. From the same bundle, update the four matching repository Actions secrets for the contractor and homeowner email/password pairs.
+5. Authenticate both identities directly, then manually dispatch this workflow and require Sandbox, Demo, and Production jobs to pass.
+
+GitHub does not expose stored secret values, so synchronization is proven by the shared canonical input, successful direct authentication, updated secret metadata, and the passing three-job dispatch. Password rotation is never part of ordinary `demo:seed`, `demo:record`, or checkpoint preparation.
 
 ## Local Operator Commands
 
