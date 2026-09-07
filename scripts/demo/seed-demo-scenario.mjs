@@ -455,7 +455,7 @@ async function findAuthUsersByEmail(service, email) {
   throw new Error('Unable to reconcile demo auth users within the expected page limit.');
 }
 
-async function ensureAuthUser(service, email, password, scenarioKey, role) {
+export async function ensureAuthUser(service, email, password, scenarioKey, role) {
   const userMetadata = demoUserMetadata(scenarioKey, role);
   const matches = await findAuthUsersByEmail(service, email);
   if (matches.length > 1) {
@@ -465,15 +465,10 @@ async function ensureAuthUser(service, email, password, scenarioKey, role) {
   if (matches.length === 1) {
     const existing = matches[0];
     assertDemoAuthMetadata(existing, email, scenarioKey, role);
-    const { data, error } = await service.auth.admin.updateUserById(existing.id, {
-      password,
-      email_confirm: true,
-      user_metadata: userMetadata,
-    });
-    if (error) {
-      throw new Error(`Unable to update demo auth user ${email}: ${error.message}`);
-    }
-    return data.user;
+    // Existing Demo identities are durable infrastructure shared by the recorder
+    // and recurring smoke. Ordinary fixture preparation must never rotate their
+    // credentials; a stale operator bundle should fail at the explicit sign-in.
+    return existing;
   }
 
   const { data, error } = await service.auth.admin.createUser({

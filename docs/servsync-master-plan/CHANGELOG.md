@@ -4,6 +4,35 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-07 - FB-016 Demo authenticated role-smoke credential repair
+
+- Branch: `codex/fb016-demo-auth-reconciliation`.
+- Files changed:
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/demo-recorder/demo-auth-credential-preservation.test.mjs`
+  - `docs/FB-016_RECURRING_ROLE_SMOKE_RUNBOOK.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reconciled only the two approved demo-owned primary Auth passwords and the four matching repository Actions secrets from one canonical local credential bundle. Ordinary Demo fixture preparation now returns an existing correctly owned identity unchanged instead of calling Admin Auth with the operator-supplied password. Missing identities can still be created, and ownership/scenario/role mismatches still fail closed. The runbook now documents the explicit shared-credential repair procedure and evidence standard.
+- Reason for change: Six consecutive scheduled FB-016 runs from September 2 through September 7 passed Sandbox and Production but left both Demo roles on Sign in. GitHub secret metadata remained at August 14 while the approved Demo identity bundle had been recovered on September 3, and `ensureAuthUser` unconditionally rewrote existing passwords during ordinary seed/record preparation. This allowed recorder credential use to invalidate the recurring-smoke bundle without warning.
+- Tests/checks run:
+  - direct boolean-only verification that both canonical credential pairs authenticate against the dedicated Demo project, resolve uniquely, retain exact demo-owned scenario/role metadata, and match their ServSync profile roles
+  - focused Demo recorder contract suite: 60/60 passing, including three new credential-preservation tests
+  - recurring role-smoke contract suite: 7/7 passing
+  - TypeScript validation
+  - manually dispatched FB-016 run `34122491160`: Sandbox, Demo, and Production jobs all passed
+  - `git diff --check`, changed-file scope review, and changed-file sensitive-value scan
+- Known risks or follow-ups:
+  - This repair changes only the two approved Demo passwords and four repository secret values; no Production identity, data, configuration, schema, permission, deployment, or unrelated Demo data changed.
+  - A manual dispatch proves current end-to-end health but does not replace the next natural scheduled observation.
+  - GitHub Actions reports a platform annotation that Node.js 20-based actions are being forced onto Node.js 24; this is unrelated to the credential failure and remains separate maintenance.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-016 now records the resolved Demo credential-drift incident, passing three-environment dispatch, and permanent seed/recorder credential-preservation guard.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is bounded operational test and Demo identity maintenance; it does not change product direction, roadmap, user workflows, feature definitions, pricing, permissions, or marketplace strategy.
+
 ## 2026-09-06 - TUT-005 published and verified in Production
 
 - Narration and credential boundary: One fresh temporary OpenAI key was restricted to **Model capabilities: Request** and used for exactly one successful `gpt-4o-mini-tts` Cedar request after an activation interval. The 71.664-second source narration was scene-aligned without another provider call. The key was immediately revoked; exact-name inventory shows **Inactive**, Restricted, and `$0.00`, the clipboard was restored, and no secret remains in ServSync, Vercel, Supabase, repository files, or durable metadata.
