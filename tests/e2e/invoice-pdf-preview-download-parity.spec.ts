@@ -1,8 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
-  downloadInvoicePdf,
-  previewInvoicePdf,
   type InvoicePdfContext,
 } from '../../src/utils/pdfDocuments';
 import type { Invoice, InvoiceLineItem } from '../../src/types';
@@ -121,83 +119,44 @@ async function normalizedPdfText(blob: Blob) {
   return text.join(' ').replace(/\s+/g, ' ').trim();
 }
 
+let browserPage: Page;
+test.beforeEach(async ({ page }) => { browserPage = page; await page.goto('/'); });
+
 async function capturePreviewAndDownload(invoice: Invoice) {
-  const originalCreateObjectURL = URL.createObjectURL;
-  const originalRevokeObjectURL = URL.revokeObjectURL;
-  const originalSetTimeout = globalThis.setTimeout;
-  const originalFetch = globalThis.fetch;
-  const originalDocument = (globalThis as typeof globalThis & { document?: Document }).document;
-  const originalWindow = (globalThis as typeof globalThis & { window?: Window }).window;
-  const blobs: Blob[] = [];
-  const previewUrls: string[] = [];
-  const downloads: Array<{ href: string; fileName: string }> = [];
-  const networkRequests: string[] = [];
-
-  URL.createObjectURL = ((blob: Blob) => {
-    blobs.push(blob);
-    return `blob:servsync-parity-${blobs.length}`;
-  }) as typeof URL.createObjectURL;
-  URL.revokeObjectURL = (() => undefined) as typeof URL.revokeObjectURL;
-  globalThis.setTimeout = (() => 1 as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout;
-  globalThis.fetch = (async input => {
-    networkRequests.push(String(input));
-    throw new Error('Invoice PDF actions must not make network or provider requests.');
-  }) as typeof fetch;
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      open: (url: string) => {
-        previewUrls.push(url);
-        return { closed: false };
-      },
-    },
-  });
-  Object.defineProperty(globalThis, 'document', {
-    configurable: true,
-    value: {
-      body: { appendChild: () => undefined },
-      createElement: () => ({
-        href: '',
-        download: '',
-        rel: '',
-        click() {
-          downloads.push({ href: this.href, fileName: this.download });
-        },
-        remove: () => undefined,
-      }),
-    },
-  });
-
-  const invoiceBeforeActions = structuredClone(invoice);
-  try {
-    await previewInvoicePdf(invoice, pdfContext);
-    await downloadInvoicePdf(invoice, pdfContext);
-  } finally {
-    URL.createObjectURL = originalCreateObjectURL;
-    URL.revokeObjectURL = originalRevokeObjectURL;
-    globalThis.setTimeout = originalSetTimeout;
-    globalThis.fetch = originalFetch;
-    Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument });
-    Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
-  }
-
-  expect(invoice).toEqual(invoiceBeforeActions);
-  expect(networkRequests).toEqual([]);
-  expect(blobs).toHaveLength(2);
-  expect(previewUrls).toEqual(['blob:servsync-parity-1']);
-  expect(downloads).toEqual([{
-    href: 'blob:servsync-parity-2',
-    fileName: 'ServSync-Test-HVAC-invoice-INV-PARITY-1001.pdf',
-  }]);
-  await Promise.all(blobs.map(async blob => {
-    expect(blob.type).toBe('application/pdf');
-    expect(Buffer.from(await blob.slice(0, 5).arrayBuffer()).toString('utf8')).toBe('%PDF-');
-  }));
-
-  return {
-    preview: await normalizedPdfText(blobs[0]),
-    download: await normalizedPdfText(blobs[1]),
-  };
+  const result = await browserPage.evaluate(async ({ invoice, context }) => {
+    const dynamicImport = new Function('path', 'return import(path)');
+    const module = await dynamicImport('/src/utils/pdfDocuments.ts');
+    const blobs: Blob[] = [];
+    const originalCreate = URL.createObjectURL;
+    const originalFetch = window.fetch;
+    const downloads: string[] = [];
+    const before = JSON.stringify(invoice);
+    URL.createObjectURL = blob => { blobs.push(blob as Blob); return originalCreate(blob); };
+    window.fetch = async () => { throw new Error('PDF actions must not fetch provider data.'); };
+    const captureDownload = (event: MouseEvent) => {
+      if (event.target instanceof HTMLAnchorElement && event.target.download) {
+        event.preventDefault(); downloads.push(event.target.download);
+      }
+    };
+    document.addEventListener('click', captureDownload);
+    try {
+      await module.previewInvoicePdf(invoice, context);
+      const dialog = document.querySelector('dialog[aria-label="PDF preview"]') as HTMLDialogElement;
+      if (!dialog?.open || !dialog.querySelector('iframe')?.src.startsWith('blob:')) throw new Error('Expected an open same-page PDF preview.');
+      await module.downloadInvoicePdf(invoice, context);
+      dialog.close();
+      return { bytes: await Promise.all(blobs.map(async blob => [...new Uint8Array(await blob.arrayBuffer())])), downloads, unchanged: before === JSON.stringify(invoice) };
+    } finally {
+      URL.createObjectURL = originalCreate; window.fetch = originalFetch;
+      document.removeEventListener('click', captureDownload);
+    }
+  }, { invoice, context: pdfContext });
+  expect(result.unchanged).toBe(true);
+  expect(result.downloads).toEqual(['ServSync-Test-HVAC-invoice-INV-PARITY-1001.pdf']);
+  expect(result.bytes).toHaveLength(2);
+  const blobs = result.bytes.map(bytes => new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
+  for (const blob of blobs) expect(Buffer.from(await blob.slice(0, 5).arrayBuffer()).toString()).toBe('%PDF-');
+  return { preview: await normalizedPdfText(blobs[0]), download: await normalizedPdfText(blobs[1]) };
 }
 
 async function expectSemanticParity(invoice: Invoice, expectedText: string[]) {

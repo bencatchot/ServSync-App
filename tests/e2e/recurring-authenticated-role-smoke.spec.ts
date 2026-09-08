@@ -77,7 +77,7 @@ function captureOperationalErrors(page: Page) {
 async function openMobileDrawer(page: Page) {
   const mobileHeader = page.locator('div.md\\:hidden').first();
   await mobileHeader.getByRole('button').first().click();
-  const drawer = page.locator('div.fixed.inset-0.z-50 aside').first();
+  const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true });
   await expect(drawer).toBeVisible();
   return drawer;
 }

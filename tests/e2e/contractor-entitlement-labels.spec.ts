@@ -21,16 +21,12 @@ test.describe('contractor entitlement labels', () => {
     expect(dashboardSource).toContain('const contractorEntitlementState = useContractorEntitlements(contractor?.id ?? null);');
     expect(dashboardSource).toContain('<ContractorEntitlementStatusPanel state={contractorEntitlementState} />');
     expect(panelSource).toContain('data-testid="contractor-entitlement-status-panel"');
-    expect(panelSource).toContain('Informational during beta.');
-    expect(panelSource).toContain('Stripe billing is not active');
-    expect(panelSource).toContain('beta contractors remain free');
-    expect(panelSource).toContain('this status does not block contractor actions');
-    expect(panelSource).toContain('Billing status');
-    expect(panelSource).toContain('Current plan');
-    expect(panelSource).toContain('Access mode');
-    expect(panelSource).toContain('Subscription required after');
-    expect(panelSource).toContain('Grace period ends');
-    expect(panelSource).toContain('Current beta access available');
+    expect(panelSource).toContain('Currently free during beta');
+    expect(panelSource).toContain('No credit card required.');
+    expect(panelSource).toContain('Any future paid plans will be explained before you choose one.');
+    expect(panelSource).toContain('readOnlyReason');
+    expect(panelSource).not.toContain('Available beta capability flags');
+    expect(panelSource).not.toContain('No price set');
   });
 
   test('entitlement labels are not payment prompts or action gates', () => {
@@ -64,7 +60,7 @@ test.describe('contractor entitlement labels', () => {
     const panelSource = sourceBetween(source, 'function ContractorEntitlementStatusPanel', 'function EmailNotificationsToggle');
     const hookSource = sourceBetween(source, 'function useContractorEntitlements', 'function EmailNotificationsToggle');
 
-    expect(panelSource).toContain('Unable to refresh entitlement labels. Current beta access remains available.');
+    expect(panelSource).toContain('Account status could not refresh. Your current access is preserved.');
     expect(hookSource).toContain('Current beta access is preserved.');
     expect(homeownerSource).not.toContain('ContractorEntitlementStatusPanel');
     expect(homeownerSource).not.toContain('useContractorEntitlements');

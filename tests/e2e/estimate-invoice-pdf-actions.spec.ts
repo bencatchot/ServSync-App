@@ -6,7 +6,6 @@ import {
   createInvoicePdf,
   downloadPdfBlob,
   PDF_OBJECT_URL_REVOKE_DELAY_MS,
-  previewPdfBlob,
 } from '../../src/utils/pdfDocuments';
 import type { Estimate, EstimateLineItem, Invoice, InvoiceLineItem } from '../../src/types';
 
@@ -194,7 +193,7 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     expect(pdfBytes).toContain('(Paid in full on Aug 11, 2026. No balance remains.)');
   });
 
-  test('download and preview helpers delay object URL revocation until after browser handoff', () => {
+  test('download helper delays object URL revocation until after browser handoff', () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     const originalSetTimeout = globalThis.setTimeout;
@@ -250,18 +249,16 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     try {
       const blob = new Blob(['%PDF- test'], { type: 'application/pdf' });
       downloadPdfBlob(blob, 'contractor-invoice.pdf');
-      previewPdfBlob(blob);
 
       expect(clickedDownloads).toEqual([{ href: 'blob:servsync-test-1', download: 'contractor-invoice.pdf', rel: 'noopener' }]);
-      expect(openedUrls).toEqual(['blob:servsync-test-2']);
+      expect(openedUrls).toEqual([]);
       expect(revokedUrls).toEqual([]);
       expect(timers.map(timer => timer.delay)).toEqual([
-        PDF_OBJECT_URL_REVOKE_DELAY_MS,
         PDF_OBJECT_URL_REVOKE_DELAY_MS,
       ]);
 
       timers.forEach(timer => timer.callback());
-      expect(revokedUrls).toEqual(['blob:servsync-test-1', 'blob:servsync-test-2']);
+      expect(revokedUrls).toEqual(['blob:servsync-test-1']);
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
@@ -288,7 +285,7 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     expect(focusSource).toContain("setContractorTab('financials');");
     expect(focusSource).toContain('setFocusedInvoiceRecordId(invoice.id);');
     expect(focusSource).toContain('setContractorFinancialsView(invoiceFinancialsViewForStatus(invoice.status));');
-    expect(saveSource).toContain('const savedInvoice = await loadInvoiceById(invoiceId);');
+    expect(saveSource).toContain('const savedInvoice = (invoiceData as { invoice?: Invoice } | null)?.invoice;');
     expect(saveSource).toContain('focusSavedInvoiceRecord(savedInvoice);');
     expect(saveSource).toContain('Preview or download the PDF from the saved invoice actions now.');
     expect(saveSource).not.toContain('openInspection(linkedJob');

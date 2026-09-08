@@ -1,3 +1,4 @@
+import { DraftPreparationError } from './preparationSession';
 import { createMarketingUsageAdapter, prepareMarketingUpload, type MarketingUsageClient } from './marketingUsage';
 
 export type MarketingCreationMedia = {
@@ -201,14 +202,24 @@ export function createMarketingCreationAdapter(client: MarketingCreationClient, 
       });
       return uploaded.asset_id;
     },
-    async generate(input: { sourceKind: 'job' | 'marketing_upload' | 'managed_asset' | 'simple'; jobId: string | null; assetId: string | null; brief: string }) {
+    async generate(input: { sourceKind: 'job' | 'marketing_upload' | 'managed_asset' | 'simple'; jobId: string | null; assetId: string | null; brief: string; requestId?: string }) {
       const { data, error } = await client.functions.invoke('marketing-content-draft', {
         body: {
-          clientRequestId: crypto.randomUUID(), contractorId, sourceKind: input.sourceKind,
+          clientRequestId: input.requestId ?? crypto.randomUUID(), contractorId, sourceKind: input.sourceKind,
           sourceJobId: input.jobId, sourceAssetId: input.assetId, ownerBrief: input.brief,
         },
       });
-      if (error) throw new Error(message(error) || 'ServSync could not prepare this draft.');
+      if (error) {
+        if (message(error) === 'Marketing drafting is temporarily paused.') throw new DraftPreparationError(message(error));
+        let noPostCreated = false;
+        if (record(error) && error.context instanceof Response) {
+          const payload: unknown = await error.context.clone().json().catch(() => null);
+          noPostCreated = record(payload) && payload.error === 'The draft could not be prepared. No post was created.';
+        }
+        throw new DraftPreparationError(noPostCreated
+          ? 'The drafting service could not complete this request. No post was created. You can try again.'
+          : 'Draft preparation could not be confirmed. Check Content for an existing draft, or retry this same request.', noPostCreated);
+      }
       if (!record(data) || typeof data.contentId !== 'string') throw new Error(text(record(data) ? data.error : '') || 'ServSync could not confirm the draft.');
       return data.contentId;
     },

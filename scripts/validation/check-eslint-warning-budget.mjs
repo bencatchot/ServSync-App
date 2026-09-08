@@ -2,7 +2,7 @@ import { ESLint } from 'eslint';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const ESLINT_WARNING_BASELINE = 79;
+export const ESLINT_WARNING_BASELINE = 77;
 
 export function lintWarningBudgetResult(warningCount, expectedWarnings = ESLINT_WARNING_BASELINE) {
   return {

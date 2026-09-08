@@ -6,6 +6,12 @@ This document describes what ServSync can honestly say during the controlled pri
 
 For new Codex-assisted internal draft preparation, use the machine-readable `config/marketing/servsync-marketing-truth-pack.v3.json` contract. The immutable v1 and v2 packs remain only for historical package replay and audit. The current pack is a conservative bounded projection of this inventory and current governed product documentation; it does not turn roadmap entries into marketable claims. Runtime AI generation, autonomous approval, publishing, and provider integrations remain unavailable.
 
+## September 7 correction branch — release verification pending
+
+`codex/astra-audit-corrections-2026-09-07` makes the existing offer explicit: contractor use is currently free during beta, no credit card is required, and future paid plans will be explained before selection. This does not promise permanent free access. The branch also adds an in-app PDF preview and a connected-customer Calendar handoff to existing service requests. Shared appointments still require their supported request workflow; this is not external calendar sync or automated dispatch.
+
+Marketing draft retries in the same open composer reuse an already confirmed upload. An uncertain generation result retains its request identity. Facebook upload evidence with a caption-verification failure now asks the owner to review the provider post; it does not certify delivery, normalize an uninspected caption, or authorize a duplicate publish. These corrections are not live until the reviewed branch is merged and deployed. Tutorial freshness remains an open release gate.
+
 ## Marketing Framing Rules
 
 Describe ServSync on its own merits. Do not imply that competitors require homeowners to create accounts, download apps, buy subscriptions, perform unnecessary steps, or use inferior, fragmented, difficult, or expensive products unless that exact comparison has current verified evidence and deliberate marketing approval.

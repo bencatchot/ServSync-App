@@ -93,7 +93,7 @@ test.describe('FB-039D homeowner Properties progressive disclosure', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileHeader = page.locator('div.md\\:hidden').first();
     await mobileHeader.getByRole('button').first().click();
-    const drawer = page.locator('div.fixed.inset-0.z-50 aside').first();
+    const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true });
     await drawer.getByRole('button', { name: /^Properties$/i }).first().click();
 
     await expect(main.getByTestId('property-overview-section')).toBeVisible();

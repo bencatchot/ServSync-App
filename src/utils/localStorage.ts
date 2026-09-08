@@ -25,6 +25,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const SIGN_OUT_LOCAL_STORAGE_KEYS = [
+  STORAGE_KEYS.homeownerSelectedHome,
   STORAGE_KEYS.fieldWorkState,
   STORAGE_KEYS.homeownerRequestSearch,
   STORAGE_KEYS.contractorHomeownerSearch,

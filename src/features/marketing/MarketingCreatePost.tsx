@@ -1,3 +1,4 @@
+import { createPreparationSession } from './preparationSession';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Briefcase, FileUp, Film, Loader2, MessageSquareText, Sparkles, X } from 'lucide-react';
@@ -25,6 +26,8 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
   const [file, setFile] = useState<File | null>(null);
   const [rights, setRights] = useState(false);
   const busyRef = useRef(false);
+  const preparation = useMemo(() => ({ adapter, current: createPreparationSession() }), [adapter]);
+  const sourceIdentity = useMemo(() => ({ mode, file, jobId, mediaPath, productMediaId, adapter }), [mode, file, jobId, mediaPath, productMediaId, adapter]);
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +44,7 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
   const selectedProductMedia = context?.productMedia.find(media => media.id === productMediaId) ?? null;
 
   const reset = () => {
+    preparation.current = createPreparationSession();
     setOpen(false); setMode('simple'); setBrief(''); setJobId(''); setMediaPath(''); setProductMediaId(''); setFile(null); setRights(false); setError(null);
   };
 
@@ -52,6 +56,7 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
     if (mode === 'product' && !selectedProductMedia) { setError('Choose ServSync product media for this post.'); return; }
     busyRef.current = true; setLoading(true); setError(null);
     try {
+      const contentId = await preparation.current.prepare(sourceIdentity, brief.trim(), async () => {
       let assetId: string | null = null;
       if (mode === 'job' && selectedJob && selectedMedia) assetId = await adapter.selectJobMedia(selectedJob.id, selectedMedia, rights);
       if (mode === 'upload' && file) {
@@ -62,18 +67,18 @@ export function MarketingCreatePost({ client, contractorId, onCreated }: {
       if (mode === 'product' && selectedProductMedia?.sourceKind === 'help_walkthrough') {
         assetId = await adapter.importHelpWalkthrough(selectedProductMedia);
       }
-      const contentId = await adapter.generate({
+      return mode === 'product' && selectedProductMedia?.sourceKind === 'managed_asset' ? selectedProductMedia.sourceAssetId : assetId;
+      }, (assetId, requestId) => adapter.generate({
         sourceKind: mode === 'upload' || selectedProductMedia?.sourceKind === 'help_walkthrough'
           ? 'marketing_upload' : mode === 'product' ? 'managed_asset' : mode,
         jobId: mode === 'job' ? selectedJob?.id ?? null : null,
-        assetId: mode === 'product' && selectedProductMedia?.sourceKind === 'managed_asset'
-          ? selectedProductMedia.sourceAssetId : assetId,
+        assetId, requestId,
         brief: brief.trim(),
-      });
+      }));
       await onCreated(contentId);
       reset();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'ServSync could not prepare this post.');
+      setError(`${reason instanceof Error ? reason.message : 'ServSync could not prepare this post.'}${preparation.current.hasAsset(sourceIdentity) ? ' Your media is saved. Retrying here will reuse it instead of uploading another copy.' : ''}`);
     } finally { busyRef.current = false; setLoading(false); }
   };
 

@@ -30,9 +30,8 @@ export async function openSidebarTab(page: Page, name: RegExp) {
   if (await visibleTab.isVisible()) {
     await visibleTab.click();
   } else {
-    const mobileHeader = page.locator('div.md\\:hidden').first();
-    await mobileHeader.getByRole('button').first().click();
-    const drawer = page.locator('div.fixed.inset-0.z-50 aside').first();
+    await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+    const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true });
     await expect(drawer).toBeVisible();
     await drawer.getByRole('button', { name }).first().click();
     await expect(drawer).toBeHidden();

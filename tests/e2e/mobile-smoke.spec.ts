@@ -23,11 +23,11 @@ function mobileHeader(page: Page): Locator {
 }
 
 async function openMobileDrawer(page: Page): Promise<Locator> {
-  const menuButton = mobileHeader(page).getByRole('button').first();
+  const menuButton = page.getByRole('button', { name: 'Open navigation', exact: true });
   await expect(menuButton).toBeVisible();
   await menuButton.click();
 
-  const drawer = page.locator('div.fixed.inset-0.z-50 aside').first();
+  const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true });
   await expect(drawer).toBeVisible();
   return drawer;
 }
@@ -59,7 +59,7 @@ test.describe('mobile read-only smoke', () => {
     await expect(main.getByText(/Home command center/i)).toBeVisible();
     await expect(main.getByText(/Upcoming reminders/i)).toBeVisible();
 
-    let drawer = await openMobileDrawer(page);
+    const drawer = await openMobileDrawer(page);
     await expect(drawer.getByRole('button', { name: /Service Requests/i })).toBeVisible();
     await page.keyboard.press('Escape').catch(() => undefined);
     if (await drawer.isVisible().catch(() => false)) {
@@ -91,7 +91,7 @@ test.describe('mobile read-only smoke', () => {
     await expectNoHorizontalOverflow(page);
     await expect(main.getByText(/Contractor command center/i)).toBeVisible();
 
-    let drawer = await openMobileDrawer(page);
+    const drawer = await openMobileDrawer(page);
     await expect(drawer.getByRole('button', { name: /Service Requests/i })).toBeVisible();
     await page.keyboard.press('Escape').catch(() => undefined);
     if (await drawer.isVisible().catch(() => false)) {
