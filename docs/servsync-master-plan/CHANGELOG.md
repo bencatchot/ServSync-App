@@ -4,6 +4,22 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-07 - Astra audit corrections prepared for review
+
+- Branch: `codex/astra-audit-corrections-2026-09-07`, based on `origin/main` at `470722c4eea66cec512b0ff39414ca3bf8a6d6b5`.
+- Corrects invoice Draft/Open/Closed summary counts and destination filters, and counts actual active Jobs on a connected Customer's Jobs tab.
+- Adds a Calendar entry point for connected Customers through the existing service-request appointment workflow; local events retain their existing customer and sharing rules. Mobile Calendar defaults to Agenda with a Month option.
+- Labels mobile navigation and notifications, provides modal navigation with keyboard focus containment/restoration, and reduces repeated mobile Estimate editor introductions.
+- Replaces contradictory Trial/No price set and internal entitlement labels with the existing currently-free beta offer. Home Access and Templates copy now describes user-visible capabilities and limitations.
+- Remounts role workspaces on identity changes, clears remembered homeowner property selection at sign-out, waits for owned-home hydration before management reads, and ignores stale Home Access responses. No authentication, authorization, RLS, or RPC implementation changes.
+- Opens generated Estimate/Invoice PDFs in a same-page dialog with download fallback and object-URL cleanup. Preview/Download use identical persisted invoice data.
+- Keeps uploaded Marketing media and generation request identities across retries in the open composer. A fresh request is allowed only after an explicit server no-post-created response; uncertain retries reuse the same identity. Facebook upload evidence plus exact-caption failure displays a separate review state and safe provider link without changing duplicate-publication safeguards.
+- Validation: 37 focused invoice/marketing reliability and worker tests; 26 architecture tests; 13 PDF/component browser tests; 14 entitlement/calendar compatibility tests; 2 authenticated Demo desktop smoke tests; 3 Demo mobile smoke tests; 3 additional Demo filter, scheduling, focus/Agenda, and account-switch tests. Typecheck/build/lint and changed-file checks are recorded in `docs/ASTRA_AUDIT_CORRECTIONS_2026-09-07.md`.
+- Backlog impact: FB-016 has this bounded launch-polish implementation awaiting release verification; FB-040A retains the tutorial review/replacement gate. No broad pilot or launch-readiness item is closed.
+- Master plan impact: none. The work corrects presentation and entry points for existing workflows and the existing free beta decision, without changing product direction, sharing, roles, billing, or lifecycle behavior.
+- Marketing inventory impact: records the review-branch limits; no new automatic scheduling, permanent-free, payment-provider, or verified-publication promise.
+- Open release gates: Help Studio search/playback comparison was blocked by the locked Mac. TUT-002 Estimate and TUT-004 Invoice walkthroughs require freshness review against the new PDF/filter/editor presentation, along with any matching navigation/Calendar guidance. No tutorial is declared fresh without playback evidence. Preserve immutable published revisions; any Production replacement requires owner approval. No merge, manual Production deployment, shared database change, or new external publication performed.
+
 ## 2026-09-07 - FB-016 Demo authenticated role-smoke credential repair
 
 - Branch: `codex/fb016-demo-auth-reconciliation`.

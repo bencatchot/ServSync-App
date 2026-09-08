@@ -14,6 +14,12 @@ Use this backlog to preserve desired outcomes, current state, guardrails, and th
 
 Release-stage sequencing and cross-feature dependencies are maintained in the [ServSync Product Roadmap](ServSync_Product_Roadmap.md).
 
+## September 7 audit correction release follow-up
+
+The `codex/astra-audit-corrections-2026-09-07` branch implements bounded FB-016 count/filter, Calendar entry, mobile accessibility, free-beta copy, PDF preview, Home Access stale-state, and Marketing retry/status corrections. This is review-branch implementation, not evidence of live rollout or completion of FB-016. See [correction evidence and release gates](../ASTRA_AUDIT_CORRECTIONS_2026-09-07.md).
+
+FB-040A additionally requires Help Studio search and playback comparison for TUT-002 (Estimate), TUT-004 (Invoice), and matching mobile navigation/Calendar guidance. The Mac was locked during the attempted Studio check. Codex owns the bounded freshness comparison and any required replacement package after the reviewed Demo build is available; Ben must approve Production Help changes and merge. Preserve the current immutable revisions and keep this correction task open until required replacements are published and verified. TUT-006 and the existing TUT-002 narration standards upgrade remain separate active outcomes.
+
 ## Current ServSync Beta Context
 
 ServSync remains in controlled private beta. The current beta loop is:

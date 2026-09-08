@@ -1,3 +1,4 @@
+import { showPdfPreview } from './pdfPreview';
 import { jsPDF } from 'jspdf';
 
 import type {
@@ -274,13 +275,8 @@ export function downloadPdfBlob(blob: Blob, fileName: string) {
   schedulePdfObjectUrlRevoke(url);
 }
 
-export function previewPdfBlob(blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
-  schedulePdfObjectUrlRevoke(url);
-  if (!openedWindow) {
-    throw new Error('Unable to open PDF preview. Allow pop-ups for ServSync or use Download PDF.');
-  }
+export function previewPdfBlob(blob: Blob, fileName?: string) {
+  showPdfPreview(blob, fileName);
 }
 
 function dataUrlFromBlob(blob: Blob): Promise<string> {
@@ -961,8 +957,8 @@ export async function previewEstimatePdf(
   estimate: Estimate,
   context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
 ) {
-  const { blob } = await createEstimatePdf(estimate, context);
-  previewPdfBlob(blob);
+  const { blob, fileName } = await createEstimatePdf(estimate, context);
+  previewPdfBlob(blob, fileName);
 }
 
 function invoiceBalanceDueCents(invoice: Pick<Invoice, 'status' | 'total_cents' | 'amount_paid_cents'>) {
@@ -1250,6 +1246,6 @@ export async function downloadInvoicePdf(invoice: Invoice, context: InvoicePdfCo
 }
 
 export async function previewInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
-  const { blob } = await createInvoicePdf(invoice, context);
-  previewPdfBlob(blob);
+  const { blob, fileName } = await createInvoicePdf(invoice, context);
+  previewPdfBlob(blob, fileName);
 }

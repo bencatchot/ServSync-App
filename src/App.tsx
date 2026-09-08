@@ -1,3 +1,6 @@
+import { MobileNavigationDialog } from './features/navigation/MobileNavigationDialog';
+import { ConnectedCustomerScheduling } from './features/calendar/ConnectedCustomerScheduling';
+import { isOpenInvoice } from './features/invoices/recordStatus';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
@@ -19,7 +22,6 @@ import {
   HelpCircle,
   ClipboardCheck,
   Compass,
-  CreditCard,
   Download,
   EyeOff,
   FileText,
@@ -7083,9 +7085,10 @@ function AppContent() {
 
   return (
     <>
-      {profile.role === 'homeowner' && <HomeownerDashboard profile={profile} onSignOut={signOut} />}
+      {profile.role === 'homeowner' && <HomeownerDashboard key={profile.id} profile={profile} onSignOut={signOut} />}
       {profile.role === 'contractor' && (
         <ContractorDashboard
+          key={profile.id}
           profile={profile}
           onProfileUpdated={updatedProfile => setProfile(updatedProfile)}
           onSignOut={signOut}
@@ -7219,54 +7222,6 @@ function QRDisplay({ value, fileName = 'qr-code' }: { value: string; fileName?: 
         Download PNG
       </button>
     </div>
-  );
-}
-
-const SUBSCRIPTION_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  trialing:  { label: 'Trial',    color: 'text-blue-400' },
-  active:    { label: 'Active',   color: 'text-emerald-400' },
-  past_due:  { label: 'Past due', color: 'text-amber-400' },
-  paused:    { label: 'Paused',   color: 'text-slate-400' },
-  canceled:  { label: 'Canceled', color: 'text-red-400' },
-  unpaid:    { label: 'Unpaid',   color: 'text-red-400' },
-};
-
-function ContractorBillingCard({ contractor }: { contractor: ContractorProfile | null }) {
-  if (!contractor) return null;
-  const sub = SUBSCRIPTION_STATUS_LABELS[contractor.subscription_status] ?? { label: contractor.subscription_status, color: 'text-slate-400' };
-  const price = contractor.monthly_price_cents > 0
-    ? `$${(contractor.monthly_price_cents / 100).toFixed(2)}/mo`
-    : 'No price set';
-
-  return (
-    <Card title="Subscription & billing" icon={<CreditCard size={18} />}>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-6">
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Status</p>
-            <p className={`text-sm font-semibold ${sub.color}`}>{sub.label}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Plan</p>
-            <p className="text-sm text-slate-200">{price}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Account</p>
-            <p className="text-sm text-slate-200 capitalize">{contractor.account_status}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          disabled
-          className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-400 cursor-not-allowed opacity-50"
-          title="Billing portal — coming soon"
-        >
-          <CreditCard size={14} />
-          Manage billing
-        </button>
-      </div>
-      <p className="mt-3 text-xs text-slate-600">Billing portal coming soon. Your subscription status is managed by the platform admin.</p>
-    </Card>
   );
 }
 
@@ -7485,82 +7440,18 @@ function useContractorEntitlements(contractorId: string | null | undefined): Con
   return state;
 }
 
-function entitlementDisplayLabel(value: string | null | undefined) {
-  if (!value) return 'Not set';
-  return value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase());
-}
-
-function entitlementDateDisplay(value: string | null | undefined) {
-  return value ? formatDateTime(value) : 'Not set';
-}
-
-function contractorEntitlementAvailableCapabilityCount(entitlements: ContractorEntitlements) {
-  return [
-    entitlements.can_use_workspace,
-    entitlements.can_create_service_requests_for_local_customers,
-    entitlements.can_create_estimates,
-    entitlements.can_send_estimates,
-    entitlements.can_create_jobs,
-    entitlements.can_create_invoices,
-    entitlements.can_send_invoices,
-    entitlements.can_use_discover_profile,
-    entitlements.can_accept_new_connections,
-    entitlements.can_use_ai_features,
-    entitlements.can_invite_team_members,
-  ].filter(Boolean).length;
-}
-
 function ContractorEntitlementStatusPanel({ state }: { state: ContractorEntitlementLoadState }) {
-  const { entitlements, loading, error, source } = state;
-  const capabilityCount = contractorEntitlementAvailableCapabilityCount(entitlements);
+  const { entitlements, loading, error } = state;
   const readOnlyReason = isContractorReadOnly(entitlements)
-    ? entitlements.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
-    : '';
-  const statusText = loading
-    ? 'Refreshing'
-    : source === 'fallback' && error
-      ? 'Beta access fallback'
-      : 'Beta access';
-
+    ? entitlements.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON : '';
   return (
-    <Card title="Beta access" icon={<ShieldCheck size={18} />}>
-      <div data-testid="contractor-entitlement-status-panel" className="space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{statusText}</span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">Informational only</span>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Informational during beta. Stripe billing is not active, beta contractors remain free, and this status does not block contractor actions.
-            </p>
-            {error && (
-              <p className="mt-2 text-xs font-semibold text-amber-700">
-                Unable to refresh entitlement labels. Current beta access remains available.
-              </p>
-            )}
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-            Current beta access available
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <InfoBox label="Billing status" value={entitlementDisplayLabel(entitlements.billing_status)} />
-          <InfoBox label="Current plan" value={entitlementDisplayLabel(entitlements.current_plan)} />
-          <InfoBox label="Access mode" value={entitlementDisplayLabel(entitlements.access_mode)} />
-          <InfoBox label="Subscription required after" value={entitlementDateDisplay(entitlements.subscription_required_after)} />
-          <InfoBox label="Grace period ends" value={entitlementDateDisplay(entitlements.grace_period_ends_at)} />
-          <InfoBox label="Available beta capability flags" value={`${capabilityCount} current flags`} />
-        </div>
-
-        {readOnlyReason && (
-          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">
-            {readOnlyReason}
-          </p>
-        )}
+    <Card title="Your ServSync access" icon={<ShieldCheck size={18} />}>
+      <div data-testid="contractor-entitlement-status-panel" className="space-y-2">
+        <p className="text-sm font-bold text-emerald-800">Currently free during beta</p>
+        <p className="text-sm text-slate-600">No credit card required. Any future paid plans will be explained before you choose one.</p>
+        {loading && <p className="text-xs text-slate-500">Refreshing account status…</p>}
+        {error && <p className="text-xs text-amber-800">Account status could not refresh. Your current access is preserved.</p>}
+        {readOnlyReason && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{readOnlyReason}</p>}
       </div>
     </Card>
   );
@@ -7758,7 +7649,7 @@ function LandingPage() {
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={`${buttonClass('primary')} min-h-11`}>
-              Create contractor account <ArrowRight size={16} />
+              Create free contractor account <ArrowRight size={16} />
             </button>
             <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={`${buttonClass('secondary')} min-h-11`}>
               Create free homeowner account <ArrowRight size={16} />
@@ -8159,7 +8050,7 @@ function AuthPage({
               : mode === 'signin'
               ? 'Sign in'
               : role === 'contractor'
-                ? 'Create contractor account'
+                ? 'Create free contractor account'
                 : 'Create homeowner account'}
           </h1>
           <p className="mt-2 text-sm leading-6 text-[#223D67]">
@@ -8171,6 +8062,7 @@ function AuthPage({
                 ? 'Sign in with an existing ServSync admin account. Admin profiles are created manually.'
               : 'Organize your home, connect with local contractors, request service, and keep records together.'}
           </p>
+          {mode === 'signup' && role === 'contractor' && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Currently free during beta. No credit card required. Any future paid plans will be explained before you choose one.</p>}
           {inviteCode && (
             <p className="mt-2 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] px-3 py-2 text-sm font-medium text-[#223D67]">
               Contractor referral link detected. You can create your homeowner account without automatically sharing any private information.
@@ -8243,7 +8135,7 @@ function AuthPage({
                 : mode === 'signin'
                 ? 'Sign in'
                 : role === 'contractor'
-                  ? 'Create contractor account'
+                  ? 'Create free contractor account'
                   : 'Create homeowner account'}
           </button>
           {message && <Notice tone="info" text={message} />}
@@ -11057,15 +10949,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void loadWorkflowJobMessageIndicators(uniqueJobMessageInspectionIds(inspectionIds));
   }, [estimates, loadWorkflowJobMessageIndicators, serviceRequests]);
 
+  const homeAccessLoadVersion = useRef(0);
   const loadHomeAccess = useCallback(async (homeId = selectedHomeId) => {
-    if (!supabase) return;
+    const version = ++homeAccessLoadVersion.current;
+    const current = () => version === homeAccessLoadVersion.current;
+    if (!supabase || workspaceLoadPhase !== 'ready') return;
+    const ownedHomeId = homes.find(item => item.id === homeId && item.homeowner_user_id === profile.id)?.id;
     setLoadingHomeAccess(true);
     try {
       const myInvitesRes = await supabase.rpc('servsync_list_my_home_membership_email_invites');
+      if (!current()) return;
       if (myInvitesRes.error) throw myInvitesRes.error;
       setMyHomeAccessEmailInvites((myInvitesRes.data || []) as MyHomeAccessEmailInvite[]);
 
-      if (!homeId) {
+      if (!ownedHomeId) {
         setHomeAccessMemberships([]);
         setHomeAccessEmailInvites([]);
         return;
@@ -11075,25 +10972,27 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         supabase
           .from('home_memberships')
           .select('id, home_id, user_id, role, status, invited_by_user_id, accepted_at, removed_at, created_at, updated_at')
-          .eq('home_id', homeId)
+          .eq('home_id', ownedHomeId)
           .order('created_at', { ascending: true }),
-        supabase.rpc('servsync_list_home_membership_email_invites', { p_home_id: homeId }),
+        supabase.rpc('servsync_list_home_membership_email_invites', { p_home_id: ownedHomeId }),
       ]);
 
+      if (!current()) return;
       if (membershipsRes.error) throw membershipsRes.error;
       if (emailInvitesRes.error) throw emailInvitesRes.error;
 
       setHomeAccessMemberships((membershipsRes.data || []) as HomeAccessMembership[]);
       setHomeAccessEmailInvites((emailInvitesRes.data || []) as HomeAccessEmailInvite[]);
     } catch (err) {
-      setError(readableError(err, 'Unable to load Home Access.'));
+      if (current()) setError(readableError(err, 'Unable to load Home Access.'));
     } finally {
-      setLoadingHomeAccess(false);
+      if (current()) setLoadingHomeAccess(false);
     }
-  }, [selectedHomeId]);
+  }, [selectedHomeId, homes, profile.id, workspaceLoadPhase]);
 
   useEffect(() => {
     void loadHomeAccess();
+    return () => { homeAccessLoadVersion.current += 1; };
   }, [loadHomeAccess]);
 
   const loadSharedHomeShells = useCallback(async () => {
@@ -16414,13 +16313,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-slate-950">Limited shared home shell</p>
+              <p className="text-sm font-bold text-slate-950">Shared home details</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
                 Shared homes show only access-approved basics. Members and viewers are read-only; shared admins can manage rooms. Service records, private files, and Home History stay private.
               </p>
             </div>
             <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
-              Shell only
+              Limited shared details
             </span>
           </div>
         </div>
@@ -16623,7 +16522,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-bold text-slate-950">Members</p>
-                      <p className="mt-1 text-sm text-slate-500">Current and prior home-level memberships visible under RLS.</p>
+                      <p className="mt-1 text-sm text-slate-500">People with current or previous access to this home.</p>
                     </div>
                     {loadingHomeAccess && <span className="text-xs font-semibold text-blue-700">Refreshing...</span>}
                   </div>
@@ -16680,7 +16579,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-bold text-slate-950">Create email invite</p>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    Creates a pending invite and checks the delivery worker. Email delivery is still disabled in this beta step.
+                    Create an invitation for a trusted person. Invitation emails are not sent yet during beta.
                   </p>
                   <div className="mt-3 space-y-3">
                     <Field label="Invite email">
@@ -23525,6 +23424,21 @@ function ContractorDashboard({
     setContractorTab('connections');
   };
 
+  const connectedCustomerScheduling = () => <ConnectedCustomerScheduling
+    customers={connections.filter(item => item.status === 'active')}
+    requests={serviceRequests}
+    onOpenRequest={id => { const request = serviceRequests.find(item => item.id === id); if (request) { closeCalendarEventComposer(); openContractorRequestInRequestsTab(request); } }}
+    onOpenCustomer={id => { const connection = connections.find(item => item.connection_id === id); if (connection) { closeCalendarEventComposer(); openHomeownerWorkspaceForConnection(connection, 'requests'); } }}
+  />;
+
+  const openFinancialSummary = (status: 'draft' | 'open' | 'closed') => {
+    setFocusedEstimateRecordId(null); setFocusedInvoiceRecordId(null);
+    setFinancialsCustomerFilterSubjectId(null); setContractorInvoiceRecordSearch('');
+    setContractorInvoiceRecordStatusFilter(status === 'closed' ? 'all' : status);
+    setContractorInvoiceRecordSort('updated_newest');
+    setContractorFinancialsViewAndScroll(status === 'closed' ? 'closed_invoices' : 'open_invoices');
+  };
+
   const openContractorRequestInRequestsTab = (request: ServiceRequestSummary) => {
     setContractorRequestView(contractorRequestQueueFor(request));
     setContractorExpandedRequestIds(new Set([request.id]));
@@ -28359,7 +28273,7 @@ function ContractorDashboard({
   const closedJobs = operationalInspections.filter(inspectionIsClosedJob);
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
-  const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
+  const openInvoiceRecords = invoices.filter(isOpenInvoice);
   const {
     acceptedEstimatesNeedingJobs,
     completedJobsReadyToInvoice,
@@ -32729,7 +32643,6 @@ function ContractorDashboard({
               </section>
 
               <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                <ContractorBillingCard contractor={contractor} />
 
                 <Card title="Invite pipeline" icon={<Link2 size={18} />}>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -34502,6 +34415,7 @@ function ContractorDashboard({
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" data-testid="contractor-calendar-beta-boundary">
             Use Calendar for ServSync appointments and business events. External calendar sync, route optimization, and advanced dispatch are not available during the beta.
           </p>
+          {connectedCustomerScheduling()}
           <CalendarView
             requests={serviceRequests}
             visitEvents={contractorVisitEvents}
@@ -34551,6 +34465,7 @@ function ContractorDashboard({
             ? calendarEventLinkForOccurrence(editingCalendarEvent.id, editingCalendarEventOccurrenceAt)
             : null}
           localContacts={localContacts}
+          connectedScheduling={connectedCustomerScheduling()}
           busy={calendarEventBusy}
           onSave={saveCalendarEvent}
           creatingJob={Boolean(
@@ -35542,8 +35457,6 @@ function ContractorDashboard({
                       .sort((a, b) => new Date(a.appointment!.proposed_at).getTime() - new Date(b.appointment!.proposed_at).getTime()) : [];
 
                     const openJobCount = activeJobRecords.length;
-                    const openFinancialCount = estimateRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length + invoiceRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length;
-                    const jobsAttentionCount = openJobCount + openFinancialCount + followUpReqs.length;
                     const tabs: Array<{ id: HomeownerWorkspaceTab; label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'slate' }> = [
                       {
                         id: 'profile',
@@ -35566,10 +35479,10 @@ function ContractorDashboard({
                       {
                         id: 'fieldwork',
                         label: 'Jobs',
-                        value: String(jobsAttentionCount),
-                        helper: jobsAttentionCount > 0 ? 'Items in progress' : 'Create work for this customer',
+                        value: String(openJobCount),
+                        helper: openJobCount > 0 ? 'Items in progress' : 'Create work for this customer',
                         icon: <ClipboardCheck size={15} />,
-                        tone: jobsAttentionCount > 0 ? 'amber' : 'blue',
+                        tone: openJobCount > 0 ? 'amber' : 'blue',
                       },
                       {
                         id: 'estimates',
@@ -38002,7 +37915,7 @@ function ContractorDashboard({
                       { id: 'templates', label: 'Templates', helper: 'Reusable tools', mobileClassName: 'col-span-3' },
                     ];
                 return (
-                  <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid={financialsWorkspace ? 'contractor-financials-header-tabs' : 'contractor-work-header-tabs'}>
+                  <section className={`${estimateComposerOpen || authorizedInvoiceComposerOpen ? 'hidden md:block ' : ''}rounded-2xl border border-slate-200 bg-white p-3 shadow-sm`} data-testid={financialsWorkspace ? 'contractor-financials-header-tabs' : 'contractor-work-header-tabs'}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div className="min-w-0">
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{financialsWorkspace ? 'Financials workspace' : 'Work workspace'}</p>
@@ -38090,8 +38003,9 @@ function ContractorDashboard({
                   canCreateInvoice={durableDraftInvoiceLaunchAvailable}
                   onCreateInvoice={startCleanDraftFirstInvoiceComposer}
                   onViewAttention={() => setContractorFinancialsViewAndScroll('needs_attention')}
-                  onViewOpen={() => setContractorFinancialsViewAndScroll('open_invoices')}
-                  onViewClosed={() => setContractorFinancialsViewAndScroll('closed_invoices')}
+                  onViewDrafts={() => openFinancialSummary('draft')}
+                  onViewOpen={() => openFinancialSummary('open')}
+                  onViewClosed={() => openFinancialSummary('closed')}
                 />
               )}
 
@@ -38361,11 +38275,11 @@ function ContractorDashboard({
                   </div>
                 </Card>
                 ) : (
-                <Card title={authorizedInvoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorTab === 'work' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
+                <Card title={authorizedInvoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorTab === 'work' ? (editingEstimateId ? 'Edit estimate' : 'New estimate') : 'New invoice'} icon={<Receipt size={18} />}>
                   <div className="space-y-4">
                     {!authorizedInvoiceComposerOpen && (
                       <>
-                        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className={`${estimateComposerOpen ? 'hidden md:flex' : 'flex'} flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between`}>
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
                             {contractorTab === 'work' && editingEstimateId ? (
@@ -39021,7 +38935,7 @@ function ContractorDashboard({
                       return estimate.status === contractorEstimateRecordStatusFilter;
                     };
                     const invoiceMatchesStatus = (invoice: Invoice) => contractorInvoiceRecordStatusFilter === 'all'
-                      || (contractorInvoiceRecordStatusFilter === 'open' && !['paid', 'void'].includes(invoice.status))
+                      || (contractorInvoiceRecordStatusFilter === 'open' && isOpenInvoice(invoice))
                       || invoice.status === contractorInvoiceRecordStatusFilter;
                     const recordTime = (value?: string | null) => value ? new Date(value).getTime() : 0;
                     const customerCompare = (left: string, right: string) => left.localeCompare(right, undefined, { sensitivity: 'base' });
@@ -39125,7 +39039,7 @@ function ContractorDashboard({
 	                    ].filter((label): label is string => Boolean(label));
 	                    const invoiceStatusShortcuts = [
 	                      { id: 'all' as const, label: 'All', count: invoiceRecordsForView.length },
-	                      { id: 'open' as const, label: 'Open', count: invoiceRecordsForView.filter(invoice => !['paid', 'void'].includes(invoice.status)).length },
+	                      { id: 'open' as const, label: 'Open', count: invoiceRecordsForView.filter(isOpenInvoice).length },
 	                      { id: 'paid' as const, label: 'Paid', count: invoiceRecordsForView.filter(invoice => invoice.status === 'paid').length },
 	                    ];
 	                    return (
@@ -40874,7 +40788,7 @@ function ContractorDashboard({
                             <section className="space-y-2">
                               <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Home-specific Inspection Checklists</p>
-                                <p className="mt-1 text-xs leading-5 text-slate-500">Home-specific checklists are saved inspection/report layouts for a property. Full Home Setup Templates and Home Map tools are future work.</p>
+                                <p className="mt-1 text-xs leading-5 text-slate-500">Save an inspection or report layout for a specific property. Homeowners can organize their rooms in Properties → Home Map.</p>
                               </div>
                               {filteredHomeTemplates.length === 0 ? (
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -48207,6 +48121,8 @@ function NotificationBell({
         ref={buttonRef}
         type="button"
         onClick={handleOpen}
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-expanded={open}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#1B85FB]/25 bg-[#02132D] text-blue-100 transition hover:border-[#1B85FB] hover:bg-[#05214A]"
       >
         <Bell size={18} />
@@ -48241,7 +48157,7 @@ function NotificationBell({
                   Mark all read
                 </button>
               )}
-              <button type="button" onClick={() => setOpen(false)} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={15} /></button>
+              <button type="button" aria-label="Close notifications" onClick={() => setOpen(false)} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={15} /></button>
             </div>
           </div>
           {notifications.length === 0 ? (
@@ -49636,18 +49552,11 @@ function SidebarLayout({
         {sidebarContent}
       </aside>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <aside className="relative z-10 flex w-64 flex-col shadow-xl">
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
+      {mobileOpen && <MobileNavigationDialog onClose={() => setMobileOpen(false)}>{sidebarContent}</MobileNavigationDialog>}
 
       <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:overflow-hidden">
         <div className="flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:hidden shrink-0">
-          <button type="button" onClick={() => setMobileOpen(true)} className="text-[#223D67] hover:text-[#0078FF] transition-colors">
+          <button type="button" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center text-[#223D67] hover:text-[#0078FF] transition-colors">
             <Menu size={22} />
           </button>
           <div className="min-w-0 flex-1">
@@ -49846,6 +49755,7 @@ function CalendarEventComposer({
   occurrenceStartsAt,
   linkedJob,
   localContacts,
+  connectedScheduling,
   busy,
   onSave,
   creatingJob,
@@ -49860,6 +49770,7 @@ function CalendarEventComposer({
   occurrenceStartsAt: string | null;
   linkedJob: ContractorCalendarEventJobLink | null;
   localContacts: ContractorLocalContact[];
+  connectedScheduling: React.ReactNode;
   busy: boolean;
   onSave: (draft: CalendarEventDraft) => void;
   creatingJob: boolean;
@@ -49982,7 +49893,7 @@ function CalendarEventComposer({
             <Field label="Duration (minutes, optional)">
               <input type="number" min="1" max="1440" className={inputClass()} value={draft.duration_minutes} onChange={e => setDraft(d => ({ ...d, duration_minutes: e.target.value }))} placeholder="60" />
             </Field>
-            <Field label="Customer (optional)">
+            <Field label="Local customer (optional)">
               <select className={inputClass()} value={draft.local_contact_id} onChange={e => setDraft(d => ({ ...d, local_contact_id: e.target.value }))}>
                 <option value="">No customer</option>
                 {localContacts.map(contact => <option key={contact.id} value={contact.id}>{contact.display_name}</option>)}
@@ -50102,6 +50013,7 @@ function CalendarEventComposer({
               </div>
             </div>
           )}
+          {!isEditing && connectedScheduling}
           <Field label="Notes (optional)">
             <textarea rows={3} className={inputClass()} {...writingAssistProps} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
           </Field>
@@ -50401,6 +50313,7 @@ function CalendarView({
   onOpenVisitEvent?: (event: ContractorVisitEvent) => void;
   onOpenCalendarEvent?: (event: ContractorCalendarEvent, occurrenceStartsAt: string) => void;
 }) {
+  const [calendarDisplay, setCalendarDisplay] = useState<'agenda' | 'month'>('agenda');
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -50623,8 +50536,21 @@ function CalendarView({
 
   return (
     <div className="space-y-5">
+      <div className="flex gap-2 md:hidden" aria-label="Calendar display">
+        {(['agenda', 'month'] as const).map(view => <button key={view} type="button" aria-pressed={calendarDisplay === view} className={buttonClass(calendarDisplay === view ? 'primary' : 'secondary')} onClick={() => setCalendarDisplay(view)}>{view === 'agenda' ? 'Agenda' : 'Month'}</button>)}
+      </div>
+      {calendarDisplay === 'agenda' && <div className="flex items-end gap-2 md:hidden">
+        <label className="min-w-0 flex-1 text-sm font-semibold text-slate-700">Agenda date
+          <input type="date" className={`${inputClass()} mt-1 min-h-11 w-full min-w-0`} value={selectedDate ?? todayKey} onChange={event => {
+            if (!event.target.value) return;
+            const date = new Date(`${event.target.value}T12:00:00`);
+            setYear(date.getFullYear()); setMonth(date.getMonth()); selectCalendarDate(event.target.value);
+          }} />
+        </label>
+        <button type="button" className={buttonClass('secondary')} onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth()); selectCalendarDate(todayKey); }}>Today</button>
+      </div>}
       <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-        <div className="space-y-4">
+        <div className={`${calendarDisplay === 'agenda' ? 'hidden md:block' : ''} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <button type="button" onClick={prevMonth} className={buttonClass('secondary')}>Prev</button>
             <h3 className="text-lg font-bold text-slate-950">{MONTHS[month]} {year}</h3>

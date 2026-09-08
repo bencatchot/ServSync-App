@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, FilePlus2, Receipt, WalletCards } from 'lucide-react';
 import type { Invoice } from '../../types';
+import { isOpenInvoice } from '../invoices/recordStatus';
 
 function FinancialTile({
   testId,
@@ -37,6 +38,7 @@ export function ContractorFinancialsDashboard({
   canCreateInvoice,
   onCreateInvoice,
   onViewAttention,
+  onViewDrafts,
   onViewOpen,
   onViewClosed,
 }: {
@@ -45,11 +47,12 @@ export function ContractorFinancialsDashboard({
   canCreateInvoice: boolean;
   onCreateInvoice: () => void;
   onViewAttention: () => void;
+  onViewDrafts: () => void;
   onViewOpen: () => void;
   onViewClosed: () => void;
 }) {
-  const openCount = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length;
-  const closedCount = invoices.length - openCount;
+  const openCount = invoices.filter(isOpenInvoice).length;
+  const closedCount = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length;
   const draftCount = invoices.filter(invoice => invoice.status === 'draft').length;
   return (
     <section data-testid="contractor-financials-dashboard" className="space-y-5">
@@ -60,7 +63,7 @@ export function ContractorFinancialsDashboard({
         </div>
         <div className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
           <FinancialTile testId="contractor-financials-summary-attention" label="Needs Attention" count={attentionCount} helper="Invoices requiring review" onClick={onViewAttention} />
-          <FinancialTile testId="contractor-financials-summary-drafts" label="Invoice Drafts" count={draftCount} helper="Draft billing records" onClick={onViewOpen} />
+          <FinancialTile testId="contractor-financials-summary-drafts" label="Invoice Drafts" count={draftCount} helper="Draft billing records" onClick={onViewDrafts} />
           <FinancialTile testId="contractor-financials-summary-open" label="Open Invoices" count={openCount} helper="Sent, viewed, overdue, or partially paid" onClick={onViewOpen} />
           <FinancialTile testId="contractor-financials-summary-closed" label="Paid / Closed" count={closedCount} helper="Paid and void Invoice history" onClick={onViewClosed} />
         </div>
