@@ -35,9 +35,9 @@ Browser tests use the new frontend on localhost with the existing Demo anonymous
 ## Tutorial and release gates
 
 Tutorial impact: UPDATE REQUIRED
-Tutorial evidence: Conservative release hold. The repository's current tutorial inventory identifies TUT-002 Estimate and TUT-004 Invoice as affected areas. An attempted interactive Help Studio check returned a locked-Mac error, so the required search and matching published-video playback comparison have not been performed. This is not a declaration that existing videos were inspected or are fresh.
-Affected tutorials: TUT-002 Estimate; TUT-004 Invoice; any published Calendar/mobile navigation matches discovered by the required Studio search.
-Tutorial follow-up: Codex must search Help Studio by Estimate/PDF/Invoice/Financials/Calendar/navigation/Home Access and related route terms, preview every matching published walkthrough, and compare against this branch. Prepare bounded replacements for any stale instructions after the reviewed Demo build is available. Ben must approve Production Help changes; publish and verify required replacement revisions before marking the overall correction task complete.
+Tutorial evidence: On September 8, Help Studio access was restored and all five published walkthroughs were previewed to completion. The 16-term search and comparison found a pre-existing mismatch in TUT-002: its written steps say Drafts, while its video starts from Service Requests. TUT-001, TUT-003, TUT-004, and TUT-005 remain applicable. See `TUTORIAL_FRESHNESS_REVIEW_2026-09-08.md`.
+Affected tutorials: TUT-002 How to create an estimate, published revision 3.
+Tutorial follow-up: Codex has prepared corrected steps, a narration draft, and a bounded replacement brief in `tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md`. Retain the current immutable lesson until the approved narrated/captioned replacement is published and verified. Any merge before that point requires Ben's explicit acknowledgement of the temporary tutorial gap.
 
 Preserve current immutable tutorial revisions. TUT-002's existing voiceover/caption standards upgrade and the planned TUT-006 remain separately tracked in FB-040A. The existing repository rule, `docs/CODEX_WORKFLOW_TEMPLATE.md` under Tutorial Freshness Gate, requires this pending state and prohibits declaring overall completion with a required replacement open.
 
@@ -47,4 +47,4 @@ Builder Mode changes include application components/helpers, relevant regression
 
 No merge to main, manual Production deployment, SQL, shared-database schema/policy changes, environment/secret changes, payment operation, external marketing publication, or Production Help publication was performed. Owner approval is required for merge and any Production Help replacement under the repository's explicit protected-action rules.
 
-Status: Implementation and local/Demo-backed validation prepared for review. Hosted Preview and interactive tutorial review are separate evidence requirements; final PR details will record their results.
+Status: PR #571 application corrections pass local and hosted Demo validation. Interactive tutorial review is complete; the confirmed TUT-002 replacement remains an open owner-gated follow-up. No merge or Production Help publication has been performed.

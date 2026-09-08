@@ -4,6 +4,14 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-09-08 - PR #571 tutorial freshness comparison completed
+
+- Restored interactive access after Mac unlock; searched Help Studio across 16 affected feature, route, and workflow terms and previewed all five published videos to completion.
+- TUT-001, TUT-003, TUT-004, and TUT-005 remain applicable. TUT-002's written steps incorrectly describe a Drafts entry while its video and supported linked flow use Service Requests → Create Estimate. This mismatch and the missing narration standard predate PR #571.
+- Prepared exact replacement steps, draft narration, and a bounded TUT-002 replacement brief. Current publication rules require narrated/captioned media and quality review, so the silent legacy lesson cannot be republished as a text-only correction.
+- Updated PR #571's evidence and FB-040A follow-up. Application validation is unchanged (98 local tests, 8 hosted Demo checks, and passing quality/Preview builds at the implementation commit). This follow-up changes documentation only.
+- No Production Help save, new revision, recording request, provider generation, publication, business-record mutation, or main merge performed. Any approved merge before TUT-002 replacement must acknowledge the temporary guidance gap; overall completion remains open until required replacement publication and verification.
+
 ## 2026-09-07 - Astra audit corrections prepared for review
 
 - Branch: `codex/astra-audit-corrections-2026-09-07`, based on `origin/main` at `470722c4eea66cec512b0ff39414ca3bf8a6d6b5`.
