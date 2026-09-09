@@ -8,7 +8,7 @@ The old iPhone document screen allowed scrolled content beneath the status bar. 
 
 The software-keyboard test exposed a focused field hidden by the navigation after resize. The native viewport adapter now reveals the focused field after resize, hides workspace tabs during text editing, and compensates for iOS visual-viewport panning. Editing text remains in the existing form. Blur restores navigation. Form controls use at least 16px text to avoid focus zoom. The connection notice is in the safe-area layout flow so it remains visible during editing.
 
-Business Profile section jumps exposed a second scroll container: `scrollIntoView` moved the native root by about 69 CSS pixels, carrying the header and bottom navigation out of position. The native workspace root now uses `overflow: clip`, while its content remains scrollable and public pages retain root scrolling. The rebuilt Android app passed the same Logo & Branding section jump with root scroll position zero, header/navigation in place, photo-picker cancel, focused-field reveal and blur. The rebuilt iPhone app passed sign-in and Work rendering, but its final section-jump replay remains unverified: CUA pointer actions repeatedly returned `windowNotFoundAtPosition`; keyboard controls worked. No substitute iPhone control method was used.
+Business Profile section jumps exposed a second scroll container: `scrollIntoView` moved the native root by about 69 CSS pixels, carrying the header and bottom navigation out of position. The native workspace root now uses `overflow: clip`, while its content remains scrollable and public pages retain root scrolling. The rebuilt Android app passed the same Logo & Branding section jump with root scroll position zero, header/navigation in place, photo-picker cancel, focused-field reveal and blur. The rebuilt iPhone app passed sign-in and Work rendering, but its final section-jump replay remains unverified: CUA pointer actions repeatedly returned `windowNotFoundAtPosition`; keyboard controls worked. A later bounded pointer retry failed with the same error. No substitute iPhone control method was used.
 
 Only inert class hooks were added to the shared sidebar layout. The website does not import the native stylesheet or install the native viewport adapter. No auth, role, permission, persistence, shared integration, or source-document behavior changed.
 
@@ -41,7 +41,7 @@ Only existing fictional Demo identities and records were used. No document, mess
 
 Role-switch evidence establishes UI session separation, not a new cross-tenant security audit. Screenshots and temporary-file counts are retained under ignored `mobile-build/evidence/`.
 
-During Android credential entry, a keyboard Tab attempt did not move focus and briefly placed the Demo homeowner password in the email field. The field was cleared before submission, the screenshot was removed locally, and direct field taps completed sign-in. Removal does not erase the earlier tool-output image in this task. The credential was not included in repository files or PR evidence. Owner rotation of this Demo credential is recommended; no password was changed.
+Ben acknowledged the isolated Demo credential appearance in prior tool output and directed that it is not a blocker. Credentials remain excluded from repository and PR content; no credential was changed.
 
 ## Android renderer investigation
 
