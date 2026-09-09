@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type { Profile } from '../../types';
 import { ProspectFields } from './ProspectFields';
-import { type ClaimReview, blankProspect, prospectButton, prospectError, prospectRpc } from './prospect';
+import { type ClaimReview, blankProspect, prospectButton, prospectError, prospectRpc, prospectUnavailable } from './prospect';
 
 export function ContractorClaimPage({ token, profile, authentication, onClaimed }: {
   token: string; profile: Profile | null; authentication: ReactNode; onClaimed: () => void;
@@ -17,7 +17,7 @@ export function ContractorClaimPage({ token, profile, authentication, onClaimed 
     let active = true; setLoading(true); setReview(null); setError(''); setAccepted(false);
     void prospectRpc<ClaimReview>('servsync_review_contractor_claim', { p_token: token }).then(result => {
       if (active) { setReview(result); setDetails({ ...blankProspect(), ...result.details }); }
-    }).catch(err => { if (active) setError(prospectError(err)); }).finally(() => { if (active) setLoading(false); });
+    }).catch(err => { if (active) setError(prospectUnavailable(err) ? 'Business profile claiming is not available yet. Please contact ServSync for help.' : prospectError(err)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [token, profile?.id, retry]);
   const claim = async () => {

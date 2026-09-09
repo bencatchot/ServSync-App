@@ -16,7 +16,7 @@ async function mount(page: Page, component: string, mode = 'normal') {
     const createRoot = ((await dynamicImport('/node_modules/.vite/deps/react-dom_client.js')).default as { createRoot: (element: HTMLElement) => { render: (node: unknown) => void } }).createRoot;
     const clientModule = await dynamicImport('/src/supabaseClient.ts');
     const client = clientModule.supabase as { rpc: (name: string, args?: Record<string, unknown>) => Promise<unknown> };
-    let item = structuredClone(initial) as Record<string, unknown>;
+    let item = { ...structuredClone(initial), ...(mode === 'claimed' ? { claim_status: 'claimed' } : {}) } as Record<string, unknown>;
     let exists = component !== 'AdminContractorProspects';
     const calls: Array<{ name: string; args?: Record<string, unknown> }> = [];
     Object.assign(window, { prospectCalls: calls });
@@ -138,4 +138,19 @@ test('anonymous public route renders unclaimed listing without sign-in or contac
   await expect(page.getByText('Unclaimed profile', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Request connection' })).toBeDisabled();
   await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toHaveCount(0);
+});
+
+test('claimed businesses retain Discover entry and open the normal public profile', async ({ page }) => {
+  await mount(page, 'DiscoverContractorProspects', 'claimed');
+  await expect(page.getByRole('heading', { name: 'Fairhope Plumbing' })).toBeVisible();
+  await expect(page.getByText('Unclaimed profile', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Request service' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'View profile' })).toHaveAttribute('href', /#\/profile\?slug=fairhope-plumbing$/);
+});
+
+test('claim entry explains pending installation without exposing backend errors', async ({ page }) => {
+  await mount(page, 'ContractorClaimPage', 'missing');
+  await expect(page.getByRole('alert')).toContainText('Business profile claiming is not available yet.');
+  await expect(page.getByRole('button', { name: 'Claim business profile' })).toHaveCount(0);
+  await expect(page.getByText('Missing function')).toHaveCount(0);
 });
