@@ -40,7 +40,10 @@ Password recovery/invitation links remain web links; they do not automatically r
 
 ## Tutorial freshness
 
-Tutorial impact: UPDATE REQUIRED.
+Tutorial impact: UPDATE REQUIRED
+Tutorial evidence: The September 8 Help Studio review covered 16 search terms and all five published walkthroughs. Fresh search and native comparison for this increment remain pending Mac unlock.
+Affected tutorials: TUT-002 How to create an estimate, revision 3; native PDF guidance assessment remains open.
+Tutorial follow-up: Codex completes native acceptance and Help Studio comparison, then prepares any required mobile guidance; Ben authorizes Production Help publication.
 
 Known existing follow-up: TUT-002 “How to create an estimate,” revision 3, needs the narrated/captioned replacement already recorded in PR #571. This prototype does not publish or retire Help content. The new native PDF behavior also requires a mobile-specific walkthrough assessment after interactive acceptance. Fresh Help Studio search/review for this increment is pending Mac unlock; prior browser tutorial evidence is not represented as native acceptance. Do not merge this prototype or declare tutorial completion from compilation alone.
 
