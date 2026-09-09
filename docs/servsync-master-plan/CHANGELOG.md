@@ -4,7 +4,7 @@
 
 - Added isolated iPhone and Android Capacitor projects with bundled local React assets and an explicit Demo-only build guard.
 - Added a native PDF share-sheet action, connectivity feedback, Android back handling, camera/photo usage descriptions, and Demo website origins for generated links. The normal website entry remains separate.
-- iOS simulator compilation, website/mobile builds, type checking, lint, and focused tests pass. Interactive native acceptance and Android SDK/license setup remain open; see `docs/mobile/ServSync_Mobile_Prototype_v1.md`.
+- iOS and Android compilation, website/mobile builds, type checking, lint, and focused tests pass. After unlock, verified iOS Demo account switching/session persistence, core navigation, and native estimate PDF preview/share/cancel. Simplified native window ownership and excluded website-only analytics from native builds. Android interactive, photo/network, physical-device/accessibility, safe-area/keyboard, and tutorial acceptance remain open; see `docs/mobile/ServSync_Mobile_Prototype_v1.md`.
 - No store submission, Production rollout, shared configuration, database/security change, or new account creation.
 
 

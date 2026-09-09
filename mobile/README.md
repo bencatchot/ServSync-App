@@ -33,7 +33,7 @@ xcodebuild -project mobile/ios/App/App.xcodeproj -scheme App \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-For Android, install an appropriate JDK and the Google Android SDK after accepting Google's SDK license, and set an untracked `mobile/android/local.properties` to its location. The generated project specifies API 36 and minimum API 24. Build with `./gradlew assembleDebug` from `mobile/android`. Do not change global toolchain configuration used by AthleticsArc.
+For Android, use JDK 21 and an installed Google Android SDK with accepted licenses. Set `ANDROID_HOME` for the process or an untracked `mobile/android/local.properties`. The project specifies API 36 and minimum API 24. Build with `./gradlew :app:assembleDebug -Pandroid.builder.sdkDownload=false --no-daemon` from `mobile/android`; the flag prevents automatic SDK installation. Do not change global toolchain settings used by AthleticsArc. The development Mac already had an SDK at `/opt/homebrew/share/android-commandlinetools`; this task used an isolated Temurin 21 archive and Gradle cache under ignored `mobile-build/`.
 
 ## Implemented foundation
 
@@ -47,8 +47,8 @@ For Android, install an appropriate JDK and the Google Android SDK after accepti
 
 ## Explicit limitations
 
-This is a feasibility prototype, not a store-ready app. Native interactive checks remain necessary. Browser-relative `/api/*` routes (including external email delivery, some guest views, payment and Marketing operations) need a deliberate native/server integration and CORS/cookie assessment; they must not be represented as working in the prototype. No global fetch interception, origin spoofing, or authentication workaround has been added. Core Supabase-backed sign-in and record screens are the first intended test path.
+This is a feasibility prototype, not a store-ready app. Both native projects compile; iOS sign-in/session switching, core navigation, and estimate PDF preview/share/cancel have initial runtime evidence. Remaining checks are tracked in `docs/mobile/ServSync_Mobile_Prototype_v1.md`. Browser-relative `/api/*` routes (including external email delivery, some guest views, payment and Marketing operations) need a deliberate native/server integration and CORS/cookie assessment; they must not be represented as working in the prototype. No global fetch interception, origin spoofing, or authentication workaround has been added. Core Supabase-backed sign-in and record screens are the first intended test path.
 
-Native universal/app links, password recovery callbacks, notification providers, offline synchronization, biometric login, production signing, store submission and physical-device acceptance remain follow-ups. Login persistence uses the existing Supabase client behavior and requires native lifecycle testing. The iPhone simulator has no physical camera; simulator tests cannot establish actual camera behavior.
+Native universal/app links, password recovery callbacks, notification providers, offline synchronization, biometric login, production signing, store submission and physical-device acceptance remain follow-ups. Login persistence uses the existing Supabase client behavior; iOS fresh-launch and account-switch checks passed, with Android and physical-device lifecycle checks remaining. The iPhone simulator has no physical camera; simulator tests cannot establish actual camera behavior.
 
 Test only with existing approved fictional Demo accounts. Do not submit signups, recovery emails, customer messages, payments or live provider actions as part of a smoke check. Keep AthleticsArc's simulator and processes separate.

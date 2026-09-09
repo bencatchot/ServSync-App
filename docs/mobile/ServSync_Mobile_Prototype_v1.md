@@ -17,20 +17,23 @@ The native entry registers a PDF dialog/share-sheet adapter for existing Preview
 - Mobile environment/package guards: 5/5 pass.
 - Astra corrections regression: 7/7 pass.
 - Architecture suite: 26/26 pass.
-- Native interactive testing: **pending**. The Mac was locked when simulator access was attempted. No native sign-in, camera, network interruption, or sharing result is claimed.
-- Android compilation: **pending**. No Java runtime, standard-location Android SDK, or Android Studio was detected. SDK installation/license approval was requested; no SDK agreement has been accepted by this task.
+- iOS interactive checks after unlock: existing Demo contractor sign-in; Dashboard, Work, Customers, Calendar Agenda/Month; existing $250 draft estimate PDF generation; native share sheet; opening the PDF in Apple Preview; returning to ServSync; reopening/canceling the sheet; dialog close and successful Filesystem delete callback. No document was sent to a recipient or source record changed.
+- Fresh process launch retained the contractor session. Sign-out removed the contractor workspace; the existing Demo homeowner then opened Demo Bay Home with homeowner navigation. Another fresh launch retained the homeowner session.
+- Used a separate iPhone 17 / iOS 26.5 simulator (`2821CA81-0355-4FD8-BAF8-532A27C3233A`), preserving AthleticsArc's iPhone 17 Pro. First launch showed a black screen. Removed redundant window creation so UIKit owns the storyboard window; subsequent fresh launches rendered correctly. The native build now omits Vercel's website-only analytics script, which cannot load from the bundled local origin.
+- Still unverified: Android interactive behavior, photo/camera selection, network interruption/recovery, physical devices, and VoiceOver/TalkBack. Simulator web content was not exposed in its accessibility tree; screenshots and native document accessibility supplied the runtime evidence. Native safe-area/header and keyboard presentation need a polish pass before distribution.
+- Android compilation: **BUILD SUCCESSFUL**, including a repeat after final bundle sync. The earlier inventory checked standard locations; an SDK with accepted license files, API 36, and build-tools 36.0.0 was subsequently found at `/opt/homebrew/share/android-commandlinetools`. Used a checksum-verified Temurin 21 archive and a task-local Gradle cache, with SDK auto-download disabled. This task accepted no SDK agreement and changed no global toolchain settings.
 
 Xcode initially waited on a locked Keychain while fetching public binary dependencies. Re-running this task's build with its supported `-packageAuthorizationProvider netrc` option fetched the public packages and completed. No Keychain was unlocked, credential exposed, global setting changed, package validation disabled, or other task's build stopped.
 
 ## Next acceptance steps
 
 1. Use a separate simulator/device from AthleticsArc and the approved existing Demo accounts.
-2. Verify native launch, contractor sign-in, close/reopen and background/resume, sign-out, and contractor/homeowner account isolation.
-3. Verify Work, Calendar, customer/job context, and authorized estimate/invoice views.
+2. Repeat the verified iOS sign-in/session/account-switch checks on Android; complete physical-device accessibility and safe-area/keyboard checks.
+3. Extend the verified Work, Calendar, customer list, and estimate PDF checks to job details and invoice views.
 4. Exercise existing photo picker grant/denial/cancel with synthetic test media; validate actual camera capture on physical devices later.
 5. Generate a Demo document and test the native PDF share sheet, cancellation, retry, and temporary-file cleanup. Do not send to a recipient.
 6. Interrupt network connectivity during an unsaved task; record actual behavior without claiming offline editing or queued synchronization.
-7. Compile and repeat the core checks on Android once its toolchain is available.
+7. Run the compiled Android APK on a separate Android device/emulator and repeat the core checks.
 
 ## Known integration gaps
 
@@ -41,11 +44,11 @@ Password recovery/invitation links remain web links; they do not automatically r
 ## Tutorial freshness
 
 Tutorial impact: UPDATE REQUIRED
-Tutorial evidence: The September 8 Help Studio review covered 16 search terms and all five published walkthroughs. Fresh search and native comparison for this increment remain pending Mac unlock.
+Tutorial evidence: September 9 searches for mobile, iPhone, Android, PDF, share, sign in, and Calendar found no matching walkthroughs. Contractor, Work, and estimate searches identified existing guidance. Opened Preview for all five published walkthroughs and reviewed their written steps; TUT-002 revision 3 still says to open Drafts. Native PDF behavior was verified separately. Full media playback comparison remains open; the September 8 full-playback review is prior evidence only.
 Affected tutorials: TUT-002 How to create an estimate, revision 3; native PDF guidance assessment remains open.
 Tutorial follow-up: Codex completes native acceptance and Help Studio comparison, then prepares any required mobile guidance; Ben authorizes Production Help publication.
 
-Known existing follow-up: TUT-002 “How to create an estimate,” revision 3, needs the narrated/captioned replacement already recorded in PR #571. This prototype does not publish or retire Help content. The new native PDF behavior also requires a mobile-specific walkthrough assessment after interactive acceptance. Fresh Help Studio search/review for this increment is pending Mac unlock; prior browser tutorial evidence is not represented as native acceptance. Do not merge this prototype or declare tutorial completion from compilation alone.
+Known existing follow-up: TUT-002 “How to create an estimate,” revision 3, needs the narrated/captioned replacement already recorded in PR #571. This prototype does not publish or retire Help content. The new native PDF behavior also requires a mobile-specific walkthrough assessment after interactive acceptance. Fresh Help Studio search and written-step Preview review are recorded above. Complete video playback comparison and prepare mobile PDF guidance covering Preview PDF → Open or share PDF → system viewer/save/cancel → return, after both-platform acceptance. Do not merge this prototype or declare tutorial completion from compilation alone.
 
 ## Release state
 
