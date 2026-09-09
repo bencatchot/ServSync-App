@@ -1,5 +1,8 @@
 # ServSync Marketing Product Inventory
 
+Mobile status, September 9, 2026: an iPhone/Android **Demo prototype is in development** under FB-015. Do not advertise a downloadable mobile app, app-store availability, push notifications, native deep links, or offline operation. Existing public mobile-web claims remain the supported offering.
+
+
 Source-of-truth brief for marketing planning, brochures, social ads, landing-page copy, and video scripts.
 
 This document describes what ServSync can honestly say during the controlled private beta. It separates live/beta/manual capabilities from future roadmap items so marketing work stays useful without overpromising.

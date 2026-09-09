@@ -7109,7 +7109,7 @@ export default function App() {
   return (
     <>
       <AppContent />
-      <Analytics />
+      {import.meta.env.VITE_NATIVE_DEMO !== 'true' && <Analytics />}
     </>
   );
 }

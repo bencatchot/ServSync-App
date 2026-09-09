@@ -1,3 +1,4 @@
+import { handleNativePdf } from "./nativePdfAction";
 import { showPdfPreview } from './pdfPreview';
 import { jsPDF } from 'jspdf';
 
@@ -264,6 +265,7 @@ export function schedulePdfObjectUrlRevoke(url: string, delayMs = PDF_OBJECT_URL
 }
 
 export function downloadPdfBlob(blob: Blob, fileName: string) {
+  if (handleNativePdf(blob, fileName)) return;
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;

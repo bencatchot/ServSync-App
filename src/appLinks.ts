@@ -25,6 +25,10 @@ function currentBrowserLocation(): AppLocationLike {
   if (typeof window === 'undefined') {
     throw new Error('App route URLs require a browser location.');
   }
+  // Native Demo links remain web links; do not publish capacitor://localhost URLs.
+  if (import.meta.env?.VITE_NATIVE_DEMO === 'true') {
+    return { origin: 'https://servsync-demo.vercel.app', pathname: '/' };
+  }
   return window.location;
 }
 

@@ -73,3 +73,11 @@ storage-export-*.zip
 storage-export-*.tar
 storage-export-*.tar.gz
 storage-export-*.tgz
+
+# Isolated native builds and local signing/toolchain files
+/dist-mobile/
+/mobile-build/
+/mobile/android/local.properties
+*.keystore
+*.jks
+*.mobileprovision
