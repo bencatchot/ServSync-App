@@ -551,6 +551,8 @@ Current beta-readiness notes:
 
 # 16. Roadmap Priorities
 
+Owner direction, 2026-09-09: begin an isolated ServSync mobile prototype for iPhone and Android together, using existing Demo accounts. This moves FB-015 discovery and prototype implementation forward while preserving the controlled-pilot and tutorial commitments. The first milestone proves reuse of the existing React app in native containers; it does not authorize a Production mobile launch, native authentication configuration, notifications, or offline synchronization. See [Mobile Prototype v1](../mobile/ServSync_Mobile_Prototype_v1.md). References below to deferred native applications continue to apply to public rollout and advanced offline capability.
+
 The canonical stage order, exit gates, dependencies, and deferrals now live in the [ServSync Product Roadmap](ServSync_Product_Roadmap.md). The active Feature Backlog remains authoritative for individual unfinished outcomes and rollout boundaries.
 
 The current execution order is:
