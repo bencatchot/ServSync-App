@@ -50,7 +50,7 @@ The remaining iPhone contractor fresh-launch/sign-out and return-to-homeowner ch
 - Website build: pass.
 - ESLint: 0 errors, exactly 77 existing warnings.
 - Architecture checks: 26/26 pass.
-- Native builds: unsigned iOS simulator build succeeded; Android Debug build succeeded with JDK 21, installed API 36, SDK auto-download disabled, and task-scoped Gradle cache. Final bundle refresh/build results are recorded in the PR.
+- Native builds: unsigned iOS simulator build succeeded; Android Debug build succeeded with JDK 21, installed API 36, SDK auto-download disabled, and task-scoped Gradle cache. Final source bundle builds both succeeded and was installed on the dedicated iPhone and Android emulator. Native acceptance still requires final-build UI checks after unlock.
 - Local evidence and build logs are ignored under `mobile-build/`; credentials and generated binaries are not committed.
 
 ## Tutorial impact and remaining work
@@ -61,7 +61,27 @@ Fresh Help Studio searches: `mobile`, `iPhone`, `Android`, `safe area`, `keyboar
 
 TUT-002 revision 3 still directs users to Drafts in its written steps. Its normal-speed video starts at Service Requests and ends in a saved $1,895 Draft. Preserve the existing [replacement brief](../tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md), including narrated/captioned media and publication verification. Ben's explicit approval is required for Production Help changes. No published revision was changed.
 
+All five matching published videos were played from the beginning through their reported end at normal speed, with sampled visual frames and written-step comparison. This is a freshness review, not a new narration/caption quality approval:
+
+| Lesson | Revision / displayed end | Comparison |
+| --- | --- | --- |
+| TUT-001 service request | 1 / 0:15 | Request context → Create Estimate → Start your estimate choices; no workflow change in this increment |
+| TUT-002 estimate | 3 / 0:45 | Video ends at saved $1,895 Draft; written Drafts instructions remain stale |
+| TUT-003 complete work | 1 / 0:57 | Approved work → Job completion → final report Filed to Documents; written steps/transcript retain this lifecycle |
+| TUT-004 invoice | 1 / 0:57 | Invoice delivery/outside-payment ledger ends at Partially Paid, $400 paid, $1,765 due; the tutorial does not demonstrate native PDF sharing |
+| TUT-005 connection/request | 1 / 1:59 | Connection step, contractor selection, request review, and final submitted request remain consistent with the existing workflow |
+
+No additional stale workflow instruction was identified in the other four lessons. End-frame screenshots and search results are retained under ignored `mobile-build/evidence/`. No Production Help save, revision, provider generation, upload, or publication occurred.
+
 Native PDF guidance remains a bounded follow-up after both-platform PDF acceptance. [The review draft](../tutorials/NATIVE_PDF_GUIDANCE_DRAFT_2026-09-09.md) records the intended scope and evidence still required; it is not publishable guidance or an assertion that Android sharing passed.
+
+## PR and website Preview
+
+Draft [PR #573](https://github.com/bencatchot/ServSync-App/pull/573) contains the implementation. Application commit `58ba0725bd6105c376735cbed8b5ab8108d81f8c` passed the full repository PR quality workflow and all three normal Vercel Preview statuses.
+
+The [Demo web Preview](https://servsync-demo-git-codex-mobile-nati-3b7d75-bencatchots-projects.vercel.app) was checked through CUA with the existing Demo contractor: login, Dashboard, Financials invoice draft filter, Customers, 390px mobile navigation/drawer, Escape dismissal, and focus restoration passed. DOM style inspection confirmed no native class or native stylesheet and the unchanged static body positioning. No browser console errors were captured. The temporary viewport override was reset.
+
+The existing $250 draft invoice `AUDIT 2026-09-07 — invoice draft check` was found read-only. Its website PDF dialog opened and closed with the source unchanged. The in-app browser's embedded PDF area was blank and showed its existing Download PDF fallback; PDF document rendering was not established by this web check and is not counted as native invoice acceptance.
 
 ## Completion gates
 
