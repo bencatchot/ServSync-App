@@ -45,6 +45,10 @@ For Android, use JDK 21 and an installed Google Android SDK with accepted licens
 - Camera/photo usage descriptions for existing HTML upload inputs. Actual capture, selection, cancellation, and upload require native-device verification.
 - Filesystem API privacy reason declaration; this is not a complete App Store privacy disclosure.
 
+## Native Work configuration
+
+The native build pins the three current Demo Work switches in `scripts/mobile/environment.mjs` and rejects conflicting local/process values. This matches verified hosted Demo configuration and preserves existing account eligibility. The earlier native package omitted these switches and showed legacy Work. Both rebuilt apps now show current At a Glance; Android Start New Draft/Estimate entry has read-only evidence. iPhone composer activation remains limited by CUA pointer errors. Earlier legacy Work navigation evidence is not full current-workflow acceptance.
+
 ## Native presentation verification
 
 The native-only layout owns safe-area spacing, keeps the workspace header above scrolling content, and reveals focused fields after keyboard resize. Both platforms have session switching/restoration, core navigation, estimate/invoice PDF rendering, cancellation/retry and temporary-file cleanup evidence. iPhone used Apple Preview; Android used system Print preview without submitting a print job. Android Back and device-only network loss/recovery passed. Ben approved standard Android testing controls for the dedicated `ServSync_Pixel_8_API_36` (`emulator-5556` during this run), with identity checks before actions. The default emulator GPU produced duplicate paint in Financials; the unchanged APK rendered correctly using the task-scoped `-gpu swiftshader` option. See [the current acceptance matrix](../docs/mobile/ServSync_Native_Polish_Acceptance_2026-09-09.md) for the final iPhone section-jump replay and remaining physical-device/accessibility checks. Android Files and Photos/Albums cancellation passed without selection or upload.

@@ -24,4 +24,4 @@ The cancellation notice can also appear when a destination is unavailable or PDF
 - Physical camera, touch/accessibility acceptance and VoiceOver/TalkBack are separate checks. Screenshots do not establish screen-reader usability.
 - Follow the existing narrated/captioned/transcript publication standard. This document does not authorize provider generation, Production recording requests, media upload or publication.
 
-TUT-002's required replacement remains separate: correct the service-request-to-estimate instructions and produce its narrated/captioned replacement under the existing brief. This draft does not satisfy that tutorial freshness gate.
+TUT-002's required replacement remains separate: align new narrated/captioned media with the current valid Draft-first instructions under the revised brief. This draft does not satisfy that tutorial freshness gate.

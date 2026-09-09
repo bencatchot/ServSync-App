@@ -2,6 +2,17 @@
 
 Status: implementation prepared; cross-platform acceptance incomplete. This is a continuation of PR #572 from main `fd912266919eb02dc821cdb4e150538b38d4f944`, on `codex/mobile-native-polish`. It is not a store release or approval to merge.
 
+## Native/hosted Work parity correction
+
+The initial native acceptance used the legacy Work fallback, not the current hosted Demo workflow. That difference was a build-input defect, not solely a tutorial mismatch. The earlier Work-navigation evidence below is historical and does not establish current-workflow parity.
+
+- Both installed native bundles matched `App-cG4u0I1H.js`, SHA-256 `e942d11e25d6caf535864cbf2b27cb7726cc30da090aca3325025dd4e803bbfc`. The effective mobile environment and bundle omitted `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED`, `VITE_DRAFT_JOB_UI_ENABLED` and `VITE_CONTRACTOR_WORK_UI_ENABLED`; their strict selectors returned false.
+- Hosted Demo `App-BGU42l7Z.js` embedded all three as `true`. The approved Gulf Coast contractor's own Demo entitlement returned `can_use_durable_drafts=true` with matching contractor identity. With the native global master false, the cohort hook had not queried eligibility. Account permissions were not the cause.
+- Hosted Demo's presentation support requires the explicit recorder query opt-in; ordinary Demo is not presentation mode. The corrected native build does not enable recorder mode.
+- Native Vite defines now pin the three verified Work switches. A conflicting local/process value fails the native build. Shared website configuration and all existing cohort/session/permission checks remain unchanged. New regressions exercise the actual feature selectors and verify cohort/session/presentation denial remains enforced.
+- Both corrected native builds succeeded and were reinstalled on the dedicated ServSync devices. Both now display the current At a Glance dashboard. Android opened Start New Draft, selected Estimate and displayed its planning fields; the focused blank Draft title remained visible above the software keyboard with header retained and navigation hidden; no record was saved or created. iPhone keyboard sign-in and current dashboard rendering passed, but pointer errors still prevent composer activation and the final section-jump replay.
+- Hosted Demo Work → Drafts → Start New Draft → Estimate was verified read-only against the same account. It displays Create Estimate and Save Draft. TUT-002's written Drafts workflow is current; its legacy video demonstrates a different path. The revised replacement brief corrects the earlier recommendation.
+
 ## Changes and observed defects
 
 The old iPhone document screen allowed scrolled content beneath the status bar. Native-only CSS now owns safe-area padding, keeps the Demo label and workspace header above an independently scrolling content area, and keeps bottom navigation within the visible viewport. The iOS automatic scroll-view content inset is disabled to avoid competing inset ownership. Android uses Capacitor SystemBars' injected safe-area variables, with platform CSS environment variables as fallback.
@@ -18,7 +29,7 @@ Only inert class hooks were added to the shared sidebar layout. The website does
 - Android: separate `ServSync_Pixel_8_API_36`, `emulator-5556`, installed API 36 Google APIs arm64 image. Ben explicitly approved standard Android testing controls after CUA could not target the emulator. Every scoped control verified the AVD identity. No SDK agreement was accepted.
 - AthleticsArc's `emulator-5554` / `AthleticsArc_Pixel_8_API_36` and iPhone 17 Pro were preserved. Simulator GUI use was coordinated with that task and released after iPhone checks.
 
-## Runtime matrix
+## Earlier runtime matrix (before Work parity correction)
 
 Only existing fictional Demo identities and records were used. No document, message, payment, recovery email, or signup was submitted. The estimate and invoice remained Draft, $250; the invoice remained paid $0, balance $250.
 
@@ -49,7 +60,7 @@ With the emulator's default graphics backend, Financials repeatedly painted a se
 
 ## Local verification
 
-- Mobile Demo/package guards, viewport and PDF lifecycle regressions: 8/8 pass. The PDF tests exercise the real adapter with mocked native boundaries: duplicate-click prevention, active-dialog protection, retry path reuse, cancellation, preparation failure, cleanup and focus restoration. The regression covers focus → keyboard resize → reveal, iOS viewport offset, pinch-zoom protection, navigation restoration, and listener cleanup.
+- Mobile Demo/package guards, viewport and PDF lifecycle regressions: 11/11 pass, including native Work-switch parity and retained eligibility gates. The PDF tests exercise the real adapter with mocked native boundaries: duplicate-click prevention, active-dialog protection, retry path reuse, cancellation, preparation failure, cleanup and focus restoration. The regression covers focus → keyboard resize → reveal, iOS viewport offset, pinch-zoom protection, navigation restoration, and listener cleanup.
 - TypeScript: pass.
 - Website build: pass.
 - ESLint: 0 errors, exactly 77 existing warnings.
@@ -63,14 +74,14 @@ Tutorial impact: UPDATE REQUIRED
 
 Fresh Help Studio searches: `mobile`, `iPhone`, `Android`, `safe area`, `keyboard`, `PDF`, `share`, `sign in`, `sign out`, `Calendar`, `Customers`, and `homeowner.documents` found no published walkthroughs. `Work` matched TUT-002, TUT-003, and TUT-005; `contractor.drafts` matched TUT-002; `contractor.financials` matched TUT-004; `estimate` also matched TUT-001. Additional searches for `Business Profile`, `contractor.profile`, `Logo`, and `Go to section` found no published walkthroughs. Recording requests were not counted as published results.
 
-TUT-002 revision 3 still directs users to Drafts in its written steps. Its normal-speed video starts at Service Requests and ends in a saved $1,895 Draft. Preserve the existing [replacement brief](../tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md), including narrated/captioned media and publication verification. Ben's explicit approval is required for Production Help changes. No published revision was changed.
+TUT-002 revision 3 correctly directs users to the supported Drafts workflow. Its normal-speed video starts at Service Requests and ends in a saved $1,895 Draft, demonstrating a different path. The earlier claim that the written steps were stale is withdrawn. Use the revised [replacement brief](../tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md), including narrated/captioned media and publication verification. Ben's explicit approval is required for Production Help changes. No published revision was changed.
 
 All five matching published videos were played from the beginning through their reported end at normal speed, with sampled visual frames and written-step comparison. This is a freshness review, not a new narration/caption quality approval:
 
 | Lesson | Revision / displayed end | Comparison |
 | --- | --- | --- |
 | TUT-001 service request | 1 / 0:15 | Request context → Create Estimate → Start your estimate choices; no workflow change in this increment |
-| TUT-002 estimate | 3 / 0:45 | Video ends at saved $1,895 Draft; written Drafts instructions remain stale |
+| TUT-002 estimate | 3 / 0:45 | Video ends at saved $1,895 Draft through a different entry path; written Drafts workflow is current |
 | TUT-003 complete work | 1 / 0:57 | Approved work → Job completion → final report Filed to Documents; written steps/transcript retain this lifecycle |
 | TUT-004 invoice | 1 / 0:57 | Invoice delivery/outside-payment ledger ends at Partially Paid, $400 paid, $1,765 due; the tutorial does not demonstrate native PDF sharing |
 | TUT-005 connection/request | 1 / 1:59 | Connection step, contractor selection, request review, and final submitted request remain consistent with the existing workflow |
@@ -89,6 +100,6 @@ The existing $250 draft invoice `AUDIT 2026-09-07 — invoice draft check` was f
 
 ## Completion gates
 
-1. Replay the final iPhone Business Profile section jump when pointer control is available. Complete physical iPhone touch/network/camera and VoiceOver checks, plus Android camera/TalkBack checks on suitable devices.
+1. Verify iPhone Start New Draft and replay the final Business Profile section jump when pointer control is available. Retest affected current Work/Estimate/Invoice entry paths after parity correction; do not promote the earlier legacy-screen matrix to full current-workflow acceptance. Complete physical iPhone touch/network/camera and VoiceOver checks, plus Android camera/TalkBack checks on suitable devices.
 2. Prepare, approve, publish and verify the required TUT-002 narrated/captioned replacement through the protected Help workflow. Native PDF guidance has a reviewable platform-specific draft; no Production Help change has been made.
 Native server-route/CORS integration, callbacks/deep links, notifications, offline synchronization, provider/payment integrations, signing, distribution, and store submission remain outside this increment. No protected integration was required for these layout corrections.

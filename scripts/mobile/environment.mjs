@@ -1,6 +1,23 @@
 export const DEMO_WEB_ORIGIN = 'https://servsync-demo.vercel.app';
 export const DEMO_SUPABASE_URL = 'https://bdytwgejqnlblhrnqxkp.supabase.co';
 
+// Match the current hosted Demo workflow. Account eligibility remains server-owned.
+export const MOBILE_DEMO_WORK_FLAGS = Object.freeze({
+  VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED: 'true',
+  VITE_DRAFT_JOB_UI_ENABLED: 'true',
+  VITE_CONTRACTOR_WORK_UI_ENABLED: 'true',
+});
+
+export function mobileDemoWorkDefines(env) {
+  for (const [name, value] of Object.entries(MOBILE_DEMO_WORK_FLAGS)) {
+    if (env[name] !== undefined && env[name] !== value) {
+      throw new Error(`Mobile Demo requires ${name}=true to match the hosted Work workflow.`);
+    }
+  }
+  return Object.fromEntries(Object.entries(MOBILE_DEMO_WORK_FLAGS)
+    .map(([name, value]) => [`import.meta.env.${name}`, JSON.stringify(value)]));
+}
+
 export function assertMobileDemoEnvironment(env) {
   if (env.VITE_SUPABASE_URL !== DEMO_SUPABASE_URL) {
     throw new Error('Mobile prototype requires the approved ServSync Demo Supabase URL.');
