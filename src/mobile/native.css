@@ -32,6 +32,10 @@ html.servsync-native {
   /* Keep fixed app overlays and navigation inside the safe viewport. */
   transform: translateZ(0);
 }
+.servsync-native #root:has(> .workspace-shell) {
+  /* Section jumps and focus reveal must scroll content without moving the shell. */
+  overflow: clip;
+}
 .servsync-native .workspace-shell,
 .servsync-native .workspace-column {
   height: 100%;

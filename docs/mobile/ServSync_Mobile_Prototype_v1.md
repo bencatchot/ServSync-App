@@ -57,3 +57,9 @@ Known existing follow-up: TUT-002 “How to create an estimate,” revision 3, n
 ## Release state
 
 Development foundation implemented for review; prototype acceptance incomplete. No main merge, production deployment, shared Auth/SQL/RLS/RPC/storage-policy/provider change, signup, outgoing communication, payment, or Production Help publication performed.
+
+## September 9 resumed native acceptance
+
+The continuing polish task completed final-build role switching and fresh launches on iPhone and Android, existing estimate/invoice native rendering, cancellation/retry and temporary-file cleanup. Android standard testing controls were explicitly approved for the dedicated ServSync emulator; network interruption/recovery, Back behavior and Files cancellation passed. See [the current acceptance matrix](ServSync_Native_Polish_Acceptance_2026-09-09.md) for exact platform paths and remaining physical-device/accessibility items. The [native PDF guidance draft](../tutorials/NATIVE_PDF_GUIDANCE_DRAFT_2026-09-09.md) is ready for review; TUT-002 replacement/publication remains open. Earlier unverified items above describe the original prototype increment.
+
+The final native polish correction prevents section jumps from scrolling the outer workspace. Rebuilt Android section-jump, Photos/Albums cancellation and keyboard checks passed; rebuilt iPhone sign-in/Work passed, with its final section-jump replay still limited by CUA pointer errors. See the acceptance matrix for the build sequence and remaining checks.

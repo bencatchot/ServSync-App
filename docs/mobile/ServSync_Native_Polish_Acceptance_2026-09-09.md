@@ -8,56 +8,60 @@ The old iPhone document screen allowed scrolled content beneath the status bar. 
 
 The software-keyboard test exposed a focused field hidden by the navigation after resize. The native viewport adapter now reveals the focused field after resize, hides workspace tabs during text editing, and compensates for iOS visual-viewport panning. Editing text remains in the existing form. Blur restores navigation. Form controls use at least 16px text to avoid focus zoom. The connection notice is in the safe-area layout flow so it remains visible during editing.
 
+Business Profile section jumps exposed a second scroll container: `scrollIntoView` moved the native root by about 69 CSS pixels, carrying the header and bottom navigation out of position. The native workspace root now uses `overflow: clip`, while its content remains scrollable and public pages retain root scrolling. The rebuilt Android app passed the same Logo & Branding section jump with root scroll position zero, header/navigation in place, photo-picker cancel, focused-field reveal and blur. The rebuilt iPhone app passed sign-in and Work rendering, but its final section-jump replay remains unverified: CUA pointer actions repeatedly returned `windowNotFoundAtPosition`; keyboard controls worked. No substitute iPhone control method was used.
+
 Only inert class hooks were added to the shared sidebar layout. The website does not import the native stylesheet or install the native viewport adapter. No auth, role, permission, persistence, shared integration, or source-document behavior changed.
 
 ## Devices and access
 
-- iPhone: dedicated iPhone 17 / iOS 26.5, `2821CA81-0355-4FD8-BAF8-532A27C3233A`.
-- Android: created separate `ServSync_Pixel_8_API_36`, booted as `emulator-5556`; APK installation succeeded. Used the already installed API 36 Google APIs arm64 image. No SDK agreement was accepted.
-- AthleticsArc's `emulator-5554` / `AthleticsArc_Pixel_8_API_36` and iPhone 17 Pro were preserved. GUI coordination confirmed the other task has no supported CUA emulator target either.
-- CUA lists no Android emulator application and rejects the qemu executable and attempted emulator bundle identifier. No shell touch/key injection, emulator-console interaction, or adb screenshot was substituted for CUA. Android interactive acceptance is blocked by the required UI access path.
-- The Mac locked during iPhone testing. CUA automatic unlock failed; manual unlock was requested. Browser Help review remained available separately.
+- iPhone: dedicated iPhone 17 / iOS 26.5, `2821CA81-0355-4FD8-BAF8-532A27C3233A`. CUA testing resumed after Ben unlocked the Mac.
+- Android: separate `ServSync_Pixel_8_API_36`, `emulator-5556`, installed API 36 Google APIs arm64 image. Ben explicitly approved standard Android testing controls after CUA could not target the emulator. Every scoped control verified the AVD identity. No SDK agreement was accepted.
+- AthleticsArc's `emulator-5554` / `AthleticsArc_Pixel_8_API_36` and iPhone 17 Pro were preserved. Simulator GUI use was coordinated with that task and released after iPhone checks.
 
 ## Runtime matrix
 
-Only existing fictional Demo identities and records were used. No document, message, payment, recovery email, or signup was submitted.
+Only existing fictional Demo identities and records were used. No document, message, payment, recovery email, or signup was submitted. The estimate and invoice remained Draft, $250; the invoice remained paid $0, balance $250.
 
-| Check | iPhone evidence in this increment | Android |
+| Check | iPhone evidence | Android evidence |
 | --- | --- | --- |
-| Fresh launch and session | Rebuilt app repeatedly restored the homeowner session and Demo Bay Home; no black screen after startup | Blocked: CUA access |
-| Sign-out | Homeowner sign-out returned to public landing and removed private navigation | Blocked |
-| Contractor sign-in / identity separation | Existing contractor opened Gulf Coast Home Services with contractor Calendar/Work/Customers; homeowner private Documents workspace absent. One early CUA input attempt failed; exact password entered after focus settled succeeded. Direct Demo credential check also passed without logging secrets | Blocked |
-| Header / safe area | Status bar, Demo label, header, and bottom controls visually separated; the scrolled form stayed below the header | Blocked |
-| Scrolling | Long Documents and Work screens scrolled with keyboard navigation. CUA drag/wheel attempts did not establish touch-scroll behavior; real touch scrolling remains open | Blocked |
-| Keyboard | Software keyboard shown on homeowner document notes; focused field stayed visible after correction. Typed/cleared temporary text without upload/save; blur restored navigation | Blocked |
-| Work | Work overview, saved estimate list, existing $250 Draft estimate visible | Blocked |
-| Calendar | Contractor Agenda and Month controls rendered September 2026 | Blocked |
-| Customers | Sarah Johnson / Demo Bay Home opened with the expected connected customer context | Blocked |
-| Estimate PDF preview/share/cancel | PR #572 evidence remains valid prior evidence; new-build repeat interrupted by Mac lock before the PDF controls | Blocked |
-| Invoice PDF preview/share/cancel | Not yet established; do not create or send a replacement invoice merely for the check | Blocked |
-| Files chooser cancel | Native Files Recents opened, canceled, returned to unchanged document form; count remained 0/50 | Blocked |
-| Photo chooser cancel | Native Photo Library opened, canceled without selecting or uploading an image | Blocked |
-| Connection loss/recovery | Notice presentation moved into safe layout; actual device interruption/recovery remains unverified | Blocked |
-| Back / modal dismissal / root minimize | Android-specific; not inferred from iPhone | Blocked |
-| Physical camera / accessibility | No physical camera available. Web content still absent from Simulator accessibility tree; screenshots do not establish VoiceOver | No physical device; TalkBack not tested |
+| Fresh launch and session | Final installed app restored contractor Gulf Coast Home Services and homeowner Demo Bay Home after termination; no black screen | Both roles restored after force-stop/relaunch; root minimize/reopen also retained the homeowner session |
+| Sign-out / role switching | Both roles returned to public landing; contractor and private homeowner navigation separated | Both roles signed out to public landing, and the next identity received the correct workspace |
+| Header / safe area | Status bar, Demo label, header and bottom controls visually separated; scrolled form stayed below header | Status bar, Demo label, header, keyboard and bottom navigation separated; see renderer investigation below |
+| Scrolling | Documents and Work scrolled using keyboard navigation. CUA drag/wheel did not establish touch scrolling | Touch swipes scrolled Calendar, Work estimates, invoices and homeowner Documents while header/navigation stayed in place |
+| Keyboard | Software keyboard on document notes; focused field visible after correction, temporary text cleared, blur restored tabs | Sign-in and customer-search keyboard visible without header overlap; tabs hidden during editing and restored after blur. Customer search text survived network loss/recovery. Document-note temporary text cleared without upload; system stylus onboarding was canceled |
+| Work / Calendar / Customers | Existing saved $250 estimate, September Calendar, Sarah Johnson / Demo Bay customer context | Same existing estimate; Agenda and Month; connected Sarah Johnson customer details |
+| Estimate PDF | System sheet → Apple Preview rendered one-page estimate with title, customer, scope, line items and $250 total; returned, retried, canceled and closed | System sheet → Print rendered the same one-page estimate. Returned without selecting a printer, retried sheet, canceled and dismissed dialog with Back |
+| Invoice PDF | Apple Preview rendered existing draft invoice, $250 total / $0 paid / $250 due; retry/cancel/Close passed | System Print preview rendered the same amounts and line items; return/retry/cancel/Close passed. No print job or external delivery submitted |
+| Temporary PDF cleanup | One cached file during sharing; zero PDF files after each dialog Close | Retry reused one cached path; zero cached PDFs after estimate Back dismissal and invoice Close |
+| Files chooser cancel | Files Recents canceled to unchanged form, 0/50 manual documents | Native Recent chooser canceled with Back; unchanged empty notes and 0/50 manual documents. Also recovered after app termination during an earlier chooser attempt |
+| Photo chooser cancel | Native Photo Library opened and canceled without selection | Business Profile Upload logo opened native Photos/Albums; Back canceled to the unchanged empty logo. Repeated on the final rebuilt APK; no image selected or uploaded |
+| Connection loss/recovery | Actual interruption remains unverified; no isolated Simulator network control was established | Disabled only this emulator's Wi-Fi and mobile data. Notice remained visible with keyboard; restored both to their original enabled state. Notice cleared and typed search text remained |
+| Android Back | Not applicable | Closed drawer and PDF dialog, traversed from Financials to Work, and minimized at root; reopening preserved session |
+| Physical camera / accessibility | No physical camera; Simulator web content absent from accessibility tree; VoiceOver remains open | No physical device; TalkBack remains open |
 
-The remaining iPhone contractor fresh-launch/sign-out and return-to-homeowner checks must be repeated on the final installed build. Role-switch evidence is UI state separation, not a new authorization or cross-tenant security audit.
+Role-switch evidence establishes UI session separation, not a new cross-tenant security audit. Screenshots and temporary-file counts are retained under ignored `mobile-build/evidence/`.
+
+During Android credential entry, a keyboard Tab attempt did not move focus and briefly placed the Demo homeowner password in the email field. The field was cleared before submission, the screenshot was removed locally, and direct field taps completed sign-in. Removal does not erase the earlier tool-output image in this task. The credential was not included in repository files or PR evidence. Owner rotation of this Demo credential is recommended; no password was changed.
+
+## Android renderer investigation
+
+With the emulator's default graphics backend, Financials repeatedly painted a second header over its “At a Glance” heading. Read-only WebView inspection found exactly one header with correct geometry. A temporary local layout-containment probe did not fix the painting and was reverted. Restarting only the dedicated ServSync AVD with `-gpu swiftshader`, leaving the APK and app CSS unchanged, rendered “At a Glance” correctly on repeated navigation. This is evidence of an emulator graphics artifact, not an additional application header or a shipped CSS fix. The process-only software renderer follows [Android's graphics troubleshooting guidance](https://developer.android.com/studio/run/emulator-troubleshooting). No global AVD/toolchain setting or AthleticsArc process changed. Physical-device rendering still needs acceptance.
 
 ## Local verification
 
-- Mobile Demo/package guards plus viewport event regression: 6/6 pass. The regression covers focus → keyboard resize → reveal, iOS viewport offset, pinch-zoom protection, navigation restoration, and listener cleanup.
+- Mobile Demo/package guards, viewport and PDF lifecycle regressions: 8/8 pass. The PDF tests exercise the real adapter with mocked native boundaries: duplicate-click prevention, active-dialog protection, retry path reuse, cancellation, preparation failure, cleanup and focus restoration. The regression covers focus → keyboard resize → reveal, iOS viewport offset, pinch-zoom protection, navigation restoration, and listener cleanup.
 - TypeScript: pass.
 - Website build: pass.
 - ESLint: 0 errors, exactly 77 existing warnings.
 - Architecture checks: 26/26 pass.
-- Native builds: unsigned iOS simulator build succeeded; Android Debug build succeeded with JDK 21, installed API 36, SDK auto-download disabled, and task-scoped Gradle cache. Final source bundle builds both succeeded and was installed on the dedicated iPhone and Android emulator. Native acceptance still requires final-build UI checks after unlock.
+- Native builds: unsigned iOS simulator build succeeded; Android Debug build succeeded with JDK 21, installed API 36, SDK auto-download disabled, and task-scoped Gradle cache. The initial presentation build was used for the broad runtime matrix above. After the section-jump correction, both native builds succeeded and were reinstalled. Android section-jump, photo-picker cancel, keyboard reveal/blur and header/navigation were repeated; iPhone sign-in/Work passed, with the final iPhone section-jump limitation recorded above.
 - Local evidence and build logs are ignored under `mobile-build/`; credentials and generated binaries are not committed.
 
 ## Tutorial impact and remaining work
 
 Tutorial impact: UPDATE REQUIRED
 
-Fresh Help Studio searches: `mobile`, `iPhone`, `Android`, `safe area`, `keyboard`, `PDF`, `share`, `sign in`, `sign out`, `Calendar`, `Customers`, and `homeowner.documents` found no published walkthroughs. `Work` matched TUT-002, TUT-003, and TUT-005; `contractor.drafts` matched TUT-002; `contractor.financials` matched TUT-004; `estimate` also matched TUT-001. Recording requests were not counted as published results.
+Fresh Help Studio searches: `mobile`, `iPhone`, `Android`, `safe area`, `keyboard`, `PDF`, `share`, `sign in`, `sign out`, `Calendar`, `Customers`, and `homeowner.documents` found no published walkthroughs. `Work` matched TUT-002, TUT-003, and TUT-005; `contractor.drafts` matched TUT-002; `contractor.financials` matched TUT-004; `estimate` also matched TUT-001. Additional searches for `Business Profile`, `contractor.profile`, `Logo`, and `Go to section` found no published walkthroughs. Recording requests were not counted as published results.
 
 TUT-002 revision 3 still directs users to Drafts in its written steps. Its normal-speed video starts at Service Requests and ends in a saved $1,895 Draft. Preserve the existing [replacement brief](../tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md), including narrated/captioned media and publication verification. Ben's explicit approval is required for Production Help changes. No published revision was changed.
 
@@ -73,7 +77,7 @@ All five matching published videos were played from the beginning through their 
 
 No additional stale workflow instruction was identified in the other four lessons. End-frame screenshots and search results are retained under ignored `mobile-build/evidence/`. No Production Help save, revision, provider generation, upload, or publication occurred.
 
-Native PDF guidance remains a bounded follow-up after both-platform PDF acceptance. [The review draft](../tutorials/NATIVE_PDF_GUIDANCE_DRAFT_2026-09-09.md) records the intended scope and evidence still required; it is not publishable guidance or an assertion that Android sharing passed.
+The [native PDF review draft](../tutorials/NATIVE_PDF_GUIDANCE_DRAFT_2026-09-09.md) now records the verified iPhone Preview and Android Print-preview paths, cancellation and local cleanup. Installed destinations vary; a generic Android viewer, external delivery, and save-to-device completion were not tested. Narration, recording, approval and publication remain separate follow-up work.
 
 ## PR and website Preview
 
@@ -85,10 +89,6 @@ The existing $250 draft invoice `AUDIT 2026-09-07 — invoice draft check` was f
 
 ## Completion gates
 
-1. Restore CUA iPhone access and finish the current-build session, PDF, and connection checks.
-2. Obtain a supported CUA Android surface/device, or an explicit owner revision of the CUA-only restriction. Do not reuse AthleticsArc's emulator.
-3. Verify invoice/PDF viewer availability using existing Demo records, without sending or processing payment.
-4. Complete physical touch/camera and VoiceOver/TalkBack checks where hardware permits; otherwise retain explicit open release items.
-5. Prepare, approve, publish, and verify the required TUT-002 narrated/captioned replacement through the protected Help workflow. Finalize native PDF guidance only from verified platform behavior.
-
+1. Replay the final iPhone Business Profile section jump when pointer control is available. Complete physical iPhone touch/network/camera and VoiceOver checks, plus Android camera/TalkBack checks on suitable devices.
+2. Prepare, approve, publish and verify the required TUT-002 narrated/captioned replacement through the protected Help workflow. Native PDF guidance has a reviewable platform-specific draft; no Production Help change has been made.
 Native server-route/CORS integration, callbacks/deep links, notifications, offline synchronization, provider/payment integrations, signing, distribution, and store submission remain outside this increment. No protected integration was required for these layout corrections.
