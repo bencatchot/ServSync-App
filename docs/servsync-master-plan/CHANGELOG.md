@@ -1,5 +1,17 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-09 — Native Work parity correction
+
+- Found that both installed native packages omitted the three current Work switches, while hosted Demo enabled them and the same approved contractor was eligible. Native-only build defines now match Demo, reject conflicting inputs and preserve server-owned eligibility; 11/11 mobile tests pass.
+- Both corrected apps display current At a Glance. Android Start New Draft/Estimate planning entry is verified without record creation; iPhone composer activation remains limited by CUA pointer errors. Earlier legacy Work acceptance is explicitly qualified.
+- Corrected TUT-002 review: written Draft-first steps are valid; its legacy video demonstrates another path. The revised brief calls for current Draft-first narrated/captioned media. No shared configuration, permissions, records, Production Help or merge changed.
+
+## 2026-09-09 — Native presentation polish prepared; acceptance remains open
+
+- Native-only safe-area layout keeps the Demo label/header, scrolling content, and navigation inside the usable viewport. Keyboard resize reveals focused fields and avoids navigation overlap; website layout retains its existing styles.
+- After unlock and explicit approval for standard controls on the separate ServSync Android emulator, both platforms passed role switching/session restoration, core navigation and existing estimate/invoice PDF rendering/retry/cancel/cleanup. iPhone used Apple Preview; Android used system Print preview without printing. Android keyboard/network recovery, Back navigation/minimize and Files/Photos cancellation passed. A Business Profile section jump exposed outer-root scrolling; native-only clipping corrected it on Android. Both final apps rebuilt; final iPhone sign-in/Work passed, while its section-jump replay remains blocked by CUA pointer errors. Added PDF adapter lifecycle/failure tests (8/8 mobile tests total). Physical-device/accessibility and bounded tutorial follow-ups remain open; no records were sent or payments submitted.
+- Added a viewport event-order regression, an explicit platform acceptance matrix, and a bounded native PDF guidance draft. TUT-002 remains UPDATE REQUIRED and Production Help publication remains owner-gated. No store/distribution or shared configuration change.
+
 ## 2026-09-09 — ServSync native Demo prototype foundation (in progress)
 
 - Added isolated iPhone and Android Capacitor projects with bundled local React assets and an explicit Demo-only build guard.

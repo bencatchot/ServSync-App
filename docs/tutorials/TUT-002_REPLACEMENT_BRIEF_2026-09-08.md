@@ -1,41 +1,42 @@
 # TUT-002 replacement brief — September 8, 2026
 
-Status: Prepared for review; no Production Help record or media changed.
+Status: revised September 9 after native/hosted Work parity investigation; prepared for review. No Production Help record or media changed.
 
-The published revision 3 of **How to create an estimate** shows the service-request-to-estimate workflow. Its written steps incorrectly direct the user to open Drafts, choose Estimate, and select the customer/home. The video instead starts in Service Requests, uses Create Estimate, and carries the customer and home into the estimate. This mismatch predates PR #571. The video is also a legacy silent package, already listed for the FB-040A narration/caption upgrade.
+## Corrected finding
 
-## Replacement copy
+The published revision 3 of **How to create an estimate** has valid Draft-first written guidance: open Drafts, start a draft, choose Estimate, select the customer/home, add the work, then create the estimate. The earlier conclusion that these steps were obsolete was wrong. The initial native bundle omitted the three current Work build switches and showed the legacy fallback; the same Demo contractor is eligible for the current workflow on hosted Demo.
+
+The 45.12-second legacy silent video demonstrates a different entry path: Service Requests → Create Estimate → Build blank estimate → Save estimate draft. It does not demonstrate the current Drafts instructions or their `contractor.drafts` Help context. Replace the video and narration with the current Draft-first flow; do not rewrite valid steps around the legacy recording. This replaces the earlier service-request-focused proposal in this brief.
+
+September 9 read-only verification used the same approved Demo contractor on hosted Demo and the corrected Android app. Work shows At a Glance and Start New Draft; Work → Drafts also offers Start New Draft. The composer offers an Estimate intended output, customer/property, work/pricing, Save Draft and Create Estimate. No Draft or Estimate was saved or created in this comparison. The corrected iPhone Work dashboard rendered, but composer activation remains limited by CUA pointer errors.
+
+## Proposed replacement copy
 
 Title: How to create an estimate
 
-Summary: Start from a homeowner service request, add the agreed scope and pricing, and save an estimate draft with the customer and home attached.
+Summary: Start a contractor Draft, choose Estimate, add the customer, property, work and pricing, then create a draft Estimate for review.
 
 Steps:
 
-1. Open Service Requests and review the homeowner's request, customer, and home.
-2. Select Create Estimate on that request, then choose Build blank estimate.
-3. Confirm the customer and home carried over. Add an estimate title, scope of work, and line items with quantities and prices.
-4. Review the line items and total, then select Save estimate draft.
-5. Confirm the saved estimate shows Draft. Saving keeps it private; sending it to the homeowner is a separate action.
+1. Open Work, then Drafts. Select Start New Draft. You can also select Start New Draft directly from the Work overview.
+2. Choose Estimate under Intended output. Select the customer and property, then add a Draft title and scope of work.
+3. Add the estimate line items and review quantities, pricing, labor and the total. Private notes remain company-only.
+4. Select Save Draft if planning is unfinished. When ready to create the estimate, select Create Estimate.
+5. Confirm the resulting Estimate and its Draft status before using any separate sending action.
 
-Existing-record note: If the request already has an estimate draft, its action may read Open Estimate. Open the existing draft to continue rather than create a duplicate. The recording should start from a clean, approved request-ready Demo fixture and show the exact Create Estimate label.
+The final creation and saved-state steps must be verified in the approved recording fixture; this read-only pass verified the controls and existing workflow implementation without producing a record.
 
-## Draft narration for the replacement
+## Draft narration
 
-Start in Service Requests and review the homeowner's message, customer, and home. Select Create Estimate on the request to keep those details attached. Choose Build blank estimate, then add a clear title and scope of work. Add the work as line items, with quantities and prices. Review the total before selecting Save estimate draft. The saved estimate stays linked to the customer and home. Its Draft status means it has not been sent to the homeowner. Sending the estimate for review is a separate step.
+Open Work, choose Drafts, and select Start New Draft. You can also start directly from the Work overview. Choose Estimate as the intended output. Select the customer and property, then enter a clear title and scope. Add the estimate line items and review the quantities, labor, pricing and total. Use Private notes only for company planning. Select Save Draft if you want to continue later. When the details are ready, select Create Estimate. Review the resulting estimate and confirm its Draft status. Sending it to the customer is a separate action.
 
 ## Recording and acceptance scope
 
 - Owner: Codex prepares the bounded replacement; Ben approves Production Help changes.
-- Audience: retain the existing authorized contractor Owner/Admin/Office audience; do not widen roles or visibility.
-- Use the existing governed `contractor-create-estimate` recorder scenario and approved Demo identities. Do not reset unrelated or unregistered Demo records.
-- Revalidate the existing 45.12-second visual source against the reviewed Demo build, or record a replacement source when that comparison requires it. Do not change the currently published immutable revision while preparing the replacement.
-- Apply the current `narrated_captioned_v1` standard: Cedar narration, synchronized compact English cues, transcript, disclosure, media checksums, and normal-speed plus sound-off review. Narration timing must follow the actual recorded actions, especially the Save estimate draft action and final Draft state.
-- No narration has been generated for this brief. A provider request, credential/configuration change, new Production recording request, upload, approval, and publication are not authorized by this local document.
-- Verify the new published revision through its existing contextual Help placement. Review route-context metadata against the actual estimate entry points without silently expanding Help availability.
+- Preserve the existing authorized contractor Owner/Admin/Office audience and `contractor.drafts` placement. Do not widen roles or visibility.
+- Use the approved Demo identities and a governed, isolated recording fixture. Revalidate/adapt the `contractor-create-estimate` recorder scenario to the current ordinary Draft-first UI. Do not use recorder presentation mode to force the legacy fallback or reuse its old video as proof of the current route. Do not reset unrelated or unregistered records.
+- Follow `narrated_captioned_v1`: Cedar narration, synchronized compact English captions, transcript, disclosure, media checksums, and normal-speed plus sound-off review. Narration must match actual Save Draft/Create Estimate actions and the resulting state.
+- No narration has been generated for this revised brief. Provider generation, new Production recording requests, upload and publication remain unapproved. This document grants no such authority.
+- Verify the approved replacement through the existing contextual Help placement, and retain the current immutable published revision until replacement is ready.
 
-The current SQL publication gate (`servsync-help-narration-caption-foundation.sql`, `servsync_transition_help_walkthrough`) rejects new publication of a protected tutorial without `narrated_captioned_v1` and passed caption/sound-off reviews. A text-only republication of this silent legacy revision is therefore not a valid completion path. Keep the existing lesson available until the approved replacement is ready.
-
-## Release relationship
-
-PR #571's application corrections are independently validated. If Ben approves merging before this replacement is published, record the temporary tutorial gap explicitly and keep this follow-up open. Do not mark the overall correction task complete until the required replacement is published and verified, as required by the repository Tutorial Freshness Gate.
+The protected publication function requires `narrated_captioned_v1` and passed caption/sound-off reviews. A text-only republication of the silent legacy revision does not satisfy the gate. Tutorial impact remains UPDATE REQUIRED because the media and steps demonstrate different flows and the media needs its narration/caption upgrade. Do not report the overall task complete until the approved replacement is published and verified.

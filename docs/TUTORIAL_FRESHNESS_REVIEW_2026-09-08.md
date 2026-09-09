@@ -1,5 +1,7 @@
 # PR #571 tutorial freshness review — September 8, 2026
 
+September 9 correction: the original TUT-002 interpretation below is superseded by the native/hosted parity investigation. Its written Drafts → Estimate workflow is supported by the current app. The legacy video shows a different entry path; replace the media to match current Draft-first guidance, rather than replacing valid steps with the legacy path. See the [revised brief](tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md). The historical playback observations are retained.
+
 Help Studio access was restored after the Mac was unlocked. The existing Production administrator session displayed five published walkthroughs and zero unpublished walkthroughs. All five published videos were opened in Preview, played to their reported end at normal speed, and their sampled workflow scenes, written steps, and available transcripts were compared with the current Demo and PR #571's changes. No Production content was saved or published.
 
 ## Search evidence

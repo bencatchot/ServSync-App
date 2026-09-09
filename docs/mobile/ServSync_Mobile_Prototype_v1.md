@@ -2,6 +2,10 @@
 
 Owner direction: September 9, 2026, iPhone and Android together. Branch `codex/mobile-prototype-v1`, based on main `68e16f52c339a68630dd6826de6db03f347fa966`.
 
+## Continuing acceptance
+
+PR #572 is merged at `fd912266919eb02dc821cdb4e150538b38d4f944`. The next native presentation increment and its explicit device/tutorial blockers are tracked in [September 9 native acceptance](ServSync_Native_Polish_Acceptance_2026-09-09.md). The original evidence below remains historical; compilation does not close native acceptance.
+
 ## Implemented
 
 Capacitor 8.5.1 projects at `mobile/ios` and `mobile/android` bundle the existing React app using a separate `mobile/index.html` and `src/mobile/main.ts` entry point. The provisional identity is `app.servsync.demo`, named ServSync Demo. The Vite mobile configuration requires the exact Demo Supabase URL and a public key; it rejects privileged credentials and non-Demo legacy JWTs. Anonymous/publishable keys are kept in ignored local configuration; no passwords are bundled.
@@ -44,12 +48,22 @@ Password recovery/invitation links remain web links; they do not automatically r
 ## Tutorial freshness
 
 Tutorial impact: UPDATE REQUIRED
-Tutorial evidence: September 9 searches for mobile, iPhone, Android, PDF, share, sign in, and Calendar found no matching walkthroughs. Contractor, Work, and estimate searches identified existing guidance. Opened Preview for all five published walkthroughs and reviewed their written steps; TUT-002 revision 3 still says to open Drafts. Native PDF behavior was verified separately. Full media playback comparison remains open; the September 8 full-playback review is prior evidence only.
+Tutorial evidence: September 9 searches for mobile, iPhone, Android, PDF, share, sign in, and Calendar found no matching walkthroughs. Contractor, Work, and estimate searches identified existing guidance. Opened Preview for all five published walkthroughs and reviewed their written steps; TUT-002 revision 3 still says to open Drafts. Native PDF behavior was verified separately. The continuing polish task subsequently played all five published videos to their reported ends; see the September 9 native acceptance record for that newer evidence.
 Affected tutorials: TUT-002 How to create an estimate, revision 3; native PDF guidance assessment remains open.
 Tutorial follow-up: Codex completes native acceptance and Help Studio comparison, then prepares any required mobile guidance; Ben authorizes Production Help publication.
 
-Known existing follow-up: TUT-002 “How to create an estimate,” revision 3, needs the narrated/captioned replacement already recorded in PR #571. This prototype does not publish or retire Help content. The new native PDF behavior also requires a mobile-specific walkthrough assessment after interactive acceptance. Fresh Help Studio search and written-step Preview review are recorded above. Complete video playback comparison and prepare mobile PDF guidance covering Preview PDF → Open or share PDF → system viewer/save/cancel → return, after both-platform acceptance. Do not merge this prototype or declare tutorial completion from compilation alone.
+Known existing follow-up: TUT-002 “How to create an estimate,” revision 3, needs the narrated/captioned replacement already recorded in PR #571. This prototype does not publish or retire Help content. The new native PDF behavior also requires a mobile-specific walkthrough assessment after interactive acceptance. Fresh Help Studio search and written-step Preview review are recorded above. The continuing task completed video playback comparison; after both-platform acceptance, finalize mobile PDF guidance covering Preview PDF → Open or share PDF → system viewer/save/cancel → return, after both-platform acceptance. Do not merge this prototype or declare tutorial completion from compilation alone.
 
 ## Release state
 
 Development foundation implemented for review; prototype acceptance incomplete. No main merge, production deployment, shared Auth/SQL/RLS/RPC/storage-policy/provider change, signup, outgoing communication, payment, or Production Help publication performed.
+
+## September 9 resumed native acceptance
+
+The continuing polish task completed final-build role switching and fresh launches on iPhone and Android, existing estimate/invoice native rendering, cancellation/retry and temporary-file cleanup. Android standard testing controls were explicitly approved for the dedicated ServSync emulator; network interruption/recovery, Back behavior and Files cancellation passed. See [the current acceptance matrix](ServSync_Native_Polish_Acceptance_2026-09-09.md) for exact platform paths and remaining physical-device/accessibility items. The [native PDF guidance draft](../tutorials/NATIVE_PDF_GUIDANCE_DRAFT_2026-09-09.md) is ready for review; TUT-002 replacement/publication remains open. Earlier unverified items above describe the original prototype increment.
+
+The final native polish correction prevents section jumps from scrolling the outer workspace. Rebuilt Android section-jump, Photos/Albums cancellation and keyboard checks passed; rebuilt iPhone sign-in/Work passed, with its final section-jump replay still limited by CUA pointer errors. See the acceptance matrix for the build sequence and remaining checks.
+
+## September 9 Work parity correction
+
+The earlier native Work checks used the legacy fallback because the mobile build omitted all three current Work switches. Installed iPhone/Android bundles were verified, hosted Demo embeds all three as true, and the same contractor is cohort-eligible. Native-only build defines now match the approved Demo workflow and reject conflicting values while retaining account checks. Both rebuilt apps show current At a Glance; Android Start New Draft/Estimate entry and keyboard visibility passed without saving. iPhone composer activation remains blocked by CUA pointer errors. Earlier legacy navigation evidence is not full current-workflow acceptance. TUT-002 written Draft-first steps are current; its replacement media must align with them, as corrected in the revised brief.

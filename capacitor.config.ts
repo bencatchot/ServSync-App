@@ -4,7 +4,7 @@ const config: CapacitorConfig = {
   appId: 'app.servsync.demo',
   appName: 'ServSync Demo',
   webDir: 'dist-mobile',
-  ios: { path: 'mobile/ios', contentInset: 'always' },
+  ios: { path: 'mobile/ios', contentInset: 'never' },
   android: { path: 'mobile/android' },
   // Bundle the app locally. No remote-server URL, cleartext, or navigation wildcard.
 };
