@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-09 — Native presentation polish prepared; acceptance remains open
+
+- Native-only safe-area layout keeps the Demo label/header, scrolling content, and navigation inside the usable viewport. Keyboard resize reveals focused fields and avoids navigation overlap; website layout retains its existing styles.
+- iPhone evidence covers homeowner session restoration/sign-out, contractor sign-in and workspace separation, Work/Calendar/Customers, software-keyboard editing, and Files/Photo Library cancellation without upload. Separate Android AVD creation, boot, compilation, and APK installation passed; CUA has no Android emulator target. The Mac locked before the remaining iPhone PDF/session checks.
+- Added a viewport event-order regression, an explicit platform acceptance matrix, and a bounded native PDF guidance draft. TUT-002 remains UPDATE REQUIRED and Production Help publication remains owner-gated. No store/distribution or shared configuration change.
+
 ## 2026-09-09 — ServSync native Demo prototype foundation (in progress)
 
 - Added isolated iPhone and Android Capacitor projects with bundled local React assets and an explicit Demo-only build guard.

@@ -45,6 +45,10 @@ For Android, use JDK 21 and an installed Google Android SDK with accepted licens
 - Camera/photo usage descriptions for existing HTML upload inputs. Actual capture, selection, cancellation, and upload require native-device verification.
 - Filesystem API privacy reason declaration; this is not a complete App Store privacy disclosure.
 
+## Native presentation verification
+
+The native-only layout owns safe-area spacing, keeps the workspace header above scrolling content, and reveals focused fields after keyboard resize. iPhone software-keyboard and Files/Photo Library cancellation checks have evidence. The separate ServSync Android AVD is `ServSync_Pixel_8_API_36` (`emulator-5556` during this run); CUA cannot currently target its emulator app, so Android interactive acceptance remains blocked. See [the current acceptance matrix](../docs/mobile/ServSync_Native_Polish_Acceptance_2026-09-09.md) before making any readiness claim.
+
 ## Explicit limitations
 
 This is a feasibility prototype, not a store-ready app. Both native projects compile; iOS sign-in/session switching, core navigation, and estimate PDF preview/share/cancel have initial runtime evidence. Remaining checks are tracked in `docs/mobile/ServSync_Mobile_Prototype_v1.md`. Browser-relative `/api/*` routes (including external email delivery, some guest views, payment and Marketing operations) need a deliberate native/server integration and CORS/cookie assessment; they must not be represented as working in the prototype. No global fetch interception, origin spoofing, or authentication workaround has been added. Core Supabase-backed sign-in and record screens are the first intended test path.

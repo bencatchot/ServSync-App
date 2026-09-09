@@ -2,6 +2,10 @@
 
 Owner direction: September 9, 2026, iPhone and Android together. Branch `codex/mobile-prototype-v1`, based on main `68e16f52c339a68630dd6826de6db03f347fa966`.
 
+## Continuing acceptance
+
+PR #572 is merged at `fd912266919eb02dc821cdb4e150538b38d4f944`. The next native presentation increment and its explicit device/tutorial blockers are tracked in [September 9 native acceptance](ServSync_Native_Polish_Acceptance_2026-09-09.md). The original evidence below remains historical; compilation does not close native acceptance.
+
 ## Implemented
 
 Capacitor 8.5.1 projects at `mobile/ios` and `mobile/android` bundle the existing React app using a separate `mobile/index.html` and `src/mobile/main.ts` entry point. The provisional identity is `app.servsync.demo`, named ServSync Demo. The Vite mobile configuration requires the exact Demo Supabase URL and a public key; it rejects privileged credentials and non-Demo legacy JWTs. Anonymous/publishable keys are kept in ignored local configuration; no passwords are bundled.

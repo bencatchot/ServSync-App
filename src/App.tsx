@@ -49547,15 +49547,15 @@ function SidebarLayout({
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F7F9FC] md:h-screen md:overflow-hidden">
+    <div className="workspace-shell flex min-h-screen bg-[#F7F9FC] md:h-screen md:overflow-hidden">
       <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col">
         {sidebarContent}
       </aside>
 
       {mobileOpen && <MobileNavigationDialog onClose={() => setMobileOpen(false)}>{sidebarContent}</MobileNavigationDialog>}
 
-      <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:hidden shrink-0">
+      <div className="workspace-column flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:overflow-hidden">
+        <div className="workspace-header flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:hidden shrink-0">
           <button type="button" aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center text-[#223D67] hover:text-[#0078FF] transition-colors">
             <Menu size={22} />
           </button>
@@ -49565,7 +49565,7 @@ function SidebarLayout({
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
-        <main className="min-h-0 flex-1 overflow-y-visible md:overflow-y-auto">
+        <main className="workspace-content min-h-0 flex-1 overflow-y-visible md:overflow-y-auto">
           <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 pb-24 sm:px-6 md:pb-5">
             <div className="hidden items-center justify-between gap-3 md:flex">
               <div>
@@ -49580,7 +49580,7 @@ function SidebarLayout({
       {visibleMobileNavItems.length > 0 && (
         <nav
           aria-label={`${brand.subtitle} mobile navigation`}
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur md:hidden"
+          className="workspace-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur md:hidden"
         >
           <div className="mx-auto flex max-w-xl gap-1">
             {visibleMobileNavItems.map(renderMobileNavButton)}

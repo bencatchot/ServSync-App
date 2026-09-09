@@ -1,3 +1,5 @@
+import './native.css';
+import { installNativeViewport } from './viewport';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
@@ -6,15 +8,17 @@ import { showNativePdf } from './pdf';
 
 async function start() {
   if (Capacitor.isNativePlatform()) {
+    document.documentElement.classList.add('servsync-native');
+    installNativeViewport();
     registerNativePdfAction(showNativePdf);
     const label = document.createElement('div');
     label.textContent = 'ServSync Demo · Test accounts only';
-    label.style.cssText = 'text-align:center;background:#223d67;color:white;font:12px system-ui;padding:5px';
+    label.className = 'native-demo-label';
     document.body.prepend(label);
     const connection = document.createElement('div');
     connection.setAttribute('role', 'status');
-    connection.style.cssText = 'position:fixed;bottom:90px;left:12px;right:12px;z-index:1000;background:#92400e;color:white;border-radius:8px;padding:12px;font:14px system-ui';
-    document.body.append(connection);
+    connection.className = 'native-connection-notice';
+    document.getElementById('root')?.before(connection);
     const updateConnection = ({ connected }: { connected: boolean }) => {
       connection.hidden = connected;
       connection.textContent = connected ? '' : 'No connection. Changes cannot be saved. Reconnect before continuing.';
