@@ -81,7 +81,7 @@ The [native PDF review draft](../tutorials/NATIVE_PDF_GUIDANCE_DRAFT_2026-09-09.
 
 ## PR and website Preview
 
-Draft [PR #573](https://github.com/bencatchot/ServSync-App/pull/573) contains the implementation. Application commit `58ba0725bd6105c376735cbed8b5ab8108d81f8c` passed the full repository PR quality workflow and all three normal Vercel Preview statuses.
+Draft [PR #573](https://github.com/bencatchot/ServSync-App/pull/573) contains the implementation. Application commit `625a58967dd91e409eea25288fce14ecda1e01cd`, including the section-jump correction, passed the full repository PR quality workflow and all three normal Vercel Preview statuses.
 
 The [Demo web Preview](https://servsync-demo-git-codex-mobile-nati-3b7d75-bencatchots-projects.vercel.app) was checked through CUA with the existing Demo contractor: login, Dashboard, Financials invoice draft filter, Customers, 390px mobile navigation/drawer, Escape dismissal, and focus restoration passed. DOM style inspection confirmed no native class or native stylesheet and the unchanged static body positioning. No browser console errors were captured. The temporary viewport override was reset.
 
