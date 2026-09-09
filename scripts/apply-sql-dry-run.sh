@@ -128,6 +128,8 @@ SQL_FILES=(
   "servsync-admin-contractor-connection-alerts.sql"
   "servsync-go-live-security-hardening.sql"
   "servsync-discover-media-browser-safe.sql"
+  "servsync-contractor-billing-readiness.sql"
+  "servsync-admin-contractor-prospects.sql"
 )
 
 echo

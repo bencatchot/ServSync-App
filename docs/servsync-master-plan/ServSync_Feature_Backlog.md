@@ -20,6 +20,10 @@ The `codex/astra-audit-corrections-2026-09-07` branch implements bounded FB-016 
 
 FB-040A freshness review for PR #571 is complete: the September 8 Help Studio search and playback of all five published walkthroughs found TUT-001, TUT-003, TUT-004, and TUT-005 still applicable. September 9 parity review corrects the TUT-002 interpretation: its Drafts written workflow is current; the legacy Service Requests video demonstrates a different path and needs a Draft-first narrated/captioned replacement. Codex prepared the [bounded replacement brief](../tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md). Preserve revision 3 until replacement publication is explicitly approved and verified. Ben's merge decision must acknowledge this temporary gap if application fixes ship first. TUT-006 remains separately active. See [freshness evidence](../TUTORIAL_FRESHNESS_REVIEW_2026-09-08.md).
 
+## Admin-created contractor profiles and ownership claim — approved, source only
+
+Admins can prepare a public Discover listing marked Unclaimed and manually share a secure claim link. Before claiming, homeowner contact/connection/service actions are disabled and no operational contractor identity exists. Claiming requires the invited verified contractor email and explicit review; it preserves the listing identity and enables existing owner workflows. Source and local validation are prepared; the next step is an approved Sandbox migration and authenticated hosted acceptance, then Demo/Production rollout decisions. Help Studio freshness review is blocked by the locked Mac session; TUT-005 connection/request guidance is the bounded review target. Do not mark this workflow live or complete until rollout/acceptance and tutorial gates are resolved. See [implementation and release evidence](../features/ADMIN_CONTRACTOR_PROSPECTS_V1.md).
+
 ## Current ServSync Beta Context
 
 ServSync remains in controlled private beta. The current beta loop is:

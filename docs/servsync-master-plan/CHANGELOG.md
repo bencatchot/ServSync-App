@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-09 — Admin-prepared unclaimed contractor profiles (source only)
+
+- Added the platform-admin prospect editor, public informational Discover listings, token-free admin reads, private manual claim-link issuance/revocation, and a recipient review/claim screen. Unclaimed businesses cannot receive homeowner connections or service requests; phone, email, contact name, and website are excluded from public prospect responses.
+- Added an approved additive SQL migration with platform-admin authorization, private direct-table grants, explicit public-field projection, cross-table identity reservation, verified recipient email checks, stale-invite invalidation, and atomic ownership/billing creation. Existing profiles are not overwritten. Claimed businesses remain in Discover using their current owner-maintained public details.
+- Disposable PostgreSQL lifecycle/security/concurrency validation and desktop/mobile browser tests pass; the application type check and production build pass. One older mobile-readiness assertion is already incompatible with main's Capacitor prototype and remains outside this feature.
+- Sandbox, Demo, and Production SQL application remain pending separate approval. Help Studio review is blocked by the locked Mac session. This entry records source work, not live availability or completed rollout; see [feature evidence](../features/ADMIN_CONTRACTOR_PROSPECTS_V1.md).
+
+
 ## 2026-09-09 — Native Work parity correction
 
 - Found that both installed native packages omitted the three current Work switches, while hosted Demo enabled them and the same approved contractor was eligible. Native-only build defines now match Demo, reject conflicting inputs and preserve server-owned eligibility; 11/11 mobile tests pass.
