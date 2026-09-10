@@ -1,0 +1,324 @@
+{
+  "date": "2026-09-09 America/Chicago",
+  "runtime": {
+    "status": "passed",
+    "target": "zpzdkoaubyjtsomccxya",
+    "migrationSha256": "0aa72fef5517fa8e843d39876637394a75b36662e37496c362b02836baf6dd42",
+    "preservationRelations": 167,
+    "checks": [
+      "anonymous cannot access admin prospects",
+      "anonymous direct table denied",
+      "homeowner cannot access admin prospects",
+      "homeowner direct table denied",
+      "contractor cannot access admin prospects",
+      "contractor direct table denied",
+      "admin direct table denied",
+      "service role direct table denied",
+      "contractor self-promotion denied",
+      "public unclaimed profile",
+      "public contact and invitation redaction",
+      "no operational contractor before claim",
+      "unclaimed connection denied",
+      "unclaimed service request denied",
+      "reserved slug spoof denied",
+      "reserved UUID spoof denied",
+      "unsafe logo rejected",
+      "ordinary admin reads token-free",
+      "anonymous claim review redacted",
+      "wrong recipient review denied",
+      "wrong recipient claim denied",
+      "stale claim denied",
+      "failed validation preserves claim",
+      "verified recipient private review",
+      "concurrent claims have one winner",
+      "replay denied",
+      "same identity and reviewed fields without privilege injection",
+      "billing initialized exactly once",
+      "normal owner editing enabled",
+      "Discover reflects current owner fields",
+      "connection allowed after claim",
+      "service request works after claim",
+      "existing owner cannot overwrite or merge",
+      "rotation invalidates previous link",
+      "unverified account cannot claim",
+      "edits invalidate link",
+      "hidden profile not public",
+      "revoked link denied",
+      "expired link denied",
+      "browser admin UI creates public profile and recipient claim link",
+      "browser anonymous profile renders at mobile width with contact actions disabled",
+      "browser homeowner Discover lists the unclaimed profile",
+      "browser recipient reviews and claims; same public address becomes owned profile",
+      "browser flow has zero uncaught browser errors",
+      "zero fixture residue; all pre-existing relation fingerprints preserved"
+    ]
+  },
+  "browser": "Local reviewed source against real Sandbox; only unrelated legacy adoption/alert refresh RPCs intercepted. Hosted Sandbox is missing Supabase build configuration.",
+  "initialPreservationException": "Initial full admin dashboard refreshed one pre-existing contractor_connection_alerts row. Other 166 relation fingerprints matched; no guessed restoration. Final guarded run preserves all 167 starting fingerprints.",
+  "catalog": "Only intended additions; no existing definitions changed or removed.",
+  "parity": {
+    "demo": [
+      {
+        "category": "intentionalAdditionGroups",
+        "object": "demo-scenario-infrastructure-v1",
+        "kind": "fingerprint-mismatch",
+        "reason": "Private Demo scenario registry and exact trusted operator helpers.",
+        "expected": {
+          "counts": {
+            "relations": 3,
+            "columns": 32,
+            "constraints": 17,
+            "indexes": 9,
+            "triggers": 2,
+            "functions": 6,
+            "functionGrants": 12,
+            "tableGrants": 48
+          },
+          "keyFingerprint": "sha256:f63af13d48e0bdc190c23d9fc6922247465b79041ceced1d9c889b6dc16e25bf",
+          "catalogFingerprint": "sha256:baf66b0bd3d39684932945107028fccc2bb50dc75b3ffcea48f43ec1ce8295e9"
+        },
+        "actual": {
+          "counts": {
+            "relations": 3,
+            "columns": 32,
+            "constraints": 17,
+            "indexes": 9,
+            "triggers": 2,
+            "functions": 6,
+            "functionGrants": 12,
+            "tableGrants": 48
+          },
+          "keyFingerprint": "sha256:f63af13d48e0bdc190c23d9fc6922247465b79041ceced1d9c889b6dc16e25bf",
+          "catalogFingerprint": "sha256:0e498585dd1605de00465b7ef9da23ce6bf22170c8c23bdb7a58451a2b0580b7"
+        }
+      }
+    ],
+    "sandbox": [
+      {
+        "category": "columns",
+        "object": "public.contractor_profiles.stripe_customer_id",
+        "kind": "missing"
+      },
+      {
+        "category": "columns",
+        "object": "public.contractor_profiles.stripe_subscription_id",
+        "kind": "missing"
+      },
+      {
+        "category": "indexes",
+        "object": "public.idx_contractor_stripe_customer",
+        "kind": "missing"
+      },
+      {
+        "category": "indexes",
+        "object": "public.idx_contractor_stripe_subscription",
+        "kind": "missing"
+      },
+      {
+        "category": "policies",
+        "object": "public.service_request_media.media_insert_contractor",
+        "kind": "logical-drift",
+        "fields": [
+          "check_expression"
+        ]
+      },
+      {
+        "category": "policies",
+        "object": "public.service_request_media.media_read_parties",
+        "kind": "logical-drift",
+        "fields": [
+          "using_expression"
+        ]
+      },
+      {
+        "category": "functions",
+        "object": "public._notif_contractor_user(uuid)",
+        "kind": "logical-drift",
+        "fields": [
+          "definition"
+        ]
+      },
+      {
+        "category": "functions",
+        "object": "public.notify_on_estimate()",
+        "kind": "logical-drift",
+        "fields": [
+          "definition"
+        ]
+      },
+      {
+        "category": "functions",
+        "object": "public.notify_on_support_message()",
+        "kind": "logical-drift",
+        "fields": [
+          "definition"
+        ]
+      },
+      {
+        "category": "functions",
+        "object": "public.servsync_contractor_propose_appointment(uuid, timestamp with time zone, text)",
+        "kind": "logical-drift",
+        "fields": [
+          "definition"
+        ]
+      },
+      {
+        "category": "functions",
+        "object": "public.servsync_create_field_work(uuid, uuid, uuid, uuid, text, jsonb, uuid)",
+        "kind": "missing"
+      },
+      {
+        "category": "functions",
+        "object": "public.servsync_homeowner_propose_appointment(uuid, timestamp with time zone, text)",
+        "kind": "logical-drift",
+        "fields": [
+          "definition"
+        ]
+      },
+      {
+        "category": "functions",
+        "object": "public.servsync_set_stripe_customer(uuid, text)",
+        "kind": "missing"
+      },
+      {
+        "category": "functions",
+        "object": "public.servsync_sync_stripe_subscription(text, text, text, integer)",
+        "kind": "missing"
+      },
+      {
+        "category": "functions",
+        "object": "public.touch_support_inquiry_from_message()",
+        "kind": "logical-drift",
+        "fields": [
+          "definition"
+        ]
+      },
+      {
+        "category": "functionGrants",
+        "object": "public.servsync_create_field_work(uuid, uuid, uuid, uuid, text, jsonb, uuid)|postgres|EXECUTE",
+        "kind": "missing"
+      },
+      {
+        "category": "functionGrants",
+        "object": "public.servsync_create_field_work(uuid, uuid, uuid, uuid, text, jsonb, uuid)|service_role|EXECUTE",
+        "kind": "missing"
+      },
+      {
+        "category": "functionGrants",
+        "object": "public.servsync_set_stripe_customer(uuid, text)|postgres|EXECUTE",
+        "kind": "missing"
+      },
+      {
+        "category": "functionGrants",
+        "object": "public.servsync_set_stripe_customer(uuid, text)|service_role|EXECUTE",
+        "kind": "missing"
+      },
+      {
+        "category": "functionGrants",
+        "object": "public.servsync_sync_stripe_subscription(text, text, text, integer)|postgres|EXECUTE",
+        "kind": "missing"
+      },
+      {
+        "category": "functionGrants",
+        "object": "public.servsync_sync_stripe_subscription(text, text, text, integer)|service_role|EXECUTE",
+        "kind": "missing"
+      }
+    ]
+  },
+  "hostedPreview": {
+    "deployment": {
+      "id": "dpl_8e4ykZDfn2tvVopfgDDEkC98abae",
+      "url": "servsync-stripe-sandbox-dvna5aqh5-bencatchots-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "projectId": "prj_NaV69E1kZmcX6tcxGOXl5TmEQnXo",
+      "gitSource": {
+        "type": "github",
+        "repoId": 1261404662,
+        "ref": "codex/admin-contractor-claim",
+        "sha": "4a83472beb1a6fb79e0d4fd68566a93357e3d5c8"
+      },
+      "alias": [
+        "servsync-stripe-sandbox-git-codex-a-72970b-bencatchots-projects.vercel.app"
+      ]
+    },
+    "configuration": {
+      "project": "prj_NaV69E1kZmcX6tcxGOXl5TmEQnXo",
+      "branch": "codex/admin-contractor-claim",
+      "ref": "zpzdkoaubyjtsomccxya",
+      "added": [
+        {
+          "id": "WkiQ3t3lgmWTeI4J",
+          "key": "VITE_SUPABASE_URL",
+          "target": [
+            "preview"
+          ],
+          "gitBranch": "codex/admin-contractor-claim"
+        },
+        {
+          "id": "skRd0U1IqZYaCGhj",
+          "key": "VITE_SUPABASE_ANON_KEY",
+          "target": [
+            "preview"
+          ],
+          "gitBranch": "codex/admin-contractor-claim"
+        }
+      ],
+      "preservedExistingVariables": 7
+    },
+    "acceptance": {
+      "status": "passed",
+      "target": "zpzdkoaubyjtsomccxya",
+      "migrationSha256": "0aa72fef5517fa8e843d39876637394a75b36662e37496c362b02836baf6dd42",
+      "preservationRelations": 167,
+      "checks": [
+        "anonymous cannot access admin prospects",
+        "anonymous direct table denied",
+        "homeowner cannot access admin prospects",
+        "homeowner direct table denied",
+        "contractor cannot access admin prospects",
+        "contractor direct table denied",
+        "admin direct table denied",
+        "service role direct table denied",
+        "contractor self-promotion denied",
+        "public unclaimed profile",
+        "public contact and invitation redaction",
+        "no operational contractor before claim",
+        "unclaimed connection denied",
+        "unclaimed service request denied",
+        "reserved slug spoof denied",
+        "reserved UUID spoof denied",
+        "unsafe logo rejected",
+        "ordinary admin reads token-free",
+        "anonymous claim review redacted",
+        "wrong recipient review denied",
+        "wrong recipient claim denied",
+        "stale claim denied",
+        "failed validation preserves claim",
+        "verified recipient private review",
+        "concurrent claims have one winner",
+        "replay denied",
+        "same identity and reviewed fields without privilege injection",
+        "billing initialized exactly once",
+        "normal owner editing enabled",
+        "Discover reflects current owner fields",
+        "connection allowed after claim",
+        "service request works after claim",
+        "existing owner cannot overwrite or merge",
+        "rotation invalidates previous link",
+        "unverified account cannot claim",
+        "edits invalidate link",
+        "hidden profile not public",
+        "revoked link denied",
+        "expired link denied",
+        "browser admin UI creates public profile and recipient claim link",
+        "browser anonymous profile renders at mobile width with contact actions disabled",
+        "browser homeowner Discover lists the unclaimed profile",
+        "browser recipient reviews and claims; same public address becomes owned profile",
+        "browser flow has zero uncaught browser errors",
+        "zero fixture residue; all pre-existing relation fingerprints preserved"
+      ]
+    },
+    "scope": "Owner-approved two branch-specific Preview variables using existing Sandbox URL/anon key; seven existing environment variables preserved. Real feature traffic, with only unrelated legacy alert/adoption refresh RPCs intercepted."
+  }
+}

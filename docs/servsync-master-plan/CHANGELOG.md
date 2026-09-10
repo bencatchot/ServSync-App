@@ -1,5 +1,19 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-09 — Unclaimed-profile management follow-up
+
+- Moved admin-created prospects into dedicated Unclaimed profiles navigation, separate from Contractor accounts. Added search, invitation/visibility filters, ten-row pages, refresh and manual Hide from Discover / Show in Discover using the existing guarded save RPC. Claimed profiles are excluded from the prospect manager; hidden profiles remain saved and manageable.
+- Replaced the confusing Profile address input with an automatic business-name-based public link. Existing links remain unchanged. No schema, permission, automatic expiration or deletion behavior changed.
+- Ten focused browser tests cover management and claim behavior; validation/Preview evidence is maintained in the feature document. Existing same-task tutorial search/playback remains NONE because this follow-up changes only the admin preparation/management screens.
+
+## 2026-09-09 — Admin-prepared unclaimed contractor profiles (Sandbox validated)
+
+- Added the platform-admin prospect editor, public informational Discover listings, token-free admin reads, private manual claim-link issuance/revocation, and a recipient review/claim screen. Unclaimed businesses cannot receive homeowner connections or service requests; phone, email, contact name, and website are excluded from public prospect responses.
+- Added an approved additive SQL migration with platform-admin authorization, private direct-table grants, explicit public-field projection, cross-table identity reservation, verified recipient email checks, stale-invite invalidation, and atomic ownership/billing creation. Existing profiles are not overwritten. Claimed businesses remain in Discover using their current owner-maintained public details.
+- Disposable PostgreSQL lifecycle/security/concurrency validation and desktop/mobile browser tests pass; the application type check and production build pass. One older mobile-readiness assertion is already incompatible with main's Capacitor prototype and remains outside this feature.
+- Ben approved the exact Sandbox migration and disposable acceptance. Installation preserved all 167 relation fingerprints and existing catalog objects; live RPC/local-browser acceptance passed 45 checks with exact fixture cleanup. The initial admin dashboard visit refreshed one existing connection-alert row; the final guarded run preserved all 167 starting fingerprints. Ben subsequently approved the two Sandbox branch Preview variables; deployment dpl_8e4ykZDfn2tvVopfgDDEkC98abae reached READY and passed all 45 hosted checks with exact cleanup/preservation. Current Help Studio search and full playback of matching TUT-005/TUT-001 passed with tutorial impact NONE; no Help content changed. Demo/Production SQL and pre-existing live parity differences remain unresolved. This is not Production availability or completed rollout; see [feature evidence](../features/ADMIN_CONTRACTOR_PROSPECTS_V1.md).
+
+
 ## 2026-09-09 — Native Work parity correction
 
 - Found that both installed native packages omitted the three current Work switches, while hosted Demo enabled them and the same approved contractor was eligible. Native-only build defines now match Demo, reject conflicting inputs and preserve server-owned eligibility; 11/11 mobile tests pass.

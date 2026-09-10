@@ -1,3 +1,7 @@
+import type { AdminContractorDraft } from './features/contractor-prospects/adminContractorTypes';
+import { AdminContractorProspects } from './features/contractor-prospects/AdminContractorProspects';
+import { ContractorClaimPage } from './features/contractor-prospects/ContractorClaimPage';
+import { DiscoverContractorProspects, PublicContractorProspect } from './features/contractor-prospects/PublicContractorProspects';
 import { MobileNavigationDialog } from './features/navigation/MobileNavigationDialog';
 import { ConnectedCustomerScheduling } from './features/calendar/ConnectedCustomerScheduling';
 import { isOpenInvoice } from './features/invoices/recordStatus';
@@ -619,13 +623,6 @@ type ContractorAppointmentWindowDraft = {
   note: string;
   windows: AppointmentWindowDraftRow[];
   error: string;
-};
-type AdminContractorDraft = {
-  account_status: ContractorAccountStatus;
-  subscription_status: ContractorSubscriptionStatus;
-  monthly_price: string;
-  subscription_notes: string;
-  admin_notes: string;
 };
 type InviteRewardDraft = {
   reward_status: ReferralRewardStatus;
@@ -6979,6 +6976,14 @@ function AppContent() {
     );
   }
 
+  if (route === 'contractor' && query.get('claim_business')) {
+    return <PublicShell route={route} profile={profile} onSignOut={signOut}>
+      <ContractorClaimPage key={`${query.get('claim_business')}:${profile?.id || 'anonymous'}`} token={query.get('claim_business')!} profile={profile}
+        authentication={<AuthPage role="contractor" inviteCode="" referralCode="" initialMode="signup" onAuthed={refreshAuthState} />}
+        onClaimed={() => { updateRoute('contractor'); window.dispatchEvent(new HashChangeEvent('hashchange')); }} />
+    </PublicShell>;
+  }
+
   if (!session) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
@@ -6986,6 +6991,8 @@ function AppContent() {
           <TrustSafetyPublicPage />
         ) : route in LEGAL_PAGES ? (
           <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
+        ) : route === 'profile' ? (
+          <ContractorPublicProfilePage key={query.get('slug')} slug={query.get('slug') ?? ''} currentProfile={null} />
         ) : route === 'home' ? (
           <LandingPage />
         ) : claimToken ? (
@@ -7062,7 +7069,7 @@ function AppContent() {
   if (route === 'profile') {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        <ContractorPublicProfilePage slug={query.get('slug') ?? ''} currentProfile={profile} />
+        <ContractorPublicProfilePage key={query.get('slug')} slug={query.get('slug') ?? ''} currentProfile={profile} />
       </PublicShell>
     );
   }
@@ -20778,6 +20785,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 Discover is limited during the private beta. Contractor coverage, rankings, response times, and lead volume are not promised.
               </p>
             </div>
+            <DiscoverContractorProspects />
             <DiscoverFeed
               perspective="homeowner"
               userId={profile.id}
@@ -44386,7 +44394,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing' | 'help_studio'>(() => (
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'unclaimed_profiles' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing' | 'help_studio'>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'marketing' : 'overview'
   ));
   useEffect(() => {
@@ -45096,6 +45104,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
         { id: 'overview',     label: 'Overview',    icon: <LayoutDashboard size={17} /> },
         { id: 'homeowners',   label: 'Homeowners',  icon: <Home size={17} /> },
         { id: 'contractors',  label: 'Contractors', icon: <Building2 size={17} /> },
+        { id: 'unclaimed_profiles', label: 'Unclaimed profiles', icon: <Building2 size={17} /> },
         { id: 'connections',  label: 'Connections', icon: <Users size={17} /> },
         { id: 'invite_leads', label: 'Invite Leads', icon: <Mail size={17} />, badge: newInviteLeadCount || undefined },
         { id: 'referrals',    label: 'Referrals',   icon: <Link2 size={17} /> },
@@ -45179,7 +45188,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
       </Card>
       )}
 
-      {adminTab === 'contractors' && (
+      {adminTab === 'unclaimed_profiles' ? <AdminContractorProspects /> : adminTab === 'contractors' && (
       <Card title="Contractor accounts" icon={<Building2 size={18} />}>
         <div className="space-y-3">
           <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4">
@@ -48291,17 +48300,7 @@ function ContractorPublicProfilePage({
     );
   }
 
-  if (notFound || !data) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <p className="text-base font-bold text-slate-950">Contractor not found</p>
-        <p className="mt-1 text-sm text-slate-500">This profile link may be incorrect or the contractor may no longer be active.</p>
-        <button type="button" onClick={() => updateRoute('home')} className={`${buttonClass('secondary')} mt-4`}>
-          Back to home
-        </button>
-      </div>
-    );
-  }
+  if (notFound || !data) return <PublicContractorProspect slug={slug} />;
 
   const location = [data.city, data.state].filter(Boolean).join(', ');
   const hasCredentials = data.license_number || data.insurance_status || data.bonded_status;

@@ -15,6 +15,10 @@ For new Codex-assisted internal draft preparation, use the machine-readable `con
 
 Marketing draft retries in the same open composer reuse an already confirmed upload. An uncertain generation result retains its request identity. Facebook upload evidence with a caption-verification failure now asks the owner to review the provider post; it does not certify delivery, normalize an uninspected caption, or authorize a duplicate publish. These corrections are not live until the reviewed branch is merged and deployed. Tutorial freshness remains an open release gate.
 
+## Admin-prepared contractor listings — Sandbox validated, release pending, September 9
+
+The approved feature prepares public Discover business profiles marked **Unclaimed**, then lets the invited verified contractor claim and manage that same listing. Until claiming, listings are informational only: no homeowner connection, service request, contact action, owner account, or billing record is created. Listings must not imply owner participation, responsiveness, verification, or endorsement. Claim links are manually shared; automated outreach is not included. The migration and real API/hosted-browser flow are validated in the owner-approved Sandbox branch Preview; Production and Demo rollout remain pending. Current tutorial review found no stale matching guidance; do not advertise this capability as live until Production SQL/source rollout is complete.
+
 ## Marketing Framing Rules
 
 Describe ServSync on its own merits. Do not imply that competitors require homeowners to create accounts, download apps, buy subscriptions, perform unnecessary steps, or use inferior, fragmented, difficult, or expensive products unless that exact comparison has current verified evidence and deliberate marketing approval.

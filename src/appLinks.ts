@@ -88,3 +88,7 @@ export function requestFreeLocalEstimateUrl(token: string, location?: AppLocatio
 export function requestFreeFinalizedReportUrl(token: string, location?: AppLocationLike) {
   return appRouteUrl('report-delivery', { access: token }, location);
 }
+
+export function contractorClaimUrl(token: string, location?: AppLocationLike) {
+  return appRouteUrl('contractor', { claim_business: token }, location);
+}
