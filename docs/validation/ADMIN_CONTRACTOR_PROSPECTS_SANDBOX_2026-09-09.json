@@ -224,5 +224,101 @@
         "kind": "missing"
       }
     ]
+  },
+  "hostedPreview": {
+    "deployment": {
+      "id": "dpl_8e4ykZDfn2tvVopfgDDEkC98abae",
+      "url": "servsync-stripe-sandbox-dvna5aqh5-bencatchots-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "projectId": "prj_NaV69E1kZmcX6tcxGOXl5TmEQnXo",
+      "gitSource": {
+        "type": "github",
+        "repoId": 1261404662,
+        "ref": "codex/admin-contractor-claim",
+        "sha": "4a83472beb1a6fb79e0d4fd68566a93357e3d5c8"
+      },
+      "alias": [
+        "servsync-stripe-sandbox-git-codex-a-72970b-bencatchots-projects.vercel.app"
+      ]
+    },
+    "configuration": {
+      "project": "prj_NaV69E1kZmcX6tcxGOXl5TmEQnXo",
+      "branch": "codex/admin-contractor-claim",
+      "ref": "zpzdkoaubyjtsomccxya",
+      "added": [
+        {
+          "id": "WkiQ3t3lgmWTeI4J",
+          "key": "VITE_SUPABASE_URL",
+          "target": [
+            "preview"
+          ],
+          "gitBranch": "codex/admin-contractor-claim"
+        },
+        {
+          "id": "skRd0U1IqZYaCGhj",
+          "key": "VITE_SUPABASE_ANON_KEY",
+          "target": [
+            "preview"
+          ],
+          "gitBranch": "codex/admin-contractor-claim"
+        }
+      ],
+      "preservedExistingVariables": 7
+    },
+    "acceptance": {
+      "status": "passed",
+      "target": "zpzdkoaubyjtsomccxya",
+      "migrationSha256": "0aa72fef5517fa8e843d39876637394a75b36662e37496c362b02836baf6dd42",
+      "preservationRelations": 167,
+      "checks": [
+        "anonymous cannot access admin prospects",
+        "anonymous direct table denied",
+        "homeowner cannot access admin prospects",
+        "homeowner direct table denied",
+        "contractor cannot access admin prospects",
+        "contractor direct table denied",
+        "admin direct table denied",
+        "service role direct table denied",
+        "contractor self-promotion denied",
+        "public unclaimed profile",
+        "public contact and invitation redaction",
+        "no operational contractor before claim",
+        "unclaimed connection denied",
+        "unclaimed service request denied",
+        "reserved slug spoof denied",
+        "reserved UUID spoof denied",
+        "unsafe logo rejected",
+        "ordinary admin reads token-free",
+        "anonymous claim review redacted",
+        "wrong recipient review denied",
+        "wrong recipient claim denied",
+        "stale claim denied",
+        "failed validation preserves claim",
+        "verified recipient private review",
+        "concurrent claims have one winner",
+        "replay denied",
+        "same identity and reviewed fields without privilege injection",
+        "billing initialized exactly once",
+        "normal owner editing enabled",
+        "Discover reflects current owner fields",
+        "connection allowed after claim",
+        "service request works after claim",
+        "existing owner cannot overwrite or merge",
+        "rotation invalidates previous link",
+        "unverified account cannot claim",
+        "edits invalidate link",
+        "hidden profile not public",
+        "revoked link denied",
+        "expired link denied",
+        "browser admin UI creates public profile and recipient claim link",
+        "browser anonymous profile renders at mobile width with contact actions disabled",
+        "browser homeowner Discover lists the unclaimed profile",
+        "browser recipient reviews and claims; same public address becomes owned profile",
+        "browser flow has zero uncaught browser errors",
+        "zero fixture residue; all pre-existing relation fingerprints preserved"
+      ]
+    },
+    "scope": "Owner-approved two branch-specific Preview variables using existing Sandbox URL/anon key; seven existing environment variables preserved. Real feature traffic, with only unrelated legacy alert/adoption refresh RPCs intercepted."
   }
 }

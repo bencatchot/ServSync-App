@@ -17,7 +17,7 @@ Marketing draft retries in the same open composer reuse an already confirmed upl
 
 ## Admin-prepared contractor listings — Sandbox validated, release pending, September 9
 
-The approved feature prepares public Discover business profiles marked **Unclaimed**, then lets the invited verified contractor claim and manage that same listing. Until claiming, listings are informational only: no homeowner connection, service request, contact action, owner account, or billing record is created. Listings must not imply owner participation, responsiveness, verification, or endorsement. Claim links are manually shared; automated outreach is not included. The migration and real API/local-browser flow are validated in Sandbox, but its hosted Preview lacks Supabase configuration; Production and Demo rollout remain pending. Do not advertise this capability until its SQL rollout, authenticated acceptance, and tutorial review are complete.
+The approved feature prepares public Discover business profiles marked **Unclaimed**, then lets the invited verified contractor claim and manage that same listing. Until claiming, listings are informational only: no homeowner connection, service request, contact action, owner account, or billing record is created. Listings must not imply owner participation, responsiveness, verification, or endorsement. Claim links are manually shared; automated outreach is not included. The migration and real API/hosted-browser flow are validated in the owner-approved Sandbox branch Preview; Production and Demo rollout remain pending. Current tutorial review found no stale matching guidance; do not advertise this capability as live until Production SQL/source rollout is complete.
 
 ## Marketing Framing Rules
 
