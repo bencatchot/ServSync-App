@@ -17,16 +17,20 @@ async function mount(page: Page, component: string, mode = 'normal') {
     const clientModule = await dynamicImport('/src/supabaseClient.ts');
     const client = clientModule.supabase as { rpc: (name: string, args?: Record<string, unknown>) => Promise<unknown> };
     let item = { ...structuredClone(initial), ...(mode === 'claimed' ? { claim_status: 'claimed' } : {}) } as Record<string, unknown>;
-    let exists = component !== 'AdminContractorProspects';
+    let exists = component !== 'AdminContractorProspects' || mode === 'directory';
     const calls: Array<{ name: string; args?: Record<string, unknown> }> = [];
     Object.assign(window, { prospectCalls: calls });
     client.rpc = async (name, args = {}) => {
       calls.push({ name, args });
       if (mode === 'missing') return { data: null, error: { code: 'PGRST202', message: 'Missing function' } };
       if (mode === 'wrong-email') return { data: null, error: { message: 'Sign in with the verified contractor account invited by ServSync.' } };
-      if (name === 'servsync_admin_contractor_prospects') return { data: exists ? [item] : [], error: null };
+      if (name === 'servsync_admin_contractor_prospects') return { data: mode === 'directory' ? [
+        ...Array.from({ length: 12 }, (_, i) => ({ ...initial, id: `10000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, details: { ...initial.details, business_name: `Public Business ${i + 1}` }, status: i === 0 ? 'expired' : 'pending' })),
+        { ...initial, id: '10000000-0000-4000-8000-000000000020', details: { ...initial.details, business_name: 'Hidden Business' }, published: false, status: 'revoked' },
+        { ...initial, id: '10000000-0000-4000-8000-000000000021', details: { ...initial.details, business_name: 'Claimed Business' }, claimed_at: '2026-09-09T12:00:00Z', status: 'claimed' },
+      ] : exists ? [item] : [], error: null };
       if (name === 'servsync_admin_save_contractor_prospect') {
-        item = { ...item, details: args.p_details, slug: args.p_slug, published: args.p_published, revision: exists ? Number(item.revision) + 1 : 1 }; exists = true;
+        item = { ...item, id: args.p_id || item.id, details: args.p_details, slug: args.p_slug, published: args.p_published, status: exists ? 'revoked' : 'draft', revision: exists ? Number(args.p_revision) + 1 : 1 }; exists = true;
         return { data: item, error: null };
       }
       if (name === 'servsync_admin_issue_contractor_claim') {
@@ -77,9 +81,11 @@ for (const width of [1440, 390]) {
 
 test('admin can publish, issue, edit safely, rotate and revoke a private claim link', async ({ page }) => {
   await mount(page, 'AdminContractorProspects');
-  await page.getByRole('button', { name: 'Create prospect profile' }).click();
-  await page.getByRole('textbox', { name: 'Profile address' }).fill('fairhope-plumbing');
+  await page.getByRole('button', { name: 'Create contractor profile' }).click();
+  await expect(page.getByRole('textbox', { name: 'Profile address' })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Business name', exact: true }).fill('Fairhope Plumbing');
+  await expect(page.getByTestId('public-profile-link')).toContainText(/slug=fairhope-plumbing-[a-f0-9]{12}$/);
+  const originalPublicLink = await page.getByTestId('public-profile-link').innerText();
   await page.getByRole('textbox', { name: 'Business email', exact: true }).fill('owner@example.test');
   await page.getByRole('button', { name: 'Save profile', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Profile saved');
@@ -87,6 +93,7 @@ test('admin can publish, issue, edit safely, rotate and revoke a private claim l
   await page.getByRole('button', { name: 'Create new claim link' }).click();
   await expect(page.getByRole('textbox', { name: 'Private claim link' })).toHaveValue(/#\/contractor\?claim_business=a{64}$/);
   await page.getByRole('textbox', { name: 'Business name', exact: true }).fill('Edited Plumbing');
+  await expect(page.getByTestId('public-profile-link')).toHaveText(originalPublicLink);
   await expect(page.getByRole('button', { name: 'Create new claim link' })).toBeDisabled();
   await page.getByRole('button', { name: 'Save profile', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Private claim link' })).toHaveCount(0);
@@ -124,7 +131,7 @@ test('wrong recipient cannot open claim form; anonymous visitors are directed to
 test('source-before-backend state disables admin creation and preserves Discover availability', async ({ page }) => {
   await mount(page, 'AdminContractorProspects', 'missing');
   await expect(page.getByRole('alert')).toContainText('awaiting backend installation');
-  await expect(page.getByRole('button', { name: 'Create prospect profile' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Create contractor profile' })).toBeDisabled();
   await mount(page, 'DiscoverContractorProspects', 'missing');
   await expect(page.getByRole('region', { name: 'Business profiles' })).toHaveCount(0);
 });
@@ -153,4 +160,36 @@ test('claim entry explains pending installation without exposing backend errors'
   await expect(page.getByRole('alert')).toContainText('Business profile claiming is not available yet.');
   await expect(page.getByRole('button', { name: 'Claim business profile' })).toHaveCount(0);
   await expect(page.getByText('Missing function')).toHaveCount(0);
+});
+
+
+test('unclaimed management filters, pages, hides and restores profiles without listing claimed accounts', async ({ page }) => {
+  await mount(page, 'AdminContractorProspects', 'directory');
+  await expect(page.getByRole('article')).toHaveCount(10);
+  await page.screenshot({ path: '/tmp/servsync-unclaimed-management-1440.png', fullPage: true });
+  await expect(page.getByRole('article', { name: 'Claimed Business', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Invitation status', exact: true }).selectOption('expired');
+  await expect(page.getByRole('article')).toHaveCount(1);
+  const first = page.getByRole('article', { name: 'Public Business 1', exact: true });
+  await first.getByRole('button', { name: 'Hide from Discover', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Previous claim links have been revoked');
+  await expect(page.getByRole('article')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Invitation status', exact: true }).selectOption('all');
+  await page.getByRole('combobox', { name: 'Visibility', exact: true }).selectOption('hidden');
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await page.getByRole('textbox', { name: 'Search unclaimed profiles', exact: true }).fill('Public Business 1');
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await first.getByRole('button', { name: 'Show in Discover', exact: true }).click();
+  await expect(page.getByRole('article')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Visibility', exact: true }).selectOption('public');
+  await expect(first).toBeVisible();
+  await page.getByRole('combobox', { name: 'Visibility', exact: true }).selectOption('all');
+  await page.getByRole('textbox', { name: 'Search unclaimed profiles', exact: true }).fill('Claimed Business');
+  await expect(page.getByRole('article')).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Search unclaimed profiles', exact: true }).fill('');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/servsync-unclaimed-management-390.png', fullPage: true });
 });

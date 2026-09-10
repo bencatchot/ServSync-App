@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { contractorClaimUrl, contractorProfileUrl } from '../../appLinks';
+import { ProspectDirectory } from './ProspectDirectory';
 import { ProspectFields } from './ProspectFields';
 import { type AdminProspect, blankProspect, prospectButton, prospectError, prospectInput, prospectRpc, prospectUnavailable } from './prospect';
 
@@ -8,8 +9,9 @@ export function AdminContractorProspects() {
   const [selected, setSelected] = useState<AdminProspect | null>(null);
   const [editing, setEditing] = useState(false);
   const [details, setDetails] = useState(blankProspect);
-  const [slug, setSlug] = useState('');
-  const [customAddress, setCustomAddress] = useState(false);
+  const [linkSuffix, setLinkSuffix] = useState('');
+  const businessLinkName = details.business_name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 80).replace(/^-|-$/g, '') || 'business';
+  const slug = selected?.slug || `${businessLinkName}-${linkSuffix}`;
   const [published, setPublished] = useState(true);
   const [email, setEmail] = useState('');
   const [claimLink, setClaimLink] = useState('');
@@ -27,12 +29,13 @@ export function AdminContractorProspects() {
   }, []);
   useEffect(() => { void load(); }, [load]);
   const choose = (row: AdminProspect | null) => {
-    setSelected(row); setDetails(row?.details || blankProspect()); setSlug(row?.slug || ''); setPublished(row?.published ?? true);
-    setCustomAddress(Boolean(row)); setEmail(row?.invited_email || row?.details.email || ''); setClaimLink(''); setEditing(true); setError(''); setNotice(''); setDirty(false);
+    setSelected(row); setDetails(row?.details || blankProspect()); setPublished(row?.published ?? true);
+    if (!row) setLinkSuffix(crypto.randomUUID().replace(/-/g, '').slice(0, 12));
+    setEmail(row?.invited_email || row?.details.email || ''); setClaimLink(''); setEditing(true); setError(''); setNotice(''); setDirty(false);
   };
   const apply = (row: AdminProspect) => {
     setRows(current => [row, ...current.filter(item => item.id !== row.id)]);
-    setSelected(row); setDetails(row.details); setSlug(row.slug); setPublished(row.published); setDirty(false);
+    setSelected(row); setDetails(row.details); setPublished(row.published); setDirty(false);
   };
   const act = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice('');
@@ -51,27 +54,27 @@ export function AdminContractorProspects() {
     });
     apply(result.profile); setClaimLink(contractorClaimUrl(result.token)); setNotice('Claim link created. Copy it and send it to the recipient. It expires in 14 days and replaces any previous link.');
   });
-  return <section className="mb-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 sm:p-5" aria-label="Prospect contractor profiles">
+  return <section className="mb-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 sm:p-5" aria-label="Unclaimed profiles">
     <div className="flex flex-wrap items-start justify-between gap-3"><div>
-      <h2 className="text-lg font-bold">Prospect contractor profiles</h2>
+      <h2 className="text-lg font-bold">Unclaimed profiles</h2>
       <p className="mt-1 text-sm text-slate-600">Prepare a Discover profile, then invite the business to claim it.</p>
-    </div><button type="button" className={prospectButton} disabled={busy || loading || !available || editing} onClick={() => choose(null)}>Create prospect profile</button></div>
+    </div><div className="flex flex-wrap gap-2"><button type="button" className={prospectButton} disabled={busy || loading || editing} onClick={() => void load()}>Refresh list</button><button type="button" className={prospectButton} disabled={busy || loading || !available || editing} onClick={() => choose(null)}>Create contractor profile</button></div></div>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error} <button type="button" disabled={busy} className="underline" onClick={() => { setEditing(false); setClaimLink(''); void load(); }}>Reload profiles</button></p>}
     {notice && <p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>}
-    {loading ? <p role="status">Loading prospect profiles…</p> : !editing && <div className="space-y-2">
-      {rows.length === 0 && available && <p className="text-sm text-slate-500">No prospect profiles yet.</p>}
-      {rows.map(row => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
-        <div className="min-w-0"><p className="break-words font-semibold">{row.details.business_name}</p><p className="text-sm capitalize text-slate-500">{row.status} · {row.published ? 'Public' : 'Hidden'}</p></div>
-        <div className="flex gap-2">{row.published && <a className={prospectButton} href={contractorProfileUrl(row.slug)}>View profile</a>}
-        {!row.claimed_at && <button type="button" disabled={busy} className={prospectButton} onClick={() => choose(row)}>Manage</button>}</div>
-      </div>)}
-    </div>}
+    {loading ? <p role="status">Loading unclaimed profiles…</p> : !editing && available && <ProspectDirectory rows={rows} busy={busy} onManage={choose} onVisibility={row => void act(async () => {
+      const updated = await prospectRpc<AdminProspect>('servsync_admin_save_contractor_prospect', {
+        p_id: row.id, p_revision: row.revision, p_slug: row.slug, p_details: row.details, p_published: !row.published,
+      });
+      setRows(current => current.map(item => item.id === updated.id ? updated : item));
+      setNotice(updated.published ? 'Profile is visible in Discover. Create a new claim link when you are ready to invite the owner.' : 'Profile hidden from Discover. You can manage it under Hidden from Discover. Previous claim links have been revoked.');
+    })} />}
     {editing && <form className="space-y-4" onSubmit={event => { event.preventDefault(); void save(); }}>
-      <label className="block text-sm font-semibold">Profile address
-        <input className={`${prospectInput} mt-1`} required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={100} disabled={busy || Boolean(selected)}
-          value={slug} placeholder="example-plumbing" onChange={event => { setSlug(event.target.value); setCustomAddress(true); setDirty(true); }} />
-      </label>
-      <ProspectFields value={details} disabled={busy} onChange={value => { setDetails(value); if (!selected && !customAddress) setSlug(value.business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)); setDirty(true); }} />
+      <ProspectFields value={details} disabled={busy} onChange={value => { setDetails(value); setDirty(true); }} />
+      <div className="rounded-xl bg-slate-50 p-3">
+        <p className="text-sm font-semibold">Public profile link</p>
+        <p className="mt-1 text-sm text-slate-600">Created automatically from the business name. This web link stays the same after saving.</p>
+        {(selected || details.business_name.trim()) && <p className="mt-2 break-all text-sm text-blue-800" data-testid="public-profile-link">{contractorProfileUrl(slug)}</p>}
+      </div>
       <p className="text-xs text-slate-500">Contact details and website links stay private until claiming. Use an HTTPS logo URL you have permission to publish.</p>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={published} disabled={busy} onChange={event => { setPublished(event.target.checked); setDirty(true); }} />Visible in Discover as an unclaimed profile</label>
       <p className="text-sm text-slate-600">Saving edits revokes existing claim links. Homeowners cannot connect or send requests until the business claims this profile.</p>

@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-09 — Unclaimed-profile management follow-up
+
+- Moved admin-created prospects into dedicated Unclaimed profiles navigation, separate from Contractor accounts. Added search, invitation/visibility filters, ten-row pages, refresh and manual Hide from Discover / Show in Discover using the existing guarded save RPC. Claimed profiles are excluded from the prospect manager; hidden profiles remain saved and manageable.
+- Replaced the confusing Profile address input with an automatic business-name-based public link. Existing links remain unchanged. No schema, permission, automatic expiration or deletion behavior changed.
+- Ten focused browser tests cover management and claim behavior; validation/Preview evidence is maintained in the feature document. Existing same-task tutorial search/playback remains NONE because this follow-up changes only the admin preparation/management screens.
+
 ## 2026-09-09 — Admin-prepared unclaimed contractor profiles (Sandbox validated)
 
 - Added the platform-admin prospect editor, public informational Discover listings, token-free admin reads, private manual claim-link issuance/revocation, and a recipient review/claim screen. Unclaimed businesses cannot receive homeowner connections or service requests; phone, email, contact name, and website are excluded from public prospect responses.

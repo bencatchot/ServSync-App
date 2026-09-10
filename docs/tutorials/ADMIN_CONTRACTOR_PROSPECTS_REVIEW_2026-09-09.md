@@ -14,3 +14,7 @@ Search terms: Discover, contractor profile, Contractors, unclaimed, claim, conne
 Comparison evidence includes the real hosted Sandbox acceptance at source 4a83472: admin creation, public unclaimed mobile profile, homeowner Discover, recipient review/claim, no pre-claim contact, and ordinary post-claim connections/service requests. Both matching published walkthroughs remain applicable. No replacement revision is required for this feature.
 
 The separate TUT-002 legacy-video/Draft-first replacement tracked by PR #571 and its existing brief is not resolved or reclassified by this feature-specific NONE decision.
+
+## Admin management follow-up
+
+The follow-up moves preparation into Unclaimed profiles, adds management filters/hide/restore, and generates the public link automatically. The same-task search already included Contractors, contractor profile and unclaimed with no published admin matches. The two reviewed operational walkthroughs and their entry paths are unchanged, so NONE remains supported without repeating unrelated playback.

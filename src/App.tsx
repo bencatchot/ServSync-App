@@ -44394,7 +44394,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing' | 'help_studio'>(() => (
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'unclaimed_profiles' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing' | 'help_studio'>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'marketing' : 'overview'
   ));
   useEffect(() => {
@@ -45104,6 +45104,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
         { id: 'overview',     label: 'Overview',    icon: <LayoutDashboard size={17} /> },
         { id: 'homeowners',   label: 'Homeowners',  icon: <Home size={17} /> },
         { id: 'contractors',  label: 'Contractors', icon: <Building2 size={17} /> },
+        { id: 'unclaimed_profiles', label: 'Unclaimed profiles', icon: <Building2 size={17} /> },
         { id: 'connections',  label: 'Connections', icon: <Users size={17} /> },
         { id: 'invite_leads', label: 'Invite Leads', icon: <Mail size={17} />, badge: newInviteLeadCount || undefined },
         { id: 'referrals',    label: 'Referrals',   icon: <Link2 size={17} /> },
@@ -45187,8 +45188,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
       </Card>
       )}
 
-      {adminTab === 'contractors' && <AdminContractorProspects />}
-      {adminTab === 'contractors' && (
+      {adminTab === 'unclaimed_profiles' ? <AdminContractorProspects /> : adminTab === 'contractors' && (
       <Card title="Contractor accounts" icon={<Building2 size={18} />}>
         <div className="space-y-3">
           <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4">
