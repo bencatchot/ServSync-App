@@ -1,11 +1,11 @@
 # ServSync Master Plan Changelog
 
-## 2026-09-09 — Admin-prepared unclaimed contractor profiles (source only)
+## 2026-09-09 — Admin-prepared unclaimed contractor profiles (Sandbox validated)
 
 - Added the platform-admin prospect editor, public informational Discover listings, token-free admin reads, private manual claim-link issuance/revocation, and a recipient review/claim screen. Unclaimed businesses cannot receive homeowner connections or service requests; phone, email, contact name, and website are excluded from public prospect responses.
 - Added an approved additive SQL migration with platform-admin authorization, private direct-table grants, explicit public-field projection, cross-table identity reservation, verified recipient email checks, stale-invite invalidation, and atomic ownership/billing creation. Existing profiles are not overwritten. Claimed businesses remain in Discover using their current owner-maintained public details.
 - Disposable PostgreSQL lifecycle/security/concurrency validation and desktop/mobile browser tests pass; the application type check and production build pass. One older mobile-readiness assertion is already incompatible with main's Capacitor prototype and remains outside this feature.
-- Sandbox, Demo, and Production SQL application remain pending separate approval. Help Studio review is blocked by the locked Mac session. This entry records source work, not live availability or completed rollout; see [feature evidence](../features/ADMIN_CONTRACTOR_PROSPECTS_V1.md).
+- Ben approved the exact Sandbox migration and disposable acceptance. Installation preserved all 167 relation fingerprints and existing catalog objects; live RPC/local-browser acceptance passed 45 checks with exact fixture cleanup. The initial admin dashboard visit refreshed one existing connection-alert row; the final guarded run preserved all 167 starting fingerprints. Hosted Sandbox lacks Supabase configuration, Demo/Production SQL remain pending, Help Studio is locked, and pre-existing live parity differences remain unresolved. This is not Production availability or completed rollout; see [feature evidence](../features/ADMIN_CONTRACTOR_PROSPECTS_V1.md).
 
 
 ## 2026-09-09 — Native Work parity correction

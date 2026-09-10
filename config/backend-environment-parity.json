@@ -107,6 +107,43 @@
         },
         "expectedKeyFingerprint": "sha256:27ddadd761e2f26948893e3aaf19a90e9407daebfe75a47ffb53324bf7da15a3",
         "expectedCatalogFingerprint": "sha256:75acd843e0f39d7d4db09130531495b782a7b8faf37d53fb3e7f1af7d470676a"
+      },
+      {
+        "id": "admin-contractor-prospects-v1",
+        "reason": "Owner-approved Sandbox experiment: public unclaimed contractor prospects and recipient-email-bound claims. Exact migration 0aa72fef5517fa8e843d39876637394a75b36662e37496c362b02836baf6dd42 applied 2026-09-09; no existing catalog definitions changed.",
+        "selectors": {
+          "relationScopes": [
+            "public.contractor_prospects"
+          ],
+          "functionScopes": [
+            "public.servsync_accept_contractor_claim(text, integer, jsonb)",
+            "public.servsync_admin_contractor_prospects()",
+            "public.servsync_admin_issue_contractor_claim(uuid, integer, text)",
+            "public.servsync_admin_revoke_contractor_claim(uuid, integer)",
+            "public.servsync_admin_save_contractor_prospect(uuid, integer, text, jsonb, boolean)",
+            "public.servsync_private_guard_prospect_identity()",
+            "public.servsync_private_prospect_admin(contractor_prospects)",
+            "public.servsync_private_prospect_details(jsonb)",
+            "public.servsync_private_prospect_public(contractor_prospects)",
+            "public.servsync_public_contractor_prospects(text, text, integer)",
+            "public.servsync_review_contractor_claim(text)"
+          ],
+          "exactObjects": [
+            "triggers:public.contractor_profiles.contractor_profile_prospect_identity_guard"
+          ]
+        },
+        "expectedCounts": {
+          "relations": 1,
+          "columns": 16,
+          "constraints": 9,
+          "indexes": 3,
+          "triggers": 2,
+          "functions": 11,
+          "functionGrants": 20,
+          "tableGrants": 8
+        },
+        "expectedKeyFingerprint": "sha256:f153c2e54ebaafafe708d180a3b92a392f47603541b8cad3a72de2fb296c70cb",
+        "expectedCatalogFingerprint": "sha256:16712ed1f734417ec644e046cbb63b552477de886a8500debafe02aca1c601e3"
       }
     ]
   }

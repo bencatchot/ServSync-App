@@ -15,9 +15,9 @@ For new Codex-assisted internal draft preparation, use the machine-readable `con
 
 Marketing draft retries in the same open composer reuse an already confirmed upload. An uncertain generation result retains its request identity. Facebook upload evidence with a caption-verification failure now asks the owner to review the provider post; it does not certify delivery, normalize an uninspected caption, or authorize a duplicate publish. These corrections are not live until the reviewed branch is merged and deployed. Tutorial freshness remains an open release gate.
 
-## Admin-prepared contractor listings — source only, September 9
+## Admin-prepared contractor listings — Sandbox validated, release pending, September 9
 
-The approved feature prepares public Discover business profiles marked **Unclaimed**, then lets the invited verified contractor claim and manage that same listing. Until claiming, listings are informational only: no homeowner connection, service request, contact action, owner account, or billing record is created. Listings must not imply owner participation, responsiveness, verification, or endorsement. Claim links are manually shared; automated outreach is not included. Implementation and local checks do not establish availability in Production, Demo, or Sandbox. Do not advertise this capability until its SQL rollout, authenticated acceptance, and tutorial review are complete.
+The approved feature prepares public Discover business profiles marked **Unclaimed**, then lets the invited verified contractor claim and manage that same listing. Until claiming, listings are informational only: no homeowner connection, service request, contact action, owner account, or billing record is created. Listings must not imply owner participation, responsiveness, verification, or endorsement. Claim links are manually shared; automated outreach is not included. The migration and real API/local-browser flow are validated in Sandbox, but its hosted Preview lacks Supabase configuration; Production and Demo rollout remain pending. Do not advertise this capability until its SQL rollout, authenticated acceptance, and tutorial review are complete.
 
 ## Marketing Framing Rules
 
