@@ -267,4 +267,8 @@ fi
 
 psql_run --file "$ROOT_DIR/servsync-marketing-storage-policy-helper-execute.sql" >/dev/null
 
+if [[ "${SERVSYNC_VALIDATE_RPC_CONFLICT_FIX:-false}" == "true" ]]; then
+  psql_run --file "$ROOT_DIR/tests/sql/rpc-business-conflict-no-retry-validation.sql" >/dev/null
+fi
+
 echo "Marketing media, entitlement, cost, and lifecycle validation passed."

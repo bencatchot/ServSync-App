@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-09-09",
+  "updatedOn": "2026-09-18",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "rpc-business-conflict-no-retry-v1",
+      "artifact": "servsync-rpc-business-conflict-no-retry.sql (SHA-256 138d444a752d9a83d229e40b1c812b1ce9a0dec6c746b98328a249a1282e97ab)",
+      "environments": {
+        "production": {
+          "status": "Applied",
+          "reason": "Owner-directed incident repair applied on 2026-09-18. All 32 installed Marketing/Help function definitions differ only by custom error code 40001 to PT409; canonical defaults, ownership, execute grants, security-definer settings and other metadata match. No custom 40001 remains. Looping backend 4109787 disappeared after installation; the guarded termination query matched no remaining session and terminated none. Content 28, packages 10, publications 7 and publication events 27 remained unchanged. See docs/operations/RPC_CONFLICT_RETRY_INCIDENT_2026-09-18.md."
+        },
+        "sandbox": {
+          "status": "Pending",
+          "reason": "This incident recovery targeted Production. Apply the same reviewed forward migration after approval for this environment; historical migration files retain their original bytes."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "This incident recovery targeted Production. Apply the same reviewed forward migration after approval for this environment; historical migration files retain their original bytes."
+        }
+      }
+    },
     {
       "id": "admin-contractor-prospects-v1",
       "artifact": "servsync-admin-contractor-prospects.sql (SHA-256 0aa72fef5517fa8e843d39876637394a75b36662e37496c362b02836baf6dd42)",

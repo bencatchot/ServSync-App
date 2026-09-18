@@ -173,7 +173,7 @@ function errorFor(value: unknown, mutation: boolean) {
   if (server.includes('publishing dependency')) return new MarketingPublishingAdapterError('stale', 'This media is now scheduled, publishing, or otherwise tied to a publishing result. Reload before continuing.');
   if (server.includes('no longer eligible for retirement')) return new MarketingPublishingAdapterError('stale', 'This media changed and is no longer eligible to retire. Reload before continuing.');
   if (server.includes('protected or permanent')) return new MarketingPublishingAdapterError('rpc', 'Protected or permanent media cannot be retired.');
-  if (code === '40001' || server.includes('changed; reload')) return new MarketingPublishingAdapterError('stale', 'This post changed. Reload before continuing.');
+  if (code === 'PT409' || code === '40001' || server.includes('changed; reload')) return new MarketingPublishingAdapterError('stale', 'This post changed. Reload before continuing.');
   if (server.includes('allowance is full')) return new MarketingPublishingAdapterError('rpc', 'The beta prepared-post limit is full. Publish or cancel an active item first.');
   if (server.includes('Provider setup is required')) return new MarketingPublishingAdapterError('rpc', 'Connect the selected destination before publishing.');
   if (server.includes('safe retry')) return new MarketingPublishingAdapterError('rpc', 'This result needs review and cannot be retried safely.');
