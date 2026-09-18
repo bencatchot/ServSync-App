@@ -217,13 +217,26 @@ test('owner queue distinguishes publishing, provider processing, schedules, and 
   assert.match(publicationStatusLabel(publication), /^Scheduled /);
 });
 
+test('preview conflicts surface once without retrying, including legacy responses', async () => {
+  for (const code of ['PT409', '40001']) {
+    let calls = 0;
+    const adapter = createMarketingPublishingAdapter({
+      rpc: async () => { calls++; return { data: null, error: { code, message: 'Stale package.' } }; },
+    }, contractorId);
+    await assert.rejects(adapter.recordPreview(packageId, fingerprint), {
+      kind: 'stale', message: 'This post changed. Reload before continuing.',
+    });
+    assert.equal(calls, 1);
+  }
+});
+
 test('retirement adapter explains concurrent publishing and lifecycle changes', async () => {
   const messages = [
     'Marketing media has a publishing dependency and cannot be retired.',
     'Marketing media is no longer eligible for retirement; reload and try again.',
   ];
   const adapter = createMarketingPublishingAdapter({
-    rpc: async () => ({ data: null, error: { code: '40001', message: messages.shift() } }),
+    rpc: async () => ({ data: null, error: { code: 'PT409', message: messages.shift() } }),
   }, contractorId);
   await assert.rejects(adapter.retireMedia(assetId), /scheduled, publishing, or otherwise tied to a publishing result/);
   await assert.rejects(adapter.retireMedia(assetId), /changed and is no longer eligible to retire/);

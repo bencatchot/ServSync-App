@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-18 — Production Marketing conflict retry loop repaired
+
+- Replaced retryable custom `40001` errors with non-retryable `PT409` conflicts in 32 installed Marketing/Help RPCs using a guarded, idempotent forward migration. Existing validation, permissions, defaults and business records were preserved; historical migration files remain unchanged.
+- The looping Production backend disappeared after installation; the guarded termination check affected no remaining session. A 77-second post-recovery window recorded zero rollbacks and 42 committed transactions. Demo and Sandbox application remain pending.
+- Added complete function-preservation and conflict regressions, published/retired preview coverage, an error-code coverage guard, and compatible client handling. SQL validation, 42 focused application tests, 16 ledger tests, type checking, build and lint passed. Tutorial impact is NOT APPLICABLE; no user-facing steps changed. See [incident evidence](../operations/RPC_CONFLICT_RETRY_INCIDENT_2026-09-18.md).
+
 ## 2026-09-09 — Unclaimed-profile management follow-up
 
 - Moved admin-created prospects into dedicated Unclaimed profiles navigation, separate from Contractor accounts. Added search, invitation/visibility filters, ten-row pages, refresh and manual Hide from Discover / Show in Discover using the existing guarded save RPC. Claimed profiles are excluded from the prospect manager; hidden profiles remain saved and manageable.
