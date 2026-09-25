@@ -4,7 +4,9 @@
 
 The owner subsequently approved the exact Estimate actor-audit amendment. It is installed on Demo, and the ordinary Draft-first recording is complete: **62.44 seconds, 1440×900**, with Save Draft, Create Estimate confirmation, unsent Estimate status, and exact $1,895 total verified. All six temporary product records were removed through the guarded reset; no other product-table row fingerprints changed.
 
-A local visual-review page contains 15 caption cues (maximum 11 words each) and remains paused on load. These are screen-aligned review captions, not narration-aligned final captions. Cedar narration remains pending: no `OPENAI_API_KEY` was present in the task process, the known project environment files, or the Production/Demo Vercel environment listings. Only variable metadata was inspected through Vercel; no settings or credentials were changed. The user has been asked for the existing credential location, not the secret value. No provider request occurred.
+The local preview now includes the approved Cedar voiceover and 14 compact, sentence-aligned English captions (maximum 11 words each). The owner approved a dedicated OpenAI key with only text-to-speech access and a one-day expiration. One `gpt-4o-mini-tts` / `cedar` request generated the narration; its credential was held only in the temporary local process and discarded when generation ended, without a repository/environment file or chat disclosure. No existing provider settings or other keys changed.
+
+Local transcription matches the approved narration, allowing capitalization, punctuation, and “workline”/“work line” differences. Six segment cuts fall inside measured speech pauses; the seven narration stages follow their recorded scenes and retain 4.29 seconds of final quiet review. A real FFmpeg audio regression verifies equal original volume in early and late scenes after correcting the retimer's unintended automatic attenuation. The narrated MP4 decodes cleanly and peaks at -4.8 dBFS.
 
 The local review specification has a local-only UUID, **not a persisted Production Help recording request**. The package must be rebound to an approved real recording request before ingestion. No Help content was created, uploaded, or published. TUT-002 remains UPDATE REQUIRED.
 
@@ -50,4 +52,13 @@ Narration preparation remains part of the tutorial work; Production Help creatio
 - Local review: `~/.codex/artifacts/tut-002-2026-09-25/preview.html` (self-contained video/captions) and `visual-review-captions.vtt`. A browser check confirmed 62.44 seconds, exactly one caption track with 15 cues, and paused playback. The MP4 contact sheet confirms the ordinary UI through the final Estimate Draft screen.
 - Updated intentional Demo catalog fingerprint: `sha256:7e5b2f5a1dc968516f9cbdec6a2ad847dc339b28341a3dc61b4b7cea05aae189`. The pre-existing 32 supported-function definition differences are unchanged.
 
-Remaining work: resolve narration credential access; generate the approved Cedar voiceover, synchronize final captions against actual speech and scenes, review sound-on and sound-off playback, then request the separately protected Production Help request/upload/publication approval. No merge is approved for PR #577.
+## Narrated local preview — September 25
+
+- Final package: `~/Documents/Codex/ServSync Help Studio Recordings/contractor-create-estimate/2026-09-25T20-31-29-648Z/`, stem `servsync-help-contractor-create-estimate-2026-09-25T20-31-29-648Z-cedar-scene-synced` (MP4, MP3, poster, VTT, manifest).
+- One provider generation; synchronization and local speech transcription made no further OpenAI requests. Source narration is 37.8 seconds within the 62.44-second video. No speech rate modification, overlapping segments, or shortened final result hold.
+- Captions preserve the exact approved script and follow measured sentence pauses. Their checksum and 14 timings are recorded in the final manifest. AI voice disclosure appears in the preview.
+- A full browser playback completed at 62.44 seconds, muted, without media errors; the final unsent Estimate and caption rendering were visually checked. Playback was then reset and left paused for owner sound-on review.
+- The local preview remains `~/.codex/artifacts/tut-002-2026-09-25/preview.html`. It does not autoplay. Local `final-package.json`, `final-captions.vtt`, and `local-speech-transcript.json` identify the current review artifacts.
+- All 14 Help tests passed, including an actual audio signal test that checks early/middle/late loudness and silent gaps. Earlier 105 recorder/Help/parity checks and all hosted PR checks passed before the bounded audio fix; final CI is recorded on PR #577.
+
+Remaining work: owner sound-on review and separately protected Production Help request/upload/publication approval, followed by publishing and verifying the replacement through Help. TUT-002 remains UPDATE REQUIRED. No merge is approved for PR #577.
