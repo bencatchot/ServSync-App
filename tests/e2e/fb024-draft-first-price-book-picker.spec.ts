@@ -380,7 +380,6 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
         harness.item({ id: 'fee', title: 'Permit fee', line_type: 'fee', default_unit_price_cents: 2500 }),
       ]);
     });
-    await page.getByRole('button', { name: 'Add invoice line' }).click();
     await page.getByLabel('Invoice line item 1 description').fill('Inherited or manual line');
     await page.getByTestId('durable-draft-price-book-toggle').click();
     for (const title of ['Service call', 'Diagnostic labor', 'Replacement part', 'Permit fee']) {
@@ -519,7 +518,6 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
         harness.item({ id: 'priced', title: 'Priced item', default_unit_price_cents: 7500 }),
       ]);
     });
-    await page.getByRole('button', { name: 'Add estimate line' }).click();
     await page.getByLabel('Draft estimate line item 1 description').fill('Existing manual line');
     await page.getByTestId('durable-draft-price-book-toggle').click();
     for (const title of ['Blank price', 'Zero price', 'Priced item']) await page.getByLabel(`Select ${title}`).check();

@@ -230,21 +230,18 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(lineRow).toContain("itemLabel !== 'draft estimate'");
   });
 
-  test('Add line action follows the empty state or final line item', () => {
+  test('Add line action follows the final line item', () => {
     const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const workItems = sourceBetween(
       composerSource,
       'data-testid="durable-draft-work-items"',
       '<WorkComposerTotalsPanel',
     );
-    const lineItemsIndex = workItems.indexOf('draft.line_items.map');
-    const emptyStateIndex = workItems.indexOf('{emptyLinesLabel}');
+    const lineItemsIndex = workItems.indexOf('displayedLines.map');
     const addLineIndex = workItems.indexOf('data-testid="durable-draft-add-line"');
 
     expect(lineItemsIndex).toBeGreaterThanOrEqual(0);
-    expect(emptyStateIndex).toBeGreaterThanOrEqual(0);
     expect(addLineIndex).toBeGreaterThan(lineItemsIndex);
-    expect(addLineIndex).toBeGreaterThan(emptyStateIndex);
     expect(workItems.slice(0, lineItemsIndex)).not.toContain('data-testid="durable-draft-add-line"');
   });
 

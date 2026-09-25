@@ -48,6 +48,13 @@ for (const viewport of [
     const composer = page.getByTestId('shared-draft-composer');
     await expect(composer).toBeVisible();
     await expect(composer.getByText('Private Draft', { exact: true })).toBeVisible();
+    await expect(composer.getByTestId('draft-compact-line')).toHaveCount(1);
+    await expect(composer.getByText('Price Required', { exact: true })).toHaveCount(0);
+    // The untouched starter row must not trigger the unsaved-change confirmation.
+    await composer.getByRole('button', { name: 'Back to Work', exact: true }).click();
+    await expect(page.getByTestId('contractor-work-dashboard')).toBeVisible();
+    await start.click();
+    await expect(composer).toBeVisible();
     const title = composer.getByRole('textbox', { name: 'What needs doing?', exact: true });
     await title.fill('Unsaved presentation check');
     await composer.getByRole('radiogroup').getByText('Estimate', { exact: true }).click();
@@ -56,7 +63,6 @@ for (const viewport of [
     await composer.getByRole('radiogroup').getByText('Choose later', { exact: true }).click();
     await expect(composer.getByRole('radio', { name: /^Choose later/ })).toBeChecked();
     await expect(title).toHaveValue('Unsaved presentation check');
-    await composer.getByTestId('durable-draft-add-line').click();
     await composer.getByLabel('Draft line item 1 description', { exact: true }).fill('Unsaved faucet review');
     await composer.getByLabel('Draft line item 1 type', { exact: true }).selectOption('material');
     await composer.getByLabel('Draft line item 1 unit price', { exact: true }).fill('250');

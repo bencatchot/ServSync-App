@@ -17,9 +17,18 @@ async function mountComposer(page: Page, configured = false, locked = false) {
     });
     document.body.innerHTML = '<main id="draft-review-root" style="padding:16px;max-width:1000px;margin:auto"></main>';
     const root = createRoot(document.getElementById('draft-review-root')!);
-    const render = () => root.render(React.createElement(ContractorDraftComposer, {
+    let changes = 0;
+    let savedDraft: typeof draft | null = null;
+    const render = () => root.render(React.createElement(React.Fragment, null, React.createElement(ContractorDraftComposer, {
       draft,
       customerOptions: [],
+      savedWorkTemplates: [{
+        id: 'template-fixture', contractor_id: 'contractor-fixture', name: 'Faucet replacement',
+        description: 'Replace the faucet', notes: '', terms: '',
+        created_at: '2026-09-25T00:00:00Z', updated_at: '2026-09-25T00:00:00Z',
+        line_items: [{ line_type: 'material', line_title: 'New faucet', description: 'New faucet',
+          quantity: 1, unit: 'each', unit_price_cents: 25000, sort_order: 0 }],
+      }],
       checklistOptions: [{
         source_kind: 'contractor_inspection_checklist', source_id: 'fixture-checklist', source_label: 'Plumbing inspection',
         workflow_kind: 'inspection', job_type: 'inspection', source_updated_at: null,
@@ -30,9 +39,9 @@ async function mountComposer(page: Page, configured = false, locked = false) {
       canViewPriceBook: true, priceBookLoadState: 'ready', priceBookItems: [],
       launchLabel: draft.intended_output ? `Create ${draft.intended_output}` : null,
       launchDisabled: locked,
-      onChange: (next: typeof draft) => { draft = next; render(); },
-      onSave: () => undefined, onLaunch: () => undefined, onBack: () => undefined, onRemovePersistedLine: () => undefined,
-    }));
+      onChange: (next: typeof draft) => { changes += 1; draft = next; render(); },
+      onSave: () => { savedDraft = structuredClone(draft); render(); }, onLaunch: () => undefined, onBack: () => undefined, onRemovePersistedLine: () => undefined,
+    }), React.createElement('output', { hidden: true, 'data-testid': 'draft-state' }, JSON.stringify({ draft, changes, savedDraft }))));
     render();
   }, { configured, locked });
 }
@@ -51,7 +60,6 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 900 }, { name: '
     await expect(page.getByRole('heading', { name: 'Work items', exact: true })).toBeVisible();
     const title = page.getByRole('textbox', { name: 'What needs doing?', exact: true });
     await title.fill('Replace kitchen faucet');
-    await page.getByTestId('durable-draft-add-line').click();
     await page.getByLabel('Draft line item 1 description', { exact: true }).fill('Replacement faucet');
     await page.getByLabel('Draft line item 1 type', { exact: true }).selectOption('material');
     await page.getByLabel('Draft line item 1 unit price', { exact: true }).fill('250');
@@ -107,4 +115,57 @@ test('existing private notes and configured labor remain discoverable; frozen fi
   await expect(page.getByTestId('durable-draft-work-format')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save Draft', exact: true })).toBeDisabled();
   await expect(page.getByTestId('durable-draft-create-output')).toBeDisabled();
+});
+
+
+test('the starter line is presentation-only until edited and returns after the last line is removed', async ({ page }) => {
+  await mountComposer(page);
+  const state = async () => JSON.parse((await page.getByTestId('draft-state').textContent())!);
+  const first = page.getByLabel('Draft line item 1 description', { exact: true });
+  await expect(first).toBeVisible();
+  await expect(page.getByTestId('draft-compact-line')).toHaveCount(1);
+  await expect(page.getByText('Price Required', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove draft line 1', exact: true })).toHaveCount(0);
+  await first.focus();
+  await page.getByRole('button', { name: /more details/i }).click();
+  expect((await state()).changes).toBe(0);
+  expect((await state()).draft.line_items).toEqual([]);
+  await page.getByRole('textbox', { name: 'What needs doing?', exact: true }).fill('Plan repairs');
+  await page.getByRole('button', { name: 'Save Draft', exact: true }).click();
+  expect((await state()).savedDraft.line_items).toEqual([]);
+
+  await page.getByTestId('durable-draft-work-format').selectOption('inspection_checklist');
+  await expect(page.getByTestId('draft-compact-line')).toHaveCount(0);
+  await page.getByTestId('durable-draft-work-format').selectOption('standard');
+  await expect(first).toBeVisible();
+  expect((await state()).draft.line_items).toEqual([]);
+
+  // Changing any work field materializes the row and restores normal validation.
+  await page.getByLabel('Draft line item 1 type', { exact: true }).selectOption('material');
+  expect((await state()).draft.line_items).toHaveLength(1);
+  await expect(page.getByText('Price Required', { exact: true })).toBeVisible();
+  await first.fill('Replacement faucet');
+  await page.getByLabel('Draft line item 1 unit price', { exact: true }).fill('250');
+  await page.getByTestId('durable-draft-add-line').click();
+  await expect(page.getByTestId('draft-compact-line')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Remove draft line 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Save Draft', exact: true }).click();
+  expect((await state()).savedDraft.line_items).toHaveLength(1);
+  expect((await state()).savedDraft.line_items[0].line_title).toBe('Replacement faucet');
+  await page.getByRole('button', { name: 'Remove draft line 1', exact: true }).click();
+  await expect(first).toHaveValue('');
+  await expect(page.getByTestId('draft-compact-line')).toHaveCount(1);
+  expect((await state()).draft.line_items).toEqual([]);
+});
+
+
+test('a saved template replaces the starter row without leaving an empty line', async ({ page }) => {
+  await mountComposer(page);
+  await page.getByTestId('durable-draft-template-picker-toggle').click();
+  await page.getByTestId('durable-draft-template-option').click();
+  await expect(page.getByTestId('durable-draft-template-confirmation')).toHaveCount(0);
+  await expect(page.getByTestId('draft-compact-line')).toHaveCount(1);
+  await expect(page.getByLabel('Draft line item 1 description', { exact: true })).toHaveValue('New faucet');
+  const state = JSON.parse((await page.getByTestId('draft-state').textContent())!);
+  expect(state.draft.line_items).toHaveLength(1);
 });

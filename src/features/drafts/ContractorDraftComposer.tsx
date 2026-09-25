@@ -110,6 +110,9 @@ export function ContractorDraftComposer({
   onBack,
   onRemovePersistedLine,
 }: ContractorDraftComposerProps) {
+  // This row stays outside Draft state until edited, so it cannot dirty or block saving.
+  const [starterLine] = useState(() => createWorkComposerLineDraft());
+  const displayedLines = draft.line_items.length ? draft.line_items : [starterLine];
   const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(() => new Set());
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<EstimateTemplate | null>(null);
@@ -144,11 +147,6 @@ export function ContractorDraftComposer({
       ? 'Add the work to include in the draft Invoice. Nothing is sent.'
       : 'Add labor, materials, or fees. You can keep planning before choosing a next step.';
   const addLineLabel = isEstimateIntent ? 'Add estimate line' : isInvoiceIntent ? 'Add invoice line' : 'Add work line';
-  const emptyLinesLabel = isEstimateIntent
-    ? 'No estimate line items yet. Add labor, materials, or fees before saving detailed pricing.'
-    : isInvoiceIntent
-      ? 'No draft Invoice line items yet. Add labor, materials, or fees before creating the draft Invoice.'
-      : 'No work scope yet. Add labor, materials, or fees before saving detailed scope.';
   const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : isInvoiceIntent ? 'Draft Invoice total' : draft.intended_output === 'job' ? 'Draft Job total' : 'Draft total';
   const savedTemplateCount = savedWorkTemplates.length;
   const templateSelectionDisabled = interactionDisabled || isChecklistDraft;
@@ -191,7 +189,7 @@ export function ContractorDraftComposer({
   const updateLine = (index: number, updates: Partial<WorkComposerLineDraft>) => {
     onChange({
       ...draft,
-      line_items: draft.line_items.map((line, lineIndex) => lineIndex === index ? { ...line, ...updates } : line),
+      line_items: displayedLines.map((line, lineIndex) => lineIndex === index ? { ...line, ...updates } : line),
     });
   };
 
@@ -607,45 +605,42 @@ export function ContractorDraftComposer({
             <p className="mt-1 text-xs leading-5 text-slate-500">{workItemsDescription}</p>
           </div>
         </div>
-        {draft.line_items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-            {emptyLinesLabel}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {draft.line_items.map((line, index) => (
-              <WorkComposerLineItemRow
-                key={line.id}
-                line={line}
-                index={index}
-                itemLabel={isEstimateIntent ? 'draft estimate' : isInvoiceIntent ? 'invoice' : 'draft'}
-                laborMode={draft.labor_mode}
-                compactAdvanced
-                draftLayout
-                advancedDetailsOpen={expandedLineIds.has(line.id)}
-                onAdvancedDetailsOpenChange={open => setExpandedLineIds(prev => {
-                  const next = new Set(prev);
-                  if (open) next.add(line.id);
-                  else next.delete(line.id);
-                  return next;
-                })}
-                onChange={updates => updateLine(index, updates)}
-                onRemove={() => removeLine(index)}
-              />
-            ))}
-          </div>
-        )}
-        <div className="mt-3 flex justify-end">
-          <button
-            type="button"
-            onClick={addLine}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:w-auto"
-            data-testid="durable-draft-add-line"
-          >
-            <Plus size={15} />
-            {addLineLabel}
-          </button>
+        <div className="space-y-3">
+          {displayedLines.map((line, index) => (
+            <WorkComposerLineItemRow
+              key={line.id}
+              line={line}
+              index={index}
+              itemLabel={isEstimateIntent ? 'draft estimate' : isInvoiceIntent ? 'invoice' : 'draft'}
+              laborMode={draft.labor_mode}
+              compactAdvanced
+              draftLayout
+              isPlaceholder={draft.line_items.length === 0}
+              advancedDetailsOpen={expandedLineIds.has(line.id)}
+              onAdvancedDetailsOpenChange={open => setExpandedLineIds(prev => {
+                const next = new Set(prev);
+                if (open) next.add(line.id);
+                else next.delete(line.id);
+                return next;
+              })}
+              onChange={updates => updateLine(index, updates)}
+              onRemove={() => removeLine(index)}
+            />
+          ))}
         </div>
+        {draft.line_items.length > 0 ? (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={addLine}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:w-auto"
+              data-testid="durable-draft-add-line"
+            >
+              <Plus size={15} />
+              {addLineLabel}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {!isChecklistDraft && (isEstimateIntent || isInvoiceIntent) && canViewPriceBook && (priceBookLoadState !== 'ready' || priceBookItems.some(item => item.active)) ? (

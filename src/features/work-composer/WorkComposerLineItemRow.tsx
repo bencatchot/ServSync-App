@@ -28,6 +28,7 @@ type WorkComposerLineItemRowProps = {
   laborMode?: EstimateLaborMode;
   compactAdvanced?: boolean;
   draftLayout?: boolean;
+  isPlaceholder?: boolean;
   advancedDetailsOpen?: boolean;
   onAdvancedDetailsOpenChange?: (open: boolean) => void;
   onChange: (updates: Partial<WorkComposerLineDraft>) => void;
@@ -69,6 +70,7 @@ export function WorkComposerLineItemRow({
   laborMode,
   compactAdvanced = false,
   draftLayout = false,
+  isPlaceholder = false,
   advancedDetailsOpen = !compactAdvanced,
   onAdvancedDetailsOpenChange,
   onChange,
@@ -144,7 +146,7 @@ export function WorkComposerLineItemRow({
     <div>
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
       <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-        {workComposerLineTotalLabel(line)}
+        {isPlaceholder ? '—' : workComposerLineTotalLabel(line)}
       </p>
     </div>
   );
@@ -171,7 +173,7 @@ export function WorkComposerLineItemRow({
   const actionButtons = (
     <div className="flex items-center gap-2">
       {duplicateButton}
-      {removeButton}
+      {!isPlaceholder && removeButton}
     </div>
   );
   const lineTypeField = (
@@ -276,7 +278,7 @@ export function WorkComposerLineItemRow({
               {unitPriceField}
             </div>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-slate-600">Line total <strong className="ml-2 text-slate-950">{workComposerLineTotalLabel(line)}</strong></p>
+              <p className="text-sm text-slate-600">Line total <strong className="ml-2 text-slate-950">{isPlaceholder ? '—' : workComposerLineTotalLabel(line)}</strong></p>
               {actionButtons}
             </div>
           </div>
