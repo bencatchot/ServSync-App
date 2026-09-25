@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Draft creation simplified after Demo review
+
+- Reorganized the existing composer into Customer & work, Scope & pricing, and Next step; simplified title language, compacted line items, exposed their type, and added a scrolling total/action bar.
+- Moved optional notes and labor settings into disclosures, hid empty loaded Price Books, and kept missing-price warnings and existing permission/lifecycle safeguards visible.
+- Format exploration now restores the prior standard outcome and an eligible checklist during the editing session. No schema, persistence contract, automatic save, send, or production-data change.
+- Validation and the post-implementation tutorial follow-up are recorded in [experience review evidence](../qa/CONTRACTOR_EXPERIENCE_REFINEMENT_2026-09-25.md). PR #576 remains a Preview; no merge or Production Help publication.
+
 ## 2026-09-25 — Tutorial review sequencing clarified
 
 - User decision: keep tutorial checks and updates, but perform them after implementation, repairs, and application/Preview validation. Help Studio review and walkthrough playback must not interrupt ongoing screen revisions.

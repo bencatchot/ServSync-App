@@ -22,6 +22,20 @@ No new automatic saves, document sends, customer communications, invoice/payment
 - Screenshots inspected for desktop/mobile Work and Draft presentation. Type checking and production build pass. ESLint has zero errors and the unchanged 77-warning baseline. All 27 architecture tests pass; App.tsx is reduced from 50,721 to 50,719 lines and the baseline is lowered.
 - Existing large application-chunk and Browserslist freshness warnings remain. No measured performance-improvement claim is made. Actual contractor preference/adoption testing remains future work.
 
+## Draft creation follow-up after hands-on Demo review
+
+Application commit: `5661595`. The user approved a second refinement after trying the first Preview.
+
+- One page now has three ordered sections: Customer & work, Scope & pricing, and Next step. The work title reads What needs doing?; output selection follows the planning fields.
+- A compact action bar keeps the total and existing Save/Create actions visible while scrolling. Missing-price warnings remain visible. The narrowly scoped web-only overflow rule in `src/index.css` enables sticky positioning only while the Draft editor is mounted; native layout rules are excluded.
+- Draft line items use two columns on mobile and four supporting columns on wider screens. Type is visible beside quantity, unit, and unit price; optional per-line details remain available. Other Estimate/Invoice and legacy Draft editors do not opt into this layout.
+- Private notes and Estimate labor settings can be expanded as needed. Existing notes/configured rates are exposed on initial load; a populated collapsed notes summary says Notes added. Estimate selection includes an Adjust labor settings shortcut. Closing settings does not clear values; missing labor-rate warnings are not hidden inside the disclosure.
+- Empty, successfully loaded Price Books no longer add a card. Loading/error states and populated authorized books remain available.
+- Choose later uses Work items and Draft total instead of implying a Job. Switching from standard work to a checklist and back restores the standard outcome, including null. Checklist selection is remembered for the mounted editing session and restored only if still eligible for the current customer/property. This is local UI memory, not a new persisted field or cross-session promise.
+- Save, launch confirmation, privacy, role gates, idempotency, and lifecycle contracts are unchanged. No record was saved or created in authenticated Demo verification.
+
+Validation: 226 focused regression cases were verified (225 passed in the combined run; the remaining asynchronous output-handoff assertion was corrected to await completion and all three output variants passed on rerun). The three new desktop/mobile/state-preservation cases also passed after final spacing changes. Type checking, production build, lint (zero errors, unchanged 77 warnings), and 27 architecture tests pass. Authenticated Demo desktop/mobile checks passed locally and again on the hosted Demo Preview for `5661595` (2/2 in each run), including the sticky action bar and an unsaved priced item. GitHub quality checks and the three normal Preview deployments passed.
+
 ## Tutorial freshness
 
 Tutorial impact: UPDATE REQUIRED
@@ -32,6 +46,8 @@ Production Help Studio was searched by Dashboard, contractor.work, Work, Draft, 
 - TUT-003 **How to complete work and save the service record**, revision 1: existing accepted-Estimate, Job, completion, and filing steps remain applicable; those actions are unchanged. The 57.32-second preview played to completion at 1×.
 - TUT-001 **How to handle a homeowner service request**, revision 1: the Request → Create Estimate route and its choices are unchanged by this slice.
 - TUT-005 **How to connect and request service**, revision 1: homeowner connection and request steps are unchanged by this contractor-only slice.
+
+Post-implementation follow-up for `5661595`: only after application/Preview validation, Help Studio was searched for Draft, contractor.drafts, What needs doing, Scope, Inspection, Estimate, Price Book, Private notes, Next step, and Invoice. Draft/contractor.drafts matched TUT-002; Estimate also matched TUT-001 and TUT-003; Invoice matched TUT-004. Other listed terms returned no matches. All four matching published revisions were opened in Preview and their written paths compared; TUT-002's paused entry frame still shows Service Requests. No recordings were played again. TUT-004's completed-work → Invoice → offline-payment route is unchanged. The updated TUT-002 replacement brief now follows the final three-section order and the action bar; replacement recording/publication remains open.
 
 Affected tutorials: TUT-002 How to create an estimate, revision 3.
 
