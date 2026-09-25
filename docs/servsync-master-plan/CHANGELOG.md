@@ -1,5 +1,10 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Tutorial review sequencing clarified
+
+- User decision: keep tutorial checks and updates, but perform them after implementation, repairs, and application/Preview validation. Help Studio review and walkthrough playback must not interrupt ongoing screen revisions.
+- Updated AGENTS.md and the working model to make that sequence explicit. Existing freshness statuses, replacement verification, and Production Help approval requirements remain in place. This process-only clarification does not require another tutorial playback check.
+
 ## 2026-09-25 — Contractor experience refinement verified in Preview
 
 - Dashboard keeps populated Today work prominent, removes the redundant empty Today card, and places workflow review before the weekly schedule. Work has one screen heading, a prominent Start New Draft action, quieter supporting tools, and neutral zero-attention presentation that stays distinct from unavailable counts.

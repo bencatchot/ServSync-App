@@ -130,7 +130,7 @@ Builder Mode is authority to complete the approved outcome, not authority to exp
 3. Codex chooses the appropriate mode:
    - use Builder Mode when the outcome and gates are clear;
    - use Audit Mode when a material decision or unapproved protected change blocks safe implementation.
-4. In Builder Mode, Codex completes investigation, implementation, validation, draft PR creation, and Preview verification without routine approval handoffs.
+4. In Builder Mode, Codex completes investigation, implementation, validation, draft PR creation, and Preview verification without routine approval handoffs. For user-facing changes, tutorial freshness review and required tutorial updates follow completed implementation and application/Preview validation.
 5. Codex returns the Preview, evidence, material risks, and any owner decisions still needed.
 6. The user reviews the result and separately approves or declines merge.
 7. After merge approval, Codex merges and verifies the resulting main/production state that the approved merge normally triggers.
@@ -243,10 +243,12 @@ Passing unrelated exhaustive checks is not required unless repository rules, CI,
 
 Every pull request must make one explicit tutorial-impact decision. This is a required verification step because a feature can remain functionally correct while its published guidance becomes misleading after a navigation, label, layout, role, workflow, state, or visible-data change.
 
-For a user-facing change:
+For a user-facing change, complete implementation, in-scope repairs, and application/Preview validation first. Tutorial checks and updates are a final follow-up phase against the finished changes, not an activity interleaved with implementation. Do not search Help Studio or play walkthroughs while the affected screens are still being revised. If later revisions change user-facing guidance, finish and validate those revisions before repeating only the affected tutorial comparison. This sequencing preserves the tutorial freshness and publication requirements below; it does not require a merge before the check when a finished Preview is available.
+
+After the changes are implemented and validated:
 
 1. Search Help Studio by the affected feature area, route context, screen label, workflow terms, and likely synonyms.
-2. Preview every matching published walkthrough and compare its visible path, labels, controls, order of operations, role assumptions, and outcome with the proposed Preview or current Demo behavior.
+2. Preview every matching published walkthrough and compare its visible path, labels, controls, order of operations, role assumptions, and outcome with the finished Preview or current Demo behavior.
 3. Record one status and concise evidence in the PR body:
 
 | Status | Meaning |
