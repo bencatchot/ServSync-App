@@ -342,26 +342,26 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     expect(await page.evaluate(() => window.__durableHarness.snapshot().target)).toEqual({ kind: 'durable', draftId: DRAFT_A, initialDraft: undefined });
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'))).toBe(0);
 
-    await page.getByLabel('Draft title').fill('Updated plan');
+    await page.getByLabel('What needs doing?').fill('Updated plan');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     const calls = await page.evaluate(() => window.__durableHarness.calls());
     expect(calls.filter(call => call.name === 'servsync_save_work_draft')[1].args).toMatchObject({ p_draft_id: DRAFT_A });
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_save_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Updated plan')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await expect(page.getByLabel('Draft title')).toHaveValue('Updated plan');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Updated plan');
   });
 
   test('preserves local edits after save failure, retries, and ignores a later save after leaving', async ({ page }) => {
     await installWorkspaceHarness(page);
     await page.evaluate(() => window.__durableHarness.showNew());
-    await page.getByLabel('Draft title').fill('Unsaved local title');
+    await page.getByLabel('What needs doing?').fill('Unsaved local title');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     await page.evaluate(() => window.__durableHarness.fail('rpc', 'servsync_save_work_draft'));
-    await expect(page.getByLabel('Draft title')).toHaveValue('Unsaved local title');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Unsaved local title');
     await expect(page.getByTestId('durable-draft-save-error')).toBeVisible();
     await page.getByRole('button', { name: 'Save Draft' }).click();
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_save_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Unsaved local title')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
     await expect(page.getByTestId('durable-draft-save-success')).toBeVisible();
-    await page.getByLabel('Draft title').fill('Later local edit');
+    await page.getByLabel('What needs doing?').fill('Later local edit');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     await page.evaluate(() => window.__durableHarness.showList());
     await expect(page.getByTestId('durable-draft-list')).toBeVisible();
@@ -375,9 +375,9 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
     await page.evaluate(({ draftB }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftB }), { draftB: DRAFT_B });
     await page.evaluate(({ draftB, contractorA }) => window.__durableHarness.completeLast('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftB, contractorA, 'Draft B')), { draftB: DRAFT_B, contractorA: CONTRACTOR_A });
-    await expect(page.getByLabel('Draft title')).toHaveValue('Draft B');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Draft B');
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Draft A')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await expect(page.getByLabel('Draft title')).toHaveValue('Draft B');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Draft B');
   });
 
   test('clears hidden service request identity after customer and property changes', async ({ page }) => {
@@ -408,7 +408,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_import_legacy_draft_job'))).toBe(1);
     await page.evaluate(({ draftA }) => window.__durableHarness.complete('rpc', 'servsync_import_legacy_draft_job', draftA), { draftA: DRAFT_A });
     await page.evaluate(({ draftA, contractorA, legacyId }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Imported', { legacy_inspection_id: legacyId })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, legacyId: LEGACY_ID });
-    await expect(page.getByLabel('Draft title')).toHaveValue('Imported');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Imported');
     expect(await page.evaluate(() => window.__durableHarness.snapshot().target)).toEqual({ kind: 'durable', draftId: DRAFT_A, initialDraft: undefined });
   });
 
@@ -420,10 +420,10 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.getByTestId('legacy-draft-row').filter({ hasText: 'Earlier plan' }).getByRole('button', { name: 'Continue Draft' }).click();
     await page.evaluate(({ draftB }) => window.__durableHarness.complete('rpc', 'servsync_import_legacy_draft_job', draftB, 'B'), { draftB: DRAFT_B });
     await page.evaluate(({ draftB, contractorB, legacyId }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftB, contractorB, 'Imported', { legacy_inspection_id: legacyId }), 'B'), { draftB: DRAFT_B, contractorB: CONTRACTOR_B, legacyId: LEGACY_ID });
-    await expect(page.getByLabel('Draft title')).toHaveValue('Imported');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Imported');
 
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('list', 'contractor_work_drafts', [window.__durableHarness.row(draftA, contractorA, 'Stale A Draft')], 'A'), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await page.getByRole('button', { name: 'Back to Jobs' }).click();
+    await page.getByRole('button', { name: 'Back to Work' }).click();
     await page.evaluate(({ draftB, contractorB, legacyId }) => window.__durableHarness.complete('list', 'contractor_work_drafts', [window.__durableHarness.row(draftB, contractorB, 'Imported', { legacy_inspection_id: legacyId })], 'B'), { draftB: DRAFT_B, contractorB: CONTRACTOR_B, legacyId: LEGACY_ID });
     await expect(page.getByText('Earlier plan')).toHaveCount(0);
     await expect(page.getByText('Unrelated plan')).toBeVisible();
@@ -437,7 +437,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.getByRole('button', { name: 'Continue Draft' }).click();
     await page.evaluate(() => window.__durableHarness.fail('rpc', 'servsync_import_legacy_draft_job'));
     await expect(page.getByTestId('durable-draft-open-error')).toBeVisible();
-    await page.getByRole('button', { name: 'Back to Jobs' }).click();
+    await page.getByRole('button', { name: 'Back to Work' }).click();
     await page.evaluate(() => window.__durableHarness.complete('list', 'contractor_work_drafts', [], 'A'));
     await expect(page.getByText('Earlier plan')).toBeVisible();
     await page.getByRole('button', { name: 'Continue Draft' }).click();
@@ -456,12 +456,12 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await installWorkspaceHarness(page);
     await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
     await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Saved Draft')), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
-    await page.getByLabel('Draft title').fill('Local edit');
+    await page.getByLabel('What needs doing?').fill('Local edit');
     page.once('dialog', dialog => void dialog.dismiss());
-    await page.getByRole('button', { name: 'Back to Jobs' }).click();
-    await expect(page.getByLabel('Draft title')).toHaveValue('Local edit');
+    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Local edit');
     page.once('dialog', dialog => void dialog.accept());
-    await page.getByRole('button', { name: 'Back to Jobs' }).click();
+    await page.getByRole('button', { name: 'Back to Work' }).click();
     await expect(page.getByTestId('durable-draft-list')).toBeVisible();
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_save_work_draft'))).toBe(0);
   });
@@ -479,7 +479,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
         launched_at: '2026-07-19T11:00:00.000Z',
       })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
       await page.getByRole('button', { name: `Open ${output.label}` }).click();
-      await page.getByRole('button', { name: 'Back to Jobs' }).click();
+      await page.getByRole('button', { name: 'Back to Work' }).click();
       await page.evaluate(({ output, contractorId }) => window.__durableHarness.complete('output', output.type, window.__durableHarness.output(output.type, output.id, contractorId)), { output, contractorId: CONTRACTOR_A });
       await expect(page.getByTestId('durable-draft-list')).toBeVisible();
       expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
@@ -513,7 +513,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'))).toBe(2);
     await page.evaluate(({ draftB, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftB, contractorA, 'Draft B')), { draftB: DRAFT_B, contractorA: CONTRACTOR_A });
     await page.evaluate(({ estimateId, contractorId }) => window.__durableHarness.complete('output', 'estimate', window.__durableHarness.output('estimate', estimateId, contractorId)), { estimateId: ESTIMATE_ID, contractorId: CONTRACTOR_A });
-    await expect(page.getByLabel('Draft title')).toHaveValue('Draft B');
+    await expect(page.getByLabel('What needs doing?')).toHaveValue('Draft B');
     expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
   });
 

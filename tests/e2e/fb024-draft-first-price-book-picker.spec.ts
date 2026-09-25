@@ -320,7 +320,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     }
   });
 
-  test('fails closed for idle, loading, and error states and distinguishes empty from no results', async ({ page }) => {
+  test('fails closed for unavailable states, hides an empty book, and distinguishes no search results', async ({ page }) => {
     await installComposerHarness(page);
     for (const state of ['idle', 'loading'] as const) {
       await page.evaluate(value => window.__draftPriceBookHarness.setLoadState(value), state);
@@ -335,10 +335,10 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
       window.__draftPriceBookHarness.setItems([]);
       window.__draftPriceBookHarness.setLoadState('ready');
     });
-    await page.getByTestId('durable-draft-price-book-toggle').click();
-    await expect(page.getByTestId('durable-draft-price-book-empty')).toBeVisible();
+    await expect(page.getByTestId('durable-draft-price-book-toggle')).toHaveCount(0);
 
     await page.evaluate(() => window.__draftPriceBookHarness.setItems([window.__draftPriceBookHarness.item()]));
+    await page.getByTestId('durable-draft-price-book-toggle').click();
     await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('no match');
     await expect(page.getByTestId('durable-draft-price-book-no-results')).toBeVisible();
   });
@@ -380,7 +380,6 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
         harness.item({ id: 'fee', title: 'Permit fee', line_type: 'fee', default_unit_price_cents: 2500 }),
       ]);
     });
-    await page.getByRole('button', { name: 'Add invoice line' }).click();
     await page.getByLabel('Invoice line item 1 description').fill('Inherited or manual line');
     await page.getByTestId('durable-draft-price-book-toggle').click();
     for (const title of ['Service call', 'Diagnostic labor', 'Replacement part', 'Permit fee']) {
@@ -519,7 +518,6 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
         harness.item({ id: 'priced', title: 'Priced item', default_unit_price_cents: 7500 }),
       ]);
     });
-    await page.getByRole('button', { name: 'Add estimate line' }).click();
     await page.getByLabel('Draft estimate line item 1 description').fill('Existing manual line');
     await page.getByTestId('durable-draft-price-book-toggle').click();
     for (const title of ['Blank price', 'Zero price', 'Priced item']) await page.getByLabel(`Select ${title}`).check();

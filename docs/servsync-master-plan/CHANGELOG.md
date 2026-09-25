@@ -1,5 +1,31 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — First Draft work line opens automatically
+
+- Standard Drafts now start with one editable work line. The untouched starter stays outside saved data and causes no price warning or unsaved-change prompt; templates and Price Book items replace it without an extra blank item.
+- Additional-line controls appear once editing begins. Removing the final item restores the starter; inspection checklists retain their current flow.
+- Reopening validation also repaired desktop Draft scrolling so the Save bar remains visible. Focused tests, authenticated local Demo checks, signed-in hosted verification, build/type/lint, CI, and Preview builds passed; the isolated hosted automation remained behind Vercel sign-in.
+- The post-validation TUT-002 review and replacement brief include this behavior. Tutorial impact remains UPDATE REQUIRED; no merge or Production Help publication. See [experience evidence](../qa/CONTRACTOR_EXPERIENCE_REFINEMENT_2026-09-25.md).
+
+## 2026-09-25 — Draft creation simplified after Demo review
+
+- Reorganized the existing composer into Customer & work, Scope & pricing, and Next step; simplified title language, compacted line items, exposed their type, and added a scrolling total/action bar.
+- Moved optional notes and labor settings into disclosures, hid empty loaded Price Books, and kept missing-price warnings and existing permission/lifecycle safeguards visible.
+- Format exploration now restores the prior standard outcome and an eligible checklist during the editing session. No schema, persistence contract, automatic save, send, or production-data change.
+- Validation and the post-implementation tutorial follow-up are recorded in [experience review evidence](../qa/CONTRACTOR_EXPERIENCE_REFINEMENT_2026-09-25.md). PR #576 remains a Preview; no merge or Production Help publication.
+
+## 2026-09-25 — Tutorial review sequencing clarified
+
+- User decision: keep tutorial checks and updates, but perform them after implementation, repairs, and application/Preview validation. Help Studio review and walkthrough playback must not interrupt ongoing screen revisions.
+- Updated AGENTS.md and the working model to make that sequence explicit. Existing freshness statuses, replacement verification, and Production Help approval requirements remain in place. This process-only clarification does not require another tutorial playback check.
+
+## 2026-09-25 — Contractor experience refinement verified in Preview
+
+- Dashboard keeps populated Today work prominent, removes the redundant empty Today card, and places workflow review before the weekly schedule. Work has one screen heading, a prominent Start New Draft action, quieter supporting tools, and neutral zero-attention presentation that stays distinct from unavailable counts.
+- Draft entry removes repeated headings and empty template guidance, uses plain preparation choices in a compact mobile grid, retains explicit private/unsent context, and consistently returns to Work. No persistence, lifecycle, roles, permissions, or backend behavior changes.
+- Validation: 301 focused Work/Draft checks passed across the initial run and eight corrected reruns; four schedule browser checks and two authenticated Demo desktop/mobile read-only checks passed locally and again on hosted Preview. GitHub quality checks and all three normal Preview deployments passed. Type checking, build, lint (77 existing warnings), and all 27 architecture checks passed. App.tsx shrank to 50,719 lines and its baseline was lowered.
+- Tutorial impact: UPDATE REQUIRED for TUT-002, whose published legacy video still demonstrates the separate Service Requests route. The existing replacement brief now uses the proposed labels. Application changes are prepared for review; merge and Production Help replacement remain pending. See [experience review evidence](../qa/CONTRACTOR_EXPERIENCE_REFINEMENT_2026-09-25.md).
+
 ## 2026-09-18 — Production Marketing conflict retry loop repaired
 
 - Replaced retryable custom `40001` errors with non-retryable `PT409` conflicts in 32 installed Marketing/Help RPCs using a guarded, idempotent forward migration. Existing validation, permissions, defaults and business records were preserved; historical migration files remain unchanged.

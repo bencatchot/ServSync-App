@@ -9,9 +9,9 @@ type DraftOutcomeSelectorProps = {
 };
 
 const BASE_OPTIONS: Array<{ value: DraftIntendedOutput | null; label: string; helper: string }> = [
-  { value: null, label: 'Not decided', helper: 'Save planning before choosing an output.' },
-  { value: 'estimate', label: 'Estimate', helper: 'Create a draft Estimate for review.' },
-  { value: 'job', label: 'Job', helper: 'Create an operational Job.' },
+  { value: null, label: 'Choose later', helper: 'Keep planning for now.' },
+  { value: 'estimate', label: 'Estimate', helper: 'Prepare pricing for review.' },
+  { value: 'job', label: 'Job', helper: 'Create a job to carry out the work.' },
 ];
 
 export function DraftOutcomeSelector({
@@ -33,11 +33,11 @@ export function DraftOutcomeSelector({
     : BASE_OPTIONS;
   return (
     <fieldset className="rounded-2xl border border-slate-200 bg-white p-3">
-      <legend className="text-sm font-bold text-slate-950">Intended output</legend>
+      <legend className="text-sm font-bold text-slate-950">What are you preparing?</legend>
       <p className="mt-1 text-xs leading-5 text-slate-500">
-        Choose what this Draft should become when it is ready.
+        You can change this before creating work.
       </p>
-      <div className={`mt-3 grid gap-2 ${invoiceAvailable ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`} role="radiogroup" aria-label="Intended output">
+      <div className={`mt-3 grid grid-cols-2 gap-2 ${invoiceAvailable ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`} role="radiogroup" aria-label="What are you preparing?">
         {options.map(option => {
           const selected = value === option.value;
           return (

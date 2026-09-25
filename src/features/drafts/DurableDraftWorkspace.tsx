@@ -1628,7 +1628,7 @@ export function DurableDraftWorkspace({
     return <div className="flex min-h-40 items-center justify-center gap-2" aria-live="polite"><Loader2 className="animate-spin" size={18} /> {loadingMessage}</div>;
   }
   if (!form) {
-    return <div ref={errorSummaryRef} tabIndex={-1} className="space-y-3 outline-none">{feedback ? <div role="alert" data-testid={feedback.testId} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{feedback.title}</div> : null}<button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold">Back to Jobs</button></div>;
+    return <div ref={errorSummaryRef} tabIndex={-1} className="space-y-3 outline-none">{feedback ? <div role="alert" data-testid={feedback.testId} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{feedback.title}</div> : null}<button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold">Back to Work</button></div>;
   }
   if ((launchState.phase === 'lifecycle_unavailable' || launchState.phase === 'reconciling_lifecycle') && canonical?.draft.status === 'active') {
     return (
@@ -1640,7 +1640,7 @@ export function DurableDraftWorkspace({
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void handleRetryLifecycleReconciliation()} disabled={durableDraftLaunchIsBusy(launchState)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Reload Draft status</button>
-          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Jobs</button>
+          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Work</button>
         </div>
       </section>
     );
@@ -1656,7 +1656,7 @@ export function DurableDraftWorkspace({
         {feedback ? <div role="alert" data-testid={feedback.testId} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p className="font-semibold">{feedback.title}</p>{feedback.body ? <p className="mt-1">{feedback.body}</p> : null}</div> : null}
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void handleRetryConsumedReconciliation()} disabled={durableDraftLaunchIsBusy(launchState)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Refresh Draft status</button>
-          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Jobs</button>
+          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Work</button>
         </div>
       </section>
     );
@@ -1697,7 +1697,7 @@ export function DurableDraftWorkspace({
               {openingOutputKey === `${outputType}:${liveOutputId}` ? <><Loader2 className="animate-spin" size={16} /> Opening…</> : <><FileText size={16} /> Open {outputFamilyLabel(outputType)}</>}
             </button>
           ) : null}
-          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Jobs</button>
+          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Work</button>
         </div>
       </section>
     );

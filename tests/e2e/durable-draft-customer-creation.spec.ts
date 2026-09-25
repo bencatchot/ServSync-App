@@ -156,14 +156,14 @@ test.describe('New Draft local-customer entry', () => {
   for (const outputType of ['estimate', 'invoice'] as const) {
     test(`selects a newly saved customer and enables the ${outputType} next action without creating it`, async ({ page }) => {
       await installHarness(page, { outputType });
-      await page.getByLabel('Draft title').fill('Still unfinished after customer save');
+      await page.getByLabel('What needs doing?').fill('Still unfinished after customer save');
       await page.getByTestId('durable-draft-add-customer').click();
       await page.getByRole('button', { name: 'Save and use customer' }).click();
 
       await expect(page.getByTestId('durable-draft-customer-created')).toContainText('New Pilot Customer is selected.');
       await expect(page.getByTestId('durable-draft-customer')).toHaveValue(/New Pilot Customer/);
       await expect(page.getByTestId('durable-draft-property')).toHaveValue(NEW_HOME_ID);
-      await expect(page.getByLabel('Draft title')).toHaveValue('Still unfinished after customer save');
+      await expect(page.getByLabel('What needs doing?')).toHaveValue('Still unfinished after customer save');
       await expect(page.getByText('Preserve this unfinished scope')).toBeVisible();
       expect(await page.locator('input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).toContain('Preserved line');
       await expect(page.getByTestId('durable-draft-create-output')).toBeEnabled();

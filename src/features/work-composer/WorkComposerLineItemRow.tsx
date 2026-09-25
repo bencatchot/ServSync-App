@@ -27,6 +27,8 @@ type WorkComposerLineItemRowProps = {
   itemLabel: 'estimate' | 'invoice' | 'draft job' | 'draft estimate' | 'draft';
   laborMode?: EstimateLaborMode;
   compactAdvanced?: boolean;
+  draftLayout?: boolean;
+  isPlaceholder?: boolean;
   advancedDetailsOpen?: boolean;
   onAdvancedDetailsOpenChange?: (open: boolean) => void;
   onChange: (updates: Partial<WorkComposerLineDraft>) => void;
@@ -67,6 +69,8 @@ export function WorkComposerLineItemRow({
   itemLabel,
   laborMode,
   compactAdvanced = false,
+  draftLayout = false,
+  isPlaceholder = false,
   advancedDetailsOpen = !compactAdvanced,
   onAdvancedDetailsOpenChange,
   onChange,
@@ -142,7 +146,7 @@ export function WorkComposerLineItemRow({
     <div>
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
       <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-        {workComposerLineTotalLabel(line)}
+        {isPlaceholder ? '—' : workComposerLineTotalLabel(line)}
       </p>
     </div>
   );
@@ -169,12 +173,13 @@ export function WorkComposerLineItemRow({
   const actionButtons = (
     <div className="flex items-center gap-2">
       {duplicateButton}
-      {removeButton}
+      {!isPlaceholder && removeButton}
     </div>
   );
   const lineTypeField = (
     <WorkComposerField label="Type">
       <select
+        aria-label={`${inputPrefix} line item ${index + 1} type`}
         className={INPUT_CLASS}
         value={line.line_type}
         onChange={event => onChange({ line_type: event.target.value as WorkComposerLineDraft['line_type'] })}
@@ -263,6 +268,21 @@ export function WorkComposerLineItemRow({
   if (compactAdvanced) {
     return (
       <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+        {draftLayout ? (
+          <div className="space-y-3" data-testid="draft-compact-line">
+            {descriptionField}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {lineTypeField}
+              {quantityField}
+              {unitField}
+              {unitPriceField}
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-600">Line total <strong className="ml-2 text-slate-950">{isPlaceholder ? '—' : workComposerLineTotalLabel(line)}</strong></p>
+              {actionButtons}
+            </div>
+          </div>
+        ) : (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_5rem_5rem_7rem_6rem_auto] lg:items-end">
           {descriptionField}
           {quantityField}
@@ -271,6 +291,7 @@ export function WorkComposerLineItemRow({
           {totalBlock}
           {actionButtons}
         </div>
+        )}
         <div className="mt-3 border-t border-slate-100 pt-3">
           <button
             type="button"
@@ -284,7 +305,7 @@ export function WorkComposerLineItemRow({
           </button>
           {advancedDetailsOpen && (
             <div className="mt-3 grid gap-3 lg:grid-cols-4">
-              {lineTypeField}
+              {!draftLayout ? lineTypeField : null}
               {laborHoursField}
               {showModelSpec ? modelSpecField : null}
               {showSupplyStatus ? supplyStatusField : null}

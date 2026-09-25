@@ -24,6 +24,28 @@ body {
   overflow-x: hidden;
 }
 
+/* Clip horizontal overflow without making the page a second scroll container:
+   the Draft action bar must follow the page's vertical scroll on mobile web. */
+html:not(.servsync-native):has(.draft-editor),
+html:not(.servsync-native) body:has(.draft-editor) {
+  overflow-x: clip;
+}
+
+/* Desktop workspaces scroll inside main. Keep the document from retaining a
+   second scroll offset when leaving and reopening the Draft editor. */
+@media (min-width: 768px) {
+  html:not(.servsync-native):has(.workspace-shell .draft-editor),
+  html:not(.servsync-native) body:has(.workspace-shell .draft-editor) {
+    overflow: hidden;
+  }
+
+  html:not(.servsync-native) body:has(.workspace-shell .draft-editor) {
+    position: fixed;
+    inset: 0;
+    overflow: clip;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;

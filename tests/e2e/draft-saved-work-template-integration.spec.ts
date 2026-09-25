@@ -159,7 +159,7 @@ test.describe('Draft saved work template integration', () => {
     const templateGuidance = sourceBetween(
       composerSource,
       'data-testid="durable-draft-template-guidance"',
-      "{composerField('Draft title'",
+      '{isChecklistDraft ? (',
     );
 
     expect(appSource).toContain(".from('estimate_templates')");
@@ -179,7 +179,7 @@ test.describe('Draft saved work template integration', () => {
     expect(templateGuidance).not.toContain('Template starting points');
     expect(templateGuidance).not.toContain('Inspection Checklists');
     expect(templateGuidance).not.toContain('Home-specific Checklists');
-    expect(composerSource).toContain('{!isChecklistDraft ? (');
+    expect(composerSource).toContain('{!isChecklistDraft && savedTemplateCount > 0 ? (');
     expect(composerSource).toContain('draftHasMeaningfulSavedWorkTemplateContent(draft)');
     expect(composerSource).toContain("applyTemplate(template, 'replace')");
     expect(composerSource).toContain("applyTemplate(pendingTemplate, 'add')");

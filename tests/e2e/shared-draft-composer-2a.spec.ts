@@ -118,7 +118,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     const laborSection = sourceBetween(
       composerSource,
       '{showEstimateLaborControls ? (',
-      '{isChecklistDraft ? (',
+      '<WorkComposerTotalsPanel',
     );
 
     expect(composerSource).toContain("const isEstimateIntent = draft.intended_output === 'estimate';");
@@ -131,7 +131,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(laborSection).toContain('data-testid="durable-draft-job-labor-hours"');
     expect(laborSection).toContain('data-testid="durable-draft-line-labor-summary"');
     expect(laborSection).toContain('Labor rows distinct from Material, Fee, and Other rows');
-    expect(composerSource).toContain("const workItemsHeading = isEstimateIntent ? 'Estimate line items' : isInvoiceIntent ? 'Draft Invoice line items' : 'Job work scope';");
+    expect(composerSource).toContain("const workItemsHeading = isEstimateIntent ? 'Estimate line items' : isInvoiceIntent ? 'Draft Invoice line items' : draft.intended_output === 'job' ? 'Job work scope' : 'Work items';");
     expect(composerSource).toContain("itemLabel={isEstimateIntent ? 'draft estimate' : isInvoiceIntent ? 'invoice' : 'draft'}");
     expect(sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx')).toContain("'draft estimate'");
   });
@@ -211,7 +211,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     const guidance = sourceBetween(
       composerSource,
       'data-testid="durable-draft-template-guidance"',
-      "{composerField('Draft title'",
+      '{isChecklistDraft ? (',
     );
     const launchTypes = sourceFile('src/features/drafts/durableDraftLaunchTypes.ts');
     const lineRow = sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
@@ -230,21 +230,18 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(lineRow).toContain("itemLabel !== 'draft estimate'");
   });
 
-  test('Add line action follows the empty state or final line item', () => {
+  test('Add line action follows the final line item', () => {
     const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const workItems = sourceBetween(
       composerSource,
       'data-testid="durable-draft-work-items"',
       '<WorkComposerTotalsPanel',
     );
-    const lineItemsIndex = workItems.indexOf('draft.line_items.map');
-    const emptyStateIndex = workItems.indexOf('{emptyLinesLabel}');
+    const lineItemsIndex = workItems.indexOf('displayedLines.map');
     const addLineIndex = workItems.indexOf('data-testid="durable-draft-add-line"');
 
     expect(lineItemsIndex).toBeGreaterThanOrEqual(0);
-    expect(emptyStateIndex).toBeGreaterThanOrEqual(0);
     expect(addLineIndex).toBeGreaterThan(lineItemsIndex);
-    expect(addLineIndex).toBeGreaterThan(emptyStateIndex);
     expect(workItems.slice(0, lineItemsIndex)).not.toContain('data-testid="durable-draft-add-line"');
   });
 
@@ -293,13 +290,13 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
 
     expect(selectorSource).toContain("label: 'Estimate'");
     expect(selectorSource).toContain("label: 'Job'");
-    expect(selectorSource).toContain("label: 'Not decided'");
+    expect(selectorSource).toContain("label: 'Choose later'");
     expect(selectorSource).toContain("label: 'Draft Invoice'");
     expect(selectorSource).toContain('invoiceAvailable');
     expect(selectorSource).toContain('It will not be sent.');
     expect(composerSource).toContain('data-testid="shared-draft-composer"');
     expect(composerSource).toContain('Save Draft');
-    expect(composerSource).toContain('Back to Jobs');
+    expect(composerSource).toContain('Back to Work');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Job');
     expect(composerSource).not.toContain('launchContractorWorkDraft');

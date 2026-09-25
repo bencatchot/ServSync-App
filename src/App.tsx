@@ -32441,27 +32441,12 @@ function ContractorDashboard({
               <h2 className="mt-1.5 text-xl font-bold text-slate-950 sm:text-2xl">
                 {contractorDraft.business_name || 'Set up your ServSync workspace'}
               </h2>
-              <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-600">
-                Start with today&apos;s work, then review the week or use setup tools when you need them.
-              </p>
             </div>
           </section>
 
-          <Card title="Today" icon={<ClipboardCheck size={18} />}>
+          {scheduleSnapshotItems.some(item => item.dayKey === todayScheduleKey) && <Card title="Today" icon={<ClipboardCheck size={18} />}>
             <ContractorTodayWork items={scheduleSnapshotItems.filter(item => item.dayKey === todayScheduleKey)} onOpenCalendar={() => setContractorTab('calendar')} />
-          </Card>
-          <Card title="Schedule snapshot" icon={<Calendar size={18} />}>
-            <ContractorScheduleSnapshot
-              days={scheduleSnapshotDays}
-              itemsByDay={scheduleItemsByDay}
-              weekLabel={scheduleWeekLabel}
-              isCurrentWeek={isCurrentDashboardWeek}
-              onPreviousWeek={() => setDashboardWeekOffset(-1)}
-              onNextWeek={() => setDashboardWeekOffset(1)}
-              onThisWeek={resetDashboardScheduleWeek}
-              onOpenCalendar={() => setContractorTab('calendar')}
-            />
-          </Card>
+          </Card>}
 
           <Card title="Workflow overview" icon={<LayoutDashboard size={18} />}>
             <div className="space-y-4">
@@ -32566,6 +32551,19 @@ function ContractorDashboard({
                 ))}
               </div>
             </div>
+          </Card>
+
+          <Card title="Schedule snapshot" icon={<Calendar size={18} />}>
+            <ContractorScheduleSnapshot
+              days={scheduleSnapshotDays}
+              itemsByDay={scheduleItemsByDay}
+              weekLabel={scheduleWeekLabel}
+              isCurrentWeek={isCurrentDashboardWeek}
+              onPreviousWeek={() => setDashboardWeekOffset(-1)}
+              onNextWeek={() => setDashboardWeekOffset(1)}
+              onThisWeek={resetDashboardScheduleWeek}
+              onOpenCalendar={() => setContractorTab('calendar')}
+            />
           </Card>
 
           {!SERVSYNC_DEMO_PRESENTATION_MODE && <ContractorEntitlementStatusPanel state={contractorEntitlementState} />}
@@ -37923,11 +37921,11 @@ function ContractorDashboard({
                       { id: 'templates', label: 'Templates', helper: 'Reusable tools', mobileClassName: 'col-span-3' },
                     ];
                 return (
-                  <section className={`${estimateComposerOpen || authorizedInvoiceComposerOpen ? 'hidden md:block ' : ''}rounded-2xl border border-slate-200 bg-white p-3 shadow-sm`} data-testid={financialsWorkspace ? 'contractor-financials-header-tabs' : 'contractor-work-header-tabs'}>
+                  <section className={`${estimateComposerOpen || authorizedInvoiceComposerOpen ? 'hidden md:block ' : ''}${financialsWorkspace ? 'rounded-2xl border border-slate-200 bg-white p-3 shadow-sm' : 'pb-1'}`} data-testid={financialsWorkspace ? 'contractor-financials-header-tabs' : 'contractor-work-header-tabs'}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div className="min-w-0">
-                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{financialsWorkspace ? 'Financials workspace' : 'Work workspace'}</p>
-                        <h2 className="mt-1 text-xl font-bold text-slate-950">{financialsWorkspace ? 'Financials' : 'Work'}</h2>
+                        {financialsWorkspace && <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Financials workspace</p>}
+                        {financialsWorkspace && <h2 className="mt-1 text-xl font-bold text-slate-950">Financials</h2>}
                         <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">{financialsWorkspace ? 'Manage Invoice drafts, billing status, and manual payment records. Payment collection happens outside ServSync during beta.' : 'Plan, estimate, perform, and document customer work.'}</p>{financialsWorkspace && supabase ? <div className="mt-3"><ContextualHelp client={supabase} contextKey="contractor.financials" contractorId={contractor?.id} label="How to deliver an invoice and record an outside payment" /></div> : null}
                       </div>
                       {(financialsWorkspace ? contractorFinancialsView !== 'overview' : contractorWorkView !== 'overview') && (canManageFinancialActions || !financialsWorkspace) ? <div

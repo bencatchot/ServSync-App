@@ -1,6 +1,6 @@
 # TUT-002 replacement brief — September 8, 2026
 
-Status: revised September 9 after native/hosted Work parity investigation; prepared for review. No Production Help record or media changed.
+Status: revised September 25 for the contractor experience Preview; prepared for review. No Production Help record or media changed.
 
 ## Corrected finding
 
@@ -14,21 +14,28 @@ September 9 read-only verification used the same approved Demo contractor on hos
 
 Title: How to create an estimate
 
-Summary: Start a contractor Draft, choose Estimate, add the customer, property, work and pricing, then create a draft Estimate for review.
+Summary: Start a contractor Draft, describe the customer work and pricing, then choose Estimate as the next step and create a draft Estimate for review.
 
 Steps:
 
-1. Open Work, then Drafts. Select Start New Draft. You can also select Start New Draft directly from the Work overview.
-2. Choose Estimate under Intended output. Select the customer and property, then add a Draft title and scope of work.
-3. Add the estimate line items and review quantities, pricing, labor and the total. Private notes remain company-only.
-4. Select Save Draft if planning is unfinished. When ready to create the estimate, select Create Estimate.
-5. Confirm the resulting Estimate and its Draft status before using any separate sending action.
+1. Open Work and select Start New Draft. The Drafts list also provides this action.
+2. In Customer & work, select the customer and property, fill What needs doing?, and describe the scope. Expand Private notes only for company-only planning.
+3. In Scope & pricing, keep Standard work scope and fill the first work line, which is already open. Use Add work line for additional items. Check each visible Type, quantity, unit, and unit price.
+4. In Next step, choose Estimate under What are you preparing? If hourly pricing is needed, select Adjust labor settings, choose the labor model, and enter the rate and hours. Review the total and any missing-price warnings.
+5. Select Save Draft to continue planning later. When ready, select Create Estimate in the action bar and review the existing confirmation before confirming creation.
+6. Confirm the resulting Estimate and its Draft status before using any separate sending action.
 
 The final creation and saved-state steps must be verified in the approved recording fixture; this read-only pass verified the controls and existing workflow implementation without producing a record.
 
 ## Draft narration
 
-Open Work, choose Drafts, and select Start New Draft. You can also start directly from the Work overview. Choose Estimate as the intended output. Select the customer and property, then enter a clear title and scope. Add the estimate line items and review the quantities, labor, pricing and total. Use Private notes only for company planning. Select Save Draft if you want to continue later. When the details are ready, select Create Estimate. Review the resulting estimate and confirm its Draft status. Sending it to the customer is a separate action.
+Open Work and select Start New Draft. In Customer and work, choose the customer and property. Enter what needs doing and describe the scope. Private notes are optional and stay within your company. In Scope and pricing, fill the first work line, which is already open. Add more lines as needed, checking their type, quantity, unit, and price. Under Next step, choose Estimate. For hourly pricing, open Adjust labor settings and enter the rate and hours. Check the total and any missing prices. Save Draft lets you continue later. When ready, select Create Estimate and review the confirmation. Confirm that the resulting estimate has Draft status. Sending it to the customer is a separate action.
+
+September 25 initial Preview alignment: Start New Draft is now the primary action beside At a Glance, the undecided choice reads Choose later, the private Draft message states that nothing is sent, and return actions read Back to Work. Record the replacement against the reviewed build once available in the governed Demo recording environment; do not splice old footage around these changes. The existing 45.12-second Production revision 3 was previewed again and still follows Service Requests rather than the written Draft-first route.
+
+September 25 follow-up alignment, application commit `5661595`: the completed and tested Preview now orders Customer & work → Scope & pricing → Next step. The action bar remains visible while scrolling, the title label is What needs doing?, item Type is visible, and private notes/labor settings are disclosures. The revised steps and narration above supersede the earlier choice-first proposal. The post-implementation Help Studio check reopened published revision 3, compared its written steps and paused Service Requests entry frame, and retained UPDATE REQUIRED. No new playback, recording request, provider generation, upload, or publication occurred.
+
+September 25 starter-line follow-up, application commit `1f69a8d`: standard Drafts now show one editable line immediately. An untouched starter is not saved and does not trigger price warnings or an unsaved-change prompt. Templates and Price Book selections replace the empty presentation row. After Preview verification, Help Studio searches for Draft and contractor.drafts matched TUT-002; Work items, Add work line, and Scope & pricing returned none. Its published revision 3 was opened paused and compared again; UPDATE REQUIRED remains. No playback or Production Help mutation occurred.
 
 ## Recording and acceptance scope
 
