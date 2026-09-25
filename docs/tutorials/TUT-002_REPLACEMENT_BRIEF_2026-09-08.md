@@ -1,6 +1,6 @@
 # TUT-002 replacement brief — September 8, 2026
 
-Status: revised September 25 for the contractor experience Preview; prepared for review. No Production Help record or media changed.
+Status: September 25 — UPDATED. The approved Draft-first, Cedar-narrated replacement is published and verified as Production revision 4. Earlier sections below preserve the investigation and proposal history.
 
 ## Corrected finding
 
@@ -51,3 +51,5 @@ The protected publication function requires `narrated_captioned_v1` and passed c
 September 25 recorder-support follow-up: the approved private Demo extension is installed with exact Draft/output ownership and inbound-dependency rejection. Installation changed no existing data. The ordinary Draft-first recorder is prepared but blocks before fixture writes because the automatically created private Estimate actor-audit row was omitted from the original five-table ownership proposal. [Recorder support evidence and the bounded additional approval](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md) document the remaining dependency. No new recording, narration, Help record, upload, or publication occurred; UPDATE REQUIRED remains.
 
 September 25 audit amendment and recording: the owner approved the additional exact-key audit cleanup. It is installed and verified without product-data or grant changes. The 62.44-second ordinary Draft-first recording succeeded, and all six temporary records were removed. The owner subsequently approved a dedicated speech-only OpenAI key with a one-day expiration. One Cedar request produced the narration; local synchronization and 14 compact captions are complete, with 4.29 seconds of final quiet review. The retimer now preserves consistent volume across scenes, covered by an actual audio-signal regression. The credential was discarded from the local generation process. The paused local preview is ready for owner sound-on review. Its UUID remains local-only; no Production Help request, upload, publication, or merge occurred. UPDATE REQUIRED remains until the approved narrated replacement is published and verified. See the updated recorder-support evidence.
+
+September 25 publication: the owner approved the finished preview and publication. Help Studio published request `d046ddc2-a1a5-4fd5-ab42-30325fa68f3d` as revision 4 of the existing TUT-002 walkthrough. Full hosted playback and dedicated Owner contextual retrieval verified the exact reviewed video, 14 captions, transcript, and disclosure. Revisions 1–3 and the other tutorials remain unchanged. No new narration request or merge occurred. See [publication evidence](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).

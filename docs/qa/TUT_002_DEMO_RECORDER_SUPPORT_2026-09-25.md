@@ -2,13 +2,13 @@
 
 ## Current result
 
-The owner subsequently approved the exact Estimate actor-audit amendment. It is installed on Demo, and the ordinary Draft-first recording is complete: **62.44 seconds, 1440×900**, with Save Draft, Create Estimate confirmation, unsent Estimate status, and exact $1,895 total verified. All six temporary product records were removed through the guarded reset; no other product-table row fingerprints changed.
+**UPDATED — TUT-002 “How to create an estimate” is published and verified as Production revision 4.** The owner approved the finished narrated preview and its Production publication, then unlocked the existing administrator session. The normal Help Studio replacement flow created request `d046ddc2-a1a5-4fd5-ab42-30325fa68f3d`, attached the exact reviewed package, approved its media reviews, and published revision 4 on walkthrough `9f62de0c-a06a-4840-86cb-6bf0362975f5`.
 
-The local preview now includes the approved Cedar voiceover and 14 compact, sentence-aligned English captions (maximum 11 words each). The owner approved a dedicated OpenAI key with only text-to-speech access and a one-day expiration. One `gpt-4o-mini-tts` / `cedar` request generated the narration; its credential was held only in the temporary local process and discarded when generation ended, without a repository/environment file or chat disclosure. No existing provider settings or other keys changed.
+The 62.44-second, 1440×900 recording demonstrates Work → Start New Draft, the already-open first line, Save Draft, Create Estimate confirmation, and an unsent $1,895 Estimate. One Cedar request supplies narration, with 14 sentence-aligned English captions (maximum 11 words each), a matching transcript/disclosure, consistent speech volume, and a 4.29-second final quiet hold. All six temporary Demo product records were removed.
 
-Local transcription matches the approved narration, allowing capitalization, punctuation, and “workline”/“work line” differences. Six segment cuts fall inside measured speech pauses; the seven narration stages follow their recorded scenes and retain 4.29 seconds of final quiet review. A real FFmpeg audio regression verifies equal original volume in early and late scenes after correcting the retimer's unintended automatic attenuation. The narrated MP4 decodes cleanly and peaks at -4.8 dBFS.
+Full muted local playback and full normal-speed hosted playback completed. The published Help Preview loads the replacement steps, media, and Cedar disclosure. An existing dedicated Production contractor-owner account retrieved exactly one revision-4 result at `contractor.drafts`; its protected caption/transcript hashes match the approved package, and the published video returned HTTP 200 with the exact approved MP4 SHA-256. The initial API check omitted contractor context and was correctly denied; the retry used the signed-in owner's own contractor context.
 
-The local review specification has a local-only UUID, **not a persisted Production Help recording request**. The package must be rebound to an approved real recording request before ingestion. No Help content was created, uploaded, or published. TUT-002 remains UPDATE REQUIRED.
+Read-only before/after snapshots confirm all seven existing immutable revision rows and the other four walkthroughs stayed unchanged. The new immutable audience is exactly Owner/Admin/Office. Pacing, sensitive-data, canonical-output, caption, sound-off, and overall validation states are all passed. No schema, permission, user-profile, production business-record, or environment change, manual deployment, or merge occurred during publication.
 
 ## Initial installation and boundaries
 
@@ -61,4 +61,13 @@ Narration preparation remains part of the tutorial work; Production Help creatio
 - The local preview remains `~/.codex/artifacts/tut-002-2026-09-25/preview.html`. It does not autoplay. Local `final-package.json`, `final-captions.vtt`, and `local-speech-transcript.json` identify the current review artifacts.
 - All 14 Help tests passed, including an actual audio signal test that checks early/middle/late loudness and silent gaps. Earlier 105 recorder/Help/parity checks and all hosted PR checks passed before the bounded audio fix; final CI is recorded on PR #577.
 
-Remaining work: owner sound-on review and separately protected Production Help request/upload/publication approval, followed by publishing and verifying the replacement through Help. TUT-002 remains UPDATE REQUIRED. No merge is approved for PR #577.
+## Publication evidence
+
+- Published walkthrough: `9f62de0c-a06a-4840-86cb-6bf0362975f5`, revision **4**; request `d046ddc2-a1a5-4fd5-ab42-30325fa68f3d` is Approved.
+- Video asset `7339ba44-fee9-4879-97e5-9e096d6e21eb`; poster asset `f3629c85-eb04-484a-9934-8f371bce3045`.
+- Captions SHA-256: `f4f5d85f015cd627a93ccf5b515492b3650c3dd220a6846b21ea2bf294f9bb5a`; narration-script SHA-256: `0d8305033c67c505b5f694be0e2550c448bc39272c7a9da373ed0f141ebb1f5b`.
+- Local publication package: `~/.codex/artifacts/tut-002-2026-09-25/publication/d046ddc2-a1a5-4fd5-ab42-30325fa68f3d/`. Rebinding used the downloaded persisted request, retained exact approved media bytes, and made no new provider request.
+- Read-only receipts: `/tmp/tut002-help-publication-before.json`, `/tmp/tut002-help-publication-after.json`, `/tmp/tut002-help-published-detail.json`, and `/tmp/tut002-owner-published-verification.json`.
+- Source/volume fix checks and all PR checks passed at `b500167`; publication is an approved Help content operation independent of merging this recorder-support branch.
+
+The TUT-002 replacement task is complete. PR #577 remains unmerged; no merge approval is included in the publication approval.

@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Draft-first Estimate tutorial published
+
+- With owner approval, Help Studio published TUT-002 revision 4: the current Work → Draft flow, starter work line, Save/Create confirmation, Cedar narration, 14 synchronized captions, transcript, and separate-send guidance.
+- Full hosted playback and Production Owner contextual retrieval verified the exact approved video and caption hashes. All seven prior immutable revision rows and the other four tutorials stayed unchanged. Tutorial impact: UPDATED.
+- Updated tutorial coverage, backlog, and roadmap to remove the completed TUT-002 replacement dependency. TUT-006 remains the next tutorial outcome; no merge, manual deployment, schema/permission change, or production business-data mutation. See [evidence](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
 ## 2026-09-25 — Draft-first tutorial narrated preview prepared
 
 - Generated the approved Cedar narration once using an owner-approved, speech-only key expiring after one day. The key stayed outside the repository and was discarded from the temporary generation process.
