@@ -178,7 +178,7 @@ test.describe('Work and Financials overview guardrails', () => {
     expect(overview).toContain("setContractorWorkViewAndScroll('open_jobs')");
     expect(overview).not.toContain('Invoice');
     expect(source).toContain("contractorTab === 'financials' && contractorFinancialsView === 'overview'");
-    expect(source).toContain("setContractorFinancialsViewAndScroll('open_invoices')");
+    expect(source).toContain("onViewOpen={() => openFinancialSummary('open')}");
     expect(source).toContain("contractorTab === 'work' && (contractorWorkView === 'open_jobs' || contractorWorkView === 'closed_jobs')");
   });
 
@@ -188,7 +188,7 @@ test.describe('Work and Financials overview guardrails', () => {
     expect(source).toContain('data-testid="contractor-invoice-status-shortcuts"');
     expect(source).toContain("{ id: 'open' as const, label: 'Open'");
     expect(source).toContain("{ id: 'paid' as const, label: 'Paid'");
-    expect(source).toContain("contractorInvoiceRecordStatusFilter === 'open' && !['paid', 'void'].includes(invoice.status)");
+    expect(source).toContain("contractorInvoiceRecordStatusFilter === 'open' && isOpenInvoice(invoice)");
     expect(source).toContain('data-testid="customer-financial-records"');
     expect(source).toContain('Open invoices</span>');
     expect(source).toContain('Paid invoices</span>');
@@ -241,7 +241,7 @@ test.describe('Work and Financials overview guardrails', () => {
     expect(source).toContain('aria-label={`${label}:');
     expect(source).toContain("state.status === 'loading'");
     expect(source).toContain("state.status === 'error'");
-    expect(source).toContain('Nothing needs attention');
+    expect(source).toContain('No work items need attention');
     expect(source).toContain('No saved Drafts');
     expect(source).not.toContain('overflow-x-auto');
   });

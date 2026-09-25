@@ -293,13 +293,13 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
 
     expect(selectorSource).toContain("label: 'Estimate'");
     expect(selectorSource).toContain("label: 'Job'");
-    expect(selectorSource).toContain("label: 'Not decided'");
+    expect(selectorSource).toContain("label: 'Choose later'");
     expect(selectorSource).toContain("label: 'Draft Invoice'");
     expect(selectorSource).toContain('invoiceAvailable');
     expect(selectorSource).toContain('It will not be sent.');
     expect(composerSource).toContain('data-testid="shared-draft-composer"');
     expect(composerSource).toContain('Save Draft');
-    expect(composerSource).toContain('Back to Jobs');
+    expect(composerSource).toContain('Back to Work');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Job');
     expect(composerSource).not.toContain('launchContractorWorkDraft');

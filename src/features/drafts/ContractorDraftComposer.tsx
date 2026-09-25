@@ -294,15 +294,9 @@ export function ContractorDraftComposer({
 
   return (
     <div className="space-y-4" data-testid="shared-draft-composer">
-      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Start New Draft</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950">{currentDraftId ? 'Continue Draft' : 'Draft composer'}</h2>
-            <p className="mt-1 text-sm leading-6 text-blue-950">Save contractor-only planning details, then create one Estimate, Job, or draft Invoice when the Draft is ready.</p>
-          </div>
-          <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">Draft planning</span>
-        </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <p className="max-w-2xl text-sm leading-6 text-slate-600">Plan the work here, then create an Estimate, Job, or draft Invoice when you&apos;re ready. Nothing is sent from this Draft.</p>
+        <span className="w-fit shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Private Draft</span>
       </div>
 
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
@@ -381,19 +375,17 @@ export function ContractorDraftComposer({
       {customerCreationPanel}
       {subjectTypeLocked ? (
         <p className="text-xs font-medium text-slate-500">
-          This saved Draft keeps its original customer connection category so retries update the same Draft safely.
+          This saved Draft keeps its original customer type. You can choose another customer of the same type.
         </p>
       ) : null}
 
-      {!isChecklistDraft ? (
+      {!isChecklistDraft && savedTemplateCount > 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-950">Saved Work Templates</h3>
               <p className="mt-1 text-xs font-medium text-slate-500">
-                {savedTemplateCount === 0
-                  ? 'No saved templates yet.'
-                  : `${savedTemplateCount} saved template${savedTemplateCount === 1 ? '' : 's'} available.`}
+                {savedTemplateCount} saved template{savedTemplateCount === 1 ? '' : 's'} available.
               </p>
             </div>
             <button
@@ -749,7 +741,7 @@ export function ContractorDraftComposer({
         {onDiscardPreparedLaunch ? <button type="button" onClick={onDiscardPreparedLaunch} disabled={launchBusy} className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 disabled:opacity-50">Discard unused attempt</button> : null}
         <button type="button" onClick={onBack} disabled={saving} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           <X size={16} />
-          Back to Jobs
+          Back to Work
         </button>
       </div>
     </div>

@@ -1,6 +1,6 @@
 # TUT-002 replacement brief — September 8, 2026
 
-Status: revised September 9 after native/hosted Work parity investigation; prepared for review. No Production Help record or media changed.
+Status: revised September 25 for the contractor experience Preview; prepared for review. No Production Help record or media changed.
 
 ## Corrected finding
 
@@ -19,7 +19,7 @@ Summary: Start a contractor Draft, choose Estimate, add the customer, property, 
 Steps:
 
 1. Open Work, then Drafts. Select Start New Draft. You can also select Start New Draft directly from the Work overview.
-2. Choose Estimate under Intended output. Select the customer and property, then add a Draft title and scope of work.
+2. Choose Estimate under What are you preparing? Select the customer and property, then add a Draft title and scope of work.
 3. Add the estimate line items and review quantities, pricing, labor and the total. Private notes remain company-only.
 4. Select Save Draft if planning is unfinished. When ready to create the estimate, select Create Estimate.
 5. Confirm the resulting Estimate and its Draft status before using any separate sending action.
@@ -28,7 +28,9 @@ The final creation and saved-state steps must be verified in the approved record
 
 ## Draft narration
 
-Open Work, choose Drafts, and select Start New Draft. You can also start directly from the Work overview. Choose Estimate as the intended output. Select the customer and property, then enter a clear title and scope. Add the estimate line items and review the quantities, labor, pricing and total. Use Private notes only for company planning. Select Save Draft if you want to continue later. When the details are ready, select Create Estimate. Review the resulting estimate and confirm its Draft status. Sending it to the customer is a separate action.
+Open Work, choose Drafts, and select Start New Draft. You can also start directly from the Work overview. Under What are you preparing, choose Estimate. Select the customer and property, then enter a clear title and scope. Add the estimate line items and review the quantities, labor, pricing and total. Use Private notes only for company planning. Select Save Draft if you want to continue later. When the details are ready, select Create Estimate. Review the resulting estimate and confirm its Draft status. Sending it to the customer is a separate action.
+
+September 25 Preview alignment: Start New Draft is now the primary action beside At a Glance, the undecided choice reads Choose later, the private Draft message states that nothing is sent, and return actions read Back to Work. Record the replacement against the reviewed build once available in the governed Demo recording environment; do not splice old footage around these changes. The existing 45.12-second Production revision 3 was previewed again and still follows Service Requests rather than the written Draft-first route.
 
 ## Recording and acceptance scope
 

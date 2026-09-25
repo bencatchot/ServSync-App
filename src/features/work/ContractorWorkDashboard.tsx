@@ -86,7 +86,7 @@ function ToolAction({
       type="button"
       data-testid={testId}
       onClick={onClick}
-      className="flex min-h-[5.5rem] min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+      className="flex min-h-[5.5rem] min-w-0 items-center gap-3 rounded-xl border border-transparent bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
     >
       <span className="shrink-0 rounded-lg bg-slate-100 p-2 text-slate-700">{icon}</span>
       <span className="min-w-0 flex-1">
@@ -147,7 +147,8 @@ export function ContractorWorkDashboard({
     status: loading ? 'loading' : loadError ? 'error' : 'ready',
     count,
   });
-  const actionsAvailable = canStartDraft || canUseTemplates || canUseServicePlans || canViewPriceBook;
+  const toolsAvailable = canUseTemplates || canUseServicePlans || canViewPriceBook;
+  const workNeedsAttention = !loading && !loadError && needsAttentionCount > 0;
 
   return (
     <section data-testid="contractor-work-dashboard" className="space-y-5">
@@ -160,20 +161,27 @@ export function ContractorWorkDashboard({
       ) : null}
 
       <section aria-labelledby="jobs-at-a-glance-heading">
-        <div className="mb-3">
-          <h2 id="jobs-at-a-glance-heading" className="text-lg font-bold text-slate-950">At a Glance</h2>
-          <p className="mt-1 text-sm text-slate-600">Open an existing workflow or review the items that need a next step.</p>
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="jobs-at-a-glance-heading" className="text-lg font-bold text-slate-950">At a Glance</h2>
+            <p className="mt-1 text-sm text-slate-600">Pick up where you left off or plan something new.</p>
+          </div>
+          {canStartDraft ? (
+            <button type="button" data-testid="contractor-work-start-draft" onClick={onStartNewDraft} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+              <Plus size={18} /> Start New Draft
+            </button>
+          ) : null}
         </div>
         <div data-testid="contractor-jobs-at-a-glance" className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
           <SummaryTile
             testId="contractor-jobs-summary-needs-attention"
             label="Needs Attention"
-            helper="Records ready for a contractor next step"
-            emptyHelper="Nothing needs attention"
+            helper="Work ready for your next step"
+            emptyHelper="No work items need attention"
             state={loadedState(needsAttentionCount)}
-            icon={<AlertTriangle size={18} />}
+            icon={workNeedsAttention ? <AlertTriangle size={18} /> : !loading && !loadError ? <CheckCircle2 size={18} /> : <ClipboardList size={18} />}
             onClick={onViewNeedsAttention}
-            prominent
+            prominent={workNeedsAttention}
           />
           {canReadDrafts ? (
             <SummaryTile
@@ -207,16 +215,13 @@ export function ContractorWorkDashboard({
         </div>
       </section>
 
-      {actionsAvailable ? (
+      {toolsAvailable ? (
         <section aria-labelledby="jobs-actions-heading">
           <div className="mb-3">
-            <h2 id="jobs-actions-heading" className="text-lg font-bold text-slate-950">Actions &amp; Tools</h2>
-            <p className="mt-1 text-sm text-slate-600">Start planning or open the reusable tools your role can manage.</p>
+            <h2 id="jobs-actions-heading" className="text-sm font-bold text-slate-700">Tools</h2>
+            <p className="mt-1 text-sm text-slate-600">Reuse your pricing, templates, and plans.</p>
           </div>
-          <div data-testid="contractor-jobs-actions-tools" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {canStartDraft ? (
-              <ToolAction testId="contractor-work-start-draft" label="Start New Draft" helper="Plan customer work before choosing an output" icon={<Plus size={18} />} onClick={onStartNewDraft} />
-            ) : null}
+          <div data-testid="contractor-jobs-actions-tools" className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {canUseTemplates ? (
               <ToolAction testId="contractor-work-open-templates" label="Templates" helper="Saved Work Templates and Inspection Checklists" icon={<Sparkles size={18} />} onClick={onOpenTemplates} />
             ) : null}
