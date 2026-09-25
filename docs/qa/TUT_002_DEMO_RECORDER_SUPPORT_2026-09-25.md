@@ -9,6 +9,7 @@ The local recorder now has a separate ordinary Work → Start New Draft path, wi
 ## Validation evidence
 
 - 140 isolated browser tests passed for the finished Draft composer, Save/launch confirmation, concurrency, and recovery behavior.
+- 16 backend-parity tests passed.
 - 89 recorder and Help-package tests passed, including new saved/consumed Draft receipt, identity, scope, total, output, and child ownership checks.
 - Disposable PostgreSQL validation passed: exact consumed and saved-only cleanup; extra Draft item/launch/Estimate item rejection; cross-run ownership refusal; wrong scenario, target, role, customer, contractor, output, and snapshot rejection; SET NULL/CASCADE dependency rejection; private browser-role denial; unchanged existing reset priorities; unrelated Estimate preservation; atomic failure; guarded reapplication refusal.
 - The actual ordinary Demo interface was opened read-only. Work, Start New Draft, the Sarah Johnson customer option, Demo Bay Home, starter line, and current labels were confirmed. No Save/Create action was taken.
