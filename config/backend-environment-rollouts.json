@@ -1,8 +1,44 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-09-18",
+  "updatedOn": "2026-09-25",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "demo-draft-first-audit-ownership-v1",
+      "artifact": "servsync-demo-draft-first-audit-ownership.sql (SHA-256 0557f48e35b6db2b3ce53c46a9b23eb9234d7ccb320506fcab445c8aad93495c)",
+      "environments": {
+        "production": {
+          "status": "N/A",
+          "reason": "Private Demo recorder only; no Production approval."
+        },
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder only; no Sandbox change."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Owner-approved amendment applied 2026-09-25. Only reset-order, primary-key mapper, and reset-run function definitions changed. Exact estimate_id registration for new same-run unsent actor attribution; creator/contractor lineage and unexpected-dependent refusal. All 161 public-table counts/full-row fingerprints and all grants unchanged. See TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md for validation and recording evidence."
+        }
+      }
+    },
+    {
+      "id": "demo-draft-first-recorder-support-v1",
+      "artifact": "servsync-demo-draft-first-recorder-support.sql (SHA-256 d7692cd27387cb7fce537af4610c8fc675ca10dab2ec497aacb26595308d280b)",
+      "environments": {
+        "production": {
+          "status": "N/A",
+          "reason": "Private Demo-only fixture support; Production application is not authorized."
+        },
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder only; no Sandbox changes authorized."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Owner-approved installation on 2026-09-25 changed only reset-order/reset-run definitions. All 161 public-table counts and full-row fingerprints were unchanged; all ACLs and other catalog objects were unchanged. Adds Draft launch/item/Draft priorities 130/129/128 with same-run ownership and inbound-dependency checks. Recording remains blocked before fixture writes because automatic estimate_actor_audit attribution is outside the approved allowlist. Live parity retains exactly the pre-existing 32 function-definition differences; no new supported-schema drift. See docs/qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md."
+        }
+      }
+    },
     {
       "id": "rpc-business-conflict-no-retry-v1",
       "artifact": "servsync-rpc-business-conflict-no-retry.sql (SHA-256 138d444a752d9a83d229e40b1c812b1ce9a0dec6c746b98328a249a1282e97ab)",
@@ -49,7 +85,7 @@
         },
         "production": {
           "status": "Applied",
-          "reason": "The identical SHA-256 f04267c23dcb3a7d868cb510b17097a68d07422ffa6c40a38870fe3a9815c777 was applied once to Production uqgtheclhxqlnjpfmheq on 2026-08-31 from reviewed PR #540 head ae93147dbe7b57ec4125c375577a4099d4e6e31c after Sandbox and Demo acceptance. Preflight found the marker absent, exact prior function hashes, zero scheduled/publishing packages, zero active publications, and zero scheduled/publishing/provider-processing lifecycles. Postflight installed abandon-RPC definition SHA-256 2b158f1931a6dbf12d999a5879a39c20ffc27d9b97b122f261e7f8d461e00d81 and catalog-RPC definition SHA-256 758d4e8502b54dcd21f8731db4f358980fbc2a4914fd4361bd780eb06a65ffac with the accepted marker, postgres ownership, SECURITY DEFINER, expected volatility, fixed search paths, authenticated-only execution, and anon/service-role denial. All 30 Marketing table counts and complete row fingerprints matched exactly before/after, including one workspace, 23 Content items/56 status events, six assets/three intakes/11 lifecycle events, nine pairings/16 pairing events, six packages, four publications/15 events, three connections, and four unchanged historical provider starts. The Published Your work, connected \u2014 Free ServSync beta record retained approved Content revision 3, Published package e8ac1f51-f320-40a8-82f3-640e984b6801, approved pairing, retention-state asset, its failed and Published publication attempts, and eight exact publication events. Authenticated catalog derivation returns retirement_eligible false and the UI retirement condition false for that package. No Production Marketing row, publication/provider state, environment setting, provider request, or external action changed; no retirement RPC was invoked."
+          "reason": "The identical SHA-256 f04267c23dcb3a7d868cb510b17097a68d07422ffa6c40a38870fe3a9815c777 was applied once to Production uqgtheclhxqlnjpfmheq on 2026-08-31 from reviewed PR #540 head ae93147dbe7b57ec4125c375577a4099d4e6e31c after Sandbox and Demo acceptance. Preflight found the marker absent, exact prior function hashes, zero scheduled/publishing packages, zero active publications, and zero scheduled/publishing/provider-processing lifecycles. Postflight installed abandon-RPC definition SHA-256 2b158f1931a6dbf12d999a5879a39c20ffc27d9b97b122f261e7f8d461e00d81 and catalog-RPC definition SHA-256 758d4e8502b54dcd21f8731db4f358980fbc2a4914fd4361bd780eb06a65ffac with the accepted marker, postgres ownership, SECURITY DEFINER, expected volatility, fixed search paths, authenticated-only execution, and anon/service-role denial. All 30 Marketing table counts and complete row fingerprints matched exactly before/after, including one workspace, 23 Content items/56 status events, six assets/three intakes/11 lifecycle events, nine pairings/16 pairing events, six packages, four publications/15 events, three connections, and four unchanged historical provider starts. The Published Your work, connected — Free ServSync beta record retained approved Content revision 3, Published package e8ac1f51-f320-40a8-82f3-640e984b6801, approved pairing, retention-state asset, its failed and Published publication attempts, and eight exact publication events. Authenticated catalog derivation returns retirement_eligible false and the UI retirement condition false for that package. No Production Marketing row, publication/provider state, environment setting, provider request, or external action changed; no retirement RPC was invoked."
         },
         "demo": {
           "status": "Applied",

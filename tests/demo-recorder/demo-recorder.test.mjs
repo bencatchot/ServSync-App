@@ -236,15 +236,15 @@ test('TUT-005 pins the Optional message field through controlled updates before 
   assert.equal(handleCalls, 1);
 });
 
-test('contractor Estimate scenario is a bounded request-to-draft workflow', () => {
+test('contractor Estimate scenario is an isolated ordinary Draft-first workflow', () => {
   assert.equal(validateScenarioDefinition(contractorCreateEstimateScenario), contractorCreateEstimateScenario);
-  assert.equal(contractorCreateEstimateScenario.initialCheckpoint, 'request_ready');
+  assert.equal(contractorCreateEstimateScenario.initialCheckpoint, 'draft_ready');
   assert.equal(contractorCreateEstimateScenario.finalCheckpoint, 'estimate_draft');
   assert.deepEqual(
     contractorCreateEstimateScenario.scenes.map((scene) => scene.key),
-    ['request-context', 'estimate-draft', 'estimate-saved'],
+    ['work-draft', 'estimate-draft', 'estimate-saved'],
   );
-  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 38, max: 55 });
+  assert.deepEqual(contractorCreateEstimateScenario.expectedDurationSeconds, { min: 55, max: 180 });
   assert.equal(contractorCreateEstimateScenario.estimate.line.unit_price_cents, 189500);
   assert.equal(contractorCreateEstimateScenario.estimate.unitPrice, '1895.00');
   assert.doesNotMatch(JSON.stringify(contractorCreateEstimateScenario), /password|service_role|@example/i);
@@ -572,7 +572,7 @@ test('duration and metadata contracts fail closed', () => {
     fileName: 'estimate.webm',
     createdAt: '2026-08-14T12:00:00.000Z',
   });
-  assert.match(estimateMetadata.fixture_policy, /estimate_draft/i);
+  assert.match(estimateMetadata.fixture_policy, /isolated draft_first_estimate/i);
 });
 
 test('fixture adoption is exact, lineage-bound, and does not broaden reset authority', () => {

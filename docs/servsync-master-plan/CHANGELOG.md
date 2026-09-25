@@ -1,5 +1,29 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Draft-first Estimate tutorial published
+
+- With owner approval, Help Studio published TUT-002 revision 4: the current Work → Draft flow, starter work line, Save/Create confirmation, Cedar narration, 14 synchronized captions, transcript, and separate-send guidance.
+- Full hosted playback and Production Owner contextual retrieval verified the exact approved video and caption hashes. All seven prior immutable revision rows and the other four tutorials stayed unchanged. Tutorial impact: UPDATED.
+- Updated tutorial coverage, backlog, and roadmap to remove the completed TUT-002 replacement dependency. TUT-006 remains the next tutorial outcome; no merge, manual deployment, schema/permission change, or production business-data mutation. See [evidence](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
+## 2026-09-25 — Draft-first tutorial narrated preview prepared
+
+- Generated the approved Cedar narration once using an owner-approved, speech-only key expiring after one day. The key stayed outside the repository and was discarded from the temporary generation process.
+- Synchronized seven narration stages and 14 compact caption cues with the completed 62-second Demo recording, retaining a four-second final hold. Corrected scene retiming so early speech retains the same volume as later speech; 14 Help tests including an audio-signal regression passed.
+- The local preview is paused on load and ready for owner sound-on review. TUT-002 remains UPDATE REQUIRED pending separately approved Production Help publication and verification; no merge or Production Help mutation. See [evidence](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
+## 2026-09-25 — Draft-first Estimate tutorial recorded with exact audit cleanup
+
+- Applied the owner-approved Demo audit-ownership amendment without changing table grants or product data. Its checks bind the newly created actor-audit row to the same run, unsent Estimate, contractor, and recording actor.
+- Recorded the ordinary 62-second Work → Start New Draft → Save Draft → Create Estimate flow, verified its unsent $1,895 output, and removed all six temporary records. Product-table fingerprints returned unchanged.
+- A paused local preview includes compact screen-aligned captions. Cedar narration remains pending the existing credential location; no provider request, Production Help creation/upload/publication, or merge occurred. TUT-002 remains UPDATE REQUIRED. See [evidence](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
+## 2026-09-25 — Demo Draft-first tutorial cleanup safeguards
+
+- Installed the owner-approved Demo-only reset support for Drafts, items, and launch records, with exact same-run lineage and unexpected-dependent rejection. Only two helper definitions changed; all 161 public data tables and all grants stayed unchanged.
+- Prepared the ordinary Work → Draft recorder and isolated receipt verification. Recording remains blocked before fixture creation because automatic Estimate actor attribution needs a separately approved exact-key cleanup extension.
+- Validation: 140 browser checks, 89 recorder/package checks, and disposable PostgreSQL ownership/cleanup tests passed. Existing Production/Demo drift is unchanged. TUT-002 remains UPDATE REQUIRED; no recording, Production Help mutation, merge, or Production/Sandbox change. See [evidence and remaining decision](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
 ## 2026-09-25 — First Draft work line opens automatically
 
 - Standard Drafts now start with one editable work line. The untouched starter stays outside saved data and causes no price warning or unsaved-change prompt; templates and Price Book items replace it without an extra blank item.

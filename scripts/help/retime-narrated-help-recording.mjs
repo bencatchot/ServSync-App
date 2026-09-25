@@ -120,6 +120,16 @@ function runFfmpeg(ffmpegPath, args, label) {
   if (result.status !== 0) throw new Error(`${label} failed: ${result.stderr.trim() || 'ffmpeg failed'}`);
 }
 
+export function buildSceneAudioFilter(segments) {
+  const filters = segments.map((segment, index) => (
+    `[0:a]atrim=start=${segment.sourceStart.toFixed(6)}:end=${segment.sourceEnd.toFixed(6)},asetpts=PTS-STARTPTS,adelay=${Math.round(segment.outputSegmentStart * 1000)}|${Math.round(segment.outputSegmentStart * 1000)}[s${index}]`
+  ));
+  // Alignment rejects overlapping segments. Normalizing their delayed inputs
+  // would attenuate earlier speech more than later speech as inputs finish.
+  filters.push(`${segments.map((_, index) => `[s${index}]`).join('')}amix=inputs=${segments.length}:duration=longest:dropout_transition=0:normalize=0[a]`);
+  return filters.join(';');
+}
+
 function probeAudio(filePath, ffprobePath) {
   const result = spawnSync(ffprobePath, [
     '-v', 'error', '-select_streams', 'a:0',
@@ -341,12 +351,8 @@ export async function retimeNarratedHelpRecording(argv = process.argv.slice(2), 
   const metadataPath = join(stagingDir, metadataFilename);
 
   try {
-    const filters = segments.map((segment, index) => (
-      `[0:a]atrim=start=${segment.sourceStart.toFixed(6)}:end=${segment.sourceEnd.toFixed(6)},asetpts=PTS-STARTPTS,adelay=${Math.round(segment.outputSegmentStart * 1000)}|${Math.round(segment.outputSegmentStart * 1000)}[s${index}]`
-    ));
-    filters.push(`${segments.map((_, index) => `[s${index}]`).join('')}amix=inputs=${segments.length}:duration=longest:dropout_transition=0[a]`);
     runFfmpeg(tools.ffmpeg, [
-      '-i', sourceAudioPath, '-filter_complex', filters.join(';'), '-map', '[a]', '-c:a', 'libmp3lame', '-b:a', '192k', audioPath,
+      '-i', sourceAudioPath, '-filter_complex', buildSceneAudioFilter(segments), '-map', '[a]', '-c:a', 'libmp3lame', '-b:a', '192k', audioPath,
     ], 'Scene-aligned narration creation');
     runFfmpeg(tools.ffmpeg, [
       '-i', silentVideoPath, '-i', audioPath, '-map', '0:v:0', '-map', '1:a:0',
