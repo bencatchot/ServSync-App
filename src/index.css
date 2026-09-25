@@ -24,6 +24,13 @@ body {
   overflow-x: hidden;
 }
 
+/* Clip horizontal overflow without making the page a second scroll container:
+   the Draft action bar must follow the page's vertical scroll on mobile web. */
+html:not(.servsync-native):has(.draft-editor),
+html:not(.servsync-native) body:has(.draft-editor) {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   min-width: 320px;

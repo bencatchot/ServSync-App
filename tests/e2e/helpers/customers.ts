@@ -109,7 +109,7 @@ export async function launchCustomerProfileDraft(page: Page, options: {
     await main.getByRole('textbox', { name: new RegExp(`^${itemLabel} line item 1 unit price$`, 'i') }).fill('123');
   }
 
-  await main.getByLabel(/^Draft title$/i).fill(options.title);
+  await main.getByLabel(/^What needs doing\?$/i).fill(options.title);
   await main.getByLabel(/^Scope \/ description$/i).fill(options.scope);
   const outputLabel = options.output === 'invoice' ? 'Draft Invoice' : options.output === 'estimate' ? 'Estimate' : 'Job';
   await main.getByTestId('durable-draft-create-output').click();

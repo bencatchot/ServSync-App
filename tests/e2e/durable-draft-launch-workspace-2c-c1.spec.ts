@@ -1008,6 +1008,9 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
       await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('${outputType}', true))`);
       await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
       await expect(page.getByText(new RegExp(`${label} created\\. Opening ${label}`))).toBeVisible();
+      // The success message can render before the asynchronous output handoff finishes.
+      await expect.poll(() => harnessValue<number>(page, 'h.snapshot().adoptCount')).toBe(1);
+      await expect.poll(() => harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(1);
       const snapshot = await harnessValue<{ adoptCount: number; outputLoadCount: number; openTargets: string[] }>(page, 'h.snapshot()');
       expect(snapshot.adoptCount).toBe(1);
       expect(snapshot.outputLoadCount).toBe(1);
@@ -1019,7 +1022,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     test(`dirty existing ${label} performs one save before launch`, async ({ page }) => {
       await installLaunchHarness(page, { outputType });
       await completeInitialDraft(page, outputType);
-      await page.getByLabel('Draft title').fill('Updated water heater plan');
+      await page.getByLabel('What needs doing?').fill('Updated water heater plan');
       await confirmLaunch(page, outputType);
       await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
       expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
@@ -1158,7 +1161,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
   test('an ordinary pending save blocks launch commitment', async ({ page }) => {
     await installLaunchHarness(page, { outputType: 'estimate' });
     await completeInitialDraft(page, 'estimate');
-    await page.getByLabel('Draft title').fill('Saving first');
+    await page.getByLabel('What needs doing?').fill('Saving first');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
     await expect(page.getByTestId('durable-draft-create-output')).toBeDisabled();
@@ -1412,7 +1415,7 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
   test('stale save cannot reactivate a Draft after external consumed proof', async ({ page }) => {
     await installLaunchHarness(page, { outputType: 'estimate' });
     await completeInitialDraft(page, 'estimate');
-    await page.getByLabel('Draft title').fill('Pending old save');
+    await page.getByLabel('What needs doing?').fill('Pending old save');
     await page.getByRole('button', { name: 'Save Draft' }).click();
     await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') === 1);
     await harnessValue(page, "h.dispatchAttempt('succeeded', 'estimate')");

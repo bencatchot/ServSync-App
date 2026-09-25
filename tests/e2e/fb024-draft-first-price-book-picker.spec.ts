@@ -320,7 +320,7 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
     }
   });
 
-  test('fails closed for idle, loading, and error states and distinguishes empty from no results', async ({ page }) => {
+  test('fails closed for unavailable states, hides an empty book, and distinguishes no search results', async ({ page }) => {
     await installComposerHarness(page);
     for (const state of ['idle', 'loading'] as const) {
       await page.evaluate(value => window.__draftPriceBookHarness.setLoadState(value), state);
@@ -335,10 +335,10 @@ test.describe('FB-024 Draft-first Price Book picker v1', () => {
       window.__draftPriceBookHarness.setItems([]);
       window.__draftPriceBookHarness.setLoadState('ready');
     });
-    await page.getByTestId('durable-draft-price-book-toggle').click();
-    await expect(page.getByTestId('durable-draft-price-book-empty')).toBeVisible();
+    await expect(page.getByTestId('durable-draft-price-book-toggle')).toHaveCount(0);
 
     await page.evaluate(() => window.__draftPriceBookHarness.setItems([window.__draftPriceBookHarness.item()]));
+    await page.getByTestId('durable-draft-price-book-toggle').click();
     await page.getByPlaceholder('Search title, description, trade, category, SKU...').fill('no match');
     await expect(page.getByTestId('durable-draft-price-book-no-results')).toBeVisible();
   });

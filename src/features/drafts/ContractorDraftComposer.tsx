@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { FileText, Loader2, Plus, Save, X } from 'lucide-react';
+import { ChevronDown, FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import { DraftPriceBookPicker } from '../price-book/DraftPriceBookPicker';
 import type { PriceBookLoadState } from '../price-book/priceBookView';
@@ -21,6 +21,7 @@ import {
   draftHasMeaningfulSavedWorkTemplateContent,
   type SavedWorkTemplateApplyMode,
 } from './savedWorkTemplateDraftIntegration';
+import { formatMoney } from '../../utils/format';
 import type { ContractorPriceBookItem, EstimateLaborMode, EstimateTemplate } from '../../types';
 import {
   applyDraftCustomerSelection,
@@ -115,10 +116,17 @@ export function ContractorDraftComposer({
   const [templateFeedback, setTemplateFeedback] = useState<{ tone: ActionFeedbackTone; title: string; body: string } | null>(null);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
   const templateApplyResetTimer = useRef<number | null>(null);
+  const [notesOpen, setNotesOpen] = useState(Boolean(draft.notes.trim()));
+  const [laborSettingsOpen, setLaborSettingsOpen] = useState(Boolean(Number(draft.labor_rate) || Number(draft.job_labor_hours)));
+  const laborSettingsRef = useRef<HTMLDetailsElement>(null);
+  const standardIntent = useRef<DraftIntendedOutput | null>(draft.work_format === 'standard' ? draft.intended_output : null);
+  const previousChecklist = useRef(draft.checklist_source);
   const selectedCustomerKey = selectedDraftCustomerKey(draft);
   const selectedCustomer = customerOptions.find(option => option.key === selectedCustomerKey) ?? null;
   const selectedPropertyId = draft.subject_type === 'connected' ? draft.home_id : draft.local_home_id;
   const totals = workComposerDraftFinancialBreakdown(draft);
+  const totalLabel = formatMoney(totals.subtotalCents);
+  const hasUnpricedLines = draft.line_items.some(line => !line.unit_price.trim());
   const subjectTypeLocked = Boolean(currentDraftId);
   const isChecklistDraft = draft.work_format === 'inspection_checklist';
   const selectedChecklistKey = draft.checklist_source
@@ -129,19 +137,19 @@ export function ContractorDraftComposer({
   const isEstimateIntent = draft.intended_output === 'estimate';
   const isInvoiceIntent = draft.intended_output === 'invoice';
   const showEstimateLaborControls = !isChecklistDraft && isEstimateIntent;
-  const workItemsHeading = isEstimateIntent ? 'Estimate line items' : isInvoiceIntent ? 'Draft Invoice line items' : 'Job work scope';
+  const workItemsHeading = isEstimateIntent ? 'Estimate line items' : isInvoiceIntent ? 'Draft Invoice line items' : draft.intended_output === 'job' ? 'Job work scope' : 'Work items';
   const workItemsDescription = isEstimateIntent
-    ? 'Plan the customer-facing estimate lines now; this structure carries into the launched Estimate.'
+    ? 'Add the work and pricing your customer will review.'
     : isInvoiceIntent
-      ? 'Plan the draft Invoice lines now; launch creates a draft only and does not send it.'
-      : 'Plan the work scope that can carry into the launched Job.';
+      ? 'Add the work to include in the draft Invoice. Nothing is sent.'
+      : 'Add labor, materials, or fees. You can keep planning before choosing a next step.';
   const addLineLabel = isEstimateIntent ? 'Add estimate line' : isInvoiceIntent ? 'Add invoice line' : 'Add work line';
   const emptyLinesLabel = isEstimateIntent
     ? 'No estimate line items yet. Add labor, materials, or fees before saving detailed pricing.'
     : isInvoiceIntent
       ? 'No draft Invoice line items yet. Add labor, materials, or fees before creating the draft Invoice.'
       : 'No work scope yet. Add labor, materials, or fees before saving detailed scope.';
-  const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : isInvoiceIntent ? 'Draft Invoice total' : 'Draft Job total';
+  const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : isInvoiceIntent ? 'Draft Invoice total' : draft.intended_output === 'job' ? 'Draft Job total' : 'Draft total';
   const savedTemplateCount = savedWorkTemplates.length;
   const templateSelectionDisabled = interactionDisabled || isChecklistDraft;
 
@@ -263,12 +271,16 @@ export function ContractorDraftComposer({
   };
 
   const updateWorkFormat = (workFormat: SharedDraftComposerDraft['work_format']) => {
+    if (workFormat === draft.work_format) return;
+    if (workFormat === 'inspection_checklist') standardIntent.current = draft.intended_output;
+    else previousChecklist.current = draft.checklist_source;
+    const rememberedChecklist = eligibleChecklistOptions.find(option =>
+      option.source_kind === previousChecklist.current?.source_kind && option.source_id === previousChecklist.current?.source_id);
     onChange({
       ...draft,
       work_format: workFormat,
-      intended_output: workFormat === 'inspection_checklist' ? 'job' : draft.intended_output,
-      checklist_source: workFormat === 'inspection_checklist' ? draft.checklist_source : null,
-      estimate_session: workFormat === 'inspection_checklist' ? draft.estimate_session : draft.estimate_session,
+      intended_output: workFormat === 'inspection_checklist' ? 'job' : standardIntent.current,
+      checklist_source: workFormat === 'inspection_checklist' && rememberedChecklist ? createDraftChecklistSnapshot(rememberedChecklist) : null,
       job_session: workFormat === 'inspection_checklist' ? { ...draft.job_session, visited: true } : draft.job_session,
       invoice_session: draft.invoice_session,
     });
@@ -293,43 +305,39 @@ export function ContractorDraftComposer({
   };
 
   return (
-    <div className="space-y-4" data-testid="shared-draft-composer">
+    <div className="draft-editor space-y-5 [&_input]:scroll-mt-40 [&_textarea]:scroll-mt-40 [&_select]:scroll-mt-40" data-testid="shared-draft-composer">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <p className="max-w-2xl text-sm leading-6 text-slate-600">Plan the work here, then create an Estimate, Job, or draft Invoice when you&apos;re ready. Nothing is sent from this Draft.</p>
+        <p className="max-w-2xl text-sm leading-6 text-slate-600">Describe the work, then choose your next step. Nothing is sent from this Draft.</p>
         <span className="w-fit shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Private Draft</span>
+      </div>
+
+      <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="draft-action-bar">
+        <div className="flex min-w-0 flex-col gap-0.5 text-sm">
+          <span className="text-xs text-slate-600">{isChecklistDraft ? 'Inspection Checklist' : totalsTitle}</span>
+          {!isChecklistDraft ? <strong className="text-slate-950">{totalLabel}</strong> : null}
+        </div>
+        {!isChecklistDraft && (hasUnpricedLines || (showEstimateLaborControls && totals.missingLaborRate)) ? <p className="w-full text-xs font-medium text-amber-800">Total excludes items or labor still needing a price.</p> : null}
+        <div className="flex flex-wrap items-center gap-2">
+        {launchLabel && onLaunch ? (
+          <button type="button" onClick={onLaunch} disabled={launchDisabled || launchBusy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" data-testid="durable-draft-create-output">
+            {launchBusy ? <Loader2 className="animate-spin" size={16} /> : <FileText size={16} />}
+            {launchBusy ? 'Working…' : launchRecoveryLabel ?? launchLabel}
+          </button>
+        ) : null}
+        <button type="button" onClick={onSave} disabled={!canSave || saving || interactionDisabled} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+          <Save size={16} />
+          {saving ? 'Saving...' : 'Save Draft'}
+        </button>
+        {onDiscardPreparedLaunch ? <button type="button" onClick={onDiscardPreparedLaunch} disabled={launchBusy} className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 disabled:opacity-50">Discard unused attempt</button> : null}
+
+        </div>
       </div>
 
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
 
       <fieldset disabled={interactionDisabled} className="contents" aria-label="Draft planning fields">
-      <div className="grid gap-3 md:grid-cols-2">
-        {composerField('Work format', (
-          <select
-            data-testid="durable-draft-work-format"
-            className={fieldClass()}
-            value={draft.work_format}
-            onChange={event => updateWorkFormat(event.target.value as SharedDraftComposerDraft['work_format'])}
-          >
-            <option value="standard">Standard work scope</option>
-            <option value="inspection_checklist">Inspection Checklist</option>
-          </select>
-        ))}
-        {isChecklistDraft ? (
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Output</p>
-            <p className="mt-1 text-sm font-semibold text-blue-950">Creates one Job with checklist/report structure</p>
-          </div>
-        ) : (
-          <DraftOutcomeSelector
-            value={draft.intended_output}
-            onChange={updateIntent}
-            disabled={interactionDisabled}
-            invoiceAvailable={invoiceOutputAvailable}
-            invoiceUnavailableReason={invoiceOutputUnavailableReason}
-          />
-        )}
-      </div>
-
+      <section aria-label="Customer and work" className="space-y-4 pt-2">
+        <div><h3 className="text-base font-bold text-slate-950">1. Customer &amp; work</h3><p className="mt-1 text-sm text-slate-500">Start with the work you have in mind. You can add a customer later.</p></div>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
         <DraftCustomerCombobox
           testId="durable-draft-customer"
@@ -379,6 +387,64 @@ export function ContractorDraftComposer({
         </p>
       ) : null}
 
+      <div className="grid gap-3">
+        {composerField('What needs doing?', (
+          <input
+            className={fieldClass()}
+            aria-label="What needs doing?"
+            value={draft.title}
+            onChange={event => onChange({ ...draft, title: event.target.value })}
+            placeholder="e.g. Kitchen faucet replacement"
+          />
+        ))}
+      </div>
+
+      {composerField('Scope / description', (
+        <textarea
+          className={`${fieldClass()} min-h-[110px] resize-y`}
+          value={draft.scope}
+          onChange={event => onChange({ ...draft, scope: event.target.value })}
+          placeholder="Describe the work to perform, materials to use, or customer expectations."
+        />
+      ))}
+
+      <details open={notesOpen} onToggle={event => setNotesOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700">
+          Private notes <span className="flex items-center gap-2 text-xs font-normal text-slate-500">{draft.notes.trim() ? 'Notes added' : 'Optional'} <ChevronDown size={16} className="transition group-open:rotate-180" /></span>
+        </summary>
+        <div className="space-y-2 pb-2">
+      {composerField('Private notes', (
+        <textarea
+          className={`${fieldClass()} min-h-[96px] resize-y`}
+          value={draft.notes}
+          onChange={event => onChange({ ...draft, notes: event.target.value })}
+          placeholder="Visible only to your company and not copied to the customer-facing Estimate, Job, or Invoice."
+          aria-describedby="durable-draft-private-notes-help"
+        />
+      ))}
+      <p id="durable-draft-private-notes-help" className="text-xs leading-5 text-slate-500">
+        Contractor-only planning notes. These are not copied to the customer-facing Estimate, Job, or Invoice.
+      </p>
+
+        </div>
+      </details>
+      </section>
+
+      <section aria-label="Scope and pricing" className="space-y-4 border-t border-slate-200 pt-5">
+        <div><h3 className="text-base font-bold text-slate-950">2. Scope &amp; pricing</h3><p className="mt-1 text-sm text-slate-500">Build a work list or start from an inspection checklist.</p></div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {composerField('Work format', (
+          <select
+            data-testid="durable-draft-work-format"
+            className={fieldClass()}
+            value={draft.work_format}
+            onChange={event => updateWorkFormat(event.target.value as SharedDraftComposerDraft['work_format'])}
+          >
+            <option value="standard">Standard work scope</option>
+            <option value="inspection_checklist">Inspection Checklist</option>
+          </select>
+        ))}
+      </div>
       {!isChecklistDraft && savedTemplateCount > 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -480,129 +546,6 @@ export function ContractorDraftComposer({
         </div>
       ) : null}
 
-      <div className="grid gap-3">
-        {composerField('Draft title', (
-          <input
-            className={fieldClass()}
-            value={draft.title}
-            onChange={event => onChange({ ...draft, title: event.target.value })}
-            placeholder="e.g. Kitchen faucet replacement"
-          />
-        ))}
-      </div>
-
-      {composerField('Scope / description', (
-        <textarea
-          className={`${fieldClass()} min-h-[110px] resize-y`}
-          value={draft.scope}
-          onChange={event => onChange({ ...draft, scope: event.target.value })}
-          placeholder="Describe the work to perform, materials to use, or customer expectations."
-        />
-      ))}
-
-      {composerField('Private notes', (
-        <textarea
-          className={`${fieldClass()} min-h-[96px] resize-y`}
-          value={draft.notes}
-          onChange={event => onChange({ ...draft, notes: event.target.value })}
-          placeholder="Visible only to your company and not copied to the customer-facing Estimate, Job, or Invoice."
-          aria-describedby="durable-draft-private-notes-help"
-        />
-      ))}
-      <p id="durable-draft-private-notes-help" className="text-xs leading-5 text-slate-500">
-        Contractor-only planning notes. These are not copied to the customer-facing Estimate, Job, or Invoice.
-      </p>
-
-      {showEstimateLaborControls ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4" data-testid="durable-draft-estimate-labor-model">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-950">Estimate labor model</h3>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Choose how labor should carry into the launched Estimate.</p>
-            </div>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Estimate labor model">
-              <button
-                type="button"
-                onClick={() => updateLaborMode('job_total')}
-                aria-pressed={draft.labor_mode === 'job_total'}
-                data-testid="durable-draft-labor-mode-job-total"
-                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
-                  draft.labor_mode === 'job_total'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
-                }`}
-              >
-                Job total labor
-              </button>
-              <button
-                type="button"
-                onClick={() => updateLaborMode('line_specific')}
-                aria-pressed={draft.labor_mode === 'line_specific'}
-                data-testid="durable-draft-labor-mode-line-specific"
-                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
-                  draft.labor_mode === 'line_specific'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
-                }`}
-              >
-                Line-specific labor
-              </button>
-            </div>
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {composerField('Labor rate', (
-              <input
-                aria-label="Draft Estimate labor rate"
-                data-testid="durable-draft-labor-rate"
-                className={fieldClass()}
-                value={draft.labor_rate}
-                onChange={event => onChange({ ...draft, labor_rate: event.target.value })}
-                placeholder="$0.00"
-              />
-            ))}
-            {draft.labor_mode === 'job_total' ? (
-              composerField('Total labor hours', (
-                <input
-                  aria-label="Draft Estimate total labor hours"
-                  data-testid="durable-draft-job-labor-hours"
-                  className={fieldClass()}
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  value={draft.job_labor_hours}
-                  onChange={event => onChange({ ...draft, job_labor_hours: event.target.value })}
-                  placeholder="0"
-                />
-              ))
-            ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" data-testid="durable-draft-line-labor-summary">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Line labor hours</p>
-                <p className="mt-1 text-sm font-bold text-slate-950">{formatDraftLaborHours(totals.laborHours)} hrs entered</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Use line Type to keep Labor rows distinct from Material, Fee, and Other rows. Material and Other rows can track Labor hrs in More details.
-                </p>
-              </div>
-            )}
-          </div>
-          {totals.missingLaborRate ? (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-              Labor hours are entered without a labor rate. Labor price is excluded until a rate is added.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {!isChecklistDraft && (isEstimateIntent || isInvoiceIntent) && canViewPriceBook ? (
-        <DraftPriceBookPicker
-          items={priceBookItems}
-          loadState={priceBookLoadState}
-          loadError={priceBookLoadError}
-          disabled={interactionDisabled || !canSave}
-          draftLabel={isInvoiceIntent ? 'Invoice Draft' : 'Draft'}
-          onAddLines={addPriceBookLines}
-        />
-      ) : null}
-
       {isChecklistDraft ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-checklist-scope">
           <div className="mb-3">
@@ -678,6 +621,7 @@ export function ContractorDraftComposer({
                 itemLabel={isEstimateIntent ? 'draft estimate' : isInvoiceIntent ? 'invoice' : 'draft'}
                 laborMode={draft.labor_mode}
                 compactAdvanced
+                draftLayout
                 advancedDetailsOpen={expandedLineIds.has(line.id)}
                 onAdvancedDetailsOpenChange={open => setExpandedLineIds(prev => {
                   const next = new Set(prev);
@@ -704,22 +648,135 @@ export function ContractorDraftComposer({
         </div>
       </div>
 
+      {!isChecklistDraft && (isEstimateIntent || isInvoiceIntent) && canViewPriceBook && (priceBookLoadState !== 'ready' || priceBookItems.some(item => item.active)) ? (
+        <DraftPriceBookPicker
+          items={priceBookItems}
+          loadState={priceBookLoadState}
+          loadError={priceBookLoadError}
+          disabled={interactionDisabled || !canSave}
+          draftLabel={isInvoiceIntent ? 'Invoice Draft' : 'Draft'}
+          onAddLines={addPriceBookLines}
+        />
+      ) : null}
+
+      {showEstimateLaborControls ? (
+        <details ref={laborSettingsRef} open={laborSettingsOpen} onToggle={event => setLaborSettingsOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-white p-3" data-testid="durable-draft-estimate-labor-model">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700">Labor settings <span className="flex items-center gap-2 text-xs font-normal text-slate-500">{draft.labor_rate ? 'Rate entered' : 'Optional'} <ChevronDown size={16} className="transition group-open:rotate-180" /></span></summary>
+          <div className="mt-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">Estimate labor model</h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Use an hourly rate for the whole job or track hours on individual items.</p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Estimate labor model">
+              <button
+                type="button"
+                onClick={() => updateLaborMode('job_total')}
+                aria-pressed={draft.labor_mode === 'job_total'}
+                data-testid="durable-draft-labor-mode-job-total"
+                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  draft.labor_mode === 'job_total'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Job total labor
+              </button>
+              <button
+                type="button"
+                onClick={() => updateLaborMode('line_specific')}
+                aria-pressed={draft.labor_mode === 'line_specific'}
+                data-testid="durable-draft-labor-mode-line-specific"
+                className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  draft.labor_mode === 'line_specific'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                Line-specific labor
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {composerField('Labor rate', (
+              <input
+                aria-label="Draft Estimate labor rate"
+                data-testid="durable-draft-labor-rate"
+                className={fieldClass()}
+                value={draft.labor_rate}
+                onChange={event => onChange({ ...draft, labor_rate: event.target.value })}
+                placeholder="$0.00"
+              />
+            ))}
+            {draft.labor_mode === 'job_total' ? (
+              composerField('Total labor hours', (
+                <input
+                  aria-label="Draft Estimate total labor hours"
+                  data-testid="durable-draft-job-labor-hours"
+                  className={fieldClass()}
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={draft.job_labor_hours}
+                  onChange={event => onChange({ ...draft, job_labor_hours: event.target.value })}
+                  placeholder="0"
+                />
+              ))
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" data-testid="durable-draft-line-labor-summary">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Line labor hours</p>
+                <p className="mt-1 text-sm font-bold text-slate-950">{formatDraftLaborHours(totals.laborHours)} hrs entered</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Use line Type to keep Labor rows distinct from Material, Fee, and Other rows. Material and Other rows can track Labor hrs in More details.
+                </p>
+              </div>
+            )}
+          </div>
+          </div>
+        </details>
+      ) : null}
+      {showEstimateLaborControls && totals.missingLaborRate ? (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Labor hours need a rate. Open Labor settings to include them in the total.</p>
+      ) : null}
       <WorkComposerTotalsPanel
         title={totalsTitle}
-        totalLabel={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.subtotalCents / 100)}
+        totalLabel={totalLabel}
         rows={draftJobTotalsRows(draft)}
-        priceRequired={draft.line_items.some(line => !line.unit_price.trim())}
+        priceRequired={hasUnpricedLines}
       />
       </>
       )}
 
-      {draft.intended_output === 'estimate' ? <section aria-label="Estimate outcome details" data-testid="shared-draft-estimate-outcome-panel" /> : null}
+      </section>
+      <section aria-label="Next step" className="space-y-4 border-t border-slate-200 pt-5">
+        <div><h3 className="text-base font-bold text-slate-950">3. Next step</h3><p className="mt-1 text-sm text-slate-500">Save your progress, or choose what to create when you’re ready.</p></div>
+      {isChecklistDraft ? (
+        <p className="rounded-xl bg-blue-50 px-3 py-3 text-sm text-blue-950">This checklist creates a Job. You can complete its findings and report after creating it.</p>
+      ) : (
+        <DraftOutcomeSelector
+          value={draft.intended_output}
+          onChange={updateIntent}
+          disabled={interactionDisabled}
+          invoiceAvailable={invoiceOutputAvailable}
+          invoiceUnavailableReason={invoiceOutputUnavailableReason}
+        />
+      )}
+      {draft.intended_output === 'estimate' ? (
+        <section aria-label="Estimate outcome details" data-testid="shared-draft-estimate-outcome-panel">
+          <button type="button" className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => {
+            setLaborSettingsOpen(true);
+            laborSettingsRef.current?.scrollIntoView({ block: 'center' });
+            laborSettingsRef.current?.querySelector('summary')?.focus({ preventScroll: true });
+          }}>Adjust labor settings</button>
+        </section>
+      ) : null}
       {draft.intended_output === 'job' ? <section aria-label="Job outcome details" data-testid="shared-draft-job-outcome-panel" /> : null}
       {draft.intended_output === 'invoice' ? (
         <section aria-label="Draft Invoice outcome details" data-testid="shared-draft-invoice-outcome-panel" className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
           Creating the Invoice makes a draft only and does not send it to the customer.
         </section>
       ) : null}
+      </section>
       </fieldset>
 
       {!draft.intended_output ? (
@@ -727,23 +784,10 @@ export function ContractorDraftComposer({
       ) : null}
       {launchDisabledReason ? <p className="text-sm font-medium text-amber-800" data-testid="durable-draft-launch-disabled-reason">{launchDisabledReason}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {launchLabel && onLaunch ? (
-          <button type="button" onClick={onLaunch} disabled={launchDisabled || launchBusy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" data-testid="durable-draft-create-output">
-            {launchBusy ? <Loader2 className="animate-spin" size={16} /> : <FileText size={16} />}
-            {launchBusy ? 'Working…' : launchRecoveryLabel ?? launchLabel}
-          </button>
-        ) : null}
-        <button type="button" onClick={onSave} disabled={!canSave || saving || interactionDisabled} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
-          <Save size={16} />
-          {saving ? 'Saving...' : 'Save Draft'}
-        </button>
-        {onDiscardPreparedLaunch ? <button type="button" onClick={onDiscardPreparedLaunch} disabled={launchBusy} className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 disabled:opacity-50">Discard unused attempt</button> : null}
         <button type="button" onClick={onBack} disabled={saving} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           <X size={16} />
           Back to Work
         </button>
-      </div>
     </div>
   );
 }

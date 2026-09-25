@@ -48,7 +48,7 @@ for (const viewport of [
     const composer = page.getByTestId('shared-draft-composer');
     await expect(composer).toBeVisible();
     await expect(composer.getByText('Private Draft', { exact: true })).toBeVisible();
-    const title = composer.getByRole('textbox', { name: 'Draft title', exact: true });
+    const title = composer.getByRole('textbox', { name: 'What needs doing?', exact: true });
     await title.fill('Unsaved presentation check');
     await composer.getByRole('radiogroup').getByText('Estimate', { exact: true }).click();
     await expect(composer.getByRole('radio', { name: /^Estimate/ })).toBeChecked();
@@ -56,6 +56,19 @@ for (const viewport of [
     await composer.getByRole('radiogroup').getByText('Choose later', { exact: true }).click();
     await expect(composer.getByRole('radio', { name: /^Choose later/ })).toBeChecked();
     await expect(title).toHaveValue('Unsaved presentation check');
+    await composer.getByTestId('durable-draft-add-line').click();
+    await composer.getByLabel('Draft line item 1 description', { exact: true }).fill('Unsaved faucet review');
+    await composer.getByLabel('Draft line item 1 type', { exact: true }).selectOption('material');
+    await composer.getByLabel('Draft line item 1 unit price', { exact: true }).fill('250');
+    const line = composer.getByTestId('draft-compact-line');
+    await line.scrollIntoViewIfNeeded();
+    await expect(line.getByText('$250.00', { exact: true })).toBeVisible();
+    const actionBar = composer.getByTestId('draft-action-bar');
+    const barBox = (await actionBar.boundingBox())!;
+    expect(barBox.y).toBeGreaterThanOrEqual(0);
+    expect(barBox.y + barBox.height).toBeLessThan(viewport.height);
+    await page.screenshot({ path: testInfo.outputPath(`draft-line-${viewport.name}.png`) });
+    await composer.getByRole('button', { name: 'Remove draft line 1', exact: true }).click();
     // Return to a clean unsaved form; no business-record mutation is needed.
     await title.fill('');
     await page.getByRole('heading', { name: 'Start New Draft', exact: true }).scrollIntoViewIfNeeded();
