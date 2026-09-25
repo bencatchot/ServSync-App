@@ -4,7 +4,7 @@ import { assertSafeRecorderEnvironment } from './lib.mjs';
 
 export const DRAFT_FIRST_TABLES = Object.freeze([
   'contractor_work_drafts', 'contractor_work_draft_items', 'contractor_work_draft_launches',
-  'estimates', 'estimate_line_items',
+  'estimates', 'estimate_line_items', 'estimate_actor_audit',
 ]);
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 function requireCondition(ok, message) { if (!ok) throw new Error(`Draft-first fixture: ${message}`); }
@@ -51,19 +51,29 @@ export async function startDraftFirstFixture(env, scenario, journalPath) {
     requireCondition(await data(service.rpc('servsync_demo_reset_order', { p_schema_name: 'public', p_table_name: table })) === order, 'approved Demo support is not installed.');
   }
   // Estimate creation also writes a private actor-attribution row. Do not create
-  // fixtures until separately approved exact-key audit cleanup is available.
+  // fixtures until the approved exact-key audit cleanup is installed.
   const auditOrder = await data(service.rpc('servsync_demo_reset_order', {p_schema_name:'public',p_table_name:'estimate_actor_audit'}));
-  requireCondition(DRAFT_FIRST_TABLES.includes('estimate_actor_audit') && auditOrder !== null, 'Estimate actor-audit cleanup is not approved/installed; recording is blocked before any fixture writes.');
+  requireCondition(auditOrder === 91, 'Estimate actor-audit cleanup is not approved/installed; recording is blocked before any fixture writes.');
   const source = await data(service.from('demo_scenario_runs').select('id,metadata').eq('scenario_key','water_heater_core_loop').eq('status','succeeded').order('started_at',{ascending:false}).limit(1).single());
   const identity = Object.fromEntries(['contractor_id','homeowner_user_id','home_id'].map(key => [key, source.metadata[key]]));
   requireCondition(Object.values(identity).every(uuid), 'shared fictional fixture identity missing.');
+  const company = await data(service.from('contractor_profiles').select('owner_user_id').eq('id',identity.contractor_id).single());
+  identity.contractor_user_id = company.owner_user_id;
+  requireCondition(uuid(identity.contractor_user_id), 'recording actor is missing.');
   const home = await data(service.from('homes').select('id,homeowner_user_id,nickname').eq('id', identity.home_id).single());
   requireCondition(home.homeowner_user_id === identity.homeowner_user_id && home.nickname === scenario.property.nickname, 'shared property changed.');
   // Unresolved runs are never automatically swept. An operator must inspect their receipts.
   const unresolved = await data(service.from('demo_scenario_runs').select('id').eq('scenario_key','draft_first_estimate').neq('status','reset'));
   requireCondition(unresolved.length === 0, 'an earlier isolated run needs receipt-based recovery before recording again.');
   const baseline = {};
-  for (const table of DRAFT_FIRST_TABLES) baseline[table] = new Set((await data(service.from(table).select('id'))).map(row => row.id));
+  for (const table of DRAFT_FIRST_TABLES.filter(table => table !== 'estimate_actor_audit')) {
+    const rows = await data(service.from(table).select('id'));
+    requireCondition(rows.length < 1000, 'baseline exceeds one page; refuse incomplete ownership coverage.');
+    baseline[table] = new Set(rows.map(row => row.id));
+  }
+  // Audit has the same key as its parent and no operator table grants. A new
+  // owned Estimate proves this key was absent; the private reset validates actors.
+  baseline.estimate_actor_audit = baseline.estimates;
   const runId = await data(service.rpc('servsync_demo_start_run', {
     p_scenario_key:'draft_first_estimate', p_display_name:'Draft-first Estimate tutorial',
     p_description:'Isolated ordinary Work → Draft → unsent Estimate recording. Shared customer/property are read-only.',
@@ -95,6 +105,7 @@ export async function startDraftFirstFixture(env, scenario, journalPath) {
     const items = await data(service.from('estimate_line_items').select('*').eq('estimate_id',estimate.id));
     const ids = validateLaunchedEstimate({draft,launches,estimate,items},identity,scenario.estimate,journal.draftId);
     await register('estimates',ids.estimateId);
+    await register('estimate_actor_audit',ids.estimateId);
     await register('estimate_line_items',ids.estimateItemId);
     await register('contractor_work_draft_launches',ids.launchId);
     journal.result=ids; await persist();

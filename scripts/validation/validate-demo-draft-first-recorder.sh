@@ -13,8 +13,10 @@ psql=("$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -h "$TMP_ROOT/socket" -p 55448 -U pos
 "${psql[@]}" -f "$ROOT/tests/demo-recorder/fixtures/reset-functions-before.sql" >/dev/null
 "${psql[@]}" -f "$ROOT/servsync-demo-draft-first-recorder-support.sql" >/dev/null
 "${psql[@]}" -f "$ROOT/tests/demo-recorder/fixtures/draft-first-cleanup-cases.sql" >/dev/null
+"${psql[@]}" -f "$ROOT/servsync-demo-draft-first-audit-ownership.sql" >/dev/null
+"${psql[@]}" -f "$ROOT/tests/demo-recorder/fixtures/draft-first-audit-cases.sql" >/dev/null
 # A second application must fail rather than silently replace unknown definitions.
-if "${psql[@]}" -f "$ROOT/servsync-demo-draft-first-recorder-support.sql" >"$TMP_ROOT/reapply.log" 2>&1; then
+if "${psql[@]}" -f "$ROOT/servsync-demo-draft-first-audit-ownership.sql" >"$TMP_ROOT/reapply.log" 2>&1; then
   echo 'Unsafe reapplication succeeded' >&2; exit 1
 fi
 rg -q 'baseline differs' "$TMP_ROOT/reapply.log"

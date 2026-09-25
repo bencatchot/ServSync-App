@@ -14,4 +14,6 @@ create table public.estimate_line_items(id uuid primary key, estimate_id uuid re
 create table public.unexpected_dependency(id uuid primary key, estimate_id uuid references estimates on delete set null, draft_id uuid references contractor_work_drafts on delete cascade);
 -- Mirrors the private automatic Estimate attribution dependency (non-id PK).
 create table public.estimate_actor_audit(estimate_id uuid primary key references estimates(id) on delete cascade,
- contractor_id uuid not null, created_by_user_id uuid, sent_by_user_id uuid, sent_at timestamptz);
+ contractor_id uuid not null, created_by_user_id uuid, sent_by_user_id uuid, sent_at timestamptz, created_at timestamptz default now(), last_edited_by_user_id uuid);
+
+create table public.contractor_profiles(id uuid primary key, owner_user_id uuid not null);
