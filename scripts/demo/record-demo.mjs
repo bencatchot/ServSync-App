@@ -897,13 +897,13 @@ async function recordDraftFirstEstimate({ scenario, env, outputDir, pacingName, 
     await moveAndType(page, page.getByLabel('Draft line item 1 description',{exact:true}), scenario.estimate.line.line_title, pacing);
     await page.getByLabel('Draft line item 1 type',{exact:true}).selectOption('labor');
     await page.getByLabel('Draft line item 1 quantity',{exact:true}).fill('1');
-    await moveAndReplaceSelectedValue(page, page.getByLabel('Draft line item 1 unit price',{exact:true}), scenario.estimate.unitPrice, pacing);
+    await moveAndType(page, page.getByLabel('Draft line item 1 unit price',{exact:true}), scenario.estimate.unitPrice, pacing);
     await scene('additional-items');
     await page.getByRole('button',{name:'Add work line',exact:true}).scrollIntoViewIfNeeded();
     await wait(2000);
     await moveAndClick(page, page.getByRole('radiogroup').getByText('Estimate',{exact:true}), pacing);
     await scene('next-step');
-    if (!(await page.getByTestId('draft-action-bar').innerText()).includes('$1895.00')) throw new Error('Draft total did not match $1895.00.');
+    if (!(await page.getByTestId('draft-action-bar').innerText()).replaceAll(',', '').includes('$1895.00')) throw new Error('Draft total did not match $1895.00.');
     saveSubmissionStarted = true;
     const saveResponse = page.waitForResponse(response => response.url().endsWith('/rpc/servsync_save_work_draft') && response.request().method()==='POST', {timeout:30000});
     await moveAndClick(page, page.getByRole('button',{name:'Save Draft',exact:true}), pacing);
