@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Demo Draft-first tutorial cleanup safeguards
+
+- Installed the owner-approved Demo-only reset support for Drafts, items, and launch records, with exact same-run lineage and unexpected-dependent rejection. Only two helper definitions changed; all 161 public data tables and all grants stayed unchanged.
+- Prepared the ordinary Work → Draft recorder and isolated receipt verification. Recording remains blocked before fixture creation because automatic Estimate actor attribution needs a separately approved exact-key cleanup extension.
+- Validation: 140 browser checks, 89 recorder/package checks, and disposable PostgreSQL ownership/cleanup tests passed. Existing Production/Demo drift is unchanged. TUT-002 remains UPDATE REQUIRED; no recording, Production Help mutation, merge, or Production/Sandbox change. See [evidence and remaining decision](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
 ## 2026-09-25 — First Draft work line opens automatically
 
 - Standard Drafts now start with one editable work line. The untouched starter stays outside saved data and causes no price warning or unsaved-change prompt; templates and Price Book items replace it without an extra blank item.

@@ -5,6 +5,7 @@ import { mkdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/pr
 import { basename, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { startDraftFirstFixture } from './recorder/draft-first-fixture.mjs';
 import { runDemoCommand } from './seed-demo-scenario.mjs';
 import { contractorCompleteWorkScenario } from './recorder/scenarios/contractor-complete-work.mjs';
 import { contractorCreateEstimateScenario } from './recorder/scenarios/contractor-create-estimate.mjs';
@@ -52,8 +53,8 @@ function required(env, name) {
   return value;
 }
 
-function pageUrl(appUrl, role, bypassSecret = '', scenarioKey = '') {
-  const url = addDemoPresentationOptIn(appUrl, scenarioKey);
+function pageUrl(appUrl, role, bypassSecret = '', scenarioKey = '', ordinaryUi = false) {
+  const url = ordinaryUi ? new URL(appUrl) : addDemoPresentationOptIn(appUrl, scenarioKey);
   if (bypassSecret) {
     url.searchParams.set('x-vercel-protection-bypass', bypassSecret);
     url.searchParams.set('x-vercel-set-bypass-cookie', 'true');
@@ -62,8 +63,8 @@ function pageUrl(appUrl, role, bypassSecret = '', scenarioKey = '') {
   return url.toString();
 }
 
-async function login(page, appUrl, role, credentials, bypassSecret = '', scenarioKey = '') {
-  await page.goto(pageUrl(appUrl, role, bypassSecret, scenarioKey), { waitUntil: 'domcontentloaded' });
+async function login(page, appUrl, role, credentials, bypassSecret = '', scenarioKey = '', ordinaryUi = false) {
+  await page.goto(pageUrl(appUrl, role, bypassSecret, scenarioKey, ordinaryUi), { waitUntil: 'domcontentloaded' });
   const main = page.getByRole('main');
   await main.getByRole('heading', { name: /^Sign in$/i }).waitFor({ state: 'visible', timeout: 30_000 });
   await main.getByLabel(/^Email$/i).fill(credentials.email);
@@ -798,6 +799,213 @@ async function recordHomeownerConnectServiceRequest({ scenario, env, outputDir, 
     await browser.close();
     await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
     if (!completed && finalPath) await unlink(finalPath).catch(() => {});
+  }
+}
+
+async function recordDraftFirstEstimate({ scenario, env, outputDir, pacingName, headed }) {
+  const pacing = pacingFor(pacingName);
+  const target = assertSafeRecorderEnvironment(env, scenario);
+  const contractor = {
+    email: required(env, 'DEMO_CONTRACTOR_EMAIL'),
+    password: required(env, 'DEMO_CONTRACTOR_PASSWORD'),
+  };
+  required(env, 'DEMO_SUPABASE_ANON_KEY');
+  required(env, 'DEMO_SUPABASE_SERVICE_ROLE_KEY');
+  env.DEMO_MODE_ENABLED = 'true';
+  env.DEMO_SUPABASE_PROJECT_REF = target.projectRef;
+  env.DEMO_SUPABASE_URL = target.supabaseUrl;
+
+  await mkdir(outputDir, { recursive: true });
+  const fixture = await startDraftFirstFixture(env, scenario, resolve(outputDir, `draft-first-receipt-${crypto.randomUUID()}.json`));
+  const scenes = [];
+  let sceneStartedAt;
+
+  const browser = await chromium.launch({ headless: !headed });
+  const errors = [];
+  let recordedContext;
+  let finalPath = null;
+  let completed = false;
+  let saveSubmissionStarted = false;
+  const stagingDir = resolve(outputDir, '.staging', crypto.randomUUID());
+  try {
+    const authContext = await browser.newContext({ viewport: scenario.viewport });
+    const authPage = await authContext.newPage();
+    await login(authPage, target.appUrl, 'contractor', contractor, env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', '', true);
+    await openSidebar(authPage, /^Work$/);
+    await authPage.getByTestId('contractor-work-start-draft').waitFor({ state: 'visible' });
+    await wait(600);
+    const initialFrame = await authPage.screenshot({ type: 'png' });
+    const storageState = await authContext.storageState();
+    await authContext.close();
+
+    await mkdir(outputDir, { recursive: true });
+    await mkdir(stagingDir, { recursive: true });
+    recordedContext = await browser.newContext({
+      viewport: scenario.viewport,
+      storageState,
+      recordVideo: { dir: stagingDir, size: scenario.viewport },
+    });
+    await recordedContext.addInitScript((src) => {
+      const install = () => {
+        document.getElementById('servsync-recorder-freeze')?.remove();
+        const freeze = document.createElement('img');
+        freeze.id = 'servsync-recorder-freeze';
+        freeze.alt = '';
+        freeze.src = src;
+        freeze.style.cssText = 'position:fixed;inset:0;z-index:2147483645;width:100vw;height:100vh;object-fit:cover;pointer-events:none';
+        document.body.append(freeze);
+      };
+      if (document.body) install();
+      else document.addEventListener('DOMContentLoaded', install, { once: true });
+    }, `data:image/png;base64,${initialFrame.toString('base64')}`);
+    const page = await recordedContext.newPage();
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !/favicon|ResizeObserver loop/i.test(message.text())) errors.push(`console.error: ${message.text()}`);
+    });
+    page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+    page.on('response', (response) => {
+      if (response.status() >= 500) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
+    });
+
+    await page.goto(pageUrl(target.appUrl, 'contractor', env.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET || '', '', true), { waitUntil: 'domcontentloaded' });
+    await page.getByTitle(/^Sign out$/i).waitFor({ state: 'visible', timeout: 30_000 });
+    await openSidebar(page, /^Work$/);
+    await page.getByTestId('contractor-work-start-draft').waitFor({ state: 'visible' });
+    await installRecorderOverlays(page);
+    await removeFreezeFrame(page);
+    sceneStartedAt = Date.now();
+    const scene = async (key) => {
+      const sensitive = scanVisibleTextForSensitiveData(await page.locator('body').innerText(), {email:contractor.email,password:contractor.password,homeownerEmail:env.DEMO_HOMEOWNER_EMAIL});
+      if (sensitive.length) throw new Error(sensitive.join(' '));
+      scenes.push({key, seconds:(Date.now()-sceneStartedAt)/1000});
+      await page.screenshot({path:resolve(outputDir, `draft-first-${key}.png`)});
+    };
+    await scene('start');
+    await wait(pacing.initialHold);
+    await moveAndClick(page, page.getByTestId('contractor-work-start-draft'), pacing);
+    await page.getByTestId('shared-draft-composer').waitFor({state:'visible'});
+    await scene('customer');
+    await moveAndType(page, page.getByTestId('durable-draft-customer'), scenario.identities.homeowner.label, pacing);
+    await moveAndClick(page, page.getByRole('option').filter({hasText:scenario.identities.homeowner.label}).first(), pacing);
+    await page.getByTestId('durable-draft-property').selectOption(fixture.identity.home_id);
+    await moveAndType(page, page.getByLabel('What needs doing?',{exact:true}), scenario.estimate.title, pacing);
+    await moveAndType(page, page.getByLabel('Scope / description',{exact:true}), scenario.estimate.scope, pacing);
+    const line = page.getByTestId('draft-compact-line');
+    if (await line.count() !== 1) throw new Error('Expected exactly one already-open starter work line.');
+    await line.scrollIntoViewIfNeeded();
+    await scene('first-line');
+    await moveAndType(page, page.getByLabel('Draft line item 1 description',{exact:true}), scenario.estimate.line.line_title, pacing);
+    await page.getByLabel('Draft line item 1 type',{exact:true}).selectOption('labor');
+    await page.getByLabel('Draft line item 1 quantity',{exact:true}).fill('1');
+    await moveAndReplaceSelectedValue(page, page.getByLabel('Draft line item 1 unit price',{exact:true}), scenario.estimate.unitPrice, pacing);
+    await scene('additional-items');
+    await page.getByRole('button',{name:'Add work line',exact:true}).scrollIntoViewIfNeeded();
+    await wait(2000);
+    await moveAndClick(page, page.getByRole('radiogroup').getByText('Estimate',{exact:true}), pacing);
+    await scene('next-step');
+    if (!(await page.getByTestId('draft-action-bar').innerText()).includes('$1895.00')) throw new Error('Draft total did not match $1895.00.');
+    saveSubmissionStarted = true;
+    const saveResponse = page.waitForResponse(response => response.url().endsWith('/rpc/servsync_save_work_draft') && response.request().method()==='POST', {timeout:30000});
+    await moveAndClick(page, page.getByRole('button',{name:'Save Draft',exact:true}), pacing);
+    const response = await saveResponse;
+    if (!response.ok()) throw new Error('Save Draft did not succeed.');
+    await fixture.adoptSaved(await response.json());
+    await page.getByTestId('durable-draft-save-success').waitFor({state:'visible',timeout:30000});
+    await scene('save-and-create');
+    await moveAndClick(page, page.getByTestId('durable-draft-create-output'), pacing);
+    const confirmation = page.getByTestId('durable-draft-launch-confirmation');
+    await confirmation.waitFor({state:'visible'});
+    await scene('confirmation');
+    await wait(3000);
+    const launchResponse = page.waitForResponse(response => response.url().endsWith('/rpc/servsync_launch_work_draft') && response.request().method()==='POST', {timeout:30000});
+    await moveAndClick(page, confirmation.getByRole('button',{name:'Create Estimate',exact:true}), pacing);
+    if (!(await launchResponse).ok()) throw new Error('Create Estimate did not succeed.');
+    if (!await fixture.adoptLaunched()) throw new Error('Draft did not reach consumed state.');
+    // The ordinary app opens the newly-created Estimate after a confirmed launch.
+    await page.getByText(scenario.estimate.title,{exact:true}).first().waitFor({state:'visible',timeout:30000});
+    await wait(2000);
+    await scene('result');
+    await moveCursorToRest(page, pacing);
+    await wait(Math.max(pacing.finalHold,7000));
+    const mainText = await page.getByRole('main').innerText();
+    const sensitiveIssues = scanVisibleTextForSensitiveData(mainText, {
+      'contractor email': contractor.email,
+      'contractor password': contractor.password,
+      'homeowner email': env.DEMO_HOMEOWNER_EMAIL,
+      'homeowner password': env.DEMO_HOMEOWNER_PASSWORD,
+    });
+    if (sensitiveIssues.length > 0) throw new Error(sensitiveIssues.join(' '));
+    const normalizedFinal = mainText.replaceAll(',', '');
+    for (const value of [scenario.estimate.title, scenario.identities.homeowner.label, '$1895.00', 'Draft']) {
+      if (!normalizedFinal.includes(value)) throw new Error(`Final Estimate scene is missing ${value}.`);
+    }
+    if (errors.length > 0) throw new Error(`Recording encountered browser errors:\n${errors.join('\n')}`);
+
+    const video = page.video();
+    if (!video) throw new Error('Playwright did not initialize WebM recording.');
+    await recordedContext.close();
+    recordedContext = null;
+    const sourcePath = await video.path();
+    const createdAt = new Date().toISOString();
+    const timestamp = createdAt.replace(/[:.]/g, '-');
+    finalPath = resolve(outputDir, `${scenario.outputBaseName}-${timestamp}.webm`);
+    await rename(sourcePath, finalPath);
+    const fileStat = await stat(finalPath);
+    if (fileStat.size <= 0) throw new Error('Recorded WebM artifact is empty.');
+    const durationSeconds = await probeVideoDuration(browser, finalPath);
+    assertRecordingDuration(durationSeconds, scenario.expectedDurationSeconds);
+    const metadata = buildArtifactMetadata({
+      scenario,
+      sourceCommit: sourceCommit(),
+      pacing: pacingName,
+      durationSeconds,
+      fileName: basename(finalPath),
+      createdAt,
+    });
+    metadata.fixture_run_id = fixture.runId;
+    metadata.scenes = scenes;
+    metadata.ordinary_ui = true;
+    const metadataPath = finalPath.replace(/\.webm$/i, '.json');
+    await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+    completed = true;
+    const durable = await promoteValidatedRecording({
+      scenarioKey: scenario.key,
+      sourceWebmPath: finalPath,
+      sourceMetadataPath: metadataPath,
+    });
+
+    return {
+      success: true,
+      scenario: scenario.key,
+      environment: scenario.environment.name,
+      projectRef: scenario.environment.projectRef,
+      artifact: finalPath,
+      metadata: metadataPath,
+      durableLibrary: durable.libraryRoot,
+      durableWebm: durable.webmPath,
+      durableMp4: durable.mp4Path,
+      durableMetadata: durable.metadataPath,
+      durablePromotion: durable.validationStatus,
+      durationSeconds: metadata.duration_seconds,
+      viewport: scenario.viewport,
+      finalCheckpoint: scenario.finalCheckpoint,
+      fixturePolicy: metadata.fixture_policy,
+      sensitiveData: 'none detected',
+    };
+  } finally {
+    if (recordedContext) await recordedContext.close().catch(() => {});
+    // A saved receipt permits exact recovery after an interrupted launch. Never
+    // guess ownership by title, user, or time range. Retain unresolved journals.
+    try {
+      if (fixture.journal.draftId || !saveSubmissionStarted) await fixture.cleanup();
+      else if (!fixture.journal.draftId && fixture.journal.records.length === 0) {
+        console.error(`Draft-first run ${fixture.runId} needs review: no confirmed save receipt; no automatic cleanup.`);
+      }
+    } finally {
+      await browser.close();
+      await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+      if (!completed && finalPath) await unlink(finalPath).catch(() => {});
+    }
   }
 }
 
@@ -1864,6 +2072,9 @@ export async function runRecorder(argv = process.argv.slice(2), processEnv = pro
   }
   if (scenario.key === servsyncPlatformIntroductionScenario.key) {
     return recordServsyncPlatformIntroduction({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
+  }
+  if (scenario.key === contractorCreateEstimateScenario.key) {
+    return recordDraftFirstEstimate({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
   }
   return recordContractorCreateEstimate({ scenario, env, outputDir, pacingName: args.pacing, headed: args.headed });
 }
