@@ -1,6 +1,6 @@
 # Contractor experience refinement — September 25, 2026
 
-Status: application revisions validated locally and prepared for draft PR/Preview. Overall completion remains open for the TUT-002 replacement. No merge or Production Help change is authorized by this report.
+Status: application revisions validated locally and on hosted Demo Preview; ready for review in draft PR #576. Overall completion remains open for the TUT-002 replacement. No merge or Production Help change is authorized by this report.
 
 ## Scope and outcome
 
@@ -18,6 +18,7 @@ No new automatic saves, document sends, customer communications, invoice/payment
 - Work/Draft overview, mappings, workspace, launch, and post-launch recovery suites: 301 cases passed across the initial run (293) and eight corrected reruns. Two older Financials source assertions were aligned with the already-shipped summary filter handler; return-button expectations and recovery labels now consistently use Work.
 - Four existing schedule component checks pass: desktop/mobile empty states, light schedules, and populated schedules with all events and week navigation retained.
 - Two authenticated read-only Demo cases pass at 1440×900 and 390×844 using the new frontend and the existing public Demo connection. They check Dashboard ordering, zero-attention presentation, the visible primary action, one Work heading, private Draft entry, selection changes preserving typed content, horizontal fit, and return with the existing unsaved-change confirmation. No Draft or business record was saved, launched, sent, or deleted.
+- The same two authenticated desktop/mobile cases also passed on the hosted Demo Preview for application commit `b5d7e15`. The test blocks credential requests to any backend other than the approved Demo project. GitHub quality checks and all three normal Vercel Preview builds passed.
 - Screenshots inspected for desktop/mobile Work and Draft presentation. Type checking and production build pass. ESLint has zero errors and the unchanged 77-warning baseline. All 27 architecture tests pass; App.tsx is reduced from 50,721 to 50,719 lines and the baseline is lowered.
 - Existing large application-chunk and Browserslist freshness warnings remain. No measured performance-improvement claim is made. Actual contractor preference/adoption testing remains future work.
 
@@ -35,6 +36,11 @@ Production Help Studio was searched by Dashboard, contractor.work, Work, Draft, 
 Affected tutorials: TUT-002 How to create an estimate, revision 3.
 
 Tutorial follow-up: Codex prepares the governed Draft-first narrated/captioned replacement using the updated [replacement brief](../tutorials/TUT-002_REPLACEMENT_BRIEF_2026-09-08.md); Ben approves Production Help publication. Preserve revision 3 until its immutable replacement is published and verified. If the app merges first to make a current Demo recording available, the merge decision must acknowledge the temporary tutorial gap under the [workflow gate](../CODEX_WORKFLOW_TEMPLATE.md#tutorial-freshness-gate).
+
+## Review links
+
+- [Draft PR #576](https://github.com/bencatchot/ServSync-App/pull/576)
+- [Demo Preview](https://servsync-demo-git-codex-refine-cont-50328d-bencatchots-projects.vercel.app)
 
 ## Documentation and handoff
 

@@ -13,6 +13,13 @@ for (const viewport of [
   test(`contractor can find and start private work on ${viewport.name}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const errors = captureMajorConsoleErrors(page);
+    await page.route(/\/auth\/v1\/token(?:\?|$)/, async route => {
+      if (new URL(route.request().url()).origin !== 'https://bdytwgejqnlblhrnqxkp.supabase.co') {
+        await route.abort();
+        throw new Error('Refusing to send Demo credentials to another backend.');
+      }
+      await route.continue();
+    });
     await loginAs(page, 'contractor');
     await openSidebarTab(page, /^Dashboard$/);
     const weekly = page.getByTestId('contractor-schedule-snapshot');
@@ -51,7 +58,7 @@ for (const viewport of [
     await expect(title).toHaveValue('Unsaved presentation check');
     // Return to a clean unsaved form; no business-record mutation is needed.
     await title.fill('');
-    await composer.scrollIntoViewIfNeeded();
+    await page.getByRole('heading', { name: 'Start New Draft', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`draft-${viewport.name}.png`) });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     page.once('dialog', async dialog => {

@@ -1,10 +1,10 @@
 # ServSync Master Plan Changelog
 
-## 2026-09-25 — Contractor experience refinement prepared for Preview
+## 2026-09-25 — Contractor experience refinement verified in Preview
 
 - Dashboard keeps populated Today work prominent, removes the redundant empty Today card, and places workflow review before the weekly schedule. Work has one screen heading, a prominent Start New Draft action, quieter supporting tools, and neutral zero-attention presentation that stays distinct from unavailable counts.
 - Draft entry removes repeated headings and empty template guidance, uses plain preparation choices in a compact mobile grid, retains explicit private/unsent context, and consistently returns to Work. No persistence, lifecycle, roles, permissions, or backend behavior changes.
-- Validation: 301 focused Work/Draft checks passed across the initial run and eight corrected reruns; four schedule browser checks and two authenticated Demo desktop/mobile read-only checks passed. Type checking, build, lint (77 existing warnings), and all 27 architecture checks passed. App.tsx shrank to 50,719 lines and its baseline was lowered.
+- Validation: 301 focused Work/Draft checks passed across the initial run and eight corrected reruns; four schedule browser checks and two authenticated Demo desktop/mobile read-only checks passed locally and again on hosted Preview. GitHub quality checks and all three normal Preview deployments passed. Type checking, build, lint (77 existing warnings), and all 27 architecture checks passed. App.tsx shrank to 50,719 lines and its baseline was lowered.
 - Tutorial impact: UPDATE REQUIRED for TUT-002, whose published legacy video still demonstrates the separate Service Requests route. The existing replacement brief now uses the proposed labels. Application changes are prepared for review; merge and Production Help replacement remain pending. See [experience review evidence](../qa/CONTRACTOR_EXPERIENCE_REFINEMENT_2026-09-25.md).
 
 ## 2026-09-18 — Production Marketing conflict retry loop repaired
