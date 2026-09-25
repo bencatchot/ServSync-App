@@ -36,6 +36,16 @@ Application commit: `5661595`. The user approved a second refinement after tryin
 
 Validation: 226 focused regression cases were verified (225 passed in the combined run; the remaining asynchronous output-handoff assertion was corrected to await completion and all three output variants passed on rerun). The three new desktop/mobile/state-preservation cases also passed after final spacing changes. Type checking, production build, lint (zero errors, unchanged 77 warnings), and 27 architecture tests pass. Authenticated Demo desktop/mobile checks passed locally and again on the hosted Demo Preview for `5661595` (2/2 in each run), including the sticky action bar and an unsaved priced item. GitHub quality checks and the three normal Preview deployments passed.
 
+## First work line follow-up
+
+Application commits: `0ea303d` and `1f69a8d`.
+
+- Standard Drafts display one stable, editable starter line when there are no real items. It stays outside Draft state until edited, so merely viewing/focusing it or opening More details does not dirty the Draft, create an empty saved item, or trigger price warnings.
+- Editing any work field activates normal line validation and the additional-line/remove controls. Removing the final line restores the starter. Templates and Price Book selections populate actual lines without a leftover empty item. Inspection checklists and existing nonempty Drafts retain their own content.
+- Reopening a Draft during desktop verification exposed an extra document scroll offset above the workspace. A desktop-web rule scoped to a mounted Draft keeps the outer page fixed/clipped while main retains its normal scrolling. Mobile, native, and other screens retain their previous layout.
+- Validation: 41 focused cases pass, including starter state/save snapshots, template/Price Book replacement, pricing, extra lines/removal, checklist switching, and desktop/mobile layout. All five layout/state cases passed again during scroll verification. Authenticated Demo desktop/mobile checks pass locally, including entering/leaving untouched Drafts, reopening, editing, sticky actions, and returning to Work without business-record writes. Type checking, build, lint (zero errors, unchanged 77 warnings), CI quality/architecture checks, and all three Preview builds pass.
+- Hosted verification: the signed-in browser session confirmed the default line, no initial price warnings, Back to Work without a discard prompt, first-line editing/pricing, adding/removing a second line, and restoration of the empty starter. No record was saved or created. The separate automated hosted run stopped at Vercel authentication before reaching ServSync; it is not counted as a pass. The user's existing Draft tab was preserved; the updated Preview was checked in a separate tab.
+
 ## Tutorial freshness
 
 Tutorial impact: UPDATE REQUIRED
@@ -48,6 +58,8 @@ Production Help Studio was searched by Dashboard, contractor.work, Work, Draft, 
 - TUT-005 **How to connect and request service**, revision 1: homeowner connection and request steps are unchanged by this contractor-only slice.
 
 Post-implementation follow-up for `5661595`: only after application/Preview validation, Help Studio was searched for Draft, contractor.drafts, What needs doing, Scope, Inspection, Estimate, Price Book, Private notes, Next step, and Invoice. Draft/contractor.drafts matched TUT-002; Estimate also matched TUT-001 and TUT-003; Invoice matched TUT-004. Other listed terms returned no matches. All four matching published revisions were opened in Preview and their written paths compared; TUT-002's paused entry frame still shows Service Requests. No recordings were played again. TUT-004's completed-work → Invoice → offline-payment route is unchanged. The updated TUT-002 replacement brief now follows the final three-section order and the action bar; replacement recording/publication remains open.
+
+Starter-line follow-up after `1f69a8d` Preview validation: searched Draft, contractor.drafts, Work items, Add work line, and Scope & pricing. Only Draft/contractor.drafts matched published TUT-002 revision 3. Opened its paused Preview and compared written steps and the unchanged Service Requests entry frame. Updated the replacement steps/narration to start with the already-open first line and use Add work line for additional items. No playback, recording, upload, or publication occurred.
 
 Affected tutorials: TUT-002 How to create an estimate, revision 3.
 

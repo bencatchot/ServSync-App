@@ -20,7 +20,7 @@ Steps:
 
 1. Open Work and select Start New Draft. The Drafts list also provides this action.
 2. In Customer & work, select the customer and property, fill What needs doing?, and describe the scope. Expand Private notes only for company-only planning.
-3. In Scope & pricing, keep Standard work scope and add the work items. Check each visible Type, quantity, unit, and unit price.
+3. In Scope & pricing, keep Standard work scope and fill the first work line, which is already open. Use Add work line for additional items. Check each visible Type, quantity, unit, and unit price.
 4. In Next step, choose Estimate under What are you preparing? If hourly pricing is needed, select Adjust labor settings, choose the labor model, and enter the rate and hours. Review the total and any missing-price warnings.
 5. Select Save Draft to continue planning later. When ready, select Create Estimate in the action bar and review the existing confirmation before confirming creation.
 6. Confirm the resulting Estimate and its Draft status before using any separate sending action.
@@ -29,11 +29,13 @@ The final creation and saved-state steps must be verified in the approved record
 
 ## Draft narration
 
-Open Work and select Start New Draft. In Customer and work, choose the customer and property. Enter what needs doing and describe the scope. Private notes are optional and stay within your company. In Scope and pricing, add the work items, checking their type, quantity, unit, and price. Under Next step, choose Estimate. For hourly pricing, open Adjust labor settings and enter the rate and hours. Check the total and any missing prices. Save Draft lets you continue later. When ready, select Create Estimate and review the confirmation. Confirm that the resulting estimate has Draft status. Sending it to the customer is a separate action.
+Open Work and select Start New Draft. In Customer and work, choose the customer and property. Enter what needs doing and describe the scope. Private notes are optional and stay within your company. In Scope and pricing, fill the first work line, which is already open. Add more lines as needed, checking their type, quantity, unit, and price. Under Next step, choose Estimate. For hourly pricing, open Adjust labor settings and enter the rate and hours. Check the total and any missing prices. Save Draft lets you continue later. When ready, select Create Estimate and review the confirmation. Confirm that the resulting estimate has Draft status. Sending it to the customer is a separate action.
 
 September 25 initial Preview alignment: Start New Draft is now the primary action beside At a Glance, the undecided choice reads Choose later, the private Draft message states that nothing is sent, and return actions read Back to Work. Record the replacement against the reviewed build once available in the governed Demo recording environment; do not splice old footage around these changes. The existing 45.12-second Production revision 3 was previewed again and still follows Service Requests rather than the written Draft-first route.
 
 September 25 follow-up alignment, application commit `5661595`: the completed and tested Preview now orders Customer & work → Scope & pricing → Next step. The action bar remains visible while scrolling, the title label is What needs doing?, item Type is visible, and private notes/labor settings are disclosures. The revised steps and narration above supersede the earlier choice-first proposal. The post-implementation Help Studio check reopened published revision 3, compared its written steps and paused Service Requests entry frame, and retained UPDATE REQUIRED. No new playback, recording request, provider generation, upload, or publication occurred.
+
+September 25 starter-line follow-up, application commit `1f69a8d`: standard Drafts now show one editable line immediately. An untouched starter is not saved and does not trigger price warnings or an unsaved-change prompt. Templates and Price Book selections replace the empty presentation row. After Preview verification, Help Studio searches for Draft and contractor.drafts matched TUT-002; Work items, Add work line, and Scope & pricing returned none. Its published revision 3 was opened paused and compared again; UPDATE REQUIRED remains. No playback or Production Help mutation occurred.
 
 ## Recording and acceptance scope
 

@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — First Draft work line opens automatically
+
+- Standard Drafts now start with one editable work line. The untouched starter stays outside saved data and causes no price warning or unsaved-change prompt; templates and Price Book items replace it without an extra blank item.
+- Additional-line controls appear once editing begins. Removing the final item restores the starter; inspection checklists retain their current flow.
+- Reopening validation also repaired desktop Draft scrolling so the Save bar remains visible. Focused tests, authenticated local Demo checks, signed-in hosted verification, build/type/lint, CI, and Preview builds passed; the isolated hosted automation remained behind Vercel sign-in.
+- The post-validation TUT-002 review and replacement brief include this behavior. Tutorial impact remains UPDATE REQUIRED; no merge or Production Help publication. See [experience evidence](../qa/CONTRACTOR_EXPERIENCE_REFINEMENT_2026-09-25.md).
+
 ## 2026-09-25 — Draft creation simplified after Demo review
 
 - Reorganized the existing composer into Customer & work, Scope & pricing, and Next step; simplified title language, compacted line items, exposed their type, and added a scrolling total/action bar.
