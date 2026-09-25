@@ -31,6 +31,21 @@ html:not(.servsync-native) body:has(.draft-editor) {
   overflow-x: clip;
 }
 
+/* Desktop workspaces scroll inside main. Keep the document from retaining a
+   second scroll offset when leaving and reopening the Draft editor. */
+@media (min-width: 768px) {
+  html:not(.servsync-native):has(.workspace-shell .draft-editor),
+  html:not(.servsync-native) body:has(.workspace-shell .draft-editor) {
+    overflow: hidden;
+  }
+
+  html:not(.servsync-native) body:has(.workspace-shell .draft-editor) {
+    position: fixed;
+    inset: 0;
+    overflow: clip;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;
