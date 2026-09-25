@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "demo-draft-first-audit-ownership-v1",
+      "artifact": "servsync-demo-draft-first-audit-ownership.sql (SHA-256 0557f48e35b6db2b3ce53c46a9b23eb9234d7ccb320506fcab445c8aad93495c)",
+      "environments": {
+        "production": {
+          "status": "N/A",
+          "reason": "Private Demo recorder only; no Production approval."
+        },
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Dedicated Demo recorder only; no Sandbox change."
+        },
+        "demo": {
+          "status": "Applied",
+          "reason": "Owner-approved amendment applied 2026-09-25. Only reset-order, primary-key mapper, and reset-run function definitions changed. Exact estimate_id registration for new same-run unsent actor attribution; creator/contractor lineage and unexpected-dependent refusal. All 161 public-table counts/full-row fingerprints and all grants unchanged. See TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md for validation and recording evidence."
+        }
+      }
+    },
+    {
       "id": "demo-draft-first-recorder-support-v1",
       "artifact": "servsync-demo-draft-first-recorder-support.sql (SHA-256 d7692cd27387cb7fce537af4610c8fc675ca10dab2ec497aacb26595308d280b)",
       "environments": {

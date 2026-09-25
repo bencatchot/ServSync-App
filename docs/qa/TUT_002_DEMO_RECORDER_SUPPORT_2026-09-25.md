@@ -1,6 +1,14 @@
 # TUT-002 Demo recorder support — September 25, 2026
 
-## Result and boundaries
+## Current result
+
+The owner subsequently approved the exact Estimate actor-audit amendment. It is installed on Demo, and the ordinary Draft-first recording is complete: **62.44 seconds, 1440×900**, with Save Draft, Create Estimate confirmation, unsent Estimate status, and exact $1,895 total verified. All six temporary product records were removed through the guarded reset; no other product-table row fingerprints changed.
+
+A local visual-review page contains 15 caption cues (maximum 11 words each) and remains paused on load. These are screen-aligned review captions, not narration-aligned final captions. Cedar narration remains pending: no `OPENAI_API_KEY` was present in the task process, the known project environment files, or the Production/Demo Vercel environment listings. Only variable metadata was inspected through Vercel; no settings or credentials were changed. The user has been asked for the existing credential location, not the secret value. No provider request occurred.
+
+The local review specification has a local-only UUID, **not a persisted Production Help recording request**. The package must be rebound to an approved real recording request before ingestion. No Help content was created, uploaded, or published. TUT-002 remains UPDATE REQUIRED.
+
+## Initial installation and boundaries
 
 The owner approved the bounded Demo-only recorder extension in the local September 25 replacement review. The reviewed SQL was applied once to Demo `bdytwgejqnlblhrnqxkp`. Only `servsync_demo_reset_order(text,text)` and `servsync_demo_reset_registered_run(uuid)` changed. Their existing ownership, grants, security mode, and search paths were preserved. No Production or Sandbox mutation, merge, Help creation, upload, narration generation, or publication occurred.
 
@@ -17,16 +25,29 @@ The local recorder now has a separate ordinary Work → Start New Draft path, wi
 - Intentional Demo infrastructure fingerprint: `sha256:2050211adbdcb2a15331f1f32264a868f06284601f9c036510c7bfd545eeefcf`; object-key fingerprint/counts unchanged.
 - Read-only Production/Demo comparison still fails on **32 pre-existing function-definition differences**, the same objects/findings as before this installation. This extension introduced no supported-schema drift. Sandbox was not changed or re-audited.
 
-## Additional dependency and smallest remaining decision
+## Audit amendment — approved and installed
 
 The complete live trigger/catalog review found `estimate_actor_audit`, a private one-row-per-Estimate attribution table. Authenticated Estimate creation automatically inserts this row. Its primary key is `estimate_id`, with an ON DELETE CASCADE foreign key to the Estimate. The approved list covered only Drafts, Draft items, Draft launches, Estimates, and Estimate items. The new inbound-dependency guard correctly rejects this unregistered audit row; a disposable regression reproduces that rejection before any deletion.
 
-The initial proposal missed this dependency. Do not bypass the guard, disable the audit trigger, grant direct audit-table access, or record a fixture whose complete cleanup is unsupported.
+The initial proposal missed this dependency. The approved amendment now owns it by exact key. Do not bypass the guard, disable the audit trigger, grant direct audit-table access, or record a fixture whose complete cleanup is unsupported.
 
-**Proposed additional approval:** extend and install the same private Demo fixture support for the newly created `estimate_actor_audit` row only. Use its exact `estimate_id` as the registered key, bound to the same run's newly created unsent Estimate and contractor. Validate its creator against the recording contractor identity and refuse sent/foreign attribution or unexpected dependents. Add audit priority 91 and the explicit non-`id` key mapping; preserve service-role-only helper execution and all existing table/role restrictions. Adapt the receipt module, validate rejection/recovery/cleanup in disposable tests, apply only to Demo after guarded preflight, update the intentional fingerprint, and then record the ordinary flow. No shared customer/property deletion, Production/Sandbox changes, provider/environment changes, or merge is included.
+**Approval subsequently granted by the owner:** extend and install the same private Demo fixture support for the newly created `estimate_actor_audit` row only. Use its exact `estimate_id` as the registered key, bound to the same run's newly created unsent Estimate and contractor. Validate its creator against the recording contractor identity and refuse sent/foreign attribution or unexpected dependents. Add audit priority 91 and the explicit non-`id` key mapping; preserve service-role-only helper execution and all existing table/role restrictions. Adapt the receipt module, validate rejection/recovery/cleanup in disposable tests, apply only to Demo after guarded preflight, update the intentional fingerprint, and then record the ordinary flow. No shared customer/property deletion, Production/Sandbox changes, provider/environment changes, or merge is included.
 
 Narration preparation remains part of the tutorial work; Production Help creation/upload/publication still requires review and separate approval. Local storyboard/narration are already prepared under `.codex/artifacts/tut-002-2026-09-25/`.
 
 ## Tutorial impact
 
 **UPDATE REQUIRED — TUT-002, “How to create an estimate,” published revision 3.** The post-implementation Help Studio review from PR #576 found the legacy Service Requests media inconsistent with the finished Work → Draft workflow. This task changes recording/operator support, not the application screens. No repeat playback was needed while working on the recorder. Codex owns the bounded follow-up: add approved audit-row ownership, record on durable Demo, prepare Cedar narration and compact synchronized captions, review the result, then obtain approval for Production Help publication and verify the replacement through Help. The tutorial task remains incomplete until that replacement is published and verified.
+
+
+## Amendment and recording evidence
+
+- `servsync-demo-draft-first-audit-ownership.sql` changed exactly the three existing reset-order, primary-key mapper, and reset-run definitions. Catalog ACLs, product tables, and audit triggers were unchanged; the audit table remains inaccessible directly to service_role/anon/authenticated.
+- Disposable tests cover successful six-record cleanup, missing audit registration, wrong creator/editor/contractor/owner, historical or sent attribution, ordinary foreign/run/dependency rejection, saved-only recovery, and no broadened table grants. All passed. Existing recorder/Help tests and parity tests passed (105 tests total).
+- All 161 public-table counts and full-row fingerprints matched across SQL installation. Across recording, only the two registry tables `demo_scenarios` and `demo_scenario_runs` changed; all product tables and `demo_scenario_records` returned to their previous fingerprints.
+- Successful recording run: `d73ce5fd-b944-4682-bb1c-fdda2d0dcee8`; shared source run: `3a2dd171-785f-4d79-955f-6cefc394d831` (never reset). Cleanup returned exactly one deletion each for Draft launch, Draft item, Draft, Estimate actor audit, Estimate line item, and Estimate. The earlier pre-save attempt also reset without product writes.
+- Recording source commit: `5c9ac21d0fe5555b90c337efa8d3a9d387a61384`. Canonical durable media: `~/Documents/Codex/ServSync Demo Recordings/contractor-create-estimate/servsync-contractor-create-estimate-v2-2026-09-25T20-12-21-290Z.{mp4,webm,json}`.
+- Local review: `~/.codex/artifacts/tut-002-2026-09-25/preview.html` (self-contained video/captions) and `visual-review-captions.vtt`. A browser check confirmed 62.44 seconds, exactly one caption track with 15 cues, and paused playback. The MP4 contact sheet confirms the ordinary UI through the final Estimate Draft screen.
+- Updated intentional Demo catalog fingerprint: `sha256:7e5b2f5a1dc968516f9cbdec6a2ad847dc339b28341a3dc61b4b7cea05aae189`. The pre-existing 32 supported-function definition differences are unchanged.
+
+Remaining work: resolve narration credential access; generate the approved Cedar voiceover, synchronize final captions against actual speech and scenes, review sound-on and sound-off playback, then request the separately protected Production Help request/upload/publication approval. No merge is approved for PR #577.

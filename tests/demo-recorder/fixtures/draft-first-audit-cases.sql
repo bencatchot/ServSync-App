@@ -1,6 +1,6 @@
 -- Run after baseline cases in an isolated PostgreSQL database only.
 truncate contractor_work_draft_launches,contractor_work_draft_items,contractor_work_drafts,
- estimate_actor_audit,estimate_line_items,unexpected_dependency,estimates,demo_scenario_records,demo_scenario_runs,demo_scenarios;
+ unexpected_audit_dependency,estimate_actor_audit,estimate_line_items,unexpected_dependency,estimates,demo_scenario_records,demo_scenario_runs,demo_scenarios;
 insert into contractor_profiles values('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001');
 create or replace function pg_temp.assert(ok boolean, message text) returns void language plpgsql as $$
 begin if ok is distinct from true then raise exception '%', message; end if; end $$;
@@ -107,6 +107,10 @@ delete from demo_scenario_records where table_name in ('contractor_work_draft_la
 select * from servsync_demo_reset_registered_run(:'run_id');
 select pg_temp.assert((select count(*) from contractor_work_drafts)=0,'Saved-only Draft recovery failed');
 rollback; -- save succeeded, launch never began: exact active Draft/item cleanup
+begin;
+insert into unexpected_audit_dependency values('00000000-0000-4000-8000-000000000098','00000000-0000-4000-8000-000000000010');
+select pg_temp.refuse_reset(:'run_id');
+rollback; -- audit's non-id parent key still protects all unexpected dependents
 begin;
 update estimate_actor_audit set created_by_user_id='00000000-0000-4000-8000-000000000099';
 select pg_temp.refuse_reset(:'run_id');

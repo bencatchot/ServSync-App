@@ -34,7 +34,7 @@
     "demo": [
       {
         "id": "demo-scenario-infrastructure-v1",
-        "reason": "Private Demo scenario registry and exact trusted operator helpers, including approved Draft-first ownership/dependency checks (2026-09-25).",
+        "reason": "Private Demo scenario registry and trusted operator helpers, including approved Draft-first and exact Estimate actor-audit ownership/dependency checks (2026-09-25).",
         "selectors": {
           "relationScopes": [
             "public.demo_scenario_records",
@@ -62,7 +62,7 @@
           "tableGrants": 48
         },
         "expectedKeyFingerprint": "sha256:f63af13d48e0bdc190c23d9fc6922247465b79041ceced1d9c889b6dc16e25bf",
-        "expectedCatalogFingerprint": "sha256:2050211adbdcb2a15331f1f32264a868f06284601f9c036510c7bfd545eeefcf"
+        "expectedCatalogFingerprint": "sha256:7e5b2f5a1dc968516f9cbdec6a2ad847dc339b28341a3dc61b4b7cea05aae189"
       }
     ],
     "sandbox": [

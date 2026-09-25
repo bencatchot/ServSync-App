@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Draft-first Estimate tutorial recorded with exact audit cleanup
+
+- Applied the owner-approved Demo audit-ownership amendment without changing table grants or product data. Its checks bind the newly created actor-audit row to the same run, unsent Estimate, contractor, and recording actor.
+- Recorded the ordinary 62-second Work → Start New Draft → Save Draft → Create Estimate flow, verified its unsent $1,895 output, and removed all six temporary records. Product-table fingerprints returned unchanged.
+- A paused local preview includes compact screen-aligned captions. Cedar narration remains pending the existing credential location; no provider request, Production Help creation/upload/publication, or merge occurred. TUT-002 remains UPDATE REQUIRED. See [evidence](../qa/TUT_002_DEMO_RECORDER_SUPPORT_2026-09-25.md).
+
 ## 2026-09-25 — Demo Draft-first tutorial cleanup safeguards
 
 - Installed the owner-approved Demo-only reset support for Drafts, items, and launch records, with exact same-run lineage and unexpected-dependent rejection. Only two helper definitions changed; all 161 public data tables and all grants stayed unchanged.
