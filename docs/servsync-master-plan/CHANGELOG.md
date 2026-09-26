@@ -1,5 +1,34 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Landing page shows the actual ServSync interface
+
+- Branch: `codex/servsync-landing-design`, draft PR #580.
+- Files changed: landing component/style; new product-screenshot component/style; browser-captured assets and capture provenance/tooling; existing landing browser tests; design report; marketing inventory; this changelog.
+- Change/reason: owner requested real app screenshots. Replace the larger invented audience panels with contractor estimate and homeowner Home History captures using fictional browser-local records. Add a native screenshot viewer with zoom, keyboard dismissal, focus restoration, and responsive presentation. Keep the hero and simple workflow illustrations.
+- Validation: type check/build passed; lint retained its existing 76-warning baseline. Public, image, responsive, keyboard, focus, zoom, and enlarged-text browser checks passed locally; independent desktop/mobile review found no material issues. Final implementation `4aab5f9` passed 27/27 hosted browser tests, CI quality checks, and all three Preview builds. Post-validation Help searches found no affected landing/screenshot walkthrough (tutorial impact NONE). Evidence is recorded in `docs/features/SERVSYNC_LANDING_DESIGN.md`.
+- Backlog Impact: Backlog reviewed; no update needed. Master plan unchanged; marketing inventory updated for the authentic-screen/sample-data demonstration boundary only.
+- Risks/follow-ups: screenshots should be refreshed when the demonstrated interface materially changes. No shared records, credentials, SQL, permissions, settings, merge, or Production deployment changes.
+
+## 2026-09-25 — Landing page copy made more conversational
+
+- Branch: `codex/servsync-landing-design`, draft PR #580.
+- Files changed: `src/features/landing/LandingPage.tsx`, `tests/e2e/landing-page-design.spec.ts`, `docs/features/SERVSYNC_LANDING_DESIGN.md`, and this changelog.
+- Change/reason: owner requested more natural language. Removed “Good homes. Good people.” and repeated story/connection slogans. Rewrote headings, examples, FAQs, and calls to action around specific tasks such as managing customers, reviewing estimates, and keeping service records. Retained the main “Home service, in sync.” brand line.
+- Validation: production build passed; all 22 existing landing/public browser checks passed after correcting two text assertions for the new multiline heading. Desktop/tablet/phone screenshots reviewed at 320, 390, 820, and 1440px; no page errors or horizontal overflow. Final implementation `10555cc` passed 22/22 hosted Preview browser checks, CI quality checks, and all three Preview builds. Post-validation published-Help searches found no affected landing/signup walkthroughs (tutorial impact NONE). Detailed evidence is recorded in the design report.
+- Backlog Impact: Backlog reviewed; no update needed. Master plan and marketing inventory reviewed; no updates needed. Copy only, with existing feature, sharing, beta, and payment boundaries retained.
+- Risks/follow-ups: no workflow or layout behavior changed. Preview review and separate merge approval remain; existing build/lint warnings are unchanged.
+
+## 2026-09-25 — ServSync landing page redesign prepared for review
+
+- Branch: `codex/servsync-landing-design`, draft PR #580, starting from latest `origin/main` at `8d60cdf` in an isolated worktree to preserve unrelated local edits.
+- Files changed: `src/features/landing/LandingPage.tsx`, `src/features/landing/LandingPage.css`, the landing import/route in `src/App.tsx`, optimized/licensed assets in `public/landing/`, `tests/e2e/landing-page-design.spec.ts`, `scripts/validation/check-app-monolith-budget.mjs`, `docs/features/SERVSYNC_LANDING_DESIGN.md`, and this changelog.
+- Change/reason: replace the dense public landing page with a complete responsive marketing experience around “Home service, in sync.” Add original home-service imagery, an accessible four-step service journey, homeowner/contractor product perspectives, clear signup/sign-in paths, and beta FAQs. Existing Demo roles were inspected read-only; public product illustrations use clearly labeled fictional examples.
+- Validation: TypeScript, production build, existing 76-warning lint budget, 27 architecture tests, 22 passing hosted browser cases on immutable Demo Preview, desktop/tablet/mobile visual review, zero axe violations in checked states, 320/390px reflow at 200% text, and changed-file secret/diff checks. Post-validation tutorial impact NONE: no matching published landing/signup walkthrough in authenticated Demo searches or the protected pilot inventory. Detailed evidence is recorded in the design report.
+- Backlog Impact: Backlog reviewed; no update needed. This changes marketing presentation without changing tracked feature scope/status, priorities, or product boundaries.
+- Master plan / marketing inventory: reviewed; no updates needed. Existing positioning and beta offer remain intact. No online payments, automated reminders, guaranteed leads, verification, public ratings, or pending Discover capabilities are promised.
+- Risks/follow-ups: owner review and separate merge approval remain. Existing application bundle-size warning and existing lint warnings remain. No SQL, auth/permissions, settings, production deployment, production data, or user-record changes.
+
+
 ## 2026-09-25 — Discover shortlist Sandbox rollout accepted
 
 - Branch: `codex/discover-market-ready-v1`, PR #578. Owner explicitly approved Sandbox; exact prepared migration applied only to `zpzdkoaubyjtsomccxya`.
