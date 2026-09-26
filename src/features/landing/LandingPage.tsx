@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   CalendarDays,
   Check,
-  CheckCheck,
   ChevronDown,
   ClipboardCheck,
   FileText,
@@ -18,12 +17,12 @@ import {
   Menu,
   MessageSquare,
   Plus,
-  Receipt,
   ShieldCheck,
   Wrench,
   X,
 } from "lucide-react";
 import { appHashRoute } from "../../appLinks";
+import { ProductScreenshot } from "./ProductScreenshot";
 import "./LandingPage.css";
 
 type Audience = "contractor" | "homeowner";
@@ -200,123 +199,6 @@ function CheckList({ items }: { items: string[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function WorkPreview({ audience }: { audience: Audience }) {
-  const homeowner = audience === "homeowner";
-  return (
-    <div
-      className="ss-product-preview"
-      role="group"
-      aria-label={`${homeowner ? "Home History" : "Contractor work"} illustrative preview`}
-    >
-      <div className="ss-preview-bar">
-        <span className="ss-preview-dot" />
-        <span>ServSync / {homeowner ? "Home History" : "Work"}</span>
-        <span className="ss-example">Example</span>
-      </div>
-      <div className="ss-preview-body">
-        <div className="ss-preview-heading">
-          <div>
-            <p className="ss-small-label">
-              {homeowner ? "HOME HISTORY" : "JOB OVERVIEW"}
-            </p>
-            <h3>
-              {homeowner ? "Past work on your home" : "Your job at a glance"}
-            </h3>
-          </div>
-          <span className="ss-preview-icon">
-            {homeowner ? <Home size={24} /> : <Wrench size={24} />}
-          </span>
-        </div>
-        <div className="ss-preview-property">
-          <Home size={17} />
-          <span>{homeowner ? "My home" : "Customer property"}</span>
-          <span>Water heater replacement</span>
-        </div>
-        {homeowner ? (
-          <div className="ss-history-list">
-            <div>
-              <span className="ss-history-icon">
-                <ClipboardCheck size={20} />
-              </span>
-              <div>
-                <strong>New water heater installed</strong>
-                <p>Completed work · Service report</p>
-              </div>
-              <span className="ss-pill">Filed</span>
-            </div>
-            <div>
-              <span className="ss-history-icon">
-                <Receipt size={20} />
-              </span>
-              <div>
-                <strong>Installation invoice</strong>
-                <p>Saved with the service record</p>
-              </div>
-              <CheckCheck size={20} />
-            </div>
-            <div>
-              <span className="ss-history-icon">
-                <FolderOpen size={20} />
-              </span>
-              <div>
-                <strong>Service documents</strong>
-                <p>Notes, documents & warranty details</p>
-              </div>
-              <ArrowUpRight size={18} />
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="ss-work-tabs">
-              <span>Overview</span>
-              <span>Scope & details</span>
-              <span>Documents</span>
-            </div>
-            <div className="ss-work-line">
-              <span className="ss-task-icon">
-                <FileText size={18} />
-              </span>
-              <div>
-                <strong>Estimate</strong>
-                <p>Scope and pricing reviewed</p>
-              </div>
-              <span className="ss-pill">Accepted</span>
-            </div>
-            <div className="ss-work-line">
-              <span className="ss-task-icon">
-                <Wrench size={18} />
-              </span>
-              <div>
-                <strong>Job & checklist</strong>
-                <p>Installation details documented</p>
-              </div>
-              <span className="ss-pill">Complete</span>
-            </div>
-            <div className="ss-work-line">
-              <span className="ss-task-icon">
-                <Receipt size={18} />
-              </span>
-              <div>
-                <strong>Invoice</strong>
-                <p>Connected to the completed work</p>
-              </div>
-              <span className="ss-pill ss-pill-blue">Sent</span>
-            </div>
-          </>
-        )}
-        <div className="ss-preview-note">
-          <Link2 size={16} />
-          <span>
-            {homeowner
-              ? "Find past service details when you need them."
-              : "Review the estimate, job, and invoice in one place."}
-          </span>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -791,20 +673,7 @@ export default function LandingPage() {
                     : "Core homeowner features are free."}
                 </p>
               </div>
-              <div className="ss-product-stage">
-                <WorkPreview audience={audience} />
-                <div className="ss-product-stage-caption">
-                  <span className="ss-mini-icon">
-                    <CheckCheck size={18} />
-                  </span>
-                  <p>
-                    {audience === "contractor"
-                      ? "Customer details and job paperwork, together."
-                      : "Keep a record of repairs and maintenance."}
-                    <span>Illustrative preview · Example data</span>
-                  </p>
-                </div>
-              </div>
+              <ProductScreenshot key={audience} audience={audience} />
             </div>
           </div>
         </section>

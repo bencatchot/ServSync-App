@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Landing page shows the actual ServSync interface
+
+- Branch: `codex/servsync-landing-design`, draft PR #580.
+- Files changed: landing component/style; new product-screenshot component/style; browser-captured assets and capture provenance/tooling; existing landing browser tests; design report; marketing inventory; this changelog.
+- Change/reason: owner requested real app screenshots. Replace the larger invented audience panels with contractor estimate and homeowner Home History captures using fictional browser-local records. Add a native screenshot viewer with zoom, keyboard dismissal, focus restoration, and responsive presentation. Keep the hero and simple workflow illustrations.
+- Validation: type check/build passed; lint retained its existing 76-warning baseline. Public, image, responsive, keyboard, focus, zoom, and enlarged-text browser checks passed locally; independent desktop/mobile review found no material issues. Hosted Preview and final tutorial evidence are recorded in `docs/features/SERVSYNC_LANDING_DESIGN.md`.
+- Backlog Impact: Backlog reviewed; no update needed. Master plan unchanged; marketing inventory updated for the authentic-screen/sample-data demonstration boundary only.
+- Risks/follow-ups: screenshots should be refreshed when the demonstrated interface materially changes. No shared records, credentials, SQL, permissions, settings, merge, or Production deployment changes.
+
 ## 2026-09-25 — Landing page copy made more conversational
 
 - Branch: `codex/servsync-landing-design`, draft PR #580.

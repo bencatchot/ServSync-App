@@ -13,13 +13,13 @@ Replace the public landing page with a complete responsive marketing experience 
 - A navy, white, and blue visual system, self-hosted Manrope typography, existing ServSync identity, and original home-service photography.
 - A responsive header with separate homeowner/contractor sign-in choices and mobile navigation.
 - A four-step, keyboard-operable service journey: Connect, Plan, Complete, Keep.
-- Contractor and homeowner tabs that change the copy, labeled product illustration, and signup destination together.
+- Contractor and homeowner tabs that change the copy, actual-app screenshot with fictional sample data, and signup destination together. Screenshots open in an accessible, zoomable viewer.
 - Permission-based sharing, repeat-service context, practical contractor tools, concise FAQs, and clear beta calls to action.
-- Explicit illustrative examples rather than fabricated testimonials, customer counts, guaranteed leads, or screenshots exposing account data.
+- Labeled illustrative journey examples and actual-app screenshots with fictional sample data; no fabricated testimonials, customer counts, guaranteed leads, or exposed account data.
 - Free beta/no-card wording follows the current offer. The FAQ explains future paid plans and outside payment handling.
 - The original photo is illustrative brand imagery, not a claim about a particular contractor or customer.
 
-Both existing Demo roles were reviewed read-only, including Contractor Work, requests, estimate presentation, homeowner dashboard, Home History, and Discover. No Demo fixtures were created/reset or records changed. Product illustrations simplify supported concepts rather than claim to reproduce the exact application interface.
+Both existing Demo roles were reviewed read-only, including Contractor Work, requests, estimate presentation, homeowner dashboard, Home History, and Discover. No Demo fixtures were created/reset or records changed. The smaller journey illustrations explain the workflow. The audience screenshots capture the actual application interface with browser-local fictional sample data; no existing account identities or internal test records are published.
 
 ## Implementation boundary
 
@@ -96,3 +96,11 @@ Copy-revision task report:
 - TESTS RUN: Production build, 22/22 hosted browser checks, passing CI lint/architecture/types/build, desktop/tablet/phone visual review, enlarged-text checks, diff checks, and post-validation tutorial searches.
 - RISKS: Existing application bundle warning; no new functional risks identified.
 - NEXT STEP: Review the revised Preview; merge remains separately gated.
+
+## September 25 actual-product screenshot revision
+
+The owner approved replacing the two larger invented app panels with authentic ServSync screenshots. The contractor view shows an estimate; the homeowner view shows Home History and a saved service record. The hero photograph and explanatory four-step journey remain. Desktop frames show the full app shell; phone frames show native mobile record crops. Both identify the screen and sample-data status and open the corresponding full capture in a native modal dialog with zoom, Escape/Close dismissal, background scroll locking, and focus restoration. The viewer’s image area supports keyboard scrolling when zoomed.
+
+Screens are captured from the actual application rendered with isolated fictional browser responses. Shared data, user records, credentials, and settings are not changed. Capture provenance and regeneration details are maintained in `public/landing/README.md`.
+
+Documentation impact: marketing inventory updated only to describe the screenshot demonstration boundary. Master plan unchanged. Backlog reviewed; no update needed. Changelog and asset provenance updated. Local validation: type checking and production build passed; lint passed with the existing 76-warning baseline. The initial 25 browser cases and the five final desktop/mobile viewer checks passed. Independent review verified actual screen content, responsive image selection, keyboard scrolling, focus containment/restoration, Escape, scroll locking, and no page errors or horizontal overflow at desktop, 390px, and 320px. Five optimized WebP captures total approximately 695KB; desktop and mobile variants load selectively, and full mobile estimate content loads only when the viewer is opened. Hosted validation and final tutorial freshness evidence follows below.

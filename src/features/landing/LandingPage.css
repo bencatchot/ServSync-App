@@ -727,191 +727,6 @@
   position: relative;
   min-width: 0;
 }
-.ss-product-preview {
-  border-radius: 11px;
-  overflow: hidden;
-  background: #fff;
-  color: var(--ss-navy);
-  box-shadow: 0 30px 80px #0003;
-  transform: rotate(-1.4deg);
-}
-.ss-preview-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #f2f6fb;
-  border-bottom: 1px solid #e3eaf2;
-  padding: 13px 20px;
-  font-size: 0.625rem;
-  color: #50647d;
-}
-.ss-preview-dot {
-  height: 7px;
-  width: 7px;
-  border-radius: 50%;
-  background: #93b7dd;
-}
-.ss-preview-bar .ss-example {
-  margin-left: auto;
-  font-size: 0.5625rem;
-  border: 1px solid #ccd9e6;
-  padding: 1px 7px;
-  border-radius: 4px;
-}
-.ss-preview-body {
-  padding: 26px 27px 22px;
-}
-.ss-preview-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-}
-.ss-small-label {
-  font-size: 0.5rem;
-  letter-spacing: 1.4px;
-  font-weight: 800;
-  color: #53677f;
-}
-.ss-preview-heading h3 {
-  font-size: 1.375rem;
-  font-weight: 750;
-  letter-spacing: -0.7px;
-  margin-top: 6px;
-  line-height: 1.4;
-}
-.ss-preview-icon {
-  width: 45px;
-  height: 45px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: var(--ss-blue);
-  background: #eef5ff;
-}
-.ss-preview-property {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.625rem;
-  margin-top: 23px;
-  padding-bottom: 17px;
-  border-bottom: 1px solid #e6edf4;
-  color: #5b6d83;
-}
-.ss-preview-property > span:last-child {
-  margin-left: auto;
-  font-size: 0.5625rem;
-}
-.ss-work-tabs {
-  display: flex;
-  gap: 25px;
-  font-size: 0.5625rem;
-  color: #50647d;
-  border-bottom: 1px solid #e6edf4;
-  padding-top: 13px;
-}
-.ss-work-tabs span {
-  padding-bottom: 11px;
-}
-.ss-work-tabs > span:first-child {
-  border-bottom: 2px solid var(--ss-blue);
-  color: var(--ss-blue);
-  font-weight: 750;
-}
-.ss-work-line {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid #e6edf4;
-}
-.ss-task-icon {
-  width: 33px;
-  height: 35px;
-  display: grid;
-  place-items: center;
-  background: #f4f7fb;
-  border: 1px solid #e8eef5;
-  border-radius: 6px;
-  color: #4a739e;
-}
-.ss-work-line strong,
-.ss-history-list strong {
-  font-size: 0.6875rem;
-  font-weight: 750;
-  display: block;
-}
-.ss-work-line p,
-.ss-history-list p {
-  font-size: 0.5625rem;
-  color: #50647d;
-  margin-top: 2px;
-}
-.ss-work-line > .ss-pill {
-  margin-left: auto;
-  font-size: 0.5625rem;
-}
-.ss-preview-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.5625rem;
-  color: #537592;
-  padding-top: 19px;
-}
-.ss-product-stage-caption {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  margin-top: 24px;
-  margin-left: 18px;
-}
-.ss-mini-icon {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  background: #1b4165;
-  border-radius: 50%;
-  color: #89bbff;
-}
-.ss-product-stage-caption p {
-  font-size: 0.75rem;
-  font-weight: 650;
-  color: #e3edf7;
-}
-.ss-product-stage-caption p > span {
-  display: block;
-  font-size: 0.625rem;
-  font-weight: 400;
-  color: #8baac8;
-  margin-top: 2px;
-}
-.ss-history-list {
-  padding-top: 6px;
-}
-.ss-history-list > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 21px 0;
-  border-bottom: 1px solid #e6edf4;
-}
-.ss-history-icon {
-  width: 33px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  color: #4773a2;
-  background: #f1f6fc;
-  border-radius: 6px;
-}
-.ss-history-list > div > svg,
-.ss-history-list > div > .ss-pill {
-  margin-left: auto;
-  color: #337959;
-}
 .ss-value-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1228,9 +1043,6 @@
   .ss-audience-copy h3 {
     font-size: 2.0625rem;
   }
-  .ss-preview-body {
-    padding: 23px 21px;
-  }
   .ss-faq-grid {
     gap: 60px;
   }
@@ -1416,32 +1228,6 @@
     font-size: 0.75rem;
     padding-inline: 16px;
     gap: 12px;
-  }
-  .ss-preview-body {
-    padding: 22px 18px;
-  }
-  .ss-preview-heading h3 {
-    font-size: 1.125rem;
-  }
-  .ss-preview-icon {
-    display: none;
-  }
-  .ss-preview-property {
-    flex-wrap: wrap;
-  }
-  .ss-preview-property > span:last-child {
-    margin-left: 24px;
-    width: 100%;
-  }
-  .ss-work-tabs {
-    gap: 17px;
-  }
-  .ss-work-line {
-    gap: 8px;
-  }
-  .ss-work-line p,
-  .ss-history-list p {
-    font-size: 0.5rem;
   }
   .ss-value-grid article {
     padding-inline: 18px;
@@ -1769,52 +1555,6 @@
   .ss-product-stage {
     padding-inline: 5px;
   }
-  .ss-product-preview {
-    transform: rotate(-1deg);
-  }
-  .ss-preview-body {
-    padding: 24px 19px 20px;
-  }
-  .ss-preview-heading h3 {
-    font-size: 1.3125rem;
-  }
-  .ss-preview-icon {
-    display: grid;
-    width: 36px;
-    height: 36px;
-  }
-  .ss-preview-property {
-    font-size: 0.625rem;
-    flex-wrap: nowrap;
-    gap: 6px;
-  }
-  .ss-preview-property > span:last-child {
-    width: auto;
-    margin-left: auto;
-    font-size: 0.5rem;
-  }
-  .ss-work-tabs {
-    gap: 23px;
-  }
-  .ss-work-line p,
-  .ss-history-list p {
-    font-size: 0.5625rem;
-  }
-  .ss-work-line strong,
-  .ss-history-list strong {
-    font-size: 0.6875rem;
-  }
-  .ss-work-line {
-    gap: 10px;
-    padding: 17px 0;
-  }
-  .ss-work-line > .ss-pill {
-    font-size: 0.5625rem;
-  }
-  .ss-product-stage-caption {
-    margin-top: 22px;
-    margin-left: 7px;
-  }
   .ss-value-grid {
     grid-template-columns: 1fr;
     border-top: 0;
@@ -2002,22 +1742,6 @@
   .ss-beta-note {
     font-size: 0.5625rem;
   }
-  .ss-preview-property {
-    flex-wrap: wrap;
-  }
-  .ss-preview-property > span:last-child {
-    margin-left: 24px;
-    width: 100%;
-  }
-  .ss-work-tabs {
-    gap: 17px;
-  }
-  .ss-preview-heading h3 {
-    font-size: 1.125rem;
-  }
-  .ss-preview-icon {
-    display: none;
-  }
   .ss-audience-tabs button {
     font-size: 0.6875rem;
   }
@@ -2175,9 +1899,6 @@
   }
   .ss-hero h1 {
     font-size: clamp(3rem, 13.6vw, 5.6rem);
-  }
-  .ss-product-preview {
-    transform: none;
   }
   .ss-audience-tabs {
     max-width: 100%;

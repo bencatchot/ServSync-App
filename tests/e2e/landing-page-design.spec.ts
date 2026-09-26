@@ -56,7 +56,7 @@ test("journey can be explored with pointer and keyboard", async ({ page }) => {
   );
 });
 
-test("audience tabs change the copy, illustration and signup destination together", async ({
+test("audience tabs change the copy, screenshot and signup destination together", async ({
   page,
 }) => {
   await page.getByRole("tab", { name: "For homeowners", exact: true }).click();
@@ -77,6 +77,109 @@ test("audience tabs change the copy, illustration and signup destination togethe
       .getByRole("tabpanel", { name: "For contractors", exact: true })
       .getByRole("link", { name: "Create a contractor account" }),
   ).toHaveAttribute("href", "#/contractor?mode=signup");
+});
+
+for (const [audience, title, width] of [
+  ["contractors", "Contractor estimates", 1440],
+  ["homeowners", "Home History", 1440],
+  ["contractors", "Contractor estimates", 390],
+  ["homeowners", "Home History", 390],
+] as const) {
+  test(`${audience} screenshot opens, zooms, and restores focus at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page
+      .getByRole("tab", { name: `For ${audience}`, exact: true })
+      .click();
+    const opener = page.getByRole("button", {
+      name: `Enlarge ${title} screenshot`,
+    });
+    const preview = opener.getByRole("img");
+    await opener.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        preview.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: title, exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByText("Actual ServSync screen · Sample data"),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Close screenshot" }),
+    ).toBeFocused();
+    await expect
+      .poll(() =>
+        dialog
+          .getByRole("img")
+          .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe(
+      "hidden",
+    );
+
+    const viewport = dialog.getByRole("region", {
+      name: `${title} screenshot`,
+    });
+    await dialog.getByRole("button", { name: "Zoom in" }).click();
+    await expect(viewport).toHaveAttribute("data-zoomed", "true");
+    expect(
+      await viewport.evaluate(
+        (element) => element.scrollWidth > element.clientWidth,
+      ),
+    ).toBe(true);
+    await dialog.getByRole("button", { name: "Fit to view" }).click();
+    await expect(viewport).toHaveAttribute("data-zoomed", "false");
+    await dialog.getByRole("button", { name: "Zoom in" }).press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+    expect(await page.evaluate(() => document.body.style.overflow)).not.toBe(
+      "hidden",
+    );
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+
+    await opener.press("Enter");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Close screenshot" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+}
+
+test("screenshot viewer controls remain reachable with enlarged text on a small phone", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.addStyleTag({ content: "html { font-size: 32px !important; }" });
+  await page
+    .getByRole("button", { name: "Enlarge Contractor estimates screenshot" })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Contractor estimates",
+    exact: true,
+  });
+  await expect(
+    dialog.getByRole("button", { name: "Close screenshot" }),
+  ).toBeInViewport();
+  await expect(
+    dialog.getByRole("button", { name: "Zoom in" }),
+  ).toBeInViewport();
+  expect(
+    await dialog.evaluate((element) => element.scrollWidth),
+  ).toBeLessThanOrEqual(320);
+  await dialog
+    .getByRole("button", { name: "Close screenshot" })
+    .press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "Zoom in" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Zoom in" }).press("Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Close screenshot" }),
+  ).toBeFocused();
 });
 
 test("FAQ disclosures expose beta and payment limits", async ({ page }) => {
