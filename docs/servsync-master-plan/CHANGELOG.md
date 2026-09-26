@@ -1,5 +1,16 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — ServSync landing page redesign prepared for review
+
+- Branch: `codex/servsync-landing-design`, starting from latest `origin/main` at `8d60cdf` in an isolated worktree to preserve unrelated local edits.
+- Files changed: `src/features/landing/LandingPage.tsx`, `src/features/landing/LandingPage.css`, the landing import/route in `src/App.tsx`, optimized/licensed assets in `public/landing/`, `tests/e2e/landing-page-design.spec.ts`, `scripts/validation/check-app-monolith-budget.mjs`, `docs/features/SERVSYNC_LANDING_DESIGN.md`, and this changelog.
+- Change/reason: replace the dense public landing page with a complete responsive marketing experience around “Home service, in sync.” Add original home-service imagery, an accessible four-step service journey, homeowner/contractor product perspectives, clear signup/sign-in paths, and beta FAQs. Existing Demo roles were inspected read-only; public product illustrations use clearly labeled fictional examples.
+- Validation: TypeScript, production build, existing lint budget, 27 architecture tests, focused public browser checks, desktop/tablet/mobile visual review, and changed-file secret/diff checks. Detailed final accessibility, Preview, and tutorial evidence is recorded in the design report.
+- Backlog Impact: Backlog reviewed; no update needed. This changes marketing presentation without changing tracked feature scope/status, priorities, or product boundaries.
+- Master plan / marketing inventory: reviewed; no updates needed. Existing positioning and beta offer remain intact. No online payments, automated reminders, guaranteed leads, verification, public ratings, or pending Discover capabilities are promised.
+- Risks/follow-ups: owner review and separate merge approval remain. Existing application bundle-size warning and existing lint warnings remain. No SQL, auth/permissions, settings, production deployment, production data, or user-record changes.
+
+
 ## 2026-09-25 — Discover shortlist Sandbox rollout accepted
 
 - Branch: `codex/discover-market-ready-v1`, PR #578. Owner explicitly approved Sandbox; exact prepared migration applied only to `zpzdkoaubyjtsomccxya`.
