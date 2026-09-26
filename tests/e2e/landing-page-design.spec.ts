@@ -15,11 +15,11 @@ test("hero assets load and both audience links open the existing signup screens"
     name: "A home-service professional arriving at a welcoming coastal home",
   });
   await expect(image).toBeVisible();
-  expect(
-    await image.evaluate(
-      (element) => (element as HTMLImageElement).naturalWidth,
-    ),
-  ).toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      image.evaluate((element) => (element as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
   for (const [label, role] of [
     ["I’m a homeowner", "homeowner"],
     ["I’m a contractor", "contractor"],

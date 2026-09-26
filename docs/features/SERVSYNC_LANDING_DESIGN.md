@@ -46,3 +46,34 @@ All imagery and fonts are served locally. The photo has desktop/mobile WebP size
 ## Release boundary
 
 Prepared for Preview review. Merge and production deployment require the owner's separate approval. No SQL, settings, authentication/authorization, user data, or production operations are included.
+
+## Final review evidence
+
+- Draft PR: https://github.com/bencatchot/ServSync-App/pull/580
+- Tested implementation: `fb81da9`.
+- Immutable Demo Preview: https://servsync-demo-l1zmkxci6-bencatchots-projects.vercel.app
+- Branch Demo Preview: https://servsync-demo-git-codex-servsync-la-58a465-bencatchots-projects.vercel.app
+- Hosted browser verification: **22/22 passed** (15 landing-page cases plus seven existing public-route checks). The first hosted run overlapped an alias deployment transition and fetched old asset names; the final run targeted the immutable deployment and passed. The image assertion now waits for actual image decoding/loading rather than merely element visibility.
+- Accessibility: zero axe violations in the checked desktop/mobile contractor and homeowner states after contrast/semantics fixes. Independent visual/DOM checks verified all four journey states, both audience states, and their controls at 320px and 390px with 200% text enlargement. No clipping or horizontal scroll remained.
+- Desktop, tablet, and mobile screenshots reviewed; all font/image assets loaded. Source, keyboard, reduced-motion, and focus behavior reviewed.
+- Local type check/build passed. Repository lint passed with the existing 76-warning baseline. All 27 architecture tests passed, and the App.tsx baseline is now 50,287 lines.
+- Assets are approximately 2.7KB (mark), 107KB (mobile photo), 275KB (desktop photo), and 165KB (self-hosted variable font). Existing authenticated application bundle-size warnings remain outside this presentation change.
+
+### Tutorial freshness
+
+Tutorial impact: NONE
+
+After application and immutable Preview validation, authenticated published-Help searches were performed with both existing Demo roles for `landing`, `signup`, `sign in`, and `platform introduction`, and for route contexts `home` and `public.home`. All twelve searches returned no matching published walkthroughs. The protected pilot tutorial inventory covers authenticated request, Draft, work, invoice, connection, and record workflows; none of those screens or instructions changes here. There was no affected matching video to play or replace. No Help media or publication state changed.
+
+## Required task report
+
+- ACTION: Built and verified the complete landing redesign; committed and pushed the review branch and opened draft PR #580.
+- FILES MODIFIED: Landing component/style, App landing delegation, landing assets/license/provenance, focused browser tests, architecture line budget, design report, and changelog (13 files total).
+- MASTER PLAN UPDATED: no.
+- CHANGELOG UPDATED: yes.
+- BACKLOG IMPACT: Backlog reviewed; no update needed.
+- BACKLOG FILE UPDATED: NOT NEEDED.
+- REASON: Marketing design and presentation only; existing product scope and promises are preserved.
+- TESTS RUN: TypeScript, build, lint baseline, 27 architecture tests, 22 hosted browser tests, independent accessibility/reflow review, image loading, diff and changed-line secret scans.
+- RISKS: Existing application bundle warning and lint baseline; Vercel Preview may require the owner's existing Vercel access. Production release is not included.
+- NEXT STEP: Owner reviews the preview and separately approves any merge/release.
