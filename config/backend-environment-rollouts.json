@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-09-18",
+  "updatedOn": "2026-09-25",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "homeowner-saved-contractors-v1",
+      "artifact": "servsync-homeowner-saved-contractors.sql (SHA-256 aa2203badabc68ab3013fc312192fc0a7af6fb3711473028465ca33f9a9749d7)",
+      "environments": {
+        "production": {
+          "status": "Pending",
+          "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
+        },
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
+        }
+      }
+    },
     {
       "id": "rpc-business-conflict-no-retry-v1",
       "artifact": "servsync-rpc-business-conflict-no-retry.sql (SHA-256 138d444a752d9a83d229e40b1c812b1ce9a0dec6c746b98328a249a1282e97ab)",

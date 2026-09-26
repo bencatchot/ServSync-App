@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Discover first-use value prepared for review
+
+- Branch: `codex/discover-market-ready-v1`; no merge, shared SQL application or production deployment.
+- Files: `src/App.tsx`, `src/features/discover/*`, `servsync-homeowner-saved-contractors.sql`, rollout ledger, shortlist SQL/browser validation, architecture/lint budget ratchets, master plan/backlog/marketing inventory and `docs/features/DISCOVER_MARKET_READY_V1.md`.
+- Change/reason: prioritize contractor finding and evaluation over feed engagement; reuse canonical directory/profile/connection/service flows, private bookmarks, public evidence and existing profile sharing. Add truthful retry/delete states, dated cards and deliberate-publication previews/acknowledgment. This gives a contractor a useful referral destination before marketplace scale.
+- Approval: owner approved app implementation and preparing the private-homeowner table/access rules. Shared migration installation remains Pending in every environment; no new anonymous directory permissions or automatic property sharing.
+- Validation: local PostgreSQL privacy/idempotency/eligibility checks passed; 17 browser cases (including routed desktop/mobile sign-in to service composer), 27 architecture tests, type check, build and lint passed. App size and lint baselines were lowered. Final Preview and current tutorial review remain release gates until explicitly recorded.
+- Risks/follow-ups: no live shortlist rollout yet; no SEO, verified-credential, current-availability or qualified-lead promise. Anonymous matching, moderation/reporting, funnel measurement and controlled pilot/advertising gates remain open. Public ServSync reviews remain paused. Backlog Impact: FB-009 updated; FB-026 public-display boundary retained.
+
 ## 2026-09-25 — First Draft work line opens automatically
 
 - Standard Drafts now start with one editable work line. The untouched starter stays outside saved data and causes no price warning or unsaved-change prompt; templates and Price Book items replace it without an extra blank item.

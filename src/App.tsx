@@ -1,3 +1,9 @@
+import { PublicPostConsent } from './features/discover/PublicPostConsent';
+import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
+import { usePublicContractorProfile } from './features/discover/usePublicContractorProfile';
+import { ContractorDiscovery, SaveContractor } from './features/discover/ContractorDiscovery';
+import { PublicProfileEvidence } from './features/discover/PublicProfileEvidence';
+import { ContractorPresence } from './features/discover/ContractorPresence';
 import type { AdminContractorDraft } from './features/contractor-prospects/adminContractorTypes';
 import { AdminContractorProspects } from './features/contractor-prospects/AdminContractorProspects';
 import { ContractorClaimPage } from './features/contractor-prospects/ContractorClaimPage';
@@ -505,7 +511,6 @@ import type {
   ConnectionAuditEvent,
   ContractorEntitlements,
   ContractorReferralInviteAdminStatus,
-  ContractorPublicProfile,
   DiscoverFeedItem,
   Estimate,
   EstimateLaborMode,
@@ -6992,7 +6997,7 @@ function AppContent() {
         ) : route in LEGAL_PAGES ? (
           <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
         ) : route === 'profile' ? (
-          <ContractorPublicProfilePage key={query.get('slug')} slug={query.get('slug') ?? ''} currentProfile={null} />
+          <ContractorPublicProfilePage key={query.get('slug')} slug={query.get('slug') ?? ''} currentProfile={null} onAuthed={refreshAuthState} />
         ) : route === 'home' ? (
           <LandingPage />
         ) : claimToken ? (
@@ -7069,7 +7074,7 @@ function AppContent() {
   if (route === 'profile') {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        <ContractorPublicProfilePage key={query.get('slug')} slug={query.get('slug') ?? ''} currentProfile={profile} />
+        <ContractorPublicProfilePage key={query.get('slug')} slug={query.get('slug') ?? ''} currentProfile={profile} onAuthed={refreshAuthState} />
       </PublicShell>
     );
   }
@@ -9550,6 +9555,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [serviceAgreementOffers, setServiceAgreementOffers] = useState<ServiceAgreementOffer[]>([]);
   const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([]);
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
+  const [directoryUnavailable, setDirectoryUnavailable] = useState(false);
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
   const [activeSharingDrafts, setActiveSharingDrafts] = useState<Record<string, ActiveSharedPropertyDraft>>({});
@@ -10892,6 +10898,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setSelectedHomeId(loadedHome?.id ?? '');
       setHome(loadedHome);
       setHomeownerProfilePhotoUrl(profilePhotoUrl);
+      setDirectoryUnavailable(Boolean(directoryRes.error));
       setDirectoryContractors((directoryRes.data || []) as ContractorProfile[]);
       setContractorInviteLeads((inviteLeadsRes.data || []) as HomeownerContractorInviteLead[]);
       const loadedConnections = (connectionsRes.data || []) as HomeownerConnection[];
@@ -12879,31 +12886,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return [display.toLowerCase(), display] as const;
   }).filter(([, display]) => Boolean(display))).values())
     .sort((a, b) => a.localeCompare(b));
-  const homeownerFindZipQuery = homeownerFindContractorZip.trim();
-  const homeownerFindZipDigits = homeownerFindZipQuery.replace(/\D/g, '');
-  const homeownerFindTradeQuery = homeownerFindContractorTrade.trim().toLowerCase();
-  const homeownerFindContractorMatchesLocation = (contractor: ContractorProfile) => {
-    if (!homeownerFindZipQuery) return true;
-    if (homeownerFindZipDigits) {
-      const zipMatches = [
-        contractor.zip_code,
-        ...(contractor.service_zip_codes ?? []),
-      ].some(zip => zip && zip.startsWith(homeownerFindZipDigits));
-      if (zipMatches) return true;
-    }
-    const locationSearch = normalizeText(homeownerFindZipQuery);
-    if (!locationSearch) return true;
-    return normalizeText([
-      contractor.city,
-      contractor.state,
-      contractor.zip_code,
-      ...(contractor.service_zip_codes ?? []),
-    ].filter(Boolean).join(' ')).includes(locationSearch);
-  };
-  const homeownerFindContractorMatchesTrade = (contractor: ContractorProfile) => {
-    if (!homeownerFindTradeQuery) return true;
-    return contractor.service_categories.some(category => category.toLowerCase() === homeownerFindTradeQuery);
-  };
+  const homeownerFindContractorMatchesLocation = (contractor: ContractorProfile) => matchesContractorLocation(contractor, homeownerFindContractorZip);
+  const homeownerFindContractorMatchesTrade = (contractor: ContractorProfile) => matchesContractorTrade(contractor, homeownerFindContractorTrade);
   const homeownerFindContractorResults = directoryContractors
     .filter(contractor => homeownerFindContractorMatchesLocation(contractor) && homeownerFindContractorMatchesTrade(contractor))
     .sort((a, b) => a.business_name.localeCompare(b.business_name))
@@ -13487,6 +13471,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       description: '',
     });
   };
+  const profileRequestConsumed = useRef(false);
+  const startProfileRequest = useRef(startServiceRequestForConnection);
+  useEffect(() => { startProfileRequest.current = startServiceRequestForConnection; });
+  useEffect(() => {
+    if (loading || workspaceLoadPhase !== 'ready' || error || profileRequestConsumed.current) return;
+    const contractorId = new URLSearchParams(window.location.hash.split('?')[1]).get('request_contractor');
+    if (!contractorId) return;
+    profileRequestConsumed.current = true;
+    const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
+    if (connection) { startProfileRequest.current(connection); setHomeownerTab('contractors'); }
+    else setError('This contractor connection is not active. Review your connections before requesting service.');
+    // Consuming the intent must not emit hashchange: the entry router remounts the app.
+    window.history.replaceState(null, '', appHashRoute('homeowner'));
+  }, [loading, workspaceLoadPhase, error, connections]);
   const selectedPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedEstimateCount = estimates.filter(estimate => !estimate.home_id).length;
   const unassignedInvoiceCount = invoices.filter(invoice => !invoice.home_id).length;
@@ -16791,6 +16789,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     >
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+      {new URLSearchParams(window.location.hash.split('?')[1]).get('return_profile') && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm"><p>After setting up your property, return to the contractor to choose what to share.</p><a className={buttonClass('secondary')} href={appHashRoute('profile', { slug: new URLSearchParams(window.location.hash.split('?')[1]).get('return_profile'), intent: 'connect' })}>Return to contractor profile</a></div>}
       <WorkspaceLoadBoundary
         phase={workspaceLoadPhase}
         label="homeowner workspace"
@@ -20776,16 +20775,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <section className="space-y-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">ServSync Discover</p>
-              <h1 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Local contractor updates</h1>
+              <h1 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Find the right contractor for your home</h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                See recent posts, services, availability, and helpful maintenance notes from contractors in your area. Open a post
-                to learn more about the contractor, view their profile, connect, or request service when available.
+                Explore participating contractors, save a private shortlist, and choose who to connect with. Browse public work and tips below.
               </p>
               <p className="mt-2 max-w-3xl text-xs font-semibold leading-5 text-slate-600">
                 Discover is limited during the private beta. Contractor coverage, rankings, response times, and lead volume are not promised.
               </p>
             </div>
-            <DiscoverContractorProspects />
+            <ContractorDiscovery contractors={directoryContractors} homeownerId={profile.id} unavailable={directoryUnavailable} onRetry={() => void loadHomeowner()} />
+            <details className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold">Other local business listings</summary><p className="my-2 text-sm text-slate-600">Informational listings. Unclaimed businesses cannot receive requests through ServSync.</p><DiscoverContractorProspects /></details>
+            <h2 className="text-lg font-bold">Local work and tips</h2>
             <DiscoverFeed
               perspective="homeowner"
               userId={profile.id}
@@ -37847,6 +37847,7 @@ function ContractorDashboard({
             userId={profile.id}
             contractorId={contractor?.id ?? null}
             contractorProfile={contractor}
+              onEditProfile={() => setContractorTab('profile')}
             connections={[]}
           />
         </div>
@@ -48203,55 +48204,15 @@ function NotificationBell({
   );
 }
 
-function ContractorPublicProfilePage({
-  slug,
-  currentProfile,
-}: {
-  slug: string;
-  currentProfile: Profile | null;
+export function ContractorPublicProfilePage({ slug, currentProfile, onAuthed }: {
+  slug: string; currentProfile: Profile | null; onAuthed: () => void;
 }) {
-  const [data, setData] = useState<ContractorPublicProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
-  const [homeownerHomes, setHomeownerHomes] = useState<HomeProfile[]>([]);
+  const { data, loading, notFound, error: profileError, connectionStatus, setConnectionStatus, homeownerHomes, retry } = usePublicContractorProfile(slug, currentProfile);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | null>(() => { const params = new URLSearchParams(window.location.hash.split('?')[1]); return params.get('intent') === 'connect' ? params.get('mode') === 'signup' ? 'signup' : 'signin' : null; });
   const [connectionModalOpen, setConnectionModalOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [requestDone, setRequestDone] = useState(false);
   const [requestError, setRequestError] = useState('');
-
-  useEffect(() => {
-    const load = async () => {
-      if (!supabase || !slug) { setNotFound(true); setLoading(false); return; }
-      const { data: result, error } = await supabase.rpc('servsync_get_public_contractor_profile', { p_slug: slug });
-      if (error || !result) { setNotFound(true); setLoading(false); return; }
-      const profile = result as ContractorPublicProfile;
-      setData(profile);
-
-      if (currentProfile?.role === 'homeowner') {
-        const [connectionRes, homesRes] = await Promise.all([
-          supabase
-            .from('homeowner_contractor_connections')
-            .select('id,status')
-            .eq('homeowner_user_id', currentProfile.id)
-            .eq('contractor_id', profile.contractor_id)
-            .maybeSingle(),
-          supabase
-            .from('homes')
-            .select('*')
-            .eq('homeowner_user_id', currentProfile.id)
-            .order('created_at', { ascending: true }),
-        ]);
-        const conn = connectionRes.data;
-        if (conn) {
-          setConnectionStatus(conn.status as string);
-        }
-        if (!homesRes.error) setHomeownerHomes((homesRes.data || []) as HomeProfile[]);
-      }
-      setLoading(false);
-    };
-    void load();
-  }, [slug, currentProfile?.id]);
 
   const publicContractorTarget = data ? {
     id: data.contractor_id,
@@ -48298,11 +48259,10 @@ function ContractorPublicProfilePage({
     );
   }
 
+  if (profileError) return <div role="alert">{profileError} <button className={buttonClass('secondary')} onClick={retry}>Retry profile</button></div>;
   if (notFound || !data) return <PublicContractorProspect slug={slug} />;
 
   const location = [data.city, data.state].filter(Boolean).join(', ');
-  const hasCredentials = data.license_number || data.insurance_status || data.bonded_status;
-  const externalReviewLinks = normalizeExternalReviewLinks(data.external_review_links);
   const returnToHomeownerDiscover = () => {
     window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'discover');
     updateRoute('homeowner');
@@ -48356,6 +48316,12 @@ function ContractorPublicProfilePage({
 
         {/* CTA */}
         <div className="mt-5 border-t border-slate-200 pt-5">
+          {!currentProfile && <div className="space-y-3">
+            <p className="font-semibold">Connect with {data.business_name}</p><p className="text-sm text-slate-600">Sign in or create a homeowner account, then choose what to share. Nothing is sent automatically.</p>
+            <div className="flex flex-wrap gap-2">{(['signin', 'signup'] as const).map(mode => <button key={mode} className={buttonClass(mode === 'signin' ? 'primary' : 'secondary')} onClick={() => { window.history.replaceState(null, '', appHashRoute('profile', { slug, intent: 'connect', mode })); setAuthMode(mode); }}>{mode === 'signin' ? 'Sign in to connect' : 'Create homeowner account'}</button>)}</div>
+            {authMode && <AuthPage key={authMode} role="homeowner" inviteCode="" referralCode="" initialMode={authMode} onAuthed={onAuthed} />}
+          </div>}
+          {currentProfile?.role === 'homeowner' && <SaveContractor key={currentProfile.id} homeownerId={currentProfile.id} contractorId={data.contractor_id} />}
           {currentProfile?.role === 'homeowner' && (!connectionStatus || ['declined', 'revoked', 'dismissed'].includes(connectionStatus)) && !requestDone && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
               <p className="text-sm font-semibold text-blue-950">Connect before requesting service</p>
@@ -48363,6 +48329,7 @@ function ContractorPublicProfilePage({
                 Send a connection request first. Choose the properties and service-relevant details this contractor may see if they accept.
               </p>
               {requestError && <div className="mt-3"><Notice tone="error" text={requestError} /></div>}
+              {homeownerHomes.length === 0 && <div className="mt-3 text-sm"><p>Add a property before sending a connection request. Then return here to choose what to share.</p><button className={buttonClass('secondary')} onClick={() => { window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'home'); updateRoute('homeowner', `return_profile=${encodeURIComponent(slug)}`); }}>Set up my property</button></div>}
               <button type="button" onClick={() => setConnectionModalOpen(true)} disabled={requesting} className={`${buttonClass('primary')} mt-3`}>
                 <Link2 size={16} />
                 {requesting ? 'Sending request…' : connectionStatus ? `Request again with ${data.business_name}` : `Request connection with ${data.business_name}`}
@@ -48376,6 +48343,7 @@ function ContractorPublicProfilePage({
               }`}>
                 {connectionStatus === 'active' ? 'Connected' : 'Connection request sent'}
               </span>
+              {connectionStatus === 'active' && <button className={buttonClass('primary')} onClick={() => updateRoute('homeowner', `request_contractor=${encodeURIComponent(data.contractor_id)}`)}>Request service</button>}
               <button type="button" onClick={returnToHomeownerDiscover} className={buttonClass('secondary')}>
                 Back to Discover
               </button>
@@ -48406,85 +48374,12 @@ function ContractorPublicProfilePage({
         />
       )}
 
-      {/* About + credentials */}
-      <div className="grid gap-5 md:grid-cols-[1fr_auto]">
-        {data.business_summary && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">About</p>
-            <p className="text-sm leading-6 text-slate-700">{data.business_summary}</p>
-            {data.website_url && (
-              <a href={data.website_url} target="_blank" rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:text-blue-800">
-                Visit website →
-              </a>
-            )}
-          </section>
-        )}
-
-        {hasCredentials && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Credentials</p>
-            <div className="space-y-2 text-sm">
-              {data.license_number && (
-                <div className="flex items-center gap-2 text-slate-700">
-                  <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-                  <span>License listed · {data.license_number}</span>
-                </div>
-              )}
-              {data.insurance_status && (
-                <div className="flex items-center gap-2 text-slate-700">
-                  <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-                  <span>Insurance listed · {data.insurance_status}</span>
-                </div>
-              )}
-              {data.bonded_status && (
-                <div className="flex items-center gap-2 text-slate-700">
-                  <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-                  <span>Bonded listed · {data.bonded_status}</span>
-                </div>
-              )}
-            </div>
-            <p className="mt-3 text-xs leading-5 text-slate-500">
-              Listed credentials are contractor-provided unless ServSync clearly states otherwise.
-            </p>
-          </section>
-        )}
-      </div>
-
-      {externalReviewLinks.length > 0 && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">External Reviews</p>
-          <p className="mb-3 text-sm leading-6 text-slate-600">
-            External review links take you to third-party review sites. ServSync reviews are separate and come from completed ServSync work.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {externalReviewLinks.map(link => (
-              <a
-                key={`${link.source}-${link.url}`}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClass('secondary')}
-              >
-                <Star size={15} />
-                View {link.label || externalReviewSourceLabel(link.source)}
-              </a>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Reviews */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
-        <p className="mt-2 text-sm font-semibold text-slate-700">{PUBLIC_REVIEW_DISPLAY_PAUSED_COPY}</p>
-        <p className="mt-1 text-sm leading-6 text-slate-500">{PUBLIC_REVIEW_DISPLAY_PAUSED_HELPER}</p>
-      </section>
+      <PublicProfileEvidence key={data.contractor_id} profile={data} />
     </div>
   );
 }
 
-function DiscoverFeed({
+export function DiscoverFeed({
   perspective,
   userId,
   contractorId,
@@ -48493,6 +48388,7 @@ function DiscoverFeed({
   contractorSlugs = {},
   onRequestConnection,
   onRequestService,
+  onEditProfile,
 }: {
   perspective: 'homeowner' | 'contractor';
   userId: string;
@@ -48502,10 +48398,16 @@ function DiscoverFeed({
   contractorSlugs?: Record<string, string>;
   onRequestConnection?: (contractor: ContextualConnectionContractorTarget) => void;
   onRequestService?: (contractorId: string, category: string) => void;
+  onEditProfile?: () => void;
 }) {
   const [feed, setFeed] = useState<DiscoverFeedItem[]>([]);
   const [savedFeed, setSavedFeed] = useState<DiscoverFeedItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState('');
+  const [savedFeedError, setSavedFeedError] = useState('');
+  const [savedFeedLoading, setSavedFeedLoading] = useState(true);
+  const feedGeneration = useRef(0);
+  const savedGeneration = useRef(0);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterRadiusMiles, setFilterRadiusMiles] = useState(String(DEFAULT_CONTRACTOR_SERVICE_RADIUS));
@@ -48517,6 +48419,7 @@ function DiscoverFeed({
 
   const [postDraft, setPostDraft] = useState({ category: '', title: '', description: '', city: '', state: '' });
   const [postFiles, setPostFiles] = useState<File[]>([]);
+  const [postConsent, setPostConsent] = useState(false);
   const [postFileInput, setPostFileInput] = useState<HTMLInputElement | null>(null);
   const [posting, setPosting] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
@@ -48529,18 +48432,21 @@ function DiscoverFeed({
 
   const loadSavedFeed = async () => {
     if (!supabase || perspective !== 'homeowner') return;
+    const generation = ++savedGeneration.current;
+    setSavedFeedLoading(true); setSavedFeedError('');
     try {
       const { data, error } = await supabase.rpc('servsync_discover_saved_posts');
       if (error) throw error;
-      setSavedFeed((data || []) as DiscoverFeedItem[]);
+      if (generation === savedGeneration.current) setSavedFeed((data || []) as DiscoverFeedItem[]);
     } catch {
-      setSavedFeed([]);
-    }
+      if (generation === savedGeneration.current) setSavedFeedError('Saved posts could not be loaded. Please retry.');
+    } finally { if (generation === savedGeneration.current) setSavedFeedLoading(false); }
   };
 
 	  const loadFeed = async (overrides: { category?: string; location?: string; radiusMiles?: string } = {}) => {
 	    if (!supabase) return;
-	    setFeedLoading(true);
+	    const generation = ++feedGeneration.current;
+	    setFeedLoading(true); setFeedError(''); setFeed([]);
 	    try {
 	      let searchLat: number | null = null;
 	      let searchLng: number | null = null;
@@ -48557,6 +48463,7 @@ function DiscoverFeed({
           city: '',
           state: '',
         });
+        if (generation !== feedGeneration.current) return;
         if (geocodeResult.ok && geocodeResult.latitude !== null && geocodeResult.longitude !== null) {
           searchLat = geocodeResult.latitude;
           searchLng = geocodeResult.longitude;
@@ -48580,17 +48487,19 @@ function DiscoverFeed({
 	          p_search_lng: searchLng,
 	        });
       if (error) throw error;
-      setFeed((data || []) as DiscoverFeedItem[]);
+      if (generation === feedGeneration.current) setFeed((data || []) as DiscoverFeedItem[]);
     } catch {
-      // silently show empty
+      if (generation === feedGeneration.current) setFeedError('Contractor posts could not be loaded. Please retry.');
     } finally {
-      setFeedLoading(false);
+      if (generation === feedGeneration.current) setFeedLoading(false);
     }
   };
 
   useEffect(() => {
+    const feedCounter = feedGeneration; const savedCounter = savedGeneration;
     void loadFeed();
     if (perspective === 'homeowner') void loadSavedFeed();
+    return () => { feedCounter.current++; savedCounter.current++; };
   }, []);
 
   const recordPostView = async (item: DiscoverFeedItem, source: 'homeowner_discover_expand' | 'homeowner_discover_profile') => {
@@ -48633,6 +48542,7 @@ function DiscoverFeed({
   const submitPost = async () => {
     if (!supabase) return;
     if (!postDraft.title.trim()) { setPostError('Add a title before posting.'); return; }
+    if (!postConsent) { setPostError('Confirm you have permission to publish this content.'); return; }
     setPosting(true);
     setPostError('');
     setPostNotice('');
@@ -48649,6 +48559,7 @@ function DiscoverFeed({
       if (error) throw error;
       setPostDraft({ category: '', title: '', description: '', city: '', state: '' });
       setPostFiles([]);
+      setPostConsent(false);
       setPostNotice('Post published.');
       await loadFeed();
     } catch (err) {
@@ -48662,8 +48573,14 @@ function DiscoverFeed({
     if (!supabase) return;
     setDeletingPostId(postId);
     try {
-      await supabase.rpc('servsync_delete_contractor_post', { p_post_id: postId });
+      setActionError(''); setActionNotice('');
+      const { error } = await supabase.rpc('servsync_delete_contractor_post', { p_post_id: postId });
+      if (error) throw error;
       setFeed(prev => prev.filter(p => p.post_id !== postId));
+      setSelectedPostId(current => current === postId ? null : current);
+      setActionNotice('Post deleted.');
+    } catch (err) {
+      setActionError(readableError(err, 'The post could not be deleted. Please retry.'));
     } finally {
       setDeletingPostId(null);
     }
@@ -48719,11 +48636,13 @@ function DiscoverFeed({
   }, {});
 
   const savedFeedCount = savedFeed.length;
+  const displayedFeedError = feedView === 'saved' ? savedFeedError : feedError;
+  const displayedFeedLoading = feedView === 'saved' ? savedFeedLoading : feedLoading;
   const feedForView = perspective === 'homeowner' && feedView === 'saved'
     ? savedFeed.filter(item => !filterCategory || item.post_category === filterCategory)
     : feed;
   const keywordTerms = normalizeText(filterKeyword).split(' ').filter(Boolean);
-  const visibleFeed = keywordTerms.length === 0
+  const visibleFeed = displayedFeedError || displayedFeedLoading ? [] : keywordTerms.length === 0
     ? feedForView
     : feedForView.filter(item => {
       const searchableText = normalizeText([
@@ -48749,14 +48668,14 @@ function DiscoverFeed({
   const discoverFiltersActive = Boolean(
     filterKeyword.trim()
     || filterCategory
-    || filterLocation.trim()
-    || (filterLocation.trim() && filterRadiusMiles !== String(DEFAULT_CONTRACTOR_SERVICE_RADIUS))
+    || (feedView === 'all' && filterLocation.trim())
+    || (feedView === 'all' && filterLocation.trim() && filterRadiusMiles !== String(DEFAULT_CONTRACTOR_SERVICE_RADIUS))
     || (perspective === 'homeowner' && feedView === 'saved')
   );
   const discoverFilterLabels = [
     filterCategory ? `Category: ${filterCategory}` : null,
-    filterLocation.trim() ? `Location: ${filterLocation.trim()}` : null,
-    filterLocation.trim() ? `Within ${filterRadiusMiles} miles` : null,
+    feedView === 'all' && filterLocation.trim() ? `Location: ${filterLocation.trim()}` : null,
+    feedView === 'all' && filterLocation.trim() ? `Within ${filterRadiusMiles} miles` : null,
     perspective === 'homeowner' && feedView === 'saved' ? 'View: Saved posts' : null,
   ].filter((label): label is string => Boolean(label));
   const clearDiscoverFilters = () => {
@@ -48781,35 +48700,7 @@ function DiscoverFeed({
 
   return (
     <div className="space-y-5">
-      {perspective === 'contractor' && (
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <p className="text-sm font-bold text-blue-950">Your Discover presence</p>
-              <p className="mt-1 text-sm leading-6 text-blue-900">
-                Homeowners can discover your public profile and helpful posts. Discover is homeowner-controlled: contractors can post useful local content, but cannot directly contact homeowners through Discover.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                <span className={`rounded-full px-3 py-1 ${contractorProfile?.public_profile_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                  {contractorProfile?.public_profile_enabled ? 'Public profile enabled' : 'Public profile hidden'}
-                </span>
-                {contractorProfile?.business_name && (
-                  <span className="rounded-full bg-white/80 px-3 py-1 text-blue-900">{contractorProfile.business_name}</span>
-                )}
-              </div>
-            </div>
-            {contractorProfile?.slug && (
-              <button
-                type="button"
-                onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractorProfile.slug)}`)}
-                className={buttonClass('secondary')}
-              >
-                View public profile
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {perspective === 'contractor' && contractorProfile && onEditProfile && <ContractorPresence contractor={contractorProfile} onEdit={onEditProfile} />}
 
       {/* Filter bar */}
       {perspective === 'homeowner' && (
@@ -48847,6 +48738,7 @@ function DiscoverFeed({
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 aria-label="Search by ZIP or city"
+                disabled={feedView === 'saved'}
                 placeholder="ZIP or city"
                 value={filterLocation}
                 onChange={e => setFilterLocation(e.target.value)}
@@ -48858,6 +48750,7 @@ function DiscoverFeed({
               value={filterRadiusMiles}
               onChange={e => setFilterRadiusMiles(e.target.value)}
               aria-label="Service area radius"
+              disabled={feedView === 'saved'}
             >
               {CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS.map(radius => (
                 <option key={radius} value={radius}>{radius} miles</option>
@@ -48865,14 +48758,14 @@ function DiscoverFeed({
             </select>
             <button
               type="button"
-              onClick={() => void loadFeed()}
-              disabled={feedLoading}
+              onClick={() => void (feedView === 'saved' ? loadSavedFeed() : loadFeed())}
+              disabled={displayedFeedLoading}
               className={buttonClass('primary')}
             >
-              {feedLoading ? 'Loading...' : 'Search'}
+              {displayedFeedLoading ? 'Loading...' : 'Search'}
             </button>
           </div>
-          {filterLocation.trim() && (
+          {feedView === 'all' && filterLocation.trim() && (
             <p className={`mt-3 rounded-xl border px-3 py-2 text-xs leading-5 ${
               discoverLocationStatus === 'fallback'
                 ? 'border-amber-200 bg-amber-50 text-amber-900'
@@ -48887,6 +48780,7 @@ function DiscoverFeed({
                     : 'Mileage is a guide for now. Results are based on contractor-listed service areas and matching locations.'}
             </p>
           )}
+          {feedView === 'saved' && <p className="mt-3 text-xs text-slate-600">Saved posts are shown across all areas. Use category and keyword to filter your saved posts.</p>}
           {discoverFiltersActive && (
             <FilterSummary
               className="mt-3"
@@ -48998,6 +48892,7 @@ function DiscoverFeed({
             )}
           </div>
 
+          <PublicPostConsent files={postFiles} accepted={postConsent} onChange={setPostConsent} />
           <div className="mt-4">
             <button type="button" onClick={() => void submitPost()} disabled={posting} className={buttonClass('primary')}>
               {posting ? 'Publishing...' : 'Create Post'}
@@ -49023,7 +48918,9 @@ function DiscoverFeed({
       )}
 
 	      {/* Feed */}
-	      {!feedLoading && visibleFeed.length === 0 && (
+          {displayedFeedError && <div role="alert">{displayedFeedError} <button className={buttonClass('secondary')} onClick={() => void (feedView === 'saved' ? loadSavedFeed() : loadFeed())}>Retry posts</button></div>}
+          {displayedFeedLoading && <p role="status">Loading posts…</p>}
+	      {!displayedFeedLoading && !displayedFeedError && visibleFeed.length === 0 && (
 	        perspective === 'homeowner' && discoverFiltersActive ? (
 	          <EmptyState
 	            title={feedView === 'saved' && savedFeedCount === 0 ? 'No saved posts yet' : 'No matching contractor posts'}
@@ -49055,15 +48952,6 @@ function DiscoverFeed({
         return (
           <div
             key={item.post_id}
-            role="button"
-            tabIndex={0}
-            onClick={() => openPostDetail(item)}
-            onKeyDown={event => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                openPostDetail(item);
-              }
-            }}
             className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           >
             {/* Card header */}
@@ -49073,6 +48961,7 @@ function DiscoverFeed({
                   {/* Contractor info */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-950">{item.business_name}</span>
+                    <time className="text-xs text-slate-500" dateTime={item.created_at}>{new Date(item.created_at).toLocaleDateString()}</time>
                     {item.post_category && (
                       <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{item.post_category}</span>
                     )}
