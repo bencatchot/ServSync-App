@@ -91,10 +91,15 @@ test('native PDF cancellation protects active sharing and closes with cleanup wh
     } : { Share: { share: () => new Promise(resolve => { window.finishShare = resolve; }) } };
     ${compile('src/mobile/pdf.ts')}
     document.getElementById('trigger').focus();
-    exports.showNativePdf(new Blob(['local test fixture']), 'Fictional Estimate.pdf');
+    window.showPdf = name => exports.showNativePdf(new Blob(['local test fixture']), name);
+    window.showPdf('Fictional Estimate.pdf');
   }` });
+  await page.evaluate(() => window.showPdf('Duplicate before sharing.pdf'));
+  await expect(page.getByRole('dialog')).toHaveCount(1);
   await page.getByRole('button', { name: 'Open or share PDF', exact: true }).click();
   await expect.poll(() => page.evaluate(() => typeof window.finishShare)).toBe('function');
+  await page.evaluate(() => window.showPdf('Duplicate during sharing.pdf'));
+  await expect(page.getByRole('dialog')).toHaveCount(1);
   await page.evaluate(() => window.pressBack());
   await expect(page.getByRole('dialog')).toBeVisible();
   assert.equal(await page.evaluate(() => window.pdfCalls.deleted), 0);
@@ -104,6 +109,12 @@ test('native PDF cancellation protects active sharing and closes with cleanup wh
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('#trigger')).toBeFocused();
   await expect.poll(() => page.evaluate(() => window.pdfCalls.deleted)).toBe(1);
+  await page.evaluate(() => window.showPdf('Reopened report.pdf'));
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Reopened report.pdf' })).toBeVisible();
+  await page.evaluate(() => window.pressBack());
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.pdfCalls.deleted)).toBe(2);
   assert.deepEqual(await page.evaluate(() => window.backCalls), { history: 0, minimize: 0 });
 });
 

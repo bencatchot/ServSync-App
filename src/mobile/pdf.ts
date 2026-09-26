@@ -1,6 +1,8 @@
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
+let activePdfDialog: HTMLDialogElement | undefined;
+
 function base64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -12,6 +14,7 @@ function base64(blob: Blob): Promise<string> {
 
 /** Ask the user to open/save/share; never silently choose a recipient. */
 export function showNativePdf(blob: Blob, fileName: string) {
+  if (activePdfDialog?.isConnected) return;
   const previousFocus = document.activeElement as HTMLElement | null;
   const dialog = document.createElement('dialog');
   dialog.setAttribute('aria-label', 'PDF document');
@@ -25,7 +28,8 @@ export function showNativePdf(blob: Blob, fileName: string) {
   const close = document.createElement('button'); close.textContent = 'Close';
   for (const button of [share, close]) button.style.cssText = 'display:block;width:100%;min-height:48px;margin-top:12px;border:1px solid #cbd5e1;border-radius:8px';
   let active = false;
-  const tempPath = `servsync-pdf/${crypto.randomUUID()}/${fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0,100) || 'document.pdf'}`;
+  const cacheName = `${fileName.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 96) || 'document'}.pdf`;
+  const tempPath = `servsync-pdf/${crypto.randomUUID()}/${cacheName}`;
   share.onclick = () => {
     if (active) return;
     active = true; share.disabled = true; close.disabled = true;
@@ -46,9 +50,16 @@ export function showNativePdf(blob: Blob, fileName: string) {
   dialog.addEventListener('cancel', event => { if (active) event.preventDefault(); });
   dialog.addEventListener('close', () => {
     dialog.remove();
+    if (activePdfDialog === dialog) activePdfDialog = undefined;
     void Filesystem.deleteFile({ path: tempPath, directory: Directory.Cache }).catch(() => undefined);
     if (previousFocus?.isConnected) previousFocus.focus();
   }, { once: true });
   dialog.append(title, status, share, close); document.body.append(dialog);
-  dialog.showModal(); share.focus();
+  activePdfDialog = dialog;
+  try {
+    dialog.showModal(); share.focus();
+  } catch (error) {
+    dialog.remove(); activePdfDialog = undefined;
+    throw error;
+  }
 }

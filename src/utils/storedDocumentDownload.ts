@@ -1,5 +1,7 @@
 import { handleNativePdf, hasNativePdfAction } from './nativePdfAction';
 
+let nativePdfDownloadPending = false;
+
 /** Keep the authorized stored-file URL; native PDFs use the existing share lifecycle. */
 export async function downloadStoredDocument(signedUrl: string, fileName: string, contentType = '') {
   const mediaType = contentType.split(';')[0].trim().toLowerCase();
@@ -8,17 +10,23 @@ export async function downloadStoredDocument(signedUrl: string, fileName: string
     : /\.pdf$/i.test(fileName);
 
   if (isPdf && hasNativePdfAction()) {
-    let blob: Blob;
+    if (nativePdfDownloadPending) return;
+    nativePdfDownloadPending = true;
     try {
-      const response = await fetch(signedUrl, { credentials: 'omit', cache: 'no-store' });
-      if (!response.ok) throw new Error('Download failed');
-      blob = await response.blob();
-    } catch {
-      // Never expose the private signed URL in a transport error.
-      throw new Error('Unable to download the PDF. Check your connection and try again.');
+      let blob: Blob;
+      try {
+        const response = await fetch(signedUrl, { credentials: 'omit', cache: 'no-store' });
+        if (!response.ok) throw new Error('Download failed');
+        blob = await response.blob();
+      } catch {
+        // Never expose the private signed URL in a transport error.
+        throw new Error('Unable to download the PDF. Check your connection and try again.');
+      }
+      if (blob.size === 0) throw new Error('The stored PDF is empty and cannot be opened.');
+      handleNativePdf(blob, fileName);
+    } finally {
+      nativePdfDownloadPending = false;
     }
-    if (blob.size === 0) throw new Error('The stored PDF is empty and cannot be opened.');
-    handleNativePdf(blob, fileName);
     return;
   }
 

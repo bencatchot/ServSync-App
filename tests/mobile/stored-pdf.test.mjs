@@ -10,7 +10,7 @@ const compile = path => ts.transpileModule(readFileSync(new URL(`../../${path}`,
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
-function fixture({ native = true, status = 200, bytes = pdfBytes, failure = null } = {}) {
+function fixture({ native = true, status = 200, bytes = pdfBytes, failure = null, respond } = {}) {
   const requests = [], opened = [], anchors = [];
   const nativeExports = {};
   vm.runInNewContext(compile('src/utils/nativePdfAction.ts'), { exports: nativeExports });
@@ -24,6 +24,7 @@ function fixture({ native = true, status = 200, bytes = pdfBytes, failure = null
     },
     fetch: async (url, options) => {
       requests.push({ url, options });
+      if (respond) return respond(requests.length);
       if (failure) throw new Error(failure);
       return new Response(bytes, { status, headers: { 'Content-Type': 'application/pdf' } });
     },
@@ -36,6 +37,53 @@ function fixture({ native = true, status = 200, bytes = pdfBytes, failure = null
   });
   return { download: exports.downloadStoredDocument, requests, opened, anchors };
 }
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+test('concurrent native downloads keep one request through response and body loading, then permit another', async () => {
+  const response = deferred(), body = deferred();
+  const f = fixture({ respond: attempt => attempt === 1 ? response.promise : new Response(pdfBytes) });
+  const first = f.download(signedUrl, 'First report.pdf', 'application/pdf');
+  const second = f.download(signedUrl + '&renewed=true', 'Second report.pdf', 'application/pdf');
+  assert.equal(f.requests.length, 1, 'a pending response blocks duplicate taps, including renewed URLs');
+  let bodyStarted = false;
+  response.resolve({ ok: true, blob: () => { bodyStarted = true; return body.promise; } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(bodyStarted, true);
+  const third = f.download(signedUrl, 'Third report.pdf', 'application/pdf');
+  assert.equal(f.requests.length, 1, 'body loading is part of the pending download');
+  body.resolve(new Blob([pdfBytes], { type: 'application/pdf' }));
+  await Promise.all([first, second, third]);
+  assert.equal(f.opened.length, 1);
+  assert.equal(f.opened[0].fileName, 'First report.pdf');
+  await f.download(signedUrl, 'Later report.pdf', 'application/pdf');
+  assert.equal(f.requests.length, 2);
+  assert.equal(f.opened.length, 2, 'completed transport releases the pending guard');
+});
+
+test('failed pending native downloads release the guard so a fresh retry can succeed', async () => {
+  for (const failure of ['transport', 'expired', 'empty']) {
+    const response = deferred();
+    const f = fixture({ respond: attempt => attempt === 1 ? response.promise : new Response(pdfBytes) });
+    const first = f.download(signedUrl, 'Job report.pdf', 'application/pdf');
+    const rejected = assert.rejects(first, /Unable to download the PDF|stored PDF is empty/);
+    const duplicate = f.download(signedUrl, 'Job report.pdf', 'application/pdf');
+    assert.equal(f.requests.length, 1);
+    if (failure === 'transport') response.reject(new Error('Network unavailable'));
+    else response.resolve(new Response('', { status: failure === 'expired' ? 403 : 200 }));
+    await rejected;
+    await duplicate;
+    assert.equal(f.opened.length, 0);
+    await f.download(signedUrl, 'Job report.pdf', 'application/pdf');
+    assert.equal(f.requests.length, 2);
+    assert.equal(f.opened.length, 1, `${failure} must not block the next attempt`);
+    assert.equal(f.anchors.length, 0);
+  }
+});
 
 test('native stored PDFs retain the exact signed URL and open the fetched bytes through the registered adapter', async () => {
   const f = fixture();
