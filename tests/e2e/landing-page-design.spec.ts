@@ -208,3 +208,41 @@ test("bottom-of-page signup starts at the top of the existing auth screen", asyn
   ).toBeInViewport();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
+
+test("200 percent text reflows on a small phone without clipping navigation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.addStyleTag({ content: "html { font-size: 32px !important; }" });
+  const clipped = await page
+    .locator(
+      ".ss-landing a, .ss-landing button, .ss-landing h1, .ss-landing h2",
+    )
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            !element.classList.contains("ss-skip") &&
+            (rect.left < -1 || rect.right > innerWidth + 1)
+          );
+        })
+        .map((element) => element.textContent),
+    );
+  expect(clipped).toEqual([]);
+  await page.getByRole("tab", { name: "04 Keep" }).click();
+  await expect(page.getByRole("tabpanel", { name: "04 Keep" })).toContainText(
+    "Make the next visit easier.",
+  );
+  await page.getByRole("tab", { name: "For homeowners", exact: true }).click();
+  await expect(
+    page.getByRole("tabpanel", { name: "For homeowners", exact: true }),
+  ).toContainText("Your home has a story.");
+  expect(
+    await page.evaluate(
+      () => document.querySelector(".ss-landing")?.scrollLeft,
+    ),
+  ).toBe(0);
+});

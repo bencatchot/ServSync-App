@@ -2186,3 +2186,16 @@
     min-width: 0;
   }
 }
+
+@media (max-width: 699px) {
+  .ss-journey-tabs {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.4em), 1fr));
+  }
+  .ss-journey-tabs button {
+    min-width: 0;
+  }
+  .ss-audience-tabs,
+  .ss-job-footer {
+    flex-wrap: wrap;
+  }
+}
