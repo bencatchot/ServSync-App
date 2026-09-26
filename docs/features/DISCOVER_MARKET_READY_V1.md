@@ -29,7 +29,8 @@ The owner approved migration **preparation**, not application. Production, Sandb
 - Full routed app journey uses intercepted HTTP responses, not live users. This validates integration wiring without mutating shared records.
 - Local validation: 17/17 focused browser tests passed, including the complete routed sign-in/service-composer journey at desktop and 390px widths. 27/27 architecture tests passed. Type check and production build passed. Lint passed with zero errors and the warning baseline reduced from 77 to 76. App.tsx shrank from 50,719 to 50,608 lines; its budget was ratcheted down. Mobile screenshots were inspected, with no horizontal overflow. A real router-remount defect found by the full journey test was fixed by consuming profile intent with history replacement rather than a new hash navigation.
 - Shared-environment shortlist installation, authenticated live acceptance, and release approval remain separate gates. Browser fixtures plus local PostgreSQL are not a claim of a completed live rollout.
-- Complete the current Help Studio search and play matching published walkthroughs after final application/Preview verification. Record evidence before release.
+- Hosted Preview at source `96484ec`: [Demo Preview](https://servsync-demo-kbdusrc79-bencatchots-projects.vercel.app) reached READY; the compiled app passed both full routed desktop/mobile journeys with intercepted backend responses using the existing Demo protection credential. No shared user records changed. This proves deployed frontend wiring, not live shortlist installation.
+- Tutorial review is blocked by the current Safari ServSync admin sign-in screen. The owner has been asked to restore the session. Do not treat the earlier September 9 review as current evidence. Search Discover, contractor profile, saved contractors, connection, service request and route contexts, then play matching published walkthroughs; previously relevant TUT-005 and TUT-001 require current inspection. This task is not release-complete while that gate is unresolved.
 
 ## Bounded rollout and pilot
 
@@ -43,3 +44,16 @@ The owner approved migration **preparation**, not application. Production, Sandb
 ## Backlog impact and follow-ups
 
 FB-009 moves from feed-strategy backlog to active implementation with rollout/pilot gates. FB-026 review moderation/public display remains gated; no reviews are newly published. Dedicated indexable public URLs/social metadata, task aliases/advanced area matching, controlled moderation/reporting and funnel measurement remain follow-ups. Operational estimate/invoice follow-up and job-closeout opportunities require their own audits; they are not bundled into Discover or silently marked complete. The master plan and marketing inventory distinguish this review branch from live behavior. No paid advertising is launched.
+
+## Task report
+
+ACTION: Implemented and prepared a review branch; release remains gated.
+FILES MODIFIED: Discover modules and App integration, additive shortlist migration/rollout ledger, focused SQL/browser tests and validation ratchets, and the product documentation listed in the changelog.
+MASTER PLAN UPDATED: yes.
+CHANGELOG UPDATED: yes.
+BACKLOG IMPACT: FB-009 active implementation; rollout/pilot follow-ups recorded; FB-026 review-publication boundary retained.
+BACKLOG FILE UPDATED: YES.
+REASON: Give contractors a usable referral destination and homeowners a clear selection/relationship path.
+TESTS RUN: Local SQL privacy tests; 17 local browser cases; two hosted compiled-app fixture journeys; 27 architecture tests; type check, build, lint and diff checks.
+RISKS: Shared shortlist migration and live acceptance are not performed; Help Studio freshness review awaits an authenticated admin session.
+NEXT STEP: Complete current Help Studio search/playback, review the draft PR, then separately approve a bounded Sandbox migration/acceptance rollout. No merge, Production deployment, shared SQL application, advertising or external outreach was performed.

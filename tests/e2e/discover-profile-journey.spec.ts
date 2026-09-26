@@ -13,7 +13,8 @@ test(`shared profile → sign-in → canonical service composer at ${width}px`, 
   const connection = { connection_id: '30000000-0000-4000-8000-000000000001', contractor_id: contractorId, business_name: 'Bay Plumbing', contact_name: 'Pat', email: 'contractor@example.test', phone: '', logo_url: '', city: 'Fairhope', state: 'AL', status: 'active', source: 'homeowner', permissions, shared_properties: [{ ...permissions, home_id: homeId }], created_at: '2026-09-01T12:00:00Z', updated_at: '2026-09-01T12:00:00Z' };
   const writes: string[] = [];
   page.on('pageerror', error => { throw error; });
-  await page.route('https://discover-fixture.invalid/**', async route => {
+  // Intercept every backend request before navigation: safe on a hosted Preview too.
+  await page.route(/https:\/\/(?:discover-fixture\.invalid|[^/]+\.supabase\.co)\//, async route => {
     const url = new URL(route.request().url());
     const name = url.pathname.split('/').pop() || '';
     let data: unknown = [];
@@ -32,6 +33,7 @@ test(`shared profile → sign-in → canonical service composer at ${width}px`, 
     if (/submit_contextual|create_service_request/.test(name)) writes.push(name);
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
   });
+  await page.route('**/api/**', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Fixture mode"}' }));
   await page.goto('/#/profile?slug=bay-plumbing');
   await page.getByRole('button', { name: 'Create homeowner account' }).click();
   await expect(page.getByLabel('Full name', { exact: true })).toBeVisible();
