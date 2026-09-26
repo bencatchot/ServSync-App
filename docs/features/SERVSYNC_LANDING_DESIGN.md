@@ -77,3 +77,22 @@ After application and immutable Preview validation, authenticated published-Help
 - TESTS RUN: TypeScript, build, lint baseline, 27 architecture tests, 22 hosted browser tests, independent accessibility/reflow review, image loading, diff and changed-line secret scans.
 - RISKS: Existing application bundle warning and lint baseline; Vercel Preview may require the owner's existing Vercel access. Production release is not included.
 - NEXT STEP: Owner reviews the preview and separately approves any merge/release.
+
+## September 25 copy revision
+
+The owner requested more natural language and specifically rejected “Good homes. Good people.” The page now uses plain descriptions of tasks and features, retaining “Home service, in sync.” as the main brand line. Examples include “Manage your jobs and customers,” “Keep track of work done on your home,” and “Create a homeowner account.” Repeated story, next-chapter, good-work, and better-connections slogans were removed. FAQ answers use conversational language while retaining existing sharing, free-beta, and payment limits.
+
+Local validation: production build passed. The 22 existing landing/public browser checks passed across the initial run and two corrected assertion reruns; the initial failures were text-content whitespace assumptions around the new multiline heading, not layout or behavior defects. Screenshots at 320, 390, 820, and 1440px show the revised text without horizontal overflow; no page errors were reported. Existing enlarged-text, audience, navigation, signup, FAQ, and legal-route checks passed. Hosted evidence follows after deployment validation.
+
+Copy-revision task report:
+
+- ACTION: Rewrote public landing copy in a more natural, specific voice.
+- FILES MODIFIED: LandingPage.tsx, existing landing browser assertions, this report, and changelog.
+- MASTER PLAN UPDATED: no.
+- CHANGELOG UPDATED: yes.
+- BACKLOG IMPACT: Backlog reviewed; no update needed.
+- BACKLOG FILE UPDATED: NOT NEEDED.
+- REASON: Editorial refinement only; product scope, pricing, permissions, and workflows are unchanged.
+- TESTS RUN: Production build, 22 existing browser checks, desktop/tablet/phone visual review, enlarged-text checks, and diff checks.
+- RISKS: Existing application bundle warning; no new functional risks identified.
+- NEXT STEP: Review the revised Preview; merge remains separately gated.

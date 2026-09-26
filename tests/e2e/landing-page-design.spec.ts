@@ -38,7 +38,7 @@ test("journey can be explored with pointer and keyboard", async ({ page }) => {
   });
   await tabs.getByRole("tab", { name: "02 Plan" }).click();
   await expect(page.getByRole("tabpanel", { name: "02 Plan" })).toContainText(
-    "Get everyone on the same page.",
+    "Agree on the work before it starts.",
   );
   await tabs.getByRole("tab", { name: "02 Plan" }).press("ArrowRight");
   await expect(tabs.getByRole("tab", { name: "03 Complete" })).toBeFocused();
@@ -64,18 +64,18 @@ test("audience tabs change the copy, illustration and signup destination togethe
     name: "For homeowners",
     exact: true,
   });
-  await expect(panel).toContainText("Your home has a story.");
+  await expect(panel).toContainText("Keep track of work");
   await expect(
-    panel.getByRole("link", { name: "Start your home’s story" }),
+    panel.getByRole("link", { name: "Create a homeowner account" }),
   ).toHaveAttribute("href", "#/homeowner?mode=signup");
-  await expect(panel).toContainText("Core homeowner use is free.");
+  await expect(panel).toContainText("Core homeowner features are free.");
   await page
     .getByRole("tab", { name: "For homeowners", exact: true })
     .press("ArrowLeft");
   await expect(
     page
       .getByRole("tabpanel", { name: "For contractors", exact: true })
-      .getByRole("link", { name: "Bring your work together" }),
+      .getByRole("link", { name: "Create a contractor account" }),
   ).toHaveAttribute("href", "#/contractor?mode=signup");
 });
 
@@ -85,14 +85,12 @@ test("FAQ disclosures expose beta and payment limits", async ({ page }) => {
     .filter({ hasText: "Is ServSync free to use?" });
   await pricing.locator("summary").click();
   await expect(pricing).toHaveAttribute("open", "");
-  await expect(pricing).toContainText(
-    "Any future paid plans will be explained",
-  );
+  await expect(pricing).toContainText("We’ll explain any future paid plans");
   const payments = page
     .locator("details")
     .filter({ hasText: "Can customers pay invoices in ServSync?" });
   await payments.locator("summary").click();
-  await expect(payments).toContainText("Payment is arranged outside ServSync");
+  await expect(payments).toContainText("Customers pay outside ServSync");
   await payments.locator("summary").press("Enter");
   await expect(payments).not.toHaveAttribute("open", "");
 });
@@ -106,7 +104,7 @@ test("section navigation stays on the landing page and moves focus to the destin
     .click();
   await expect(page.locator("#questions")).toBeFocused();
   await expect(
-    page.getByRole("heading", { name: "Good questions. Straight answers." }),
+    page.getByRole("heading", { name: "Common questions." }),
   ).toBeInViewport();
   await expect(page).not.toHaveURL(/#questions/);
 });
@@ -234,12 +232,12 @@ test("200 percent text reflows on a small phone without clipping navigation", as
   expect(clipped).toEqual([]);
   await page.getByRole("tab", { name: "04 Keep" }).click();
   await expect(page.getByRole("tabpanel", { name: "04 Keep" })).toContainText(
-    "Make the next visit easier.",
+    "Save the records you’ll need later.",
   );
   await page.getByRole("tab", { name: "For homeowners", exact: true }).click();
   await expect(
     page.getByRole("tabpanel", { name: "For homeowners", exact: true }),
-  ).toContainText("Your home has a story.");
+  ).toContainText("Keep track of work");
   expect(
     await page.evaluate(
       () => document.querySelector(".ss-landing")?.scrollLeft,

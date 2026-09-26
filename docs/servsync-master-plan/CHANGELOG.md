@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Landing page copy made more conversational
+
+- Branch: `codex/servsync-landing-design`, draft PR #580.
+- Files changed: `src/features/landing/LandingPage.tsx`, `tests/e2e/landing-page-design.spec.ts`, `docs/features/SERVSYNC_LANDING_DESIGN.md`, and this changelog.
+- Change/reason: owner requested more natural language. Removed “Good homes. Good people.” and repeated story/connection slogans. Rewrote headings, examples, FAQs, and calls to action around specific tasks such as managing customers, reviewing estimates, and keeping service records. Retained the main “Home service, in sync.” brand line.
+- Validation: production build passed; all 22 existing landing/public browser checks passed after correcting two text assertions for the new multiline heading. Desktop/tablet/phone screenshots reviewed at 320, 390, 820, and 1440px; no page errors or horizontal overflow. Hosted Preview and final review evidence are recorded in the design report.
+- Backlog Impact: Backlog reviewed; no update needed. Master plan and marketing inventory reviewed; no updates needed. Copy only, with existing feature, sharing, beta, and payment boundaries retained.
+- Risks/follow-ups: no workflow or layout behavior changed. Preview review and separate merge approval remain; existing build/lint warnings are unchanged.
+
 ## 2026-09-25 — ServSync landing page redesign prepared for review
 
 - Branch: `codex/servsync-landing-design`, draft PR #580, starting from latest `origin/main` at `8d60cdf` in an isolated worktree to preserve unrelated local edits.

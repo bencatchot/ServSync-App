@@ -32,24 +32,24 @@ const signup = (role: Audience) => appHashRoute(role, { mode: "signup" });
 const journey = [
   {
     label: "Connect",
-    title: "Start with the right connection.",
-    copy: "Find local contractors, explore their profiles, and choose who to connect with. Already have someone you trust? Keep your work together in ServSync.",
+    title: "Find a contractor for your home.",
+    copy: "Browse local contractor profiles and choose who to connect with. You can also use ServSync with a contractor you already know.",
     icon: Link2,
     status: "Connected",
-    detail: "A home. A contractor. A shared place to start.",
+    detail: "The homeowner and contractor are connected.",
     items: [
       "Choose a contractor",
-      "Share the details you allow",
+      "Choose which home details to share",
       "Start the conversation",
     ],
   },
   {
     label: "Plan",
-    title: "Get everyone on the same page.",
-    copy: "Describe what needs attention, review an estimate, and coordinate a visit. Keep the scope and next steps with the work, so there’s less to piece together.",
+    title: "Agree on the work before it starts.",
+    copy: "Describe what needs attention, review the estimate, and confirm a proposed visit. You can refer back to the scope and pricing whenever you need to.",
     icon: FileText,
     status: "Estimate accepted",
-    detail: "Clear scope. Clear next steps.",
+    detail: "The homeowner has reviewed and accepted the estimate.",
     items: [
       "Send a service request",
       "Review the estimate",
@@ -59,10 +59,10 @@ const journey = [
   {
     label: "Complete",
     title: "Keep the details with the job.",
-    copy: "Contractors can organize work, add notes and photos, complete checklists, and prepare a report. Homeowners can follow the related updates in one place.",
+    copy: "Contractors can add notes and photos, work through a checklist, and prepare a service report. Homeowners can review the updates shared with them.",
     icon: ClipboardCheck,
     status: "Work completed",
-    detail: "The work gets done. The details stay together.",
+    detail: "The installation is finished and the report is ready.",
     items: [
       "Organize the job",
       "Document the work",
@@ -71,11 +71,11 @@ const journey = [
   },
   {
     label: "Keep",
-    title: "Make the next visit easier.",
-    copy: "Review the invoice and file eligible records to Home History. Keep useful service details close for the next repair, a warranty question, or a follow-up.",
+    title: "Save the records you’ll need later.",
+    copy: "Keep service records in Home History so you can look up past work when a repair or warranty question comes up. You can also add your own follow-up reminders to check in the app.",
     icon: FolderOpen,
     status: "Filed to Home History",
-    detail: "A useful record, long after the tools are packed.",
+    detail: "The service record is saved in Home History.",
     items: [
       "Review the invoice",
       "File your service records",
@@ -88,32 +88,32 @@ const questions = [
   {
     question: "Who is ServSync for?",
     answer:
-      "ServSync is built for homeowners and independent home-service contractors, especially solo operators and small teams. Homeowners get a clearer way to manage service relationships and home records. Contractors get practical tools for customer records, estimates, jobs, reports, and invoices.",
+      "ServSync is for homeowners and home-service contractors, especially solo operators and small teams. Homeowners can find contractors, request service, and keep home records. Contractors can manage customers, estimates, jobs, reports, and invoices.",
   },
   {
     question: "Is ServSync free to use?",
     answer:
-      "Core homeowner use is free. Contractor accounts are currently free during beta, with no credit card required. Any future paid plans will be explained before you choose one.",
+      "The core homeowner features are free. Contractor accounts are free during beta, and you don’t need a credit card. We’ll explain any future paid plans before you choose one.",
   },
   {
     question: "Can I use ServSync with my existing customers?",
     answer:
-      "Yes. Contractors can organize local customer and property records and prepare work without waiting for every customer to join. Eligible estimates, invoices, and finalized reports can be shared through secure, expiring links for that specific document. A connected homeowner account supports an ongoing relationship and home records.",
+      "Yes. You can keep customer and property records and prepare work even if a customer hasn’t joined ServSync. Where document sharing is available, you can send a secure link to an estimate, invoice, or completed report. Each link expires and opens only that document. Customers who join can connect with you and keep their own home records.",
   },
   {
     question: "What information can a contractor see?",
     answer:
-      "Homeowners choose what information to share through a contractor connection and can update or revoke that access. Connecting does not automatically share every document or all of your Home History. Visit Trust & Safety for more on sharing and platform boundaries.",
+      "You choose which home information to share with each connected contractor, and you can change or remove that access. Connecting doesn’t give a contractor access to every document or all of your Home History. Trust & Safety explains how sharing works.",
   },
   {
     question: "Can customers pay invoices in ServSync?",
     answer:
-      "Online payment collection is not currently available. Payment is arranged outside ServSync, and authorized contractors can manually record invoice payment status in the app.",
+      "Online payments aren’t available yet. Customers pay outside ServSync, and contractors with billing access can update an invoice’s payment status in the app.",
   },
   {
     question: "Does ServSync work on my phone?",
     answer:
-      "Yes. You can use ServSync in a mobile browser, as well as on a tablet or computer. No app-store download is required.",
+      "Yes. Open ServSync in the browser on your phone, tablet, or computer. You don’t need to download an app.",
   },
 ];
 
@@ -220,12 +220,10 @@ function WorkPreview({ audience }: { audience: Audience }) {
         <div className="ss-preview-heading">
           <div>
             <p className="ss-small-label">
-              {homeowner ? "YOUR HOME, REMEMBERED" : "A CLEAR VIEW OF THE WORK"}
+              {homeowner ? "HOME HISTORY" : "JOB OVERVIEW"}
             </p>
             <h3>
-              {homeowner
-                ? "A history worth keeping."
-                : "From request to record."}
+              {homeowner ? "Past work on your home" : "Your job at a glance"}
             </h3>
           </div>
           <span className="ss-preview-icon">
@@ -254,8 +252,8 @@ function WorkPreview({ audience }: { audience: Audience }) {
                 <Receipt size={20} />
               </span>
               <div>
-                <strong>The invoice, right here</strong>
-                <p>Service details kept with your home</p>
+                <strong>Installation invoice</strong>
+                <p>Saved with the service record</p>
               </div>
               <CheckCheck size={20} />
             </div>
@@ -264,8 +262,8 @@ function WorkPreview({ audience }: { audience: Audience }) {
                 <FolderOpen size={20} />
               </span>
               <div>
-                <strong>The details for next time</strong>
-                <p>Notes, documents & warranty context</p>
+                <strong>Service documents</strong>
+                <p>Notes, documents & warranty details</p>
               </div>
               <ArrowUpRight size={18} />
             </div>
@@ -313,8 +311,8 @@ function WorkPreview({ audience }: { audience: Audience }) {
           <Link2 size={16} />
           <span>
             {homeowner
-              ? "Your records stay useful beyond a single visit."
-              : "One customer. Connected work. Less searching."}
+              ? "Find past service details when you need them."
+              : "Review the estimate, job, and invoice in one place."}
           </span>
         </div>
       </div>
@@ -495,7 +493,8 @@ export default function LandingPage() {
         >
           <div className="ss-hero-copy">
             <p className="ss-eyebrow">
-              <span className="ss-eyebrow-line" /> GOOD HOMES. GOOD PEOPLE.
+              <span className="ss-eyebrow-line" /> HOMEOWNERS & LOCAL
+              CONTRACTORS
             </p>
             <h1 id="ss-hero-title">
               Home service,
@@ -503,13 +502,12 @@ export default function LandingPage() {
               <span>in sync.</span>
             </h1>
             <p className="ss-hero-description">
-              Find your people. Plan the work.
-              <br className="ss-desktop-break" /> Keep the story of your home
-              together.
+              Find a contractor and
+              <br className="ss-desktop-break" /> keep track of the work.
             </p>
             <p className="ss-hero-detail">
-              One shared place for homeowners and local contractors, from the
-              first request to the final invoice.
+              ServSync helps homeowners manage repairs and gives contractors the
+              tools to manage their jobs.
             </p>
             <div className="ss-hero-buttons">
               <SignupLink role="homeowner">I’m a homeowner</SignupLink>
@@ -525,7 +523,7 @@ export default function LandingPage() {
               <span>
                 <ArrowDown size={17} aria-hidden="true" />
               </span>{" "}
-              A better way to work together
+              See how ServSync works
             </SectionLink>
           </div>
           <div className="ss-hero-visual">
@@ -547,7 +545,7 @@ export default function LandingPage() {
               <span>
                 <Home size={15} />
               </span>{" "}
-              More care. Less chasing.
+              Repairs & routine maintenance
             </div>
             <div className="ss-connection-card">
               <div className="ss-connection-top">
@@ -555,8 +553,8 @@ export default function LandingPage() {
                   <Link2 size={20} />
                 </span>
                 <div>
-                  <p>GOOD WORK, CONNECTED</p>
-                  <strong>A better visit starts here.</strong>
+                  <p>YOUR SERVICE DETAILS</p>
+                  <strong>Know where things stand.</strong>
                 </div>
                 <Check size={18} />
               </div>
@@ -570,11 +568,11 @@ export default function LandingPage() {
                 </span>
               </div>
               <p className="ss-connection-caption">
-                Requests, estimates & records. Together.
+                Service requests, estimates & invoices
               </p>
             </div>
             <span className="ss-photo-caption">
-              Built around real homes and the people who care for them.
+              For homeowners, solo contractors, and small teams.
             </span>
           </div>
         </section>
@@ -582,16 +580,16 @@ export default function LandingPage() {
         <div className="ss-promise-strip">
           <div className="ss-container">
             <span>
-              <Link2 /> Meaningful connections
+              <Link2 /> Local contractors
             </span>
             <span>
-              <FileText /> Clearer next steps
+              <FileText /> Estimates & scheduling
             </span>
             <span>
-              <MessageSquare /> Work that stays connected
+              <MessageSquare /> Job updates
             </span>
             <span>
-              <FolderOpen /> Records worth keeping
+              <FolderOpen /> Home service records
             </span>
           </div>
         </div>
@@ -604,16 +602,16 @@ export default function LandingPage() {
         >
           <div className="ss-section-heading">
             <div>
-              <p className="ss-eyebrow">FROM FIRST HELLO TO WHAT’S NEXT</p>
+              <p className="ss-eyebrow">HOW SERVSYNC WORKS</p>
               <h2 id="ss-how-title">
-                Finding your contractor
+                From the first request
                 <br />
-                is just the beginning.
+                to the finished job.
               </h2>
             </div>
             <p>
-              Good service is a relationship. ServSync gives both sides a shared
-              place to keep it moving, one clear step at a time.
+              Find a contractor, agree on the work, and keep the paperwork when
+              it’s done. Here’s how that looks in ServSync.
             </p>
           </div>
           <div
@@ -655,7 +653,7 @@ export default function LandingPage() {
             </div>
             <div className="ss-journey-example">
               <div className="ss-example-heading">
-                <span>ONE HOME. ONE SERVICE STORY.</span>
+                <span>A TYPICAL HOME REPAIR</span>
                 <span>Illustrative example</span>
               </div>
               <div className="ss-job-card">
@@ -697,8 +695,8 @@ export default function LandingPage() {
         >
           <div className="ss-container">
             <div className="ss-audience-heading">
-              <p className="ss-eyebrow">TWO SIDES. ONE SHARED EXPERIENCE.</p>
-              <h2 id="ss-audience-title">Built for your side of the work.</h2>
+              <p className="ss-eyebrow">WHAT YOU CAN DO</p>
+              <h2 id="ss-audience-title">See what’s here for you.</h2>
               <div
                 className="ss-audience-tabs"
                 role="tablist"
@@ -742,28 +740,28 @@ export default function LandingPage() {
               <div className="ss-audience-copy">
                 <span className="ss-number-label">
                   {audience === "contractor"
-                    ? "FOR THE PEOPLE DOING THE WORK"
-                    : "FOR THE PLACE YOU CALL HOME"}
+                    ? "FOR CONTRACTORS"
+                    : "FOR HOMEOWNERS"}
                 </span>
                 <h3>
                   {audience === "contractor" ? (
                     <>
-                      Less scattered.
+                      Manage your jobs
                       <br />
-                      More in control.
+                      and customers.
                     </>
                   ) : (
                     <>
-                      Your home has a story.
+                      Keep track of work
                       <br />
-                      Keep it together.
+                      done on your home.
                     </>
                   )}
                 </h3>
                 <p>
                   {audience === "contractor"
-                    ? "You bring the know-how. Bring your customer details, estimates, jobs, and invoices into one practical workspace built for independent contractors."
-                    : "From the first repair to the next routine visit, keep your contractors, service requests, invoices, and home records in one place you can come back to."}
+                    ? "Put together an estimate, check the job details, and send the invoice. Your customer information and paperwork are in the same place."
+                    : "Look up who did the repair, find an old invoice, or request another visit. Keep your contractors and service records together so you don’t have to start from scratch."}
                 </p>
                 <CheckList
                   items={
@@ -772,7 +770,7 @@ export default function LandingPage() {
                           "Prepare estimates with reusable templates and pricing",
                           "Keep job notes, photos, and checklists together",
                           "Create invoices connected to the work",
-                          "Work with existing customers, too",
+                          "Manage existing customers, even before they join",
                         ]
                       : [
                           "Find local contractors and choose who to connect with",
@@ -784,13 +782,13 @@ export default function LandingPage() {
                 />
                 <SignupLink role={audience}>
                   {audience === "contractor"
-                    ? "Bring your work together"
-                    : "Start your home’s story"}
+                    ? "Create a contractor account"
+                    : "Create a homeowner account"}
                 </SignupLink>
                 <p className="ss-small-note">
                   {audience === "contractor"
                     ? "For solo pros and small teams. Free during beta."
-                    : "Core homeowner use is free."}
+                    : "Core homeowner features are free."}
                 </p>
               </div>
               <div className="ss-product-stage">
@@ -801,8 +799,8 @@ export default function LandingPage() {
                   </span>
                   <p>
                     {audience === "contractor"
-                      ? "The details stay with the work."
-                      : "The work ends. The record stays useful."}
+                      ? "Customer details and job paperwork, together."
+                      : "Keep a record of repairs and maintenance."}
                     <span>Illustrative preview · Example data</span>
                   </p>
                 </div>
@@ -819,15 +817,16 @@ export default function LandingPage() {
         >
           <div className="ss-section-heading">
             <div>
-              <p className="ss-eyebrow">A BETTER KIND OF CONNECTION</p>
+              <p className="ss-eyebrow">WHY SERVSYNC</p>
               <h2 id="ss-difference-title">
-                More than finding someone.
-                <br />A better way to work together.
+                There’s a lot to keep track of.
+                <br />
+                ServSync helps you stay organized.
               </h2>
             </div>
             <p>
-              Built for the part that matters most: the work, the relationship,
-              and everything worth remembering afterward.
+              Home repairs come with appointments, decisions, and paperwork.
+              Keep those details handy for this job and the next one.
             </p>
           </div>
           <div className="ss-value-grid">
@@ -836,15 +835,15 @@ export default function LandingPage() {
                 <LockKeyhole size={24} />
               </span>
               <h3>
-                Your home. <br />
-                Your say.
+                You choose <br />
+                what to share.
               </h3>
               <p>
                 Choose who you connect with and what home information you share.
-                Update or revoke that access as your needs change.
+                Change or remove that access whenever you need to.
               </p>
               <a href={appHashRoute("trust-safety")}>
-                Explore Trust & Safety <ArrowUpRight size={16} />
+                Read about sharing <ArrowUpRight size={16} />
               </a>
             </article>
             <article>
@@ -852,15 +851,16 @@ export default function LandingPage() {
                 <CalendarDays size={24} />
               </span>
               <h3>
-                The next visit <br />
-                starts ahead.
+                Look up <br />
+                past work.
               </h3>
               <p>
-                Keep the contractor relationship and useful service records
-                together, so the next conversation has somewhere to begin.
+                Check what was done, when it happened, and who handled it. Your
+                service records are there to refer back to before the next
+                visit.
               </p>
               <SectionLink id="for-you">
-                See how it comes together <ArrowUpRight size={16} />
+                See the features <ArrowUpRight size={16} />
               </SectionLink>
             </article>
             <article>
@@ -868,24 +868,23 @@ export default function LandingPage() {
                 <Wrench size={24} />
               </span>
               <h3>
-                Practical tools. <br />
-                Real-world work.
+                Spend less time <br />
+                on paperwork.
               </h3>
               <p>
-                Estimates, checklists, reports, and invoices for independent
-                pros. A clear way to get organized without enterprise-level
-                complexity.
+                Reuse estimate templates and pricing, keep a checklist for each
+                job, and create invoices from the work you’ve already entered.
               </p>
               <a href={signup("contractor")}>
-                Explore the contractor side <ArrowUpRight size={16} />
+                Get started as a contractor <ArrowUpRight size={16} />
               </a>
             </article>
           </div>
           <div className="ss-trust-note">
             <ShieldCheck size={20} />
             <p>
-              Connections start with your choice. ServSync does not verify
-              contractor licenses, insurance, or quality of work.
+              You choose who to hire. ServSync does not verify contractor
+              licenses, insurance, or quality of work.
             </p>
           </div>
         </section>
@@ -898,15 +897,15 @@ export default function LandingPage() {
         >
           <div className="ss-container ss-faq-grid">
             <div>
-              <p className="ss-eyebrow">A FEW THINGS TO KNOW</p>
+              <p className="ss-eyebrow">BEFORE YOU GET STARTED</p>
               <h2 id="ss-faq-title">
-                Good questions.
+                Common
                 <br />
-                Straight answers.
+                questions.
               </h2>
               <p>
-                We’re building ServSync carefully, with feedback from the people
-                who use it.
+                A few things to know about accounts, pricing, and how ServSync
+                works.
               </p>
               <span className="ss-beta-badge">CURRENTLY IN BETA</span>
             </div>
@@ -932,21 +931,21 @@ export default function LandingPage() {
         >
           <div className="ss-container">
             <div className="ss-closing-top">
-              <p className="ss-eyebrow">LET’S BRING IT ALL TOGETHER</p>
+              <p className="ss-eyebrow">TRY SERVSYNC</p>
               <span className="ss-closing-mark">
                 <Link2 size={38} />
               </span>
             </div>
             <h2 id="ss-closing-title">
-              Good work.
+              Ready to
               <br />
-              <span>Better connected.</span>
+              <span>get started?</span>
             </h2>
             <div className="ss-closing-bottom">
               <p>
-                Your home or your business.
+                Choose a homeowner or contractor account.
                 <br />
-                Give the next chapter a better place to start.
+                You can try ServSync for free during beta.
               </p>
               <div>
                 <div className="ss-closing-buttons">
@@ -997,7 +996,6 @@ export default function LandingPage() {
                 Contractor Agreement
               </a>
             </div>
-            <span>Built for better connections.</span>
           </div>
         </div>
       </footer>
