@@ -1,5 +1,15 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-26 — Demo iPhone development build signed and installed
+
+- Branch: `codex/mobile-current-acceptance`, PR #582; application source remains `f8b60835e042810f1fa9c39b11c93ce1e9e33ec9`.
+- Files changed: native acceptance report, FB-015 backlog, and this changelog. No application code or tracked signing configuration changed; build artifacts and device receipts remain ignored.
+- Change/reason: owner explicitly approved development signing/provisioning and installation/testing on the paired physical iPhone 16 Pro Max. The Demo app now installs and launches on that device using the existing Apple Development identity.
+- Validation: signed Debug ARM64 build passed; strict signature verification and signing-certificate comparison passed; the development profile permits `app.servsync.demo` and includes the approved device. All 52 `dist-mobile` assets match the signed bundle. Device JSON receipts confirm installation, installed ServSync Demo version 1.0/build 1, and successful process launch.
+- Runtime boundary: process launch does not establish rendered UI or PDF acceptance. iPhone Mirroring currently reports the phone is in use; the owner has been asked to lock it for visual testing. Current physical login/session/PDF checks remain pending.
+- Backlog Impact: FB-015 remains Implementation In Progress. Development signing/install is complete; physical runtime acceptance and other integration/distribution gates remain open. Master plan unchanged; product direction is unchanged. Tutorial impact remains NONE for unchanged application source.
+- Risks/follow-ups: complete physical UI/PDF acceptance and retain separate touch, camera, accessibility, contractor finalized-report fixture, and physical Android gaps. This is a development install, not TestFlight/App Store distribution. No product-record write, backend/auth/storage change, merge, or production deployment.
+
 ## 2026-09-26 — Native Demo apps rebuilt for current-workflow acceptance
 
 - Branch: `codex/mobile-current-acceptance`, PR #582, from `origin/main` at `749d182`; final code `f8b60835e042810f1fa9c39b11c93ce1e9e33ec9`.
