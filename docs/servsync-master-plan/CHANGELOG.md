@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Discover shortlist Sandbox rollout accepted
+
+- Branch: `codex/discover-market-ready-v1`, PR #578. Owner explicitly approved Sandbox; exact prepared migration applied only to `zpzdkoaubyjtsomccxya`.
+- Files: Sandbox runtime/browser acceptance harnesses, backend rollout ledger, Discover implementation report, master plan, backlog, and this changelog.
+- Reason/result: prove the private shortlist works with real Sandbox authentication and policies before a production release. All 168 pre-existing relation fingerprints survived installation; 20 API/browser checks passed and all 169 post-install fingerprints matched after exact fixture cleanup.
+- Validation: two homeowners/one contractor; ownership, eligibility, deny paths, idempotency and persistence; full local app at 390px against live Sandbox save/reload/remove; no overflow/uncaught errors. Initial invalid fixture status and premature browser snapshot were corrected in the harness, with cleanup verified on every run. Syntax and diff checks passed.
+- Backlog Impact: FB-009 Sandbox shortlist gate complete; full live pilot journey and Production/Demo rollout remain open. Tutorial impact NONE; no app screen changed after the previous playback review. No merge, Production/Demo SQL, shared settings, publication or advertising.
+
 ## 2026-09-25 — Discover first-use value prepared for review
 
 - Branch: `codex/discover-market-ready-v1`; no merge, shared SQL application or production deployment.

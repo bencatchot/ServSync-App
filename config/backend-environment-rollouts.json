@@ -12,8 +12,8 @@
           "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
         },
         "sandbox": {
-          "status": "Pending",
-          "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
+          "status": "Applied",
+          "reason": "Owner approved Sandbox on 2026-09-25. Exact SHA-256 aa2203badabc68ab3013fc312192fc0a7af6fb3711473028465ca33f9a9749d7 applied once to zpzdkoaubyjtsomccxya. All 168 existing relation fingerprints preserved immediately after installation. Twenty runtime/browser checks passed: real Auth sessions for two homeowners and a contractor, owner-only read/save/remove, duplicate saves, spoof/update/anonymous/contractor denial, hidden and paused eligibility, and 390px full local app against live Sandbox save/reload/remove. Exact Auth lifecycle cleanup returned all 169 post-install relation fingerprints to baseline. No Production/Demo installation or hosted environment changes. See docs/features/DISCOVER_MARKET_READY_V1.md."
         },
         "demo": {
           "status": "Pending",
