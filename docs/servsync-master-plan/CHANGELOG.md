@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Discover shortlist enabled in Demo and Production
+
+- Branch: `codex/discover-shortlist-production-rollout`; owner explicitly approved both migrations after PR #578 merge/deployment.
+- Applied the unchanged Sandbox-tested migration first to Demo, then Production. Preserved all 165/162 pre-existing relation fingerprints; exact table/security catalog matches Sandbox. Read-only roles and real API anonymous denial passed; no fixtures or real-user mutations were introduced.
+- Files: rollout ledger, Discover implementation evidence, master plan, backlog, marketing inventory and changelog. Reason: enable private saved contractors in the deployed application and accurately record live availability.
+- Validation: exact migration checksum, project identity, absent-table preflight, data preservation, catalog/grant/policy parity, REST visibility/anonymous denial, ledger tests and diff checks. No app code or infrastructure settings changed. Tutorial impact NONE; existing reviewed flow is unchanged.
+- Backlog Impact: FB-009 all-environment installation complete; full live pilot journey and marketplace supply/response gates remain open. No advertising or external outreach.
+
 ## 2026-09-25 — Discover shortlist Sandbox rollout accepted
 
 - Branch: `codex/discover-market-ready-v1`, PR #578. Owner explicitly approved Sandbox; exact prepared migration applied only to `zpzdkoaubyjtsomccxya`.

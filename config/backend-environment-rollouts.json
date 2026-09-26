@@ -8,16 +8,16 @@
       "artifact": "servsync-homeowner-saved-contractors.sql (SHA-256 aa2203badabc68ab3013fc312192fc0a7af6fb3711473028465ca33f9a9749d7)",
       "environments": {
         "production": {
-          "status": "Pending",
-          "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
+          "status": "Applied",
+          "reason": "Owner-approved exact migration applied on September 25 America/Chicago (2026-09-26T01:51:36.469559+00:00 UTC) to uqgtheclhxqlnjpfmheq. All 162 pre-existing relation fingerprints preserved. Columns, constraints, policies, grants, owner, RLS and absence of side-effect triggers match accepted Sandbox exactly. Empty shortlist verified after installation; read-only role checks and real API anonymous denial passed. No real-user mutation, fixture, auth account, or settings changes. See docs/features/DISCOVER_MARKET_READY_V1.md."
         },
         "sandbox": {
           "status": "Applied",
           "reason": "Owner approved Sandbox on 2026-09-25. Exact SHA-256 aa2203badabc68ab3013fc312192fc0a7af6fb3711473028465ca33f9a9749d7 applied once to zpzdkoaubyjtsomccxya. All 168 existing relation fingerprints preserved immediately after installation. Twenty runtime/browser checks passed: real Auth sessions for two homeowners and a contractor, owner-only read/save/remove, duplicate saves, spoof/update/anonymous/contractor denial, hidden and paused eligibility, and 390px full local app against live Sandbox save/reload/remove. Exact Auth lifecycle cleanup returned all 169 post-install relation fingerprints to baseline. No Production/Demo installation or hosted environment changes. See docs/features/DISCOVER_MARKET_READY_V1.md."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Owner approved preparation of private shortlist table/access rules on 2026-09-25, not installation. Disposable local PostgreSQL validation passed. Application and acceptance in this environment require separate approval."
+          "status": "Applied",
+          "reason": "Owner-approved exact migration applied on September 25 America/Chicago (2026-09-26T01:51:22.531227+00:00 UTC) to bdytwgejqnlblhrnqxkp. All 165 pre-existing relation fingerprints preserved. Columns, constraints, policies, grants, owner, RLS and absence of side-effect triggers match accepted Sandbox exactly. Empty shortlist verified after installation; read-only role checks and real API anonymous denial passed. No real-user mutation, fixture, auth account, or settings changes. See docs/features/DISCOVER_MARKET_READY_V1.md."
         }
       }
     },
