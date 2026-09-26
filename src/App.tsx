@@ -11279,6 +11279,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const downloadDocument = async (doc: HomeDocument) => {
     if (!supabase) return;
+    setError('');
     const { data, error } = await supabase.storage.from('home-documents').createSignedUrl(doc.storage_path, 60);
     if (error || !data?.signedUrl) { setError('Unable to generate download link.'); return; }
     await downloadStoredDocument(data.signedUrl, doc.file_name, doc.content_type)
@@ -30004,6 +30005,7 @@ function ContractorDashboard({
       setError('The finalized report file is not available.');
       return;
     }
+    setError('');
     const { data, error: signedUrlError } = await supabase.storage
       .from('home-documents')
       .createSignedUrl(insp.report_storage_path, 60);
