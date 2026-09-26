@@ -103,4 +103,18 @@ The owner approved replacing the two larger invented app panels with authentic S
 
 Screens are captured from the actual application rendered with isolated fictional browser responses. Shared data, user records, credentials, and settings are not changed. Capture provenance and regeneration details are maintained in `public/landing/README.md`.
 
-Documentation impact: marketing inventory updated only to describe the screenshot demonstration boundary. Master plan unchanged. Backlog reviewed; no update needed. Changelog and asset provenance updated. Local validation: type checking and production build passed; lint passed with the existing 76-warning baseline. The initial 25 browser cases and the five final desktop/mobile viewer checks passed. Independent review verified actual screen content, responsive image selection, keyboard scrolling, focus containment/restoration, Escape, scroll locking, and no page errors or horizontal overflow at desktop, 390px, and 320px. Five optimized WebP captures total approximately 695KB; desktop and mobile variants load selectively, and full mobile estimate content loads only when the viewer is opened. Hosted validation and final tutorial freshness evidence follows below.
+Documentation impact: marketing inventory updated only to describe the screenshot demonstration boundary. Master plan unchanged. Backlog reviewed; no update needed. Changelog and asset provenance updated. Local validation: type checking and production build passed; lint passed with the existing 76-warning baseline. The initial 25 browser cases and the five final desktop/mobile viewer checks passed. Independent review verified actual screen content, responsive image selection, keyboard scrolling, focus containment/restoration, Escape, scroll locking, and no page errors or horizontal overflow at desktop, 390px, and 320px. Five optimized WebP captures total approximately 695KB; desktop and mobile variants load selectively, and full mobile estimate content loads only when the viewer is opened. Final implementation `4aab5f9` passed **27/27 hosted browser checks** on https://servsync-demo-2ykh849ju-bencatchots-projects.vercel.app. The CI lint/architecture/types/build check and all three Preview deployments passed. After this verification, both Demo roles searched published Help for landing, signup, sign in, platform introduction, screenshot, product preview, and home/public.home contexts. All sixteen searches returned no matching published walkthroughs. Tutorial impact: NONE. The screenshots depict existing authenticated screens without changing their workflows or guidance.
+
+
+Screenshot-revision task report:
+
+- ACTION: Replaced both larger invented app panels with authentic responsive screenshots and a zoomable image viewer; updated draft PR #580.
+- FILES MODIFIED: Landing components/styles, five WebP captures, capture script/provenance, focused browser tests, marketing inventory, design report, changelog (15 files).
+- MASTER PLAN UPDATED: no.
+- CHANGELOG UPDATED: yes.
+- BACKLOG IMPACT: Backlog reviewed; no update needed.
+- BACKLOG FILE UPDATED: NOT NEEDED.
+- REASON: Show the actual app with fictional sample records while preserving the existing page design and product claims.
+- TESTS RUN: Type checking/build, lint with existing 76-warning baseline, capture-script syntax/format/lint, 27/27 hosted browser cases, independent desktop/mobile and keyboard review, CI architecture checks, and post-validation tutorial search.
+- RISKS: Refresh the captures when the pictured interface changes; screenshots demonstrate UI with fictional data, not backend transactions. Existing bundle/lint warnings remain.
+- NEXT STEP: Owner reviews the updated preview. No merge, Production deployment, shared-data mutation, or configuration change was performed.
