@@ -41,6 +41,7 @@ For Android, use JDK 21 and an installed Google Android SDK with accepted licens
 
 - Shared existing role-aware app, with contractor entry on first launch and a Demo label.
 - Native PDF action registration: the existing Preview/Download actions offer an explicit system share-sheet action. It never automatically chooses a destination or sends a document. Retry/cancel keeps the source document intact; closing the dialog removes its temporary cache file.
+- Stored PDFs from existing document/report downloads use the same native PDF adapter, with guarded concurrent fetching and stable PDF filenames. Android homeowner Documents/Home History acceptance passed; the website and non-PDF downloads retain their existing anchor behavior.
 - Native network-status notice; no claim of offline editing or synchronized drafts.
 - Android back action closes an open dialog first, otherwise navigates back or minimizes at the root.
 - Generated links use the Demo website origin rather than `capacitor://localhost`. Password recovery and invitations still return to the website; automatic native callback handling is not implemented.
@@ -57,7 +58,7 @@ The native-only layout owns safe-area spacing, keeps the workspace header above 
 
 ## Explicit limitations
 
-This is a feasibility prototype, not a store-ready app. Remaining checks are tracked in the current acceptance report. Browser-relative `/api/*` routes include ordinary Help video playback, external email delivery, guest document views, payment and Marketing operations. These need a deliberate native/server integration and CORS/cookie assessment; they must not be represented as working in the prototype. Stored report/document downloads also use a different path from generated estimate/invoice PDFs and need their own native acceptance. No global fetch interception, origin spoofing, or authentication workaround has been added. Core Supabase-backed sign-in and connected-account record screens are the intended acceptance path.
+This is a feasibility prototype, not a store-ready app. Remaining checks are tracked in the current acceptance report. Browser-relative `/api/*` routes include ordinary Help video playback, external email delivery, guest document views, payment and Marketing operations. These need a deliberate native/server integration and CORS/cookie assessment; they must not be represented as working in the prototype. Stored-PDF opening passed on Android's homeowner paths; authenticated iOS and the contractor finalized-report caller still need runtime acceptance. No global fetch interception, origin spoofing, or authentication workaround has been added. Core Supabase-backed sign-in and connected-account record screens are the intended acceptance path.
 
 Native universal/app links, password recovery callbacks, notification providers, offline synchronization, biometric login, production signing, store submission and physical-device acceptance remain follow-ups. Login persistence uses the existing Supabase client behavior; iOS and Android fresh-launch and account-switch checks passed; physical-device lifecycle checks remain. The iPhone simulator has no physical camera; simulator tests cannot establish actual camera behavior.
 
