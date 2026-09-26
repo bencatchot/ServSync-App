@@ -19,6 +19,12 @@ Marketing draft retries in the same open composer reuse an already confirmed upl
 
 The approved feature prepares public Discover business profiles marked **Unclaimed**, then lets the invited verified contractor claim and manage that same listing. Until claiming, listings are informational only: no homeowner connection, service request, contact action, owner account, or billing record is created. Listings must not imply owner participation, responsiveness, verification, or endorsement. Claim links are manually shared; automated outreach is not included. The migration and real API/hosted-browser flow are validated in the owner-approved Sandbox branch Preview; Production and Demo rollout remain pending. Current tutorial review found no stale matching guidance; do not advertise this capability as live until Production SQL/source rollout is complete.
 
+## Discover first-use value — review branch only, September 25
+
+`codex/discover-market-ready-v1` prepares a stronger referral destination: public work/updates on profiles, visible website links, profile-specific sign-in continuation, connected service-request entry, and easier profile sharing/setup. Authenticated homeowners can find participating contractors without requiring posts, and privately save contractors once the approved shortlist migration is installed. Migration installation is Pending in Production, Sandbox and Demo. These are review-branch capabilities, not live claims.
+
+Public post previews and a permission acknowledgment support deliberate publication; they do not constitute a complete moderation/reporting system. No claim of verified credentials, current availability, guaranteed jobs, SEO performance, Jobber synchronization, a website builder or production-ready local marketplace is supported. Preserve the existing paused public-review policy. Profile/referral pilot first; area/category advertising follows supply, usability, response and support gates in `docs/features/DISCOVER_MARKET_READY_V1.md`.
+
 ## Marketing Framing Rules
 
 Describe ServSync on its own merits. Do not imply that competitors require homeowners to create accounts, download apps, buy subscriptions, perform unnecessary steps, or use inferior, fragmented, difficult, or expensive products unless that exact comparison has current verified evidence and deliberate marketing approval.

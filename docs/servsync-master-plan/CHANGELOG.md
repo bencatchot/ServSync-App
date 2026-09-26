@@ -1,5 +1,22 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Discover shortlist Sandbox rollout accepted
+
+- Branch: `codex/discover-market-ready-v1`, PR #578. Owner explicitly approved Sandbox; exact prepared migration applied only to `zpzdkoaubyjtsomccxya`.
+- Files: Sandbox runtime/browser acceptance harnesses, backend rollout ledger, Discover implementation report, master plan, backlog, and this changelog.
+- Reason/result: prove the private shortlist works with real Sandbox authentication and policies before a production release. All 168 pre-existing relation fingerprints survived installation; 20 API/browser checks passed and all 169 post-install fingerprints matched after exact fixture cleanup.
+- Validation: two homeowners/one contractor; ownership, eligibility, deny paths, idempotency and persistence; full local app at 390px against live Sandbox save/reload/remove; no overflow/uncaught errors. Initial invalid fixture status and premature browser snapshot were corrected in the harness, with cleanup verified on every run. Syntax and diff checks passed.
+- Backlog Impact: FB-009 Sandbox shortlist gate complete; full live pilot journey and Production/Demo rollout remain open. Tutorial impact NONE; no app screen changed after the previous playback review. No merge, Production/Demo SQL, shared settings, publication or advertising.
+
+## 2026-09-25 — Discover first-use value prepared for review
+
+- Branch: `codex/discover-market-ready-v1`; no merge, shared SQL application or production deployment.
+- Files: `src/App.tsx`, `src/features/discover/*`, `servsync-homeowner-saved-contractors.sql`, rollout ledger, shortlist SQL/browser validation, architecture/lint budget ratchets, master plan/backlog/marketing inventory and `docs/features/DISCOVER_MARKET_READY_V1.md`.
+- Change/reason: prioritize contractor finding and evaluation over feed engagement; reuse canonical directory/profile/connection/service flows, private bookmarks, public evidence and existing profile sharing. Add truthful retry/delete states, dated cards and deliberate-publication previews/acknowledgment. This gives a contractor a useful referral destination before marketplace scale.
+- Approval: owner approved app implementation and preparing the private-homeowner table/access rules. Shared migration installation remains Pending in every environment; no new anonymous directory permissions or automatic property sharing.
+- Validation: local PostgreSQL privacy/idempotency/eligibility checks passed; 17 browser cases (including routed desktop/mobile sign-in to service composer), 27 architecture tests, type check, build and lint passed. App size and lint baselines were lowered. The compiled Demo Preview passed both routed desktop/mobile journeys with isolated HTTP fixtures. Post-validation authenticated Help Studio search and complete normal-speed playback of published TUT-005 and TUT-001 revision 1 passed on September 25. Tutorial impact: NONE; existing request/connection paths remain accurate. Evidence is in the feature report. Release and shared-backend acceptance remain gated.
+- Risks/follow-ups: no live shortlist rollout yet; no SEO, verified-credential, current-availability or qualified-lead promise. Anonymous matching, moderation/reporting, funnel measurement and controlled pilot/advertising gates remain open. Public ServSync reviews remain paused. Backlog Impact: FB-009 updated; FB-026 public-display boundary retained.
+
 ## 2026-09-25 — First Draft work line opens automatically
 
 - Standard Drafts now start with one editable work line. The untouched starter stays outside saved data and causes no price warning or unsaved-change prompt; templates and Price Book items replace it without an extra blank item.
