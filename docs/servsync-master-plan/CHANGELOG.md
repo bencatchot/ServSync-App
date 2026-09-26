@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-25 — Discover live Sandbox referral journey verified
+
+- Branch: `codex/discover-shortlist-production-rollout`, continuing rollout evidence PR #579. Added fixed-Sandbox runtime/browser harnesses; updated Discover evidence, master plan, backlog, marketing inventory and this changelog.
+- Real 390px app journey passed: shared profile, UI sign-in, property creation/return, explicit connection, pending service-request denial, contractor-authenticated RPC acceptance, explicit submission and contractor retrieval of exactly one request. No app repair or mocked backend responses. All 169 starting relation fingerprints matched after exact Auth cleanup; no overflow or browser errors.
+- Two harness-only selector assumptions were corrected with complete cleanup on failed runs. Syntax/diff checks passed; existing Sandbox privacy and migrated catalog evidence retained.
+- Backlog Impact: FB-009 core technical referral path verified. Hosted/account-verification and human supply/response pilot checks remain. Tutorial impact NONE; no user-facing code changed. No Production/Demo mutation, schema/settings change, merge or advertising.
+
 ## 2026-09-25 — Discover shortlist enabled in Demo and Production
 
 - Branch: `codex/discover-shortlist-production-rollout`; owner explicitly approved both migrations after PR #578 merge/deployment.
