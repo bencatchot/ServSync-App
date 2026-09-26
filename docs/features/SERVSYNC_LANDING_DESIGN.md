@@ -45,7 +45,7 @@ All imagery and fonts are served locally. The photo has desktop/mobile WebP size
 
 ## Release boundary
 
-Prepared for Preview review. Merge and production deployment require the owner's separate approval. No SQL, settings, authentication/authorization, user data, or production operations are included.
+The owner approved the live release on September 26, 2026. PR #580 was merged and automatically deployed through the existing Vercel pipeline. The landing page is live at https://servsync.app. No SQL, settings, authentication/authorization, or user-data changes were included. Earlier review reports below record the state at their respective checkpoints; the production evidence at the end supersedes their pending-release status.
 
 ## Final review evidence
 
@@ -118,3 +118,12 @@ Screenshot-revision task report:
 - TESTS RUN: Type checking/build, lint with existing 76-warning baseline, capture-script syntax/format/lint, 27/27 hosted browser cases, independent desktop/mobile and keyboard review, CI architecture checks, and post-validation tutorial search.
 - RISKS: Refresh the captures when the pictured interface changes; screenshots demonstrate UI with fictional data, not backend transactions. Existing bundle/lint warnings remain.
 - NEXT STEP: Owner reviews the updated preview. No merge, Production deployment, shared-data mutation, or configuration change was performed.
+
+
+## September 26 production release
+
+The owner explicitly requested “make this live.” PR #580 merged the approved head `9c9335029501a5f60494b8d9ee99edfb40a15225` into `main` at 09:45 UTC, producing merge commit `b869015bba973e145d3ad7a80d3a30a5e81c4a05`. The existing automatic Vercel deployments for serv-sync-app-refresh, servsync-demo, and servsync-stripe-sandbox all succeeded. Production deployment: https://vercel.com/bencatchots-projects/serv-sync-app-refresh/6oQMNuba91vdHxG8LqiLwMqpzHoY.
+
+Production validation on https://servsync.app passed **27/27 browser tests** in 19.7 seconds: 20 landing-page cases and seven public-route smoke checks. These cover responsive layouts, both screenshot views, image loading, zoom, keyboard focus and dismissal, enlarged text, audience/journey tabs, signup/sign-in destinations, FAQs, and legal routes. Public checks submitted no forms and created no accounts. No manual deployment or configuration change was needed.
+
+Independent release review found no blocker or scope expansion. The release remains public presentation only; separately gated Discover and backend rollouts are not included. Tutorial impact remains NONE based on the final post-implementation review; the release changed no application code after that check. Master plan unchanged. Backlog reviewed; no update needed. Marketing inventory and changelog now record production availability. Refresh the captures when the demonstrated interface materially changes.

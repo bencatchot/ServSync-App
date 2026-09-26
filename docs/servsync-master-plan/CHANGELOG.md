@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-09-26 — Landing page released to Production
+
+- Branch: `codex/servsync-landing-release-record`; release documentation for approved landing PR #580, merged as `b869015bba973e145d3ad7a80d3a30a5e81c4a05`.
+- Files changed: marketing inventory, landing design/release report, and this changelog. The released application/assets are those already recorded in the September 25 entries below.
+- Change/reason: owner requested the completed landing page go live. Merged the approved PR and verified the normal automatic Vercel release; reconciled current Preview wording with Production availability at https://servsync.app.
+- Validation: all three normal Vercel deployment statuses succeeded. All 27 public browser checks passed on the live domain, including responsive layout, screenshot viewer, enlarged text, signup/sign-in destinations, navigation, FAQs, and legal pages. Release documentation passed a focused diff check. Tutorial impact remains NONE; no application changes followed the completed tutorial review.
+- Backlog Impact: Backlog reviewed; no update needed. Master plan unchanged; no product boundary or tracked feature status changed. This release does not authorize or complete pending Discover/backend rollouts.
+- Risks/follow-ups: refresh product captures when the pictured interface materially changes. Existing bundle/lint warnings remain; no new release blocker. No manual deployment, SQL, settings, permissions, or production-data changes were required.
+
 ## 2026-09-25 — Landing page shows the actual ServSync interface
 
 - Branch: `codex/servsync-landing-design`, draft PR #580.
