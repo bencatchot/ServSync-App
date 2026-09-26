@@ -25,9 +25,9 @@ The approved feature prepares public Discover business profiles marked **Unclaim
 
 Public post previews and a permission acknowledgment support deliberate publication; they do not constitute a complete moderation/reporting system. No claim of verified credentials, current availability, guaranteed jobs, SEO performance, Jobber synchronization, a website builder or production-ready local marketplace is supported. Preserve the existing paused public-review policy. Profile/referral pilot first; area/category advertising follows supply, usability, response and support gates in `docs/features/DISCOVER_MARKET_READY_V1.md`.
 
-## Landing-page product screenshots — review branch, September 25
+## Landing-page product screenshots — live, September 26
 
-The landing redesign on `codex/servsync-landing-design` demonstrates existing contractor estimates and homeowner Home History with captures of the actual application interface, rendered using fictional local sample records. Label the images as actual ServSync screens with sample data; retain original UI controls and distinguish explanatory workflow diagrams from screenshots. These images are examples of supported screens, not proof of live customer activity, contractor verification, automated reminders, online payments, or any pending feature rollout. The landing page remains in Preview until merge approval.
+The landing redesign released through PR #580 demonstrates existing contractor estimates and homeowner Home History with captures of the actual application interface, rendered using fictional local sample records. Label the images as actual ServSync screens with sample data; retain original UI controls and distinguish explanatory workflow diagrams from screenshots. These images are examples of supported screens, not proof of live customer activity, contractor verification, automated reminders, online payments, or any pending feature rollout. The owner-approved landing page is live at https://servsync.app as of September 26, 2026. This presentation release does not release any separately gated Discover or backend capability.
 
 ## Marketing Framing Rules
 
