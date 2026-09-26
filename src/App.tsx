@@ -9,6 +9,7 @@ import { AdminContractorProspects } from './features/contractor-prospects/AdminC
 import { ContractorClaimPage } from './features/contractor-prospects/ContractorClaimPage';
 import { DiscoverContractorProspects, PublicContractorProspect } from './features/contractor-prospects/PublicContractorProspects';
 import { MobileNavigationDialog } from './features/navigation/MobileNavigationDialog';
+import { downloadStoredDocument } from './utils/storedDocumentDownload';
 import { ConnectedCustomerScheduling } from './features/calendar/ConnectedCustomerScheduling';
 import { isOpenInvoice } from './features/invoices/recordStatus';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11280,10 +11281,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!supabase) return;
     const { data, error } = await supabase.storage.from('home-documents').createSignedUrl(doc.storage_path, 60);
     if (error || !data?.signedUrl) { setError('Unable to generate download link.'); return; }
-    const link = document.createElement('a');
-    link.href = data.signedUrl;
-    link.download = doc.file_name;
-    link.click();
+    await downloadStoredDocument(data.signedUrl, doc.file_name, doc.content_type)
+      .catch(err => setError(readableError(err, 'Unable to open this document.')));
   };
 
   const deleteDocument = async (doc: HomeDocument) => {
@@ -30012,10 +30011,8 @@ function ContractorDashboard({
       setError('Unable to generate the finalized report download link.');
       return;
     }
-    const link = document.createElement('a');
-    link.href = data.signedUrl;
-    link.download = insp.report_file_name || 'ServSync-Job-Report.pdf';
-    link.click();
+    await downloadStoredDocument(data.signedUrl, insp.report_file_name || 'ServSync-Job-Report.pdf', 'application/pdf')
+      .catch(err => setError(readableError(err, 'Unable to open the finalized report.')));
   };
 
   const sendInspectionReportToHomeowner = async (insp: Inspection, options?: { skipHomeTemplatePrompt?: boolean }) => {
