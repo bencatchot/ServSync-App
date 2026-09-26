@@ -1,5 +1,7 @@
 # Native presentation and acceptance — September 9, 2026
 
+Historical acceptance record. See [September 26 rebuild and acceptance](ServSync_Native_Acceptance_2026-09-26.md) for current-build evidence and remaining gates. TUT-002 revision 4 was published and verified September 25, resolving the older estimate-media replacement dependency below; native PDF guidance remains a draft and native Help playback needs separate integration.
+
 Status: implementation prepared; cross-platform acceptance incomplete. This is a continuation of PR #572 from main `fd912266919eb02dc821cdb4e150538b38d4f944`, on `codex/mobile-native-polish`. It is not a store release or approval to merge.
 
 ## Native/hosted Work parity correction

@@ -2,6 +2,8 @@
 
 Owner direction: September 9, 2026, iPhone and Android together. Branch `codex/mobile-prototype-v1`, based on main `68e16f52c339a68630dd6826de6db03f347fa966`.
 
+Current status: see [September 26 rebuild and acceptance](ServSync_Native_Acceptance_2026-09-26.md). This document preserves historical prototype evidence. TUT-002 revision 4 was published and verified September 25; its older replacement-blocker statements below are superseded, while native PDF guidance and native Help playback remain separate follow-ups.
+
 ## Continuing acceptance
 
 PR #572 is merged at `fd912266919eb02dc821cdb4e150538b38d4f944`. The next native presentation increment and its explicit device/tutorial blockers are tracked in [September 9 native acceptance](ServSync_Native_Polish_Acceptance_2026-09-09.md). The original evidence below remains historical; compilation does not close native acceptance.

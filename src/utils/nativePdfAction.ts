@@ -6,6 +6,10 @@ export function registerNativePdfAction(action: NativePdfAction) {
   nativePdfAction = action;
 }
 
+export function hasNativePdfAction() {
+  return Boolean(nativePdfAction);
+}
+
 export function handleNativePdf(blob: Blob, fileName: string) {
   if (!nativePdfAction) return false;
   nativePdfAction(blob, fileName);

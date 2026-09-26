@@ -5,6 +5,7 @@ import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
 import { registerNativePdfAction } from '../utils/nativePdfAction';
 import { showNativePdf } from './pdf';
+import { handleNativeBack } from './back';
 
 async function start() {
   if (Capacitor.isNativePlatform()) {
@@ -28,12 +29,7 @@ async function start() {
     updateConnection(await Network.getStatus());
     if (Capacitor.getPlatform() === 'android') {
       await App.addListener('backButton', ({ canGoBack }) => {
-        const dialog = document.querySelector<HTMLDialogElement>('dialog[open]');
-        if (dialog) {
-          const event = new Event('cancel', { cancelable: true });
-          if (dialog.dispatchEvent(event)) dialog.close();
-        } else if (canGoBack) window.history.back();
-        else void App.minimizeApp();
+        handleNativeBack(canGoBack, () => App.minimizeApp());
       });
     }
   }
