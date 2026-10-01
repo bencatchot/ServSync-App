@@ -1,5 +1,10 @@
 # ServSync Marketing Product Inventory
 
+## October 1 legal/privacy review boundary
+
+ServSync's substantive policy/acceptance changes are prepared for review, not published. Do not advertise finalized or attorney-approved policies, privacy certification, automatic exports/deletion, guaranteed backup-erasure times, verified guest signatures, U.S.-only processing, zero-retention AI, or live payment/subscription features. Required signup assent does not opt users into marketing. See [legal release review](legal/US_LAUNCH_REVIEW.md) for operator/contact, provider and rollout gates. Current beta and independent contractor service/payment boundaries remain unchanged.
+
+
 Mobile status, September 9, 2026: an iPhone/Android **Demo prototype is in development** under FB-015. Do not advertise a downloadable mobile app, app-store availability, push notifications, native deep links, or offline operation. Existing public mobile-web claims remain the supported offering.
 
 
