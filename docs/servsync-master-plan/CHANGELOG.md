@@ -1,5 +1,16 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-01 — U.S. legal/privacy launch fixes prepared for review
+
+- Branch: `codex/servsync-legal-privacy-launch`; starting main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`, isolated worktree preserving unrelated local changes.
+- Files changed: `.github/workflows/pull-request-quality.yml`, `src/App.tsx`, `src/features/legal/{policies.ts,LegalConsent.tsx,LegalPage.tsx}`, `public/legal/{servsync-2026-10-01-v1.json,manifest.json}`, `servsync-versioned-legal-acceptance.sql`, `servsync-legal-policy-archive.sql`, `scripts/legal/{archive-policy.mjs,activate-policy.sql,check-release.mjs}`, `scripts/validation/{validate-legal-acceptance.sh,check-app-monolith-budget.mjs}`, `tests/legal/`, `docs/legal/`, `docs/FB-016_RECOVERY_RUNBOOK.md`, `docs/MARKETING_PRODUCT_INVENTORY.md`, Master Plan, Feature Backlog and this changelog.
+- Change/reason: address October 1 audit with substantive current-service policies, version/hash-bound signup evidence, immutable archives, separate privacy acknowledgment and marketing, AI input guidance, manual rights/retention procedure, provider register and explicit commercial/sharing boundaries. Policies are review candidates, not effective or attorney-approved; entity/contact/effective-date metadata remains blocked pending facts/approval.
+- Checks: read-only live policy/analytics and exact-main deployment review, Production function/source/secret-name inventory and DNS; isolated PostgreSQL acceptance/RLS/immutability/history/rollback tests; policy helper/hash checks; TypeScript/build, lint baseline (0 errors/76 existing warnings), 27 architecture tests; local browser policy review. Detailed final tests and limitations are in `docs/legal/US_LAUNCH_REVIEW.md`.
+- Risks/follow-ups: no shared SQL, user-record changes, cleanup, settings, merge or Production publication. Owner/entity/inbox, retention/state-law/counsel/provider questions and hosted Sandbox verification remain launch gates. Existing-user renewed assent is a separate decision; never invent historical consent. Existing dependency audit findings remain separate maintenance work.
+- Master Plan updated: YES; acceptance/rights operating and release strategy changed.
+- Backlog Impact: FB-016 now tracks prepared scope, incomplete gates and guarded next steps. BACKLOG FILE UPDATED: YES. Marketing inventory updated with do-not-promise boundaries.
+
+
 ## 2026-09-26 — Landing page released to Production
 
 - Branch: `codex/servsync-landing-release-record`; release documentation for approved landing PR #580, merged as `b869015bba973e145d3ad7a80d3a30a5e81c4a05`.

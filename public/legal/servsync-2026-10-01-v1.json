@@ -1,0 +1,190 @@
+{
+  "bundleId": "servsync-2026-10-01-v1",
+  "preparedOn": "2026-10-01",
+  "effectiveDate": null,
+  "releaseReady": false,
+  "operator": null,
+  "privacyEmail": null,
+  "pages": {
+    "terms": {
+      "title": "Terms of Service",
+      "sections": [
+        {
+          "title": "Your agreement with ServSync",
+          "body": "These terms govern your use of ServSync, a platform for organizing homeowner and contractor relationships and service records. The operator and contact are identified above. The Acceptable Use & Content Policy is part of these terms. Contractors also agree to the Contractor Platform Agreement. The Privacy Policy describes information handling; acknowledging it is not consent to optional marketing."
+        },
+        {
+          "title": "U.S. use and account authority",
+          "body": "ServSync is offered for use in the United States. You must be at least 18 and able to enter into an agreement, and have authority to act for any business or property you represent. Provide accurate account information, protect your credentials, grant team access only to authorized people, and report suspected misuse through Support. A U.S.-only offering does not mean all providers process information only in the United States."
+        },
+        {
+          "title": "What the platform provides",
+          "body": "ServSync helps users discover contractor profiles, choose connections and sharing permissions, organize properties and customers, exchange service requests, and prepare estimates, jobs, service plans, invoices, reports, documents and Home History. Availability depends on your role and enabled features. Beta features may change or be interrupted. Keep copies of records you need."
+        },
+        {
+          "title": "Independent contractors and homeowner decisions",
+          "body": "Contractors provide the underlying services and are responsible for their work, personnel, qualifications, licenses, permits, insurance, prices, warranties and legal obligations. A listing or profile is not a ServSync endorsement, background check or verification of credentials. Homeowners should verify qualifications and review scope, pricing and terms before approving work. ServSync does not provide emergency response; contact emergency services when needed."
+        },
+        {
+          "title": "Platform assent is separate from work approval",
+          "body": "Creating a ServSync account accepts these platform rules. It does not accept an estimate or service plan. Selecting an acceptance action on a contractor document communicates your approval to that contractor and records the response in ServSync. An estimate acceptance changes the estimate status; a service-plan acceptance activates the plan record. These actions may be evidence of your agreement with the contractor. They do not by themselves schedule visits, complete work, create every downstream document or authorize a charge. Review the displayed document and save a copy before responding."
+        },
+        {
+          "title": "Document links and electronic records",
+          "body": "Eligible customers can review a particular estimate, invoice or finalized report through an expiring document link without an account. A secure guest estimate response is tied to the delivered version. Possession of a link is not verified identity or a certified signature. Protect links and use them only if you are the intended recipient or authorized representative. ServSync records do not replace any legally required contract language, notices, signatures, cancellation forms or consent to electronic delivery. Contractors must supply those separately when required."
+        },
+        {
+          "title": "Prices, payments, cancellation and refunds",
+          "body": "The current beta does not charge a ServSync subscription or automatically renew a paid platform plan. Production online payment collection is not enabled. Contractors arrange payment directly with customers; invoice payment entries are records, not proof that ServSync moved funds. Service-plan prices and installment schedules do not enable automatic charging. Resolve changes to work, cancellation, disputed charges and refunds with the contractor under the actual service agreement and applicable law. Any future paid platform offer requires separate prices and terms before purchase."
+        },
+        {
+          "title": "Your content and sharing",
+          "body": "You retain your rights in content you provide. You authorize ServSync and its service providers to host, process, reproduce and display that content as needed to operate the service and carry out your sharing choices. You must have authority to upload customer and property information and to publish photos or posts. Public content can be copied by others. Revoking a connection does not recall already delivered files or erase historical business records."
+        },
+        {
+          "title": "AI assistance",
+          "body": "Optional AI suggestions can contain errors or omit important conditions. Review and edit them before using or sending them. They are not a professional inspection, safety determination, legal opinion or guarantee. Do not enter information you lack authority to share, access codes, financial credentials or unnecessary sensitive personal information into AI inputs."
+        },
+        {
+          "title": "Service limitations and responsibility",
+          "body": "ServSync does not guarantee uninterrupted availability, error-free suggestions, contractor performance, leads, or recovery of every record. Each party remains responsible for its own conduct under applicable law. These terms do not waive non-waivable consumer rights or remedies and do not impose mandatory arbitration, a class-action waiver, a special damages cap or an indemnity obligation."
+        },
+        {
+          "title": "Restrictions, closure and records",
+          "body": "ServSync may restrict access or content to address misuse, security threats, legal requirements or violations of these rules. Contact Support to ask for review or account closure. Closure and content removal require review of authority, shared records and retention obligations as described in the Privacy Policy. Download available records before closing your account; closure does not cancel a separate contractor agreement."
+        },
+        {
+          "title": "Changes and questions",
+          "body": "We identify each published revision and its effective date and keep earlier versions available. Material changes will be communicated through the service or account contact before taking effect where required. New contractual assent, when needed, will be requested rather than inferred from an old acceptance. Contact ServSync using the contact above or Support for questions or disputes; applicable rights to seek relief remain available."
+        }
+      ]
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "sections": [
+        {
+          "title": "Scope and sources",
+          "body": "This notice covers ServSync accounts, public pages and the information people submit through ServSync. It also covers information about customers who have not created accounts, when contractors enter their contact, property or service records. We receive information from you, authorized household members and contractor teams, other participants in your service work, and technical interactions with the service. Contractors may separately keep and use records for their own service businesses."
+        },
+        {
+          "title": "Account, property and work information",
+          "body": "We process names, email addresses, phone numbers, account authentication and role information, business profiles and team memberships. Property and work records can include home addresses, property details, photos, uploaded documents, requests, messages, appointment details, estimates, approvals, service plans, jobs, findings, reports, invoices, manual payment entries and Home History. Support inquiries, referral/invitation information and policy acceptance records are also processed. Avoid uploading government identifiers, payment credentials, medical information or access/security codes unless there is a specific authorized need."
+        },
+        {
+          "title": "Purposes",
+          "body": "We use information to provide and secure accounts, enforce role and sharing permissions, organize service work and records, deliver selected documents and messages, respond to support and privacy requests, investigate misuse, maintain backups and improve service reliability. We use public business information and deliberately published content for profile and discovery features. Optional marketing is separate from account agreement and transactional communication."
+        },
+        {
+          "title": "Who can see private records",
+          "body": "Authorized household/property participants and contractor team members may see information within their assigned roles. Homeowners choose contractor connections, shared properties and available permissions for contact details, address, home overview, photos and other supported context. Service requests and documents sent to a contractor also provide work context independently of general sharing switches. Contractors retain their own customer and work records; sharing permissions are not a promise that all copies or transaction history disappear when changed. Authorized ServSync support and administrators may access information for support, security and operation."
+        },
+        {
+          "title": "Non-account customers, invitations and guest documents",
+          "body": "A contractor can create local customer/property records, send invitations to claim eligible records, and deliver supported documents to customers without accounts. Claiming requires the applicable account and invitation checks; the link alone does not give access to an entire household or contractor workspace. Document links provide limited access to the particular delivered document and supported response actions. Recipients can download or forward information; keep links private. People without an account may use the public privacy contact above to ask about their information."
+        },
+        {
+          "title": "Public profiles and content",
+          "body": "Contractor public profiles and deliberately published Discover content may be viewed by visitors without an account. Business details, website links, descriptions, logos and authorized work photos or posts can therefore leave the private service relationship. Do not publish private homeowner details, addresses, faces or documents without permission. Public viewers may retain copies even after removal. Contact Support or the public contact above about inaccurate or unauthorized publication."
+        },
+        {
+          "title": "Hosting, storage, email and backups",
+          "body": "Vercel hosts the web application and server routes and receives network/request information and data submitted to those routes. Supabase provides authentication, the database, file storage and server functions and processes the account, property, work and uploaded content those features require. Resend delivers supported transactional document emails, receiving recipient addresses, message content and included links. Supabase database backups and private Cloudflare R2 storage-object backups support recovery; R2 receives backed-up file bytes, object metadata and manifests. A provider receives only the information used by the relevant flow, not necessarily every category listed in this notice."
+        },
+        {
+          "title": "Location search",
+          "body": "When location search uses geocoding, the location query, which may include an address, city or ZIP code, is sent to the configured geocoding service to return location coordinates and search results. This is separate from giving access to your device location. Contractor website links and map destinations may have their own information practices."
+        },
+        {
+          "title": "Optional AI processing",
+          "body": "The contractor AI inspection assistant sends submitted notes plus room and checklist context through a Supabase function to OpenAI to prepare suggestions. Anything included in free text is part of that submission. An admin-only field-note service can process a note, checklist choices, room, customer name, property ages and plan context; it is not a general customer-facing feature. Ordinary Single and Walk note assistance uses local rules. Internal approved tutorial narration also uses OpenAI with selected scripts. Separately enabled internal drafting can use selected business content; it does not automatically send all customer records to AI. Do not send unnecessary identifiers, access codes or sensitive details. Provider processing is subject to its API terms and account configuration; we do not promise zero retention or that submissions never leave the United States."
+        },
+        {
+          "title": "Analytics and browser storage",
+          "body": "Vercel Web Analytics measures page use and technical information such as device/browser, referrer and approximate location derived from network information. It is separate from records you enter for a contractor. Authentication and some work preferences or drafts use browser storage; signing out is not a guarantee that every downloaded file or device copy has been erased. ServSync does not currently offer a browser Do Not Track response setting. This notice does not represent that every third-party site linked from a contractor profile follows our practices."
+        },
+        {
+          "title": "Other disclosures",
+          "body": "We may disclose information when reasonably necessary to comply with legal process, protect people or the service, investigate fraud or security incidents, or carry out your instructions. A business transfer involving ServSync may include service records subject to applicable obligations. The current service does not offer the sale of customer records or targeted advertising based on private home or service records. Any change in these practices requires review and an updated notice."
+        },
+        {
+          "title": "Access, correction, export, deletion and closure",
+          "body": "Use Privacy & Data Requests or Support in your account, or the public privacy contact above if you cannot sign in or do not have an account. Say whether you want access, a copy, correction, deletion, account closure or review of a prior decision, and identify the relevant account or contractor and records without sending passwords or identity documents in your initial message. We review requests manually and may verify identity and authority using existing account information or a proportionate follow-up. We will explain what can be done, any verification needed, and any applicable limitation. An authorized representative may contact us with evidence of authority. You can ask for review of a response through the same route; state-specific rights and deadlines depend on applicable law."
+        },
+        {
+          "title": "Retention and shared records",
+          "body": "We retain information according to its operational purpose, the service relationship, necessary security and dispute evidence, applicable recordkeeping duties and requests we can lawfully fulfill. No single retention period applies to every category. A homeowner request does not automatically erase a contractor’s invoices, accepted documents, service history or other legitimately retained business records, or vice versa. We assess ownership, authority, other people’s information, legal holds and whether correction, redaction or restricted access is appropriate. We do not operate automatic account-wide deletion based on inactivity."
+        },
+        {
+          "title": "Removing a relationship and backup limits",
+          "body": "Revoking contractor access changes the connection and sharing access; hiding a contractor removes the relationship from your list. Neither action is account deletion or erasure of work already performed, historical records or downloaded copies. Backups are separate from active records. Storage backup retention is based on successful backup runs, so a stated run count is not a calendar-day deletion guarantee. Copies can remain until relevant backup retention expires or a reviewed removal is possible. Restores require checking prior approved deletion/restriction decisions before data returns to ordinary use."
+        },
+        {
+          "title": "Security, locations and children",
+          "body": "We use access controls, role-based permissions and provider security mechanisms, but no service can guarantee absolute security. The service is for U.S. adults and is not directed to children under 13. Do not create a child account; contact us if you believe child information was collected improperly. U.S.-only availability does not guarantee U.S.-only processing by every provider."
+        },
+        {
+          "title": "Notice changes",
+          "body": "The version and effective date above identify this notice. Historical versions remain available. Material changes will be communicated through the service or account contact as appropriate and as required by law. Privacy-notice acknowledgment is recorded separately in meaning from agreement to platform terms and is not permission for unrelated marketing."
+        }
+      ]
+    },
+    "acceptable-use": {
+      "title": "Acceptable Use & Content Policy",
+      "sections": [
+        {
+          "title": "Permitted use",
+          "body": "Use ServSync for authorized property and service work, accurate business profiles, customer communications and related records. Respect other people’s privacy and intellectual property."
+        },
+        {
+          "title": "Prohibited behavior",
+          "body": "Do not use ServSync for fraud, unlawful discrimination, harassment, threats, impersonation, malware, unauthorized access, credential sharing that defeats permissions, spam, infringement or unsafe or illegal instructions. Do not misrepresent qualifications, insurance, licensing, prices, reviews, affiliation or platform verification."
+        },
+        {
+          "title": "Customer information and publication",
+          "body": "Only upload information you have authority to use and share. Do not publish customer identities, addresses, photos, documents, access codes or private work details without permission. Do not reuse private customer data for unrelated solicitation or sell it. Keep guest and claim links confidential."
+        },
+        {
+          "title": "Discover",
+          "body": "Publish accurate, useful business content. Contractors may not use Discover to directly solicit homeowners outside homeowner-initiated connections, requests or other authorized communication paths. A public listing is not permission to scrape private records or bypass the platform’s controls."
+        },
+        {
+          "title": "Reports and enforcement",
+          "body": "Report misuse or unauthorized content through Support or the public contact above. Identify the content and concern without disclosing more sensitive information than needed. ServSync may review, restrict or remove content or access to address misuse, security or legal obligations. Ask through the same contact for review of an enforcement decision."
+        }
+      ]
+    },
+    "contractor-agreement": {
+      "title": "Contractor Platform Agreement",
+      "sections": [
+        {
+          "title": "Your business and team",
+          "body": "This agreement supplements the Terms of Service for contractor use. You must have authority to act for the business. Maintain accurate business, license, insurance and service-area information. Give team members only the access their work requires and remove access when no longer appropriate. ServSync does not verify credentials unless it expressly identifies a particular verification."
+        },
+        {
+          "title": "Service responsibility",
+          "body": "You, not ServSync, provide contractor services and are responsible for qualifications, lawful work, permits, safety, workers, scheduling, pricing, taxes, workmanship, warranties and required notices. Provide clear estimates, scope changes, cancellation terms and service-plan terms to customers. Supply legally required contracts and electronic-record disclosures separately; a platform approval control is not a substitute."
+        },
+        {
+          "title": "Customer information and independent records",
+          "body": "Use homeowner and non-account customer information only with appropriate authority for the service relationship, recordkeeping or other lawful disclosed purposes. Keep it confidential, limit team access, and do not sell, publish or reuse private records for unrelated solicitation. Cooperate in verifying and responding to privacy or correction requests. Retain only records with a documented purpose or obligation. A disconnected homeowner may withdraw shared-context access while your legitimate transaction records remain; this is not authority to keep browsing revoked private property information."
+        },
+        {
+          "title": "Documents and approvals",
+          "body": "You are responsible for the content, prices, accuracy and lawful terms of estimates, reports, invoices and service plans you send. A customer’s acceptance records a response in ServSync and may be evidence of an agreement between you and that customer. Guest acceptance is document-specific and is not verified identity. Confirm authority where needed. Do not treat an accepted estimate or plan as automatic payment, scheduling, a signed statutory disclosure or permission for later unapproved changes."
+        },
+        {
+          "title": "Beta and charges",
+          "body": "Current beta platform use does not enroll you in a paid subscription. Production online payment collection and automatic charging are not enabled. Collect and reconcile customer payments through your own arrangements; manual invoice payment records do not move money. Future platform billing requires a separately presented offer. You handle service cancellations, refunds and disputes according to your customer agreement and applicable law."
+        },
+        {
+          "title": "Public content, AI and support",
+          "body": "Obtain permission before publishing customer-related photos or work details. Review AI-generated suggestions before using them in customer records and disclose/obtain authorization for the information you submit as required. Do not use public profiles or Discover to imply endorsement or verified credentials. Contact Support or the public contact above for account, privacy or platform disputes."
+        }
+      ]
+    }
+  },
+  "assent": {
+    "homeowner": "I am at least 18, use ServSync in the United States, agree to the Terms of Service and Acceptable Use Policy, and acknowledge the Privacy Policy.",
+    "contractor": "I am at least 18, use ServSync in the United States, have authority for this business, agree to the Terms of Service, Acceptable Use Policy and Contractor Platform Agreement, and acknowledge the Privacy Policy."
+  }
+}

@@ -1,5 +1,12 @@
 # ServSync Feature Backlog
 
+## 2026-10-01 — FB-016 legal/privacy launch fixes prepared
+
+Status: implementation candidate; not deployed or launch-complete. See [release review](../legal/US_LAUNCH_REVIEW.md), [provider/data register](../legal/PROVIDER_AND_DATA_REGISTER.md), and [manual request/retention procedure](../legal/PRIVACY_REQUEST_RUNBOOK.md). Prepared scope covers four substantive policy pages, immutable version archive, required server-validated signup evidence in all three paths, separate privacy acknowledgment/marketing boundaries, inspection-AI input guidance, access/correction/review intake and backup/relationship-retention explanations.
+
+Next: establish exact operator and a monitored public contact with a named handler; owner/counsel approve effective date, retention/state-law terms and provider evidence; approve isolated Sandbox hosted-Auth verification and then coordinated Production schema/activation/publication. No shared SQL applied, existing-user backfill, destructive cleanup, payments/subscription activation or Production publication. Source has an explicit incomplete-release gate. Retention disposal, existing-user renewed assent and provider-account settings remain separately reviewed work. Preserve the current U.S.-only direction without claiming U.S.-only hosting or legal certification.
+
+
 Last updated: 2026-09-06
 
 Last reconciled against `origin/main` at `97f529db9783fb12c04a9b43b65b9682932bd48c`.

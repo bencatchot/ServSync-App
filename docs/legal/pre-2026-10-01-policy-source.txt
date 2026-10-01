@@ -1,0 +1,62 @@
+Historical source from origin/main 749d182. Observed live 2026-10-01. No acceptance evidence inferred.
+
+const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement'>, { title: string; sections: Array<{ title: string; body: string }> }> = {
+  terms: {
+    title: 'Terms of Service',
+    sections: [
+      { title: 'Platform use', body: 'ServSync is intended to help homeowners and contractors organize connections, requests, estimates, jobs, invoices, reports, documents, and home records. Final terms should define permitted use, account access, and platform rules.' },
+      { title: 'Accounts', body: 'Users are responsible for accurate account information, credential security, and activity under their account. Attorney review should define account suspension, closure, and access limits.' },
+      { title: 'Homeowner responsibilities', body: 'Homeowners should provide accurate information, choose what to share with contractors, review contractor documents, and use judgment before approving work or payments.' },
+      { title: 'Contractor responsibilities', body: 'Contractors are responsible for their profiles, licensing and insurance representations, estimates, invoices, reports, services, work quality, and communications with homeowners.' },
+      { title: 'Estimates, invoices, and reports', body: 'ServSync provides software tools for contractor-created records. Final terms should clarify that estimates, invoices, reports, and payment instructions are contractor-provided unless otherwise stated.' },
+      { title: 'Discover/public content', body: 'Public profile and Discover content should be accurate, helpful, and non-misleading. Contractors may not use Discover to directly solicit homeowners outside homeowner-initiated connection or request flows.' },
+      { title: 'Content uploads', body: 'Users should upload only content they own or have the right to share, and should avoid uploading unlawful, unsafe, misleading, or highly sensitive information unless needed.' },
+      { title: 'Disclaimers', body: 'ServSync is a software platform. Contractors, not ServSync, are responsible for their own work, services, licenses, insurance, estimates, invoices, and reports.' },
+      { title: 'Limitation of liability placeholder', body: 'Attorney review should provide appropriate limitation of liability, warranty disclaimer, and damages language for the ServSync business model and launch states.' },
+      { title: 'Termination', body: 'Final terms should explain when accounts, content, public profiles, or access may be suspended, restricted, archived, or removed.' },
+      { title: 'Contact/support', body: 'Users can contact ServSync support through the app. Final terms should include the official legal/contact address and dispute process.' },
+    ],
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    sections: [
+      { title: 'Information collected', body: 'ServSync may collect account, profile, contact, contractor business, connection, request, estimate, invoice, report, notification, support, and usage-related information.' },
+      { title: 'Home/property information', body: 'Homeowners may store home profile details, addresses, photos, documents, Home History records, and service history. Final policy should explain the sensitivity of this information.' },
+      { title: 'Documents/photos/uploads', body: 'Uploaded content may include property-sensitive or personal information. Final policy should explain storage, access, sharing, deletion, and support access practices.' },
+      { title: 'Connections and permissions', body: 'Homeowners control sharing permissions for each contractor connection. Final policy should describe what contractors can see when sharing is enabled.' },
+      { title: 'How information is used', body: 'ServSync uses information to provide accounts, contractor discovery, service requests, reports, estimates, invoices, documents, notifications, support, and platform administration.' },
+      { title: 'How information is shared', body: 'Information may be shared with connected contractors, homeowners, service providers, support/admin users, or public viewers depending on user actions and settings.' },
+      { title: 'Public profile/Discover visibility', body: 'Contractor public profiles and Discover posts may be visible to authenticated users or public visitors depending on app settings. Final policy should define visibility clearly.' },
+      { title: 'Data retention/deletion requests', body: 'Final policy should explain how users request access, correction, export, deletion, or account closure, and what records may need to be retained.' },
+      { title: 'Security practices placeholder', body: 'ServSync should describe practical security practices without overclaiming compliance, certification, or guaranteed protection.' },
+      { title: 'Contact/support', body: 'Final policy should provide privacy contact information and any state-specific rights process that applies.' },
+    ],
+  },
+  'acceptable-use': {
+    title: 'Acceptable Use & Content Policy',
+    sections: [
+      { title: 'Allowed use', body: 'ServSync may be used to manage homeowner-contractor connections, service requests, estimates, jobs, inspections, reports, invoices, documents, maintenance records, public profiles, and helpful Discover posts.' },
+      { title: 'Prohibited content', body: 'Final policy should prohibit unlawful, deceptive, harmful, harassing, discriminatory, infringing, unsafe, or privacy-invasive content.' },
+      { title: 'Document/photo upload rules', body: 'Users should upload only documents and photos they have the right to use or share, and should be careful before sending sensitive home, identity, financial, or insurance records to a contractor, support, or another person.' },
+      { title: 'Discover posting rules', body: 'Discover posts should share recent work, maintenance tips, company news, or helpful local advice. They should not be misleading or include private homeowner information without permission.' },
+      { title: 'No direct solicitation through Discover', body: 'Contractors may not directly message, pitch, solicit, or contact homeowners through Discover unless the homeowner initiates a connection, service request, or approved communication path.' },
+      { title: 'No misleading licensing/insurance claims', body: 'Contractors should accurately represent licensing, insurance, bonding, certifications, qualifications, service areas, and business status. Listed credentials are not verified unless ServSync explicitly says so.' },
+      { title: 'No unsafe/illegal content', body: 'Content should not encourage unsafe work, illegal activity, code evasion, fraud, or improper handling of hazardous materials or regulated services.' },
+      { title: 'Takedown/moderation placeholder', body: 'ServSync may review, restrict, archive, or remove content or accounts under standards to be finalized by attorney review.' },
+    ],
+  },
+  'contractor-agreement': {
+    title: 'Contractor Platform Agreement',
+    sections: [
+      { title: 'Contractor account use', body: 'Contractors are responsible for the accuracy and security of their contractor account, team access, public profile, customer records, and uploaded content.' },
+      { title: 'Subscription/payment placeholder', body: 'Final agreement should define subscription terms, billing, cancellations, refunds, taxes, plan changes, and payment collection once billing is active.' },
+      { title: 'Responsibility for contractor work', body: 'Contractors remain solely responsible for their services, work quality, scheduling, estimates, invoices, reports, licenses, insurance, permits, warranties, and customer communications.' },
+      { title: 'Estimates/invoices/reports', body: 'ServSync provides tools to create records, but contractors are responsible for the content, accuracy, pricing, terms, and legal effect of records they send.' },
+      { title: 'Homeowner data access and confidentiality', body: 'Contractors may access homeowner/home information only as allowed by connection permissions, service requests, or homeowner-approved workflows, and should keep that information confidential.' },
+      { title: 'Discover posting rules', body: 'Contractor posts should share recent work, maintenance tips, company news, or helpful local advice. Posts must not expose private homeowner information without permission.' },
+      { title: 'Public profile rules', body: 'Public profile information should be accurate, current, and not misleading. Listed credentials should not imply ServSync verification unless a verification process exists.' },
+      { title: 'No direct solicitation', body: 'Contractors may not directly solicit, pitch, message, or contact homeowners through Discover unless the homeowner has initiated a connection, service request, or approved communication path.' },
+      { title: 'Licensing/insurance representation placeholder', body: 'Final agreement should define what contractors may say about licensing, insurance, bonding, certifications, permits, and trade qualifications.' },
+    ],
+  },
+};

@@ -47,6 +47,12 @@ Recommended workflow: keep this Word document for human reading and review. If C
 - Roadmap implementation prompts should live separately under docs/prompts/ or docs/implementation-plans/.
 - Never ask Codex to “do the whole master plan.” Ask Codex to audit or implement one clearly bounded section at a time.
 
+## October 1, 2026 — U.S. legal/privacy launch candidate
+
+The [legal/privacy implementation and release review](../legal/US_LAUNCH_REVIEW.md) prepares substantive platform/privacy/acceptable-use/contractor policies, an exact versioned text archive, manual privacy-request and retention operations, provider evidence, and database-enforced append-only signup acceptance across the three existing account-creation paths. This is prepared source, not an active policy or completed public-launch gate. Existing accounts are not backfilled or forced into fabricated renewed assent. Marketing consent remains separate, beta stays free/manual, and contractor document approvals do not enable charging or subscriptions.
+
+Entity, monitored public contact/handler, effective date, retention categories, provider agreements/settings and state-law/counsel review remain unresolved. Shared Sandbox/Production installation, activation, merge and publication require separate approvals. Preserve published policy bytes and acceptance history, including after account closure. Future destructive disposal and existing-user renewed-assent decisions require bounded review. FB-016 owns this launch-readiness follow-up; no public-launch or broader marketplace readiness claim is added.
+
 # 1. Executive Summary
 
 ServSync is a homeowner-contractor marketplace with contractor software. It is designed to help homeowners find local service contractors, connect with them in a controlled way, communicate clearly, request work, review estimates and invoices, preserve a Home History for their property, and create manual follow-up reminders. On the contractor side, ServSync gives solo and small-team contractors practical software tools for requests, estimates, jobs, invoices, reports, calendar events, customer/home records, and workflow follow-up.

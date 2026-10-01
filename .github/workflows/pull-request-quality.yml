@@ -29,6 +29,10 @@ jobs:
       - run: npm run lint
       - run: npm run check:app-size
       - run: npm run test:architecture
+      - name: Verify legal policy archives and acceptance contracts
+        run: |
+          node scripts/legal/archive-policy.mjs --check
+          node --test tests/legal/policies.test.mjs
       - run: npm run backend:parity:test
       - run: npm run runtime:parity:test
       - run: npm run test:demo-recorder

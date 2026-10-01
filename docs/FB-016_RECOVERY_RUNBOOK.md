@@ -53,6 +53,7 @@ The August 14 drill supports both targets under isolated-drill conditions. Real 
 11. Reapply project-level Auth, API, Storage, Realtime, extension, SMTP, and other settings from approved secure configuration.
 12. Recreate the Vercel project/environment linkage, browser-public variables, aliases/domains, protection, deployment configuration, and firewall/rate limits from approved secure configuration.
 13. Restore Stripe, email, SMS, maps/geocoding, AI, and other provider configuration only after isolation and safety checks. Keep sending and money movement disabled until deliberately approved.
+    Before normal access or provider reactivation, reconcile the restored environment against the separately held approved privacy deletion/restriction register. Reapply reviewed redactions/restrictions/removals and verify shared-record/legal-hold exceptions before cutover. Storage tombstones alone are not privacy-request suppression evidence; see [privacy request runbook](legal/PRIVACY_REQUEST_RUNBOOK.md). No destructive automation is authorized.
 14. Reconfirm database ref, app URL, environment label, provider mode, and public-domain isolation before any authenticated validation.
 15. Run the catalog/security validator and check RLS, grants, private tables, RPC ownership/search paths, and tenant boundaries.
 16. Run financial integrity checks for totals, paid amounts, balances, statuses, idempotency, and payment ledgers. Distinguish historical source findings from restore corruption.

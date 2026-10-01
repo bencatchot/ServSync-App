@@ -1,3 +1,6 @@
+import { LEGAL_PAGES, legalSignupMetadata, requireCurrentLegalBundle } from './features/legal/policies';
+import { LegalPage } from './features/legal/LegalPage';
+import { LegalConsent } from './features/legal/LegalConsent';
 import { PublicPostConsent } from './features/discover/PublicPostConsent';
 import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
 import { usePublicContractorProfile } from './features/discover/usePublicContractorProfile';
@@ -75,7 +78,6 @@ import { isExactMissingEstimateSendRpcError } from './features/estimates/estimat
 import {
   APP_ROUTE_NAMES,
   appHashRoute,
-  appRouteUrl,
   contractorProfileUrl,
   contractorTeamInviteUrl,
   homeownerClaimUrl,
@@ -1461,66 +1463,6 @@ type StoredFieldWorkState = {
   draftSnapshot?: StoredFieldWorkDraft | null;
 };
 
-const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement'>, { title: string; sections: Array<{ title: string; body: string }> }> = {
-  terms: {
-    title: 'Terms of Service',
-    sections: [
-      { title: 'Platform use', body: 'ServSync is intended to help homeowners and contractors organize connections, requests, estimates, jobs, invoices, reports, documents, and home records. Final terms should define permitted use, account access, and platform rules.' },
-      { title: 'Accounts', body: 'Users are responsible for accurate account information, credential security, and activity under their account. Attorney review should define account suspension, closure, and access limits.' },
-      { title: 'Homeowner responsibilities', body: 'Homeowners should provide accurate information, choose what to share with contractors, review contractor documents, and use judgment before approving work or payments.' },
-      { title: 'Contractor responsibilities', body: 'Contractors are responsible for their profiles, licensing and insurance representations, estimates, invoices, reports, services, work quality, and communications with homeowners.' },
-      { title: 'Estimates, invoices, and reports', body: 'ServSync provides software tools for contractor-created records. Final terms should clarify that estimates, invoices, reports, and payment instructions are contractor-provided unless otherwise stated.' },
-      { title: 'Discover/public content', body: 'Public profile and Discover content should be accurate, helpful, and non-misleading. Contractors may not use Discover to directly solicit homeowners outside homeowner-initiated connection or request flows.' },
-      { title: 'Content uploads', body: 'Users should upload only content they own or have the right to share, and should avoid uploading unlawful, unsafe, misleading, or highly sensitive information unless needed.' },
-      { title: 'Disclaimers', body: 'ServSync is a software platform. Contractors, not ServSync, are responsible for their own work, services, licenses, insurance, estimates, invoices, and reports.' },
-      { title: 'Limitation of liability placeholder', body: 'Attorney review should provide appropriate limitation of liability, warranty disclaimer, and damages language for the ServSync business model and launch states.' },
-      { title: 'Termination', body: 'Final terms should explain when accounts, content, public profiles, or access may be suspended, restricted, archived, or removed.' },
-      { title: 'Contact/support', body: 'Users can contact ServSync support through the app. Final terms should include the official legal/contact address and dispute process.' },
-    ],
-  },
-  privacy: {
-    title: 'Privacy Policy',
-    sections: [
-      { title: 'Information collected', body: 'ServSync may collect account, profile, contact, contractor business, connection, request, estimate, invoice, report, notification, support, and usage-related information.' },
-      { title: 'Home/property information', body: 'Homeowners may store home profile details, addresses, photos, documents, Home History records, and service history. Final policy should explain the sensitivity of this information.' },
-      { title: 'Documents/photos/uploads', body: 'Uploaded content may include property-sensitive or personal information. Final policy should explain storage, access, sharing, deletion, and support access practices.' },
-      { title: 'Connections and permissions', body: 'Homeowners control sharing permissions for each contractor connection. Final policy should describe what contractors can see when sharing is enabled.' },
-      { title: 'How information is used', body: 'ServSync uses information to provide accounts, contractor discovery, service requests, reports, estimates, invoices, documents, notifications, support, and platform administration.' },
-      { title: 'How information is shared', body: 'Information may be shared with connected contractors, homeowners, service providers, support/admin users, or public viewers depending on user actions and settings.' },
-      { title: 'Public profile/Discover visibility', body: 'Contractor public profiles and Discover posts may be visible to authenticated users or public visitors depending on app settings. Final policy should define visibility clearly.' },
-      { title: 'Data retention/deletion requests', body: 'Final policy should explain how users request access, correction, export, deletion, or account closure, and what records may need to be retained.' },
-      { title: 'Security practices placeholder', body: 'ServSync should describe practical security practices without overclaiming compliance, certification, or guaranteed protection.' },
-      { title: 'Contact/support', body: 'Final policy should provide privacy contact information and any state-specific rights process that applies.' },
-    ],
-  },
-  'acceptable-use': {
-    title: 'Acceptable Use & Content Policy',
-    sections: [
-      { title: 'Allowed use', body: 'ServSync may be used to manage homeowner-contractor connections, service requests, estimates, jobs, inspections, reports, invoices, documents, maintenance records, public profiles, and helpful Discover posts.' },
-      { title: 'Prohibited content', body: 'Final policy should prohibit unlawful, deceptive, harmful, harassing, discriminatory, infringing, unsafe, or privacy-invasive content.' },
-      { title: 'Document/photo upload rules', body: 'Users should upload only documents and photos they have the right to use or share, and should be careful before sending sensitive home, identity, financial, or insurance records to a contractor, support, or another person.' },
-      { title: 'Discover posting rules', body: 'Discover posts should share recent work, maintenance tips, company news, or helpful local advice. They should not be misleading or include private homeowner information without permission.' },
-      { title: 'No direct solicitation through Discover', body: 'Contractors may not directly message, pitch, solicit, or contact homeowners through Discover unless the homeowner initiates a connection, service request, or approved communication path.' },
-      { title: 'No misleading licensing/insurance claims', body: 'Contractors should accurately represent licensing, insurance, bonding, certifications, qualifications, service areas, and business status. Listed credentials are not verified unless ServSync explicitly says so.' },
-      { title: 'No unsafe/illegal content', body: 'Content should not encourage unsafe work, illegal activity, code evasion, fraud, or improper handling of hazardous materials or regulated services.' },
-      { title: 'Takedown/moderation placeholder', body: 'ServSync may review, restrict, archive, or remove content or accounts under standards to be finalized by attorney review.' },
-    ],
-  },
-  'contractor-agreement': {
-    title: 'Contractor Platform Agreement',
-    sections: [
-      { title: 'Contractor account use', body: 'Contractors are responsible for the accuracy and security of their contractor account, team access, public profile, customer records, and uploaded content.' },
-      { title: 'Subscription/payment placeholder', body: 'Final agreement should define subscription terms, billing, cancellations, refunds, taxes, plan changes, and payment collection once billing is active.' },
-      { title: 'Responsibility for contractor work', body: 'Contractors remain solely responsible for their services, work quality, scheduling, estimates, invoices, reports, licenses, insurance, permits, warranties, and customer communications.' },
-      { title: 'Estimates/invoices/reports', body: 'ServSync provides tools to create records, but contractors are responsible for the content, accuracy, pricing, terms, and legal effect of records they send.' },
-      { title: 'Homeowner data access and confidentiality', body: 'Contractors may access homeowner/home information only as allowed by connection permissions, service requests, or homeowner-approved workflows, and should keep that information confidential.' },
-      { title: 'Discover posting rules', body: 'Contractor posts should share recent work, maintenance tips, company news, or helpful local advice. Posts must not expose private homeowner information without permission.' },
-      { title: 'Public profile rules', body: 'Public profile information should be accurate, current, and not misleading. Listed credentials should not imply ServSync verification unless a verification process exists.' },
-      { title: 'No direct solicitation', body: 'Contractors may not directly solicit, pitch, message, or contact homeowners through Discover unless the homeowner has initiated a connection, service request, or approved communication path.' },
-      { title: 'Licensing/insurance representation placeholder', body: 'Final agreement should define what contractors may say about licensing, insurance, bonding, certifications, permits, and trade qualifications.' },
-    ],
-  },
-};
 
 function legalRouteLabel(route: keyof typeof LEGAL_PAGES) {
   return route === 'acceptable-use' ? 'Acceptable Use' : route === 'contractor-agreement' ? 'Contractor Agreement' : LEGAL_PAGES[route].title.replace(' of Service', '');
@@ -5151,36 +5093,6 @@ function LegalLinks({ contractor = false, className = '' }: { contractor?: boole
   );
 }
 
-function LegalPage({ pageId }: { pageId: keyof typeof LEGAL_PAGES }) {
-  const page = LEGAL_PAGES[pageId];
-  return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Draft placeholder for attorney review</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950">{page.title}</h1>
-        <p className="mt-2 text-sm leading-6 text-amber-900">
-          This page is a product placeholder to organize legal topics for attorney review. It is not final legal advice,
-          not an attorney-approved agreement, and should be reviewed before public launch.
-        </p>
-      </section>
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="space-y-5">
-          {page.sections.map(section => (
-            <div key={section.title} className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0">
-              <h2 className="text-base font-bold text-slate-950">{section.title}</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">{section.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => updateRoute('home')} className={buttonClass('secondary')}>
-          Back to ServSync
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function privacyRequestDraft(kind: PrivacyRequestKind, role: 'homeowner' | 'contractor') {
   const roleLabel = role === 'homeowner' ? 'homeowner' : 'contractor';
@@ -5196,7 +5108,7 @@ function privacyRequestDraft(kind: PrivacyRequestKind, role: 'homeowner' | 'cont
     file_deletion: role === 'homeowner'
       ? 'I would like help deleting or reviewing uploaded home documents/photos. I understand home files may contain sensitive information and this request may require account verification.'
       : 'I would like help deleting or reviewing uploaded contractor files, public profile media, or Discover posts. I understand some customer/business records may need review before removal.',
-    question: `I have a privacy or data question about my ServSync ${roleLabel} account.`,
+    question: `I would like access, correction, or review of a privacy response for my ServSync ${roleLabel} account. Please describe the request and relevant records; do not include passwords or identity documents.`,
   };
   return {
     category: 'question' as SupportInquiryCategory,
@@ -5232,8 +5144,8 @@ function PrivacyDataRequestsPanel({
     },
     {
       kind: 'question',
-      title: 'Ask a privacy question',
-      body: 'Send support a question about data sharing, retention, deletion, or account privacy.',
+      title: 'Request access, correction or review',
+      body: 'Ask to access or correct your information, question data handling, or request review of a prior privacy response.',
     },
   ];
 
@@ -7672,14 +7584,16 @@ function AuthPage({
         throw new Error('ServSync admin accounts are created manually. Sign in with an existing admin account.');
       }
       if (!acceptedLegal) {
-        throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
+        throw new Error('Please agree to the platform terms and acknowledge the Privacy Policy before creating an account.');
       }
 
+      await requireCurrentLegalBundle(supabase);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
+            legal_acceptance: legalSignupMetadata(signupRole, 'standard', acceptedLegal),
             full_name: fullName,
             role: signupRole,
             referral_invite_code: signupRole === 'homeowner' ? inviteCode : '',
@@ -7797,25 +7711,7 @@ function AuthPage({
             <p className="text-xs text-slate-400">Use a strong password. Short or weak passwords may be rejected.</p>
           )}
           {mode === 'signup' && (
-            <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={acceptedLegal}
-                onChange={event => setAcceptedLegal(event.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
-              />
-              <span>
-                I agree to the{' '}
-                <button type="button" onClick={() => updateRoute('terms')} className="font-semibold text-blue-700 hover:text-blue-800">
-                  Terms of Service
-                </button>
-                {' '}and{' '}
-                <button type="button" onClick={() => updateRoute('privacy')} className="font-semibold text-blue-700 hover:text-blue-800">
-                  Privacy Policy
-                </button>
-                .
-              </span>
-            </label>
+            <LegalConsent role={signupRole} accepted={acceptedLegal} onChange={setAcceptedLegal} />
           )}
           <button type="submit" disabled={busy || !email || (mode !== 'reset' && !password) || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
             <KeyRound size={16} />
@@ -8170,14 +8066,16 @@ function ContractorReferralInvitePage({
       }
 
       if (!acceptedLegal) {
-        throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
+        throw new Error('Please agree to the platform terms and acknowledge the Privacy Policy before creating an account.');
       }
 
+      await requireCurrentLegalBundle(supabase);
       const { data, error: signupError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
+            legal_acceptance: legalSignupMetadata('homeowner', 'contractor_invitation', acceptedLegal),
             full_name: fullName,
             role: 'homeowner',
             referral_invite_code: choice === 'account' ? inviteCode : '',
@@ -8341,24 +8239,7 @@ function ContractorReferralInvitePage({
           <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
         </Field>
         {mode === 'signup' && (
-          <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={acceptedLegal}
-              onChange={event => setAcceptedLegal(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
-            />
-            <span>
-              I agree to the{' '}
-              <button type="button" onClick={() => window.open(appRouteUrl('terms'), '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
-                Terms of Service
-              </button>
-              {' '}and{' '}
-              <button type="button" onClick={() => window.open(appRouteUrl('privacy'), '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
-                Privacy Policy
-              </button>.
-            </span>
-          </label>
+          <LegalConsent role={'homeowner'} accepted={acceptedLegal} onChange={setAcceptedLegal} />
         )}
         <button type="submit" disabled={authBusy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
           <KeyRound size={16} />
@@ -8674,13 +8555,15 @@ function LocalCustomerClaimPage({
         return;
       }
       if (!acceptedLegal) {
-        throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
+        throw new Error('Please agree to the platform terms and acknowledge the Privacy Policy before creating an account.');
       }
+      await requireCurrentLegalBundle(supabase);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
+            legal_acceptance: legalSignupMetadata('homeowner', 'local_customer_claim', acceptedLegal),
             full_name: fullName || profileUpdates.display_name,
             role: 'homeowner',
             local_customer_claim: token,
@@ -8898,32 +8781,7 @@ function LocalCustomerClaimPage({
                   <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
                 </Field>
                 {mode === 'signup' && (
-                  <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={acceptedLegal}
-                      onChange={event => setAcceptedLegal(event.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
-                    />
-                    <span>
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={() => window.open(appRouteUrl('terms'), '_blank', 'noopener,noreferrer')}
-                        className="font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Terms of Service
-                      </button>
-                      {' '}and{' '}
-                      <button
-                        type="button"
-                        onClick={() => window.open(appRouteUrl('privacy'), '_blank', 'noopener,noreferrer')}
-                        className="font-semibold text-blue-700 hover:text-blue-800"
-                      >
-                        Privacy Policy
-                      </button>.
-                    </span>
-                  </label>
+                  <LegalConsent role={'homeowner'} accepted={acceptedLegal} onChange={setAcceptedLegal} />
                 )}
                 <button type="submit" disabled={authBusy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
                   <KeyRound size={16} />
@@ -42870,6 +42728,7 @@ function ContractorDashboard({
                                 {/* AI mode */}
                                 {assistantMode === 'ai' && (
                                   <>
+                                    <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-950" data-testid="inspection-ai-privacy-notice">Get AI suggestions sends these notes and the current room/checklist context to OpenAI through ServSync. Include only information you have authority to share. Omit customer names, access codes and unnecessary personal details. Review suggestions before applying them. Single and Walk modes use local rules.</p>
                                     <p className="text-xs text-slate-500 leading-relaxed">Describe your observations. AI will suggest statuses, actions, and match findings to your checklist items.</p>
                                     <textarea rows={5}
                                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 resize-none bg-white"
