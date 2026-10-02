@@ -1,5 +1,16 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-02 — Recurring contractor browser smoke selectors repaired
+
+- Branch: `codex/recurring-role-smoke-repair`, based on current main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.
+- Files changed: `tests/e2e/recurring-authenticated-role-smoke.spec.ts`, `tests/e2e/recurring-demo-readonly-smoke.spec.ts`, `docs/FB-016_RECURRING_ROLE_SMOKE_RUNBOOK.md`, `docs/servsync-master-plan/ServSync_Feature_Backlog.md`, and this changelog.
+- Change/reason: the September 25 contractor refinement removed the `Work workspace` label and changed the Draft action markup, leaving the daily browser smoke dependent on obsolete text matching. Sandbox desktop/mobile now checks the existing Work surface; Demo checks the exact accessible Start New Draft button. Job navigation accepts Open Jobs or Active Jobs while retaining destination, role, read-only, and runtime-error assertions.
+- Validation: reproduced the hosted Demo contractor failure before the repair; all eight authenticated Sandbox desktop/mobile cases and both hosted Demo read-only cases passed after it. Type checking, build, all seven operational-smoke contract tests, lint (76 existing warnings), diff checks, and a changed-line credential scan passed. Complete GitHub branch workflow dispatch [`37008339503`](https://github.com/bencatchot/ServSync-App/actions/runs/37008339503) passed Sandbox, Demo, and Production, including all 25 Sandbox API/fixture/authorization/backup-health checks. All four retained sanitized JSON reports passed independent status and credential/private-identifier review. All three normal Vercel Preview build statuses passed.
+- Backlog Impact: FB-016 records the incident repair and default-branch/natural-run recovery follow-up; its broader Active status and readiness guardrails remain intact. BACKLOG FILE UPDATED: YES.
+- Master plan impact: reviewed; no update needed because this is test/operational maintenance with no product or workflow definition change. MASTER PLAN UPDATED: NO. Marketing claims are unaffected.
+- Tutorial impact: NOT APPLICABLE. This changes automated checks and operational documentation only; the user interface and published guidance are unaffected.
+- Risks/follow-ups: feature-branch validation cannot repair the scheduled default-branch job until merge is approved. Verify the first subsequent natural schedule run after release. No app, SQL/RLS/RPC, auth/permissions, secret/settings, fixture/user-record, production-data, or notification configuration changes; no merge or manual production deployment.
+
 ## 2026-09-26 — Landing page released to Production
 
 - Branch: `codex/servsync-landing-release-record`; release documentation for approved landing PR #580, merged as `b869015bba973e145d3ad7a80d3a30a5e81c4a05`.
