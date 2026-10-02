@@ -49,10 +49,10 @@ async function openJobs(page: Page) {
   await openTab(page, /^Work(?:\s+\d+)?$/i, /^Work$/i);
   const main = page.getByRole('main');
   await expect(main.getByText(/Loading contractor workspace/i)).toBeHidden({ timeout: 30_000 });
-  await expect(main.getByText(/^Work workspace$/i)).toBeVisible();
+  await expect(main.getByTestId('contractor-work-header-tabs')).toBeVisible();
   const openJobsHeading = main.getByRole('heading', { level: 2, name: /^Open jobs$/i });
   if (!(await openJobsHeading.isVisible())) {
-    await main.getByRole('button', { name: /Open Jobs/i }).first().click();
+    await main.getByRole('button', { name: /(?:Open|Active) Jobs\b/i }).click();
   }
   await expect(openJobsHeading).toBeVisible();
   return main;
@@ -153,7 +153,7 @@ test.describe('FB-016 recurring authenticated role browser smoke', () => {
       if (portal === 'contractor') {
         await signInContractor(page, 'owner');
         await openMobileTab(page, /^Work(?:\s+\d+)?$/i, /^Work$/i);
-        await expect(page.getByRole('main').getByText(/^Work workspace$/i)).toBeVisible();
+        await expect(page.getByRole('main').getByTestId('contractor-work-header-tabs')).toBeVisible();
       } else {
         await signInHomeowner(page);
         await openMobileTab(page, /^Properties\b/i, /^My Home$/i);

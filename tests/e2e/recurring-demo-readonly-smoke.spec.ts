@@ -15,7 +15,7 @@ test.describe('FB-016 recurring Demo read-only smoke', () => {
     await expectActiveTabHeading(page, /^Customers$/i);
     await openSidebarTab(page, /^Work\b/i);
     await expectActiveTabHeading(page, /^Work$/i);
-    await expect(main.getByText(/^Start New Draft$/i).first()).toBeVisible();
+    await expect(main.getByRole('button', { name: 'Start New Draft', exact: true })).toBeVisible();
     await openSidebarTab(page, /^Financials\b/i);
     await expectActiveTabHeading(page, /^Financials$/i);
     await expect(main.getByTestId('contractor-financials-dashboard')).toBeVisible();
