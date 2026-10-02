@@ -42,6 +42,18 @@ Natural runs `33615712359`, `33741633276`, `33859860099`, `33957230580`, `340248
 
 Under explicit Demo-only approval, the two exact existing primary identities and four matching repository secrets were synchronized from one approved canonical bundle. User IDs, emails, ownership metadata, scenario roles, profiles, unrelated Demo data, and every Production surface remained unchanged. Both direct authentications passed, and manual dispatch `34122491160` then completed all Sandbox, Demo, and Production jobs successfully. The fixture runner now preserves existing Auth users unchanged; stale operator credentials fail at normal authentication instead of rotating shared passwords. The next natural scheduled run remains the recurring observation, but the manual dispatch closes the bounded incident-repair check.
 
+### 2026-10-02 Contractor Work Selector Repair
+
+The seven natural runs from September 26 through October 2 failed after the September 25 contractor screen refinement. The first failing run was `36234324983`; the latest audited run was `36999589517`, both at default-branch SHA `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.
+
+- Sandbox passed all 25 API identity, fixture, authorization, and aggregate backup-health checks, but six contractor browser cases stopped at the removed `Work workspace` text. Both homeowner browser cases passed.
+- Demo contractor navigation stopped at an exact text selector for `Start New Draft`. Reproduction against hosted Demo confirmed that the accessible button was present; selecting the button by its exact accessible name passed. Demo homeowner navigation and Production public/authenticated read-only checks passed.
+- Branch `codex/recurring-role-smoke-repair` replaces the retired Sandbox text assertion with the existing `contractor-work-header-tabs` surface in desktop/mobile checks and uses the accessible Demo button name. Job navigation recognizes both legacy `Open Jobs` and canonical `Active Jobs`, with the existing Open jobs destination assertion retained.
+- All eight authenticated Sandbox desktop/mobile cases and both hosted Demo cases passed locally. Role restrictions, Viewer read-only detail checks, operational error checks, capture restrictions, credentials, fixtures, schedule, and backup-health requirements remain intact.
+- GitHub workflow dispatch [`37008339503`](https://github.com/bencatchot/ServSync-App/actions/runs/37008339503), at test commit `5c8510ed2cd95f7c97ac8da4791cdee5c619a5e2`, passed all three required jobs using the existing repository secrets: all 25 Sandbox API/fixture/authorization/backup-health checks, eight Sandbox browser cases, both hosted Demo cases, and Production public/authenticated read-only smoke. Independent review of all four retained JSON reports found passing statuses and no email, credential, private identifier, trace, screenshot, or network capture. A branch dispatch does not establish natural scheduler recovery.
+
+Release follow-up: merge approval is required before the daily default-branch workflow can use the repair. Require the first subsequent natural `schedule` run to pass Sandbox, Demo, and Production, retaining only the existing sanitized JSON evidence. No app behavior, authentication, authorization, environment, notification settings, or data repair is part of this incident.
+
 ## Environment Scope
 
 | Environment | Recurring scope | Mutation |
