@@ -30,6 +30,7 @@ The existing Work → Drafts path already provides optional-customer planning, d
 - 29 existing Draft creation/workspace browser regressions passed. These use isolated adapters and cover save/resume, duplicate-save protection, interrupted/stale operations and output navigation; they do not prove hosted persistence.
 - Existing `validate-admin-office-estimate-authority.sh` passed against disposable local PostgreSQL, including real SQL role boundaries. No shared migration was applied.
 - A dedicated authenticated Demo read-only check is included with an explicit opt-in, fixed Demo backend, RPC allowlist, business-write denial and disabled credential-bearing test artifacts. It checks the full app's entry → practice → fresh unsaved real Draft → customer preview. Passed locally against the actual Demo backend on October 15: sample $195, fresh real Draft with blank customer, then unsaved real preview $125; zero blocked/attempted business mutations.
+- Hosted verification on October 15 passed on desktop and 390px mobile at `https://servsync-demo-1it47qh03-bencatchots-projects.vercel.app`, exact application commit `877a74c8d649cfb732483de38eb3367da249bb52`. Existing Demo credentials and the explicitly approved bypass were used with an exact-origin header guard; the unrelated Vercel toolbar was blocked. Both runs reached sample $195 → clean real Draft → unsaved $125 customer preview with no attempted business writes. The initial strict run flagged only the toolbar login request, which remained blocked in the passing reruns. No settings or access grants changed.
 - Fresh-account signup/confirmation, shared-backend Save Draft/refresh, creation/duplicate retry with a real customer/property and cross-device progression remain release acceptance items. No new user or business record has been created to claim those checks passed.
 
 ## Existing adoption signals (source review only)
@@ -38,7 +39,9 @@ Existing Draft `created_at`/`updated_at`, launch receipts and Estimate timestamp
 
 ## Tutorial and release gate
 
-PR #577 owns the existing TUT-002 Draft-first recording and reports published revision 4. This branch does not duplicate its recorder or SQL work. The new guide and preview controls need final post-validation Help search/playback comparison; TUT-002 is the named affected walkthrough. Any replacement recording/publication must use the existing recorder/Help Studio process with separate approval for protected publication and any paid narration. Overall completion is not claimed while this gate remains open.
+**Tutorial impact: UPDATE REQUIRED.** Post-verification authenticated Demo Help searches succeeded but found no published matches for onboarding, estimate, first estimate, contractor.dashboard or contractor.drafts. PR #577 records the published TUT-002 revision 4. Its preserved publication package passed video/caption hash verification and full 62.44-second local browser playback with 14 cues and no media errors. It covers Save/Create/Send distinctions, but omits the new guide and preview controls. This is not a fresh Production Help retrieval.
+
+The [bounded update brief](../tutorials/GUIDED_FIRST_ESTIMATE_UPDATE_BRIEF.md) records evidence, affected steps and proposed scenes. Reuse PR #577's recorder/Help Studio process. Fresh Production contextual playback and the approved replacement/addendum publication remain release gates. No paid narration, recording upload or Help content mutation occurred. Repository `AGENTS.md` requires that an UPDATE REQUIRED task not be reported complete until its replacement is published and verified; overall completion is not claimed.
 
 ## Factual wording after release
 

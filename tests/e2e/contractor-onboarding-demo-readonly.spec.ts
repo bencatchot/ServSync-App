@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 const demoHost = 'bdytwgejqnlblhrnqxkp.supabase.co';
+// This destination was explicitly approved for the existing Demo bypass.
+const approvedPreviewOrigin = 'https://servsync-demo-1it47qh03-bencatchots-projects.vercel.app';
 const readRpcs = new Set([
   'servsync_current_contractor_profile', 'servsync_contractor_connected_homeowners', 'servsync_contractor_service_requests',
   'servsync_contractor_pending_connection_requests', 'servsync_contractor_team', 'servsync_list_local_customer_summaries',
@@ -14,15 +16,26 @@ const readRpcs = new Set([
 test('Demo owner reaches sample and real unsaved preview through the actual app without business writes', async ({ page }) => {
   test.skip(process.env.ONBOARDING_DEMO_READONLY !== 'true', 'Requires explicit dedicated Demo credentials and read-only opt-in.');
   test.setTimeout(90_000);
+  if (process.env.ONBOARDING_MOBILE === 'true') await page.setViewportSize({ width: 390, height: 844 });
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) throw new Error('Use the origin-scoped ONBOARDING_DEMO_BYPASS instead of global headers');
+  const bypass = process.env.ONBOARDING_DEMO_BYPASS;
+  if (bypass && process.env.TEST_APP_URL !== approvedPreviewOrigin) throw new Error('Unapproved bypass destination');
   const blocked: string[] = [];
   await page.route('**/*', async route => {
     const request = route.request();
     const url = new URL(request.url());
+    // Preview toolbar is unrelated to app verification. Do not authenticate it.
+    if (url.hostname === 'vercel.live') { await route.abort(); return; }
     if (url.hostname.endsWith('.supabase.co') && url.hostname !== demoHost) { blocked.push('non-Demo backend'); await route.abort(); return; }
-    if (['GET', 'HEAD', 'OPTIONS'].includes(request.method())) { await route.continue(); return; }
+    if (['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+      await route.continue(bypass && url.origin === approvedPreviewOrigin
+        ? { headers: { ...request.headers(), 'x-vercel-protection-bypass': bypass } }
+        : undefined);
+      return;
+    }
     const rpc = url.pathname.split('/rest/v1/rpc/')[1];
     if (url.hostname === demoHost && (url.pathname === '/auth/v1/token' || (rpc && readRpcs.has(rpc)))) { await route.continue(); return; }
-    blocked.push(url.pathname); await route.abort();
+    blocked.push(`${url.origin}${url.pathname}`); await route.abort();
   });
   await page.goto('/#/contractor');
   await page.getByLabel('Email', { exact: true }).fill(process.env.DEMO_CONTRACTOR_EMAIL!);
