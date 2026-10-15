@@ -761,7 +761,7 @@ export type InvoicePdfContext = {
 
 export async function createEstimatePdf(
   estimate: Estimate,
-  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
+  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null; previewGeneratedAt?: Date },
 ) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -837,7 +837,10 @@ export async function createEstimatePdf(
   pdf.setFontSize(10);
   pdf.setTextColor(71, 85, 105);
   pdf.text(`Status: ${estimateStatusLabel(estimate.status)}`, margin, y);
-  pdf.text(`Updated: ${new Date(estimate.updated_at).toLocaleDateString('en-US')}`, margin, y + 5);
+  const dateLabel = context.previewGeneratedAt
+    ? `Preview generated: ${context.previewGeneratedAt.toLocaleDateString('en-US')}`
+    : `Updated: ${new Date(estimate.updated_at).toLocaleDateString('en-US')}`;
+  pdf.text(dateLabel, margin, y + 5);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(18);
   pdf.setTextColor(15, 23, 42);

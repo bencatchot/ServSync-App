@@ -33,7 +33,7 @@ export function DraftEstimatePreview({ draft, businessName, businessLogoUrl, cus
       setBusy(true); setError('');
       try {
         const { createEstimatePdf } = await import('../../utils/pdfDocuments');
-        const { blob } = await createEstimatePdf(record, { contractorName: businessName || 'Business name not set', customerName, customerAddress, contractorLogoUrl: businessLogoUrl });
+        const { blob } = await createEstimatePdf(record, { contractorName: businessName || 'Business name not set', customerName, customerAddress, contractorLogoUrl: businessLogoUrl, previewGeneratedAt: new Date() });
         if (generation.current !== requestGeneration) return;
         setPdfUrl(URL.createObjectURL(blob)); setOpen(true); onPreview?.();
       } catch { if (generation.current === requestGeneration) setError('The preview could not be opened. Your Draft is unchanged. Try again.'); }

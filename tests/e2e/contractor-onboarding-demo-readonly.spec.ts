@@ -59,5 +59,8 @@ test('Demo owner reaches sample and real unsaved preview through the actual app 
   await page.getByRole('button', { name: 'Preview customer estimate' }).click();
   await expect(page.getByTestId('onboarding-estimate-preview')).toContainText('$125.00');
   await expect(page.getByTestId('onboarding-estimate-preview')).toContainText('Customer not selected');
+  const pdfText = await page.getByRole('link', { name: 'Open customer PDF preview' }).evaluate(async link => (await fetch((link as HTMLAnchorElement).href)).text());
+  expect(pdfText).toContain('Preview generated:');
+  expect(pdfText).not.toContain('Invalid Date');
   expect(blocked, 'No business mutation or unexpected backend requests').toEqual([]);
 });

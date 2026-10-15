@@ -39,6 +39,9 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 
     expect(pdfText).toContain('%PDF');
     expect(pdfText).toContain('Sample Service Company');
     expect(pdfText).toContain('195.00');
+    expect(pdfText).toContain('Preview generated:');
+    expect(pdfText).not.toContain('Invalid Date');
+    expect(pdfText).not.toContain('Updated:');
     await page.screenshot({ path: info.outputPath(`guide-${viewport.name}.png`), fullPage: true });
     await page.getByLabel('Draft estimate line item 1 quantity', { exact: true }).fill('3');
     await expect(preview).toHaveCount(0);
@@ -95,4 +98,21 @@ test('application preserves role and capability gating and new real drafts recei
   expect(app).toContain('onStartReal={startCleanDraftFirstEstimateComposer}');
   expect(app).toContain('sharedDraftComposerEnabled && !durableDraftCohortSafeHold && !createEstimateCapability.disabled');
   expect(workspace).toContain('previewBusinessName={capabilities.canLaunchEstimate ? previewBusinessName : undefined}');
+});
+
+test('saved Estimate PDFs retain their saved update date', async ({ page }) => {
+  await page.goto('/');
+  const pdfText = await page.evaluate(async () => {
+    const load = new Function('path', 'return import(path)');
+    const { createEstimatePdf } = await load('/src/utils/pdfDocuments.ts');
+    const { draftEstimatePreview } = await load('/src/features/onboarding/estimatePreview.ts');
+    const { createBlankSharedDraftComposerDraft } = await load('/src/features/drafts/draftComposerMappings.ts');
+    const estimate = draftEstimatePreview(createBlankSharedDraftComposerDraft());
+    estimate.updated_at = '2026-01-02T12:00:00';
+    const { blob } = await createEstimatePdf(estimate, { contractorName: 'Test Company', customerName: 'Test Customer' });
+    return blob.text();
+  });
+  expect(pdfText).toContain('Updated: 1/2/2026');
+  expect(pdfText).not.toContain('Preview generated:');
+  expect(pdfText).not.toContain('Invalid Date');
 });
