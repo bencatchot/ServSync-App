@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-15 — Guided contractor first estimate prepared for review
+
+- Branch: `codex/guided-contractor-first-estimate`; issue #585; base `5ea8fec`.
+- Changes: replace the dashboard profile prompt/seven-step send-dependent checklist with a resumable optional guide; reuse the Draft editor for isolated practice and add customer PDF preview to eligible real Estimate Drafts. Preserve all existing persistence, launch/send, legal, billing and role boundaries.
+- Files: `src/features/onboarding/*`, Draft composer/workspace, `src/App.tsx`, focused onboarding tests, app-size baseline, this changelog, master plan, backlog, marketing inventory and `docs/features/GUIDED_CONTRACTOR_ONBOARDING.md`.
+- Validation: TypeScript/build/27 architecture tests; focused desktop/mobile browser and PDF checks; 29 existing Draft browser regressions; disposable PostgreSQL Estimate authority suite. Hosted and release acceptance evidence is distinguished in the feature report/PR.
+- Risks/follow-ups: same-browser guide progress and same-tab practice edits only; real work still requires Save Draft. Fresh-account hosted persistence/duplicate-retry acceptance and final TUT-002 tutorial review remain release gates. No merge, production deployment, shared SQL/data mutation, notifications, purchases, auth/permission/env changes or new dependencies.
+- Backlog Impact: FB-040 records the review-branch guided first-estimate slice and remaining acceptance/tutorial gates. Marketing wording remains conditional on release; no time-to-completion claim.
+
 ## 2026-10-02 — Recurring contractor browser smoke selectors repaired
 
 - Branch: `codex/recurring-role-smoke-repair`, based on current main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.

@@ -183,3 +183,7 @@ This section is factual repo state, not a product-priority decision.
 - Do not use "completed", "live", "enabled", or equivalent terms when only source, hidden foundation, disabled gate, Sandbox-only SQL, or planning exists.
 - Preserve retired and consolidated IDs in the crosswalk. Do not reuse a retired ID for an unrelated feature.
 - Update the backlog when feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority changes.
+
+## 2026-10-15 — FB-040 guided first-estimate review slice
+
+Issue #585 / `codex/guided-contractor-first-estimate` prepares optional guided setup, isolated browser-local practice, customer PDF preview in the shared Draft editor, skip/resume and optional next steps. It replaces the old send-dependent checklist and profile-polish prompt without adding a second persisted work lifecycle. No auth, permission, billing, schema, shared settings or production-data changes. Remains review-branch only: complete the exact Preview check, fresh-account hosted Save Draft/resume/duplicate-retry acceptance and final TUT-002 Help comparison/replacement gate before declaring the onboarding outcome complete. Guide flags are local convenience state, not adoption analytics. See `docs/features/GUIDED_CONTRACTOR_ONBOARDING.md` for scoped evidence and remaining work.

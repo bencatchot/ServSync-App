@@ -1,3 +1,4 @@
+import { DraftEstimatePreview } from '../onboarding/DraftEstimatePreview';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ChevronDown, FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
@@ -31,6 +32,10 @@ import {
 } from './draftCustomerOptions';
 
 type ContractorDraftComposerProps = {
+  previewBusinessName?: string;
+  previewBusinessLogoUrl?: string;
+  onEstimatePreview?: () => void;
+  practiceMode?: boolean;
   draft: SharedDraftComposerDraft;
   customerOptions: DraftCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
@@ -80,6 +85,7 @@ function formatDraftLaborHours(value: number) {
 }
 
 export function ContractorDraftComposer({
+  previewBusinessName, previewBusinessLogoUrl, onEstimatePreview, practiceMode = false,
   draft,
   customerOptions,
   checklistOptions = [],
@@ -324,7 +330,7 @@ export function ContractorDraftComposer({
         ) : null}
         <button type="button" onClick={onSave} disabled={!canSave || saving || interactionDisabled} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
           <Save size={16} />
-          {saving ? 'Saving...' : 'Save Draft'}
+          {saving ? 'Saving...' : practiceMode ? 'Save practice in this tab' : 'Save Draft'}
         </button>
         {onDiscardPreparedLaunch ? <button type="button" onClick={onDiscardPreparedLaunch} disabled={launchBusy} className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 disabled:opacity-50">Discard unused attempt</button> : null}
 
@@ -431,7 +437,7 @@ export function ContractorDraftComposer({
       <section aria-label="Scope and pricing" className="space-y-4 border-t border-slate-200 pt-5">
         <div><h3 className="text-base font-bold text-slate-950">2. Scope &amp; pricing</h3><p className="mt-1 text-sm text-slate-500">Build a work list or start from an inspection checklist.</p></div>
       <div className="grid gap-3 md:grid-cols-2">
-        {composerField('Work format', (
+        {!practiceMode && composerField('Work format', (
           <select
             data-testid="durable-draft-work-format"
             className={fieldClass()}
@@ -743,7 +749,8 @@ export function ContractorDraftComposer({
       )}
 
       </section>
-      <section aria-label="Next step" className="space-y-4 border-t border-slate-200 pt-5">
+      {isEstimateIntent && previewBusinessName !== undefined && <DraftEstimatePreview draft={draft} businessName={previewBusinessName} businessLogoUrl={previewBusinessLogoUrl} customerName={selectedCustomer?.label || 'Customer not selected'} customerAddress={selectedCustomer?.properties.find(property => property.id === selectedPropertyId)?.label} sample={practiceMode} disabled={interactionDisabled} onPreview={onEstimatePreview} />}
+      {!practiceMode && <section aria-label="Next step" className="space-y-4 border-t border-slate-200 pt-5">
         <div><h3 className="text-base font-bold text-slate-950">3. Next step</h3><p className="mt-1 text-sm text-slate-500">Save your progress, or choose what to create when you’re ready.</p></div>
       {isChecklistDraft ? (
         <p className="rounded-xl bg-blue-50 px-3 py-3 text-sm text-blue-950">This checklist creates a Job. You can complete its findings and report after creating it.</p>
@@ -771,7 +778,7 @@ export function ContractorDraftComposer({
           Creating the Invoice makes a draft only and does not send it to the customer.
         </section>
       ) : null}
-      </section>
+      </section>}
       </fieldset>
 
       {!draft.intended_output ? (
@@ -781,7 +788,7 @@ export function ContractorDraftComposer({
 
         <button type="button" onClick={onBack} disabled={saving} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           <X size={16} />
-          Back to Work
+          {practiceMode ? 'Close practice editor' : 'Back to Work'}
         </button>
     </div>
   );
