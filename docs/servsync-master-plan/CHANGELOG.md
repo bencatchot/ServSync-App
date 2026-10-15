@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-15 — Guided setup tutorial review package and PDF date correction
+
+- Issue #585 / draft PR #586 remains unmerged. A read-only local recorder reuses the established human pacing and media tools without invoking Demo seeding/reset or Help publication. Its 68.92-second captioned review shows actual isolated practice, customer PDF, refresh/resume, optional skipping and a fresh unsaved real Draft.
+- The recording independently revealed an invalid Updated date in unsaved preview PDFs. A narrow optional preview-generation label fixes it; persisted Estimate dates and save/send/role behavior are unchanged. Six focused checks (including real PDF content and existing document date), authenticated local Demo read-only validation, two recorder safety tests, type/build/lint, GitHub quality and Preview builds passed.
+- Existing Demo Owner Marcus Bennett / Gulf Coast Home Services, Sarah Johnson and Demo Bay Home were verified read-only. The bounded remaining-acceptance plan specifies one retained Draft/item and one unsent Estimate/item/launch/audit, no deletion, and an owner-controlled dedicated-inbox signup for true fresh-account coverage. No proposed acceptance write has run.
+- Tutorial impact remains UPDATE REQUIRED. Local review package is prepared; no paid narration, upload, Help job/revision/publication, credential creation, shared migration or production deployment. The corrected hosted Demo Preview passed desktop/mobile read-only checks after exact-destination approval. Details: guided onboarding feature report, tutorial brief and `docs/qa/GUIDED_ONBOARDING_REMAINING_ACCEPTANCE.md`.
+
 ## 2026-10-15 — Guided contractor first estimate prepared for review
 
 - Branch: `codex/guided-contractor-first-estimate`; issue #585; base `5ea8fec`.

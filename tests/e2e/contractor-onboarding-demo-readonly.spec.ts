@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 const demoHost = 'bdytwgejqnlblhrnqxkp.supabase.co';
 // This destination was explicitly approved for the existing Demo bypass.
-const approvedPreviewOrigin = 'https://servsync-demo-1it47qh03-bencatchots-projects.vercel.app';
+const approvedPreviewOrigin = 'https://servsync-demo-mddems300-bencatchots-projects.vercel.app';
 const readRpcs = new Set([
   'servsync_current_contractor_profile', 'servsync_contractor_connected_homeowners', 'servsync_contractor_service_requests',
   'servsync_contractor_pending_connection_requests', 'servsync_contractor_team', 'servsync_list_local_customer_summaries',

@@ -10,10 +10,10 @@ import { pathToFileURL } from 'node:url';
 import { HUMAN_PACED_RECORDING_PRESET as pacing, cursorInterpolation } from '../demo/recorder/lib.mjs';
 import { resolveMediaTools, probeMedia } from '../demo/recorder/output-library.mjs';
 
-export const approvedOrigin = 'https://servsync-demo-1it47qh03-bencatchots-projects.vercel.app';
+export const approvedOrigin = 'https://servsync-demo-mddems300-bencatchots-projects.vercel.app';
 export const localOrigin = 'http://127.0.0.1:5180';
 const demoOrigin = 'https://bdytwgejqnlblhrnqxkp.supabase.co';
-const applicationCommit = '877a74c8d649cfb732483de38eb3367da249bb52';
+const applicationCommit = 'fc4d2d770ab536a1c41151a73601d8326bf39361';
 const readRpcs = new Set([
   'servsync_current_contractor_profile', 'servsync_contractor_connected_homeowners', 'servsync_contractor_service_requests',
   'servsync_contractor_pending_connection_requests', 'servsync_contractor_team', 'servsync_list_local_customer_summaries',
@@ -194,7 +194,7 @@ export async function recordReview(outputDirectory, env = process.env) {
     publication: 'Not uploaded or published; no Help recording job created.',
   };
   await writeFile(join(output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  await writeFile(join(output, 'preview.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ServSync guided first estimate — review</title><style>body{font:16px/1.5 system-ui;background:#eef2f6;color:#172334;max-width:1152px;margin:32px auto;padding:16px}video{width:100%;background:#111;border-radius:12px}h1{font-size:26px}a{color:#1459a8}</style><h1>Guided first estimate — TUT-002 review</h1><p>Silent, captioned review draft. Recorded from the verified branch frontend against the Demo backend using fictional practice data. No business records were saved or sent. Not published.</p><video controls preload="metadata" src="data:video/mp4;base64,${(await readFile(mp4)).toString('base64')}"><track default kind="captions" src="data:text/vtt;base64,${Buffer.from(captions).toString('base64')}" srclang="en" label="English"></video><p><a href="narration-script.txt">Narration script</a> · <a href="manifest.json">Recording evidence</a></p><p>Review the sample, customer preview, refresh/resume, optional setup and fresh real Draft. Existing TUT-002 remains published; this package is not a Help Studio ingestion package.</p></html>`);
+  await writeFile(join(output, 'preview.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ServSync guided first estimate — review</title><style>body{font:16px/1.5 system-ui;background:#eef2f6;color:#172334;max-width:1152px;margin:32px auto;padding:16px}video{width:100%;background:#111;border-radius:12px}video::cue{font-size:1.25rem}h1{font-size:26px}a{color:#1459a8}</style><h1>Guided first estimate — TUT-002 review</h1><p>Silent, captioned review draft. Recorded from the verified branch frontend against the Demo backend using fictional practice data. No business records were saved or sent. Not published.</p><video controls onloadedmetadata="this.textTracks[0].mode='showing'" preload="metadata" src="data:video/mp4;base64,${(await readFile(mp4)).toString('base64')}"><track default kind="captions" src="data:text/vtt;base64,${Buffer.from(captions).toString('base64')}" srclang="en" label="English"></video><p><a href="narration-script.txt">Narration script</a> · <a href="manifest.json">Recording evidence</a></p><p>Review the sample, customer preview, refresh/resume, optional setup and fresh real Draft. Existing TUT-002 remains published; this package is not a Help Studio ingestion package.</p></html>`);
   console.log(JSON.stringify({ output, duration: media.durationSeconds, businessMutationAttempts: blocked.length, localReviewOnly: true }));
   return manifest;
 }
