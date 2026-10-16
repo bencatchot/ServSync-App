@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Existing Demo Practice integration prepared, not activated
+
+- Prepared a separately guarded migration draft outside automatic migration discovery and an unmounted/default-off Demo transport. Private storage, an empty pilot allowlist, fixed synthetic snapshots, 720-hour expiry, bounded revisioned saves and explicit grants are covered by 13 new actual PostgreSQL tests; the combined Practice suite passes 37/37.
+- Independent review found and verified fixes for non-superuser ownership setup and incomplete/Unicode Draft resume. Local Auth/HTTP are simulated; hosted acceptance remains unperformed. The disposable installer is unchanged.
+- The [approval packet](../features/PRACTICE_DEMO_DRAFT_APPROVAL.md) proposes only exact-target Demo installation with the allowlist empty. No push, migration application, credentials, hosted grants/settings, cleanup, merge or deployment occurred. Backlog, marketing limits and rollout ledger updated. No product-direction change.
+- Tutorial impact: NOT APPLICABLE to unmounted source-only code; hosted UI guidance remains a later validation gate.
+
 ## 2026-10-16 — Practice expiry and transfer recovery corrected
 
 - PR #588 remains local/test-only. Expiry is now enforced by database read policies; status-only reads and recovery use separate narrow capabilities.

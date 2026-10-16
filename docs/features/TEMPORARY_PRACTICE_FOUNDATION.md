@@ -2,6 +2,10 @@
 
 Implementation issue: [#587](https://github.com/bencatchot/ServSync-App/issues/587). Branch: `codex/temporary-practice-workspace`, based on main `5ea8fec`. This is independent of onboarding PR #586. **Local/test foundation only; no hosted Practice capability or live importer is released.**
 
+## Demo integration draft, not installed
+
+A separately reviewed [Demo source and approval packet](PRACTICE_DEMO_DRAFT_APPROVAL.md) prepares restricted synthetic `state/start/save` access in the existing Demo project. The migration remains outside automatic discovery; the transport is unmounted/default-off and the pilot allowlist empty. No hosted action or cleanup is enabled. The disposable local installer and transfer harness below remain unchanged. The Demo draft has one cycle per approved reviewer until renewal/retention is separately decided.
+
 ## Approved direction and initial scope
 
 Ben approved beginning the recommended owner-only Practice workspace with fictional customers, business/pricing/template snapshots, and explicit create-only transfer review. He requested roughly monthly cleanup and clear notice. **30 days, seven-day and one-day warnings are implementation defaults proposed for review**, not an assertion that he chose those precise periods.
