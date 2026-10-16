@@ -1,6 +1,6 @@
 # Practice Demo integration — revised approval packet
 
-Prepared October 16, 2026 for [issue #587](https://github.com/bencatchot/ServSync-App/issues/587) / [draft PR #588](https://github.com/bencatchot/ServSync-App/pull/588). **Uninstalled and inactive. This revision requires new exact-byte approval.** Ordinary automatic non-Practice Preview builds remain permitted; no manual deployment is authorized. Onboarding PR #586 and AthleticsArc are unchanged.
+Prepared October 16, 2026 for [issue #587](https://github.com/bencatchot/ServSync-App/issues/587) / [draft PR #588](https://github.com/bencatchot/ServSync-App/pull/588). **Approved exact bytes were installed in Demo on October 16, 2026; Practice remains inactive with an empty pilot allowlist.** See [execution evidence and limits](PRACTICE_DEMO_INSTALLATION_2026-10-16.md). The scope and preconditions below are retained as the approval record. Ordinary automatic non-Practice Preview builds remain permitted; no manual deployment is authorized. Onboarding PR #586 and AthleticsArc are unchanged.
 
 ## Why the previously approved installation stopped
 

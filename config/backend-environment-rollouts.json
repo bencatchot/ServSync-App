@@ -8,8 +8,8 @@
       "artifact": "server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql (SHA-256 4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4)",
       "environments": {
         "demo": {
-          "status": "Pending",
-          "reason": "Prior approved bytes were blocked at read-only preflight; no SQL was attempted. Revised source removes managed Auth grants and reads PostgREST-validated request claims with unchanged tenant RLS. New hash requires fresh exact-byte approval. Allowlist stays empty; no install retry, access/configuration change, cleanup or deployment. See docs/features/PRACTICE_DEMO_DRAFT_APPROVAL.md."
+          "status": "Applied",
+          "reason": "Ben approved exact SQL at 4618568d99fa731b571cabaa602bfb5f97431478 / SHA-256 4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4. Applied once as migration 20261016180520 on 2026-10-16. Pilots/cycles/Drafts all empty; Practice remains inactive/unmounted. Existing Demo catalog fingerprints, all 162 public-table row counts, managed Auth ACLs/owners/memberships and advisor findings unchanged. Private schema remains unexposed. No pilot activation, production change or deployment. See docs/features/PRACTICE_DEMO_INSTALLATION_2026-10-16.md."
         },
         "production": {
           "status": "N/A",

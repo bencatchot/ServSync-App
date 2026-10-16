@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Approved Practice Demo SQL installed, feature still inactive
+
+- Applied only approved SQL hash `4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4` from `4618568` to existing Demo, migration `20261016180520`. No pilot bindings, cycles or Drafts.
+- Read-back verified restricted executor, FORCE RLS, exact ACLs and unexposed private schema. Existing catalog fingerprints, all 162 public-table row counts, managed Auth permissions/definitions and security-advisor finding content are unchanged.
+- [Execution record](../features/PRACTICE_DEMO_INSTALLATION_2026-10-16.md) distinguishes catalog verification from still-pending user-session/UI/provider acceptance and cross-environment parity. Rollout ledger now marks only Demo Applied. No merge, code push, deployment, new credential, real-data write or cleanup. Tutorial impact: NOT APPLICABLE.
+
 ## 2026-10-16 — Practice draft revised for managed installer permissions
 
 - The prior approved Demo installation stopped at read-only preflight; no SQL was attempted. The local fixture had incorrectly supplied Auth grant options. It now models the observed managed owners/ACLs and non-superuser installer, including existing BYPASSRLS.
