@@ -382,16 +382,16 @@ export function PracticeDemoReview({ transport }: { transport: Transport }) {
             </p>
             {workspace && (
               <p className="mt-2 font-bold">
-                Access expires:{" "}
+                Practice cycle expires:{" "}
                 <time>{new Date(workspace.expires_at).toISOString()}</time>{" "}
                 (UTC)
               </p>
             )}
             <p className="mt-2 text-sm">
-              Expiry makes saved content unavailable. Automatic deletion and
-              renewal are not enabled; stored data may remain after expiry.
-              In-app warnings appear in the last 7 days and last day. No email
-              is sent.
+              Pilot access may end before the cycle expires. Expiry makes saved
+              content unavailable. Automatic deletion and renewal are not
+              enabled; stored data may remain after expiry. In-app warnings
+              appear in the last 7 days and last day. No email is sent.
             </p>
             {notice === "seven_days" && (
               <p role="alert">Practice expires within 7 days.</p>
