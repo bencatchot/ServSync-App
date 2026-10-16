@@ -154,7 +154,7 @@ test("canonical money totals, blank versus zero, invalid inputs and warning thre
   assert.equal(validatePracticePreview(draft()).totalCents, 25000);
   const d = draft();
   d.line_items[0].unit_price = "";
-  assert.throws(() => validatePracticePreview(d), /Price every/);
+  assert.throws(() => validatePracticePreview(d), /Price line/);
   d.line_items[0].unit_price = "0";
   assert.equal(validatePracticePreview(d).totalCents, 0);
   d.line_items[0].quantity = "NaN";
@@ -995,4 +995,17 @@ process.stdin.on('end',()=>{
     /Missing database result/,
   );
   assert.equal(await query(fixture.db, OWNER, "select null::json;"), null);
+});
+
+test('Practice currency normalization agrees with shared rounding and requires descriptions only at preview', () => {
+  const d = draft();
+  for (const [input, expected] of [['$125.25', 25050], ['1,250.50', 250100], ['125.255', 25052], ['.50', 100]]) {
+    d.line_items[0].unit_price = String(input);
+    assert.equal(validatePracticePreview(d).totalCents, expected);
+  }
+  d.line_items[0].unit_price = 'invalid';
+  assert.throws(() => sanitizePracticeDraft(d), /non-negative price/);
+  d.line_items[0].unit_price = '125.25'; d.line_items[0].line_title = ''; d.line_items[0].description = '';
+  assert.doesNotThrow(() => sanitizePracticeDraft(d));
+  assert.throws(() => validatePracticePreview(d), /Describe what line 1 covers/);
 });

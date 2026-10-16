@@ -4,6 +4,24 @@
   "authoritativeEnvironment": "production",
   "foundations": [
     {
+      "id": "practice-demo-access-deadline-response",
+      "artifact": "server/practice/demo-draft/20261016193850_practice_demo_access_deadline_response.sql",
+      "environments": {
+        "demo": {
+          "status": "Pending",
+          "reason": "Response-only source draft adds the existing pilot access deadline to state/start. Verified only in disposable local PostgreSQL. Approved application stopped at read-only preflight: the managed operator is not superuser and cannot inherit or SET ROLE to the function owner. No SQL attempted. Existing function-owner capability is required; no privilege grant or credential change is authorized. See docs/features/PRACTICE_DEMO_IMPROVEMENTS_REVIEW.md."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Demo-only Practice response; no Production installation proposed."
+        },
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Existing Demo reuse remains the approved direction; no Sandbox installation proposed."
+        }
+      }
+    },
+    {
       "id": "practice-demo-review-draft",
       "artifact": "server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql (SHA-256 4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4)",
       "environments": {

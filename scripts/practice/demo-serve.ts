@@ -26,6 +26,8 @@ const migration = readFileSync(
 await admin(`create role anon nologin; create role authenticated nologin; create role service_role nologin;
 create schema auth; create function auth.uid() returns uuid language sql as $$select null::uuid$$;
 set local servsync.reviewed_demo_target='bdytwgejqnlblhrnqxkp'; ${migration} select null::json;`);
+// Local-only evaluation of the pending response contract. The hosted function is unchanged.
+await admin(`set local servsync.reviewed_demo_target='bdytwgejqnlblhrnqxkp'; ${readFileSync(new URL('../../server/practice/demo-draft/20261016193850_practice_demo_access_deadline_response.sql', import.meta.url), 'utf8')} select null::json;`);
 const actors = [OWNER, OTHER_OWNER];
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const servers: ViteDevServer[] = [];
@@ -90,6 +92,8 @@ try {
                   result = await admin(
                     `update servsync_practice_demo.cycles set expires_at=clock_timestamp()+interval '3 seconds' where user_id=${sql(b.actor)}; select null::json;`,
                   );
+                } else if (req.url === "/__fixture/short-access") {
+                  result = await admin(`update servsync_practice_demo.pilots set access_until=clock_timestamp()+interval '3 seconds' where user_id=${sql(b.actor)}; select null::json;`);
                 } else if (req.url === "/__fixture/revoke") {
                   result = await admin(
                     `update servsync_practice_demo.pilots set enabled=false where user_id=${sql(b.actor)}; select null::json;`,

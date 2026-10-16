@@ -2,6 +2,10 @@
 
 October 16, 2026 · [Issue #587](https://github.com/bencatchot/ServSync-App/issues/587) · [Draft PR #588](https://github.com/bencatchot/ServSync-App/pull/588)
 
+## Subsequent status — local improvement pass
+
+The activation proposal below is historical: a later separately approved single-account Demo pilot completed synthetic start/save/refresh/resume/PDF acceptance. Its existing deadline and saved draft remain unchanged. The [October 16 local improvement review](PRACTICE_DEMO_IMPROVEMENTS_REVIEW.md) supersedes the UI/test counts below for the reviewed improvement pass. UI-only publication is approved; exact commit/Preview evidence follows in PR #588. The deadline response SQL is a separate unapplied draft, blocked by existing function-owner privileges. Private account/session evidence stays outside this public repository.
+
 ## Implemented scope
 
 `/#/practice-demo` is an isolated entry using the installed Demo state/start/save RPC and the existing estimate composer/PDF renderer. It requires the build flag `VITE_SERVSYNC_DEMO_PRACTICE_ENABLED=true`, exact Demo project reference `bdytwgejqnlblhrnqxkp`, and exact Supabase URL `https://bdytwgejqnlblhrnqxkp.supabase.co`. Missing or mismatched configuration leaves it off before loading the Auth client or normal business app. Query strings and browser storage cannot enable it.

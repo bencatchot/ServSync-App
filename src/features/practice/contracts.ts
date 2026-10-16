@@ -120,6 +120,25 @@ function numberInput(value: unknown, { blank = false, positive = false } = {}) {
     throw new Error("Number is outside the supported range.");
   return input;
 }
+export class PracticeInputError extends Error {
+  constructor(message: string, public readonly fieldLabel?: string) {
+    super(message);
+  }
+}
+function field<T>(label: string, read: () => T): T {
+  try { return read(); } catch (error) {
+    throw new PracticeInputError(`${label}: ${error instanceof Error ? error.message : "Check this value."}`, label);
+  }
+}
+// The shared editor accepts dollars and grouping commas. Normalize before the
+// existing strict wire validator; SQL still receives a bounded decimal string.
+function moneyInput(value: unknown) {
+  const cleaned = text(value, 32).replace(/[$,]/g, "").trim();
+  if (cleaned === "") return "";
+  if (!/^(?:\d+(?:\.\d{0,4})?|\.\d{1,4})$/.test(cleaned))
+    throw new Error("Enter a non-negative price, such as 125.25.");
+  return numberInput(String(Number(cleaned)));
+}
 function lineType(value: unknown): ContractorPriceBookItem["line_type"] {
   if (
     value !== "labor" &&
@@ -144,28 +163,28 @@ export function sanitizePracticeDraft(
   if (!["job_total", "line_specific"].includes(String(v.labor_mode)))
     throw new Error("Unsupported labor mode.");
   const draft = createBlankSharedDraftComposerDraft({
-    title: text(v.title, 200),
-    scope: text(v.scope, 10000),
+    title: field("What needs doing?", () => text(v.title, 200)),
+    scope: field("Scope / description", () => text(v.scope, 10000)),
     notes: "",
     intended_output: "estimate",
     subject_type: "local",
     local_contact_id: "practice-customer",
     local_home_id: "practice-property",
     labor_mode: v.labor_mode as SharedDraftComposerDraft["labor_mode"],
-    labor_rate: numberInput(v.labor_rate, { blank: true }),
-    job_labor_hours: numberInput(v.job_labor_hours, { blank: true }),
+    labor_rate: field("Draft Estimate labor rate", () => moneyInput(v.labor_rate)),
+    job_labor_hours: field("Draft Estimate total labor hours", () => numberInput(v.job_labor_hours, { blank: true })),
     line_items: v.line_items.map((inputLine, i) => {
       const line = record(inputLine);
       return createWorkComposerLineDraft({
         id: `practice-line-${i}`,
         line_type: lineType(line.line_type),
-        description: text(line.line_title || line.description, 500),
-        line_title: text(line.line_title || line.description, 500),
-        customer_description: text(line.customer_description ?? "", 2000),
-        quantity: numberInput(line.quantity, { positive: true }),
-        unit: text(line.unit, 40),
-        unit_price: numberInput(line.unit_price, { blank: true }),
-        labor_hours: numberInput(line.labor_hours ?? "", { blank: true }),
+        description: field(`Draft estimate line item ${i + 1} description`, () => text(line.line_title || line.description, 500)),
+        line_title: field(`Draft estimate line item ${i + 1} description`, () => text(line.line_title || line.description, 500)),
+        customer_description: field(`Draft estimate line item ${i + 1} customer description`, () => text(line.customer_description ?? "", 2000)),
+        quantity: field(`Draft estimate line item ${i + 1} quantity`, () => numberInput(line.quantity, { positive: true })),
+        unit: field(`Draft estimate line item ${i + 1} unit`, () => text(line.unit, 40)),
+        unit_price: field(`Draft estimate line item ${i + 1} unit price`, () => moneyInput(line.unit_price)),
+        labor_hours: field(`Draft estimate line item ${i + 1} labor hours`, () => numberInput(line.labor_hours ?? "", { blank: true })),
       });
     }),
   });
@@ -177,18 +196,28 @@ export function sanitizePracticeDraft(
   return draft;
 }
 export function validatePracticePreview(input: unknown) {
-  const draft = sanitizePracticeDraft(input);
-  if (!draft.title.trim() || !draft.scope.trim() || !draft.line_items.length)
-    throw new Error("Add a title, scope and at least one priced line.");
-  if (draft.line_items.some((line) => line.unit_price === ""))
-    throw new Error("Price every line. Use 0 for an included item.");
+  let draft: SharedDraftComposerDraft;
+  try {
+    draft = sanitizePracticeDraft(input);
+  } catch (error) {
+    throw error instanceof PracticeInputError
+      ? error
+      : new PracticeInputError(error instanceof Error ? error.message : "Check this draft.");
+  }
+  if (!draft.title.trim()) throw new PracticeInputError("Add a title for the work.", "What needs doing?");
+  if (!draft.scope.trim()) throw new PracticeInputError("Describe the scope your customer will review.", "Scope / description");
+  if (!draft.line_items.length) throw new PracticeInputError("Add at least one priced line.", "Draft estimate line item 1 description");
+  for (const [index, line] of draft.line_items.entries()) {
+    if (!line.line_title.trim()) throw new PracticeInputError(`Describe what line ${index + 1} covers.`, `Draft estimate line item ${index + 1} description`);
+    if (line.unit_price === "") throw new PracticeInputError(`Price line ${index + 1}. Use 0 for an included item.`, `Draft estimate line item ${index + 1} unit price`);
+  }
   const totals = workComposerDraftFinancialBreakdown(draft);
   if (
     totals.missingLaborRate ||
     !Number.isSafeInteger(totals.subtotalCents) ||
     totals.subtotalCents > 100000000
   )
-    throw new Error("Review the labor rate and total (maximum $1,000,000).");
+    throw new PracticeInputError("Review the labor rate and total (maximum $1,000,000).", totals.missingLaborRate ? "Draft Estimate labor rate" : undefined);
   return { draft, totalCents: totals.subtotalCents };
 }
 export function sanitizeSnapshot(input: unknown): PracticeSnapshot {

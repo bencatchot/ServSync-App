@@ -19,6 +19,9 @@ export class DemoPracticeRequestError extends Error {
 export type DemoPracticeState = {
   status: "not_started" | "active" | "expired";
   serverNow: string;
+  // Optional until the reviewed response-only SQL update is installed.
+  accessExpiresAt?: string;
+  effectiveExpiresAt?: string;
   // Conservative monotonic deadline; computed locally, never trusted from the server payload.
   accessDeadline?: number;
   workspace:
@@ -143,11 +146,17 @@ export function createDemoPracticeTransport(options: {
   ): Promise<DemoPracticeState> => {
     const started = performance.now();
     const value = (await call(command)) as DemoPracticeState;
+    const cycleExpiry = value.workspace?.expires_at;
+    const dates = [cycleExpiry, value.accessExpiresAt].filter((date): date is string => Boolean(date));
+    if (!Number.isFinite(Date.parse(value.serverNow)) || dates.some(date => !Number.isFinite(Date.parse(date))))
+      throw new Error("Practice deadline could not be verified. Recheck access.");
+    const effectiveExpiresAt = dates.length ? new Date(Math.min(...dates.map(date => Date.parse(date)))).toISOString() : undefined;
     return {
       ...value,
-      accessDeadline: value.workspace
+      effectiveExpiresAt,
+      accessDeadline: effectiveExpiresAt
         ? started +
-          Date.parse(value.workspace.expires_at) -
+          Date.parse(effectiveExpiresAt) -
           Date.parse(value.serverNow)
         : undefined,
       drafts: value.drafts.map(draft),

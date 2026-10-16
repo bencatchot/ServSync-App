@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Practice improvements verified locally, UI-only publication approved
+
+- Added sample/blank starts, compact Practice-only guidance and one-row Save/Preview actions, working return-to-drafts navigation, inline currency/description recovery, and PDF-close keyboard focus restoration. Shared real-editor defaults remain unchanged.
+- Independent review found and verified repairs for unreadable primary buttons and overlong-description errors hiding the editor. All 24 desktop Chromium/mobile WebKit tests and 44 disposable PostgreSQL/contract checks pass. No hosted acceptance is claimed for this working tree.
+- Owner approved UI-only publication after read-only database preflight confirmed the existing operator cannot inherit or assume function-owner authority. No SQL was attempted and no grants/ownership/credentials changed.
+- Prepared a separate unapplied state/start response draft for the existing pilot deadline; legacy responses clearly disclose that access may end before the cycle. Installed SQL remains byte-identical. No pilot reset, renewal, cleanup or shared application occurred.
+- [Local evidence, UI recommendations and remaining gates](../features/PRACTICE_DEMO_IMPROVEMENTS_REVIEW.md). Backlog and rollout ledger distinguish the prior approved pilot from this UI improvement pass. Tutorial impact: NONE after final local application validation and read-only Demo Help catalog search found no matching current/published walkthrough.
+
 ## 2026-10-16 — Default-off synthetic Demo Practice UI prepared
 
 - Added an isolated `/#/practice-demo` entry, exact Demo/build gating, existing-session handling and synthetic state/start/save editor using the reviewed installed RPC. No normal App/business queries load in this entry; no hosted pilot or setting was enabled.

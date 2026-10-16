@@ -87,10 +87,10 @@ async function bridge(context: BrowserContext, actor = OWNER) {
 async function start(page: Page) {
   await page.goto("/#/practice-demo");
   await page
-    .getByRole("button", { name: "Start Practice with fictional setup" })
+    .getByRole("button", { name: "Start blank" })
     .click();
   await expect(
-    page.getByRole("button", { name: "New Practice Draft", exact: true }),
+    page.getByRole("button", { name: "Back to Practice drafts", exact: true }),
   ).toBeVisible();
 }
 async function fill(page: Page, title = "Synthetic repair") {
@@ -156,14 +156,14 @@ test("actual SQL saves, reloads, resumes in another browser context and produces
   page.on("pageerror", (e) => errors.push(e.message));
   await start(page);
   await expect(
-    page.getByText("No saved Drafts yet.", { exact: false }),
+    page.getByText("New unsaved Practice Draft.", { exact: false }),
   ).toBeVisible();
   await fill(page);
   await save(page);
   expect(await control(request, "count")).toBe(1);
   await page.reload();
   await page
-    .getByRole("button", { name: "Synthetic repair", exact: true })
+    .getByRole("button", { name: /^Synthetic repair Continue saved draft/ })
     .click();
   await expect(
     page.getByLabel("Draft estimate line item 1 quantity", { exact: true }),
@@ -173,7 +173,7 @@ test("actual SQL saves, reloads, resumes in another browser context and produces
   const other = await second.newPage();
   await other.goto(`${base}/#/practice-demo`);
   await other
-    .getByRole("button", { name: "Synthetic repair", exact: true })
+    .getByRole("button", { name: /^Synthetic repair Continue saved draft/ })
     .click();
   await expect(other.getByLabel("What needs doing?")).toHaveValue(
     "Synthetic repair",
@@ -218,7 +218,7 @@ test("unsaved changes survive cancelled navigation, token refresh and an offline
   await fill(page, "Unsaved example");
   page.on("dialog", (d) => void d.dismiss());
   await page
-    .getByRole("button", { name: "New Practice Draft", exact: true })
+    .getByRole("button", { name: "Back to Practice drafts", exact: true })
     .click();
   await expect(page.getByLabel("What needs doing?")).toHaveValue(
     "Unsaved example",
@@ -280,7 +280,7 @@ test("lost save acknowledgement retries the same Draft without duplication; conc
   const other = await second.newPage();
   await other.goto(`${base}/#/practice-demo`);
   await other
-    .getByRole("button", { name: "Synthetic repair", exact: true })
+    .getByRole("button", { name: /^Synthetic repair Continue saved draft/ })
     .click();
   await other.getByLabel("What needs doing?").fill("Other saved edit");
   await save(other);
@@ -312,13 +312,13 @@ test("expiry closes the PDF and revocation prevents download", async ({
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 6000 });
   await expect(
-    page.getByText("This Practice cycle has expired.", { exact: false }),
+    page.getByText("Practice access has ended.", { exact: false }),
   ).toBeVisible();
   await expect(page.getByLabel("What needs doing?")).toHaveCount(0);
   await control(request, "reset");
   await page.reload();
   await page
-    .getByRole("button", { name: "Start Practice with fictional setup" })
+    .getByRole("button", { name: "Start blank" })
     .click();
   await fill(page);
   await save(page);
@@ -368,13 +368,13 @@ test("account changes discard old input and ignore a late save response", async 
   await seen;
   await broadcast(page, "SIGNED_IN", OTHER_OWNER);
   await expect(
-    page.getByRole("button", { name: "Start Practice with fictional setup" }),
+    page.getByRole("button", { name: "Start blank" }),
   ).toBeVisible();
   release();
   await delivered;
   await page.unroute(rpc);
   await page
-    .getByRole("button", { name: "Start Practice with fictional setup" })
+    .getByRole("button", { name: "Start blank" })
     .click();
   await expect(page.getByLabel("What needs doing?")).toHaveValue("");
   await expect(
@@ -414,11 +414,11 @@ test("initial access checks are serialized and delayed expired responses never o
   expect(stateCalls).toBe(calls);
   release();
   await expect(
-    page.getByRole("button", { name: "Start Practice with fictional setup" }),
+    page.getByRole("button", { name: "Start blank" }),
   ).toBeVisible();
   await page.unroute(rpc);
   await page
-    .getByRole("button", { name: "Start Practice with fictional setup" })
+    .getByRole("button", { name: "Start blank" })
     .click();
   await fill(page);
   await save(page);
@@ -439,7 +439,7 @@ test("initial access checks are serialized and delayed expired responses never o
     .getByRole("button", { name: "Preview Practice estimate", exact: true })
     .click();
   await expect(
-    page.getByText("This Practice cycle has expired.", { exact: false }),
+    page.getByText("Practice access has ended.", { exact: false }),
   ).toBeVisible({ timeout: 8000 });
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
@@ -452,7 +452,7 @@ test("browser Back cancellation keeps unsaved input and public delivery entry re
   await page.goto("/#/estimate-delivery");
   await page.goto("/#/practice-demo");
   await page
-    .getByRole("button", { name: "Start Practice with fictional setup" })
+    .getByRole("button", { name: "Start blank" })
     .click();
   await fill(page, "Keep after Back");
   page.on("dialog", (d) => void d.dismiss());
@@ -514,4 +514,97 @@ test("public delivery routes consume tokens without mounting the business app", 
       /supabaseClient|\/src\/App\.tsx|supabase\.co/.test(u),
     ),
   ).toEqual([]);
+});
+
+test('guided sample uses real editor, stays unsaved until Save, and returns to saved drafts', async ({ page, context, request }, info) => {
+  const external = await bridge(context);
+  await page.goto('/#/practice-demo');
+  await page.getByRole('button', { name: 'Try sample repair', exact: true }).click();
+  await expect(page.getByLabel('What needs doing?')).toHaveValue('Sample — small repair visit');
+  await expect(page.getByLabel('Draft estimate line item 1 unit price', { exact: true })).toHaveValue('75');
+  await expect(page.getByLabel('Draft estimate line item 2 description', { exact: true })).toHaveValue('Small repair');
+  expect(await control(request, 'count')).toBe(0);
+  await expect(page.getByLabel('Work format', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Show draft estimate line item 1 more details' })).toHaveCount(0);
+  await expect(page.getByText('Build a work list or start from an inspection checklist.')).toHaveCount(0);
+  const previewButton = page.getByRole('button', { name: 'Preview Practice estimate', exact: true });
+  const colors = await previewButton.evaluate(el => ({ text: getComputedStyle(el).color, background: getComputedStyle(el).backgroundColor }));
+  expect(colors.text).not.toBe(colors.background);
+  expect(colors.background).not.toBe('rgb(255, 255, 255)');
+  const saveBounds = await page.getByRole('button', { name: 'Save Draft', exact: true }).boundingBox();
+  const previewBounds = await previewButton.boundingBox();
+  expect(Math.abs(saveBounds!.y - previewBounds!.y)).toBeLessThan(5);
+  const position = await page.getByLabel('What needs doing?').evaluate(el => ({ top: el.getBoundingClientRect().top, height: innerHeight }));
+  expect(position.top).toBeLessThan(position.height + 150);
+  await page.screenshot({ path: info.outputPath('guided-sample.png'), fullPage: true });
+  await save(page);
+  await page.getByRole('button', { name: 'Back to Practice drafts' }).click();
+  await expect(page.getByLabel('What needs doing?')).toHaveCount(0);
+  await page.getByRole('button', { name: /Sample — small repair visit Continue saved draft/ }).click();
+  await expect(page.getByLabel('What needs doing?')).toHaveValue('Sample — small repair visit');
+  expect(await control(request, 'count')).toBe(1);
+  expect(external).toEqual([]);
+});
+
+test('currency keyboard entry, rounding, inline recovery and missing-description preview use consistent values', async ({ page, context, request }) => {
+  await bridge(context); await start(page); await fill(page);
+  const price = page.getByLabel('Draft estimate line item 1 unit price', { exact: true });
+  await price.fill(''); await price.pressSequentially('125.25');
+  await expect(price).toHaveValue('125.25');
+  await price.fill('$125.255'); await save(page);
+  await expect(price).toHaveValue('125.255');
+  await page.getByRole('button', { name: 'Preview Practice estimate', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('$250.52');
+  await page.getByRole('button', { name: 'Close preview' }).click();
+  await expect(page.getByRole('button', { name: 'Preview Practice estimate', exact: true })).toBeFocused();
+  await price.fill('1,250.50'); await save(page);
+  await expect(price).toHaveValue('1250.5');
+  await price.fill('not a price');
+  await page.getByRole('button', { name: 'Save Draft', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Enter a non-negative price');
+  await expect(price).toBeVisible(); await expect(price).toBeFocused();
+  await expect(price).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('button', { name: 'Recheck Practice access' })).toHaveCount(0);
+  await price.fill('$125.25'); await save(page);
+  await page.reload();
+  await page.getByRole('button', { name: /^Synthetic repair Continue saved draft/ }).click();
+  await expect(price).toHaveValue('125.25');
+  const description = page.getByLabel('Draft estimate line item 1 description', { exact: true });
+  await description.fill('x'.repeat(501));
+  await page.getByRole('button', { name: 'Preview Practice estimate', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Invalid or oversized text');
+  await expect(description).toBeFocused();
+  await expect(description).toHaveValue('x'.repeat(501));
+  await expect(page.getByRole('button', { name: 'Recheck Practice access' })).toHaveCount(0);
+  await description.fill('');
+  await page.getByRole('button', { name: 'Preview Practice estimate', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Describe what line 1 covers');
+  await expect(description).toBeFocused(); await expect(page.getByRole('dialog')).toHaveCount(0);
+  await description.fill('Fictional repair');
+  await page.getByRole('button', { name: 'Preview Practice estimate', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('$250.50');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Preview Practice estimate', exact: true })).toBeFocused();
+  expect(await control(request, 'count')).toBe(1);
+});
+
+test('pending deadline response uses earliest access expiry; legacy response never labels cycle as access', async ({ page, context, request }) => {
+  await bridge(context); await start(page); await fill(page);
+  await page.route(rpc, async route => {
+    const body = route.request().postDataJSON();
+    const r = await context.request.post(`${base}/__fixture/rpc`, { headers: { 'x-local-fixture': 'synthetic-browser-test' }, data: { actor: OWNER, body } });
+    const value = await r.json(); delete value.accessExpiresAt;
+    await route.fulfill({ status: r.status(), contentType: 'application/json', body: JSON.stringify(value) });
+  });
+  await page.reload();
+  await expect(page.getByLabel('Practice access deadline')).toContainText('Access deadline unavailable');
+  await expect(page.getByLabel('Practice access deadline')).not.toContainText('Access ends');
+  await page.unroute(rpc);
+  await page.getByRole('button', { name: 'Start blank', exact: true }).click(); await fill(page);
+  await control(request, 'short-access');
+  await page.getByRole('button', { name: 'Preview Practice estimate', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Practice access deadline')).toContainText('Access ends');
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 6000 });
+  await expect(page.getByRole('alert')).toContainText('Practice access has ended');
 });

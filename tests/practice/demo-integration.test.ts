@@ -156,6 +156,11 @@ before(async () => {
   await admin(
     `set session authorization demo_installer; set local servsync.reviewed_demo_target='bdytwgejqnlblhrnqxkp'; ${migration} select null::json;`,
   );
+  const before = await admin(`select jsonb_build_object('owner',proowner,'acl',proacl,'definer',prosecdef,'config',proconfig) from pg_proc where oid='servsync_practice_demo.dispatch(text,jsonb)'::regprocedure;`);
+  const responseDraft = readFileSync(new URL('../../server/practice/demo-draft/20261016193850_practice_demo_access_deadline_response.sql', import.meta.url), 'utf8');
+  await admin(`set local servsync.reviewed_demo_target='bdytwgejqnlblhrnqxkp'; ${responseDraft} select null::json;`);
+  assert.deepEqual(await admin(`select jsonb_build_object('owner',proowner,'acl',proacl,'definer',prosecdef,'config',proconfig) from pg_proc where oid='servsync_practice_demo.dispatch(text,jsonb)'::regprocedure;`), before);
+
 });
 after(() => fixture?.close());
 
@@ -688,4 +693,15 @@ test("UI gate requires explicit flag and both exact Demo destination identifiers
     );
     assert.equal(demoPracticeEnabled({ ...correct, [field]: "wrong" }), false);
   }
+});
+
+test('response-only draft returns current pilot deadline without changing cycle or save identity', async () => {
+  const actor = await pilot();
+  const initial = await rpc(actor, 'start');
+  await admin(`update servsync_practice_demo.pilots set access_until=clock_timestamp()+interval '2 hours' where user_id=${sql(actor)}; select null::json;`);
+  const state = await rpc(actor, 'state');
+  assert.ok(state.accessExpiresAt);
+  assert.ok(Date.parse(state.accessExpiresAt) < Date.parse(state.workspace.expires_at));
+  assert.equal(state.workspace.id, initial.workspace.id);
+  assert.equal(state.workspace.expires_at, initial.workspace.expires_at);
 });
