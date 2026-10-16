@@ -250,6 +250,8 @@ test("generated files are bounded and app cannot invoke cleanup or extend expiry
   );
 });
 test("cleanup is dry-run, exact-target guarded and idempotent; fresh cycle and destination survive", async () => {
+  await assert.rejects(query(fixture.db, OWNER, "delete from practice.workspaces; select '{}'::json;", "practice_cleanup"), /permission/);
+  await assert.rejects(query(fixture.db, OWNER, "select json_agg(payload) from practice.drafts;", "practice_cleanup"), /permission/);
   const { own, w } = await isolatedOwner();
   const d = await own.save(w.id, randomUUID(), 0, draft());
   await own.file(w.id, randomUUID(), new TextEncoder().encode("%PDF-owned"));

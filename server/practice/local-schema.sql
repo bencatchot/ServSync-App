@@ -25,7 +25,7 @@ create policy own_binding on practice.owners to practice_app using (owner_id=pra
 create function practice.owns(contractor uuid) returns boolean language sql stable as $$
   select exists(select 1 from practice.owners where contractor_id = contractor and owner_id = practice.actor() and enabled)
 $$;
-grant select on practice.environment, practice.owners to practice_app, practice_cleanup;
+grant select on practice.environment, practice.owners to practice_app;
 create table practice.workspaces (
   id uuid primary key default gen_random_uuid(), contractor_id uuid not null references practice.owners,
   created_at timestamptz not null default clock_timestamp(),
@@ -132,17 +132,11 @@ create trigger guard_draft before insert or update on practice.drafts for each r
 create trigger guard_file before insert on practice.files for each row execute function practice.guard_child();
 create trigger guard_transfer before insert or update on practice.transfers for each row execute function practice.guard_child();
 
--- Cleanup is a separate authority. Ordinary app traffic cannot execute deletion.
-do $$ declare t text; begin
-  foreach t in array array['workspaces','drafts','files','transfers'] loop
-    execute format('create policy cleanup_rows on practice.%I to practice_cleanup using (true) with check (true)',t);
-  end loop;
-end $$;
-grant select, delete on practice.workspaces, practice.drafts, practice.files, practice.transfers to practice_cleanup;
--- FOR UPDATE requires an UPDATE privilege; no column values are changed by cleanup.
-grant update(id) on practice.workspaces to practice_cleanup;
+-- Cleanup is a narrow private capability, not a role with arbitrary row-delete access.
+-- These two owner-run functions are the only elevation; fixed search paths and explicit
+-- disposable-target/expiry/transfer checks are mandatory. No browser can execute them.
 create function practice.cleanup_plan() returns table(workspace_id uuid, expires_at timestamptz, draft_count bigint, file_count bigint, file_bytes bigint, blocked boolean)
-language sql as $$
+language sql security definer set search_path=pg_catalog,practice as $$
   select w.id, w.expires_at,
     (select count(*) from practice.drafts where workspace_id=w.id),
     (select count(*) from practice.files where workspace_id=w.id),
@@ -151,7 +145,7 @@ language sql as $$
   from practice.workspaces w where w.expires_at <= clock_timestamp()
 $$;
 create function practice.cleanup_disposable(expected_database text, target uuid, expected_expiry timestamptz) returns boolean
-language plpgsql as $$
+language plpgsql security definer set search_path=pg_catalog,practice as $$
 declare w practice.workspaces;
 begin
   if current_database() <> expected_database or current_database() !~ '^servsync_practice_local_[a-f0-9]+$'
