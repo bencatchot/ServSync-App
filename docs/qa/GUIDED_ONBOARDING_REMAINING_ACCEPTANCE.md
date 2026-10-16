@@ -1,6 +1,6 @@
 # Guided onboarding — exact remaining acceptance scope
 
-Issue #585 / draft PR #586. This is a proposed test scope, not evidence that the listed writes or signup have occurred. No test credentials or private record IDs belong in this document.
+Issue #585 / draft PR #586. The bounded Demo record test below was explicitly approved and completed on October 15. Fresh signup remains unverified. No test credentials or private record IDs belong in this document.
 
 ## Verified existing fixture
 
@@ -11,9 +11,13 @@ Issue #585 / draft PR #586. This is a proposed test scope, not evidence that the
 
 The established Demo account is suitable for persistence testing but cannot prove fresh signup. Do not reset its profile/history to simulate a new contractor. Do not run the existing seed/reset/full-core-loop tools: their cleanup permanently deletes records, and some workflows create additional records or messages outside this bounded test.
 
-## Minimal hosted save/resume/retry test — approval not yet requested or exercised
+## Minimal hosted save/resume/retry test — approved and passed October 15
 
-Proposed authorization: use the existing Demo owner and existing Sarah Johnson / Demo Bay Home fixture to **create and retain one uniquely labeled synthetic Draft with one line, then one unsent Estimate from that same Draft**. No other business objects are needed.
+Exactly one Draft/item and one unsent $125 Estimate/item were retained, with one durable launch receipt. The interrupted initial Save first wrote nothing; its forwarded retry committed once and an intentionally suppressed response was reconciled through the unique Draft list entry. Refresh, navigation, another browser login and known-ID save preserved the same Draft. A suppressed successful launch response followed by the UI's same-key retry returned the same Estimate with `idempotent=true`; independent read-only verification confirmed the counts, consumed Draft, unsent Estimate and total. The automatic private audit row was not inspected. IDs and complete receipts remain in the private local test report. No deletion, messages, signup or configuration changes occurred.
+
+The following describes the exact executed scope, including its limits:
+
+Executed authorization: use the existing Demo owner and existing Sarah Johnson / Demo Bay Home fixture to **create and retain one uniquely labeled synthetic Draft with one line, then one unsent Estimate from that same Draft**. No other business objects are needed.
 
 Use a unique title such as `ONBOARDING QA PR586 <UTC run timestamp> — DO NOT SEND`, scope `Synthetic acceptance fixture; retain for review; do not send`, one labor line `Synthetic repair`, quantity 1, price $125.00, tax zero. Do not use a real customer, add contacts/properties, connect payments or alter the existing shared fixture.
 
@@ -26,7 +30,7 @@ Use a unique title such as `ONBOARDING QA PR586 <UTC run timestamp> — DO NOT S
 
 Expected retained footprint is **six product rows**: one `contractor_work_drafts`, one `contractor_work_draft_items`, one `contractor_work_draft_launches`, one `estimates`, one `estimate_line_items`, and the existing automatic `estimate_actor_audit` row. This follows the prior six-record Draft-first Demo receipt in PR #577 and the existing SQL path. The Owner cannot directly inspect the private audit table; do not grant access or claim a privileged audit-row count was checked. Keep all other records and the shared scenario registry unchanged.
 
-Permitted mutation RPCs for this proposed run are only `servsync_save_work_draft` and `servsync_launch_work_draft`, with payload checks binding them to this run and the verified fixture. The save payload must not remove items. Block notifications, email/SMS, payment, other outputs, deletes and all other write endpoints. The current recorder/read-only test deliberately permits neither mutation RPC.
+Permitted mutation RPCs for this run are only `servsync_save_work_draft` and `servsync_launch_work_draft`, with payload checks binding them to this run and the verified fixture. The save payload must not remove items. Block notifications, email/SMS, payment, other outputs, deletes and all other write endpoints. The current recorder/read-only test deliberately permits neither mutation RPC.
 
 ## Fresh-account signup and first-run acceptance — owner action required
 
@@ -41,7 +45,7 @@ After the owner completes that action, verify new-account first entry, empty sta
 ## Narrow decisions
 
 1. Completed: exact corrected-Preview bypass approval and desktop/mobile read-only verification.
-2. Separately approve the one-Draft/one-unsent-Estimate retained fixture test above if hosted persistence/retry acceptance should run. This is not approval to seed/reset or delete anything.
+2. Completed: the separately approved one-Draft/one-unsent-Estimate retained fixture test above. No approval to seed/reset or delete anything.
 3. Owner performs the one dedicated-inbox signup/confirmation if fresh-account acceptance is required; Codex does not create its credentials.
 
 Help recording review is independent of these writes. Help ingestion, paid narration and publication remain outside this authorization.

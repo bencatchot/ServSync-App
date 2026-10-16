@@ -43,7 +43,7 @@ A 68.92-second, 1440×900 silent review package was recorded from the validated 
 
 Local package: `~/Documents/Codex/2026-10-15/task-3/tut002-guided-setup-review/` (`preview.html`, MP4, 15-cue VTT, narration script, hash manifest, actual sample PDF and review images). It is explicitly a local review artifact, not an ingestible/published Help Studio package. Media SHA-256: `9cb7b1850ba8c6d816751c0add76efa16ff07259208b24794d83250525f92d1b`. Full playback completed at 68.92 seconds with no media error; 15 cues loaded and visible captions were visually checked using the existing Help caption font size. Package/media/PDF hashes were verified independently. No paid narration or new provider request. The existing narrated TUT-002 remains unchanged.
 
-The [exact remaining acceptance plan](../qa/GUIDED_ONBOARDING_REMAINING_ACCEPTANCE.md) identifies the verified Demo Owner/customer/property, a proposed retained one-Draft/one-unsent-Estimate test, the expected six-row footprint, initial-save versus launch retry limits, and the owner-controlled signup action needed for a genuinely fresh account. These proposed writes have not been exercised.
+The [exact remaining acceptance plan](../qa/GUIDED_ONBOARDING_REMAINING_ACCEPTANCE.md) identifies the verified Demo Owner/customer/property, a proposed retained one-Draft/one-unsent-Estimate test, the expected six-row footprint, initial-save versus launch retry limits, and the owner-controlled signup action needed for a genuinely fresh account. On October 15 the owner separately approved this bounded test: one retained Draft and one unsent $125 Estimate passed refresh, navigation, independent-login resume and same-key launch retry without duplicates. Private record IDs are held in the local acceptance receipt, not this repository. Fresh signup remains unverified; recovery of an ambiguous initial save used the existing Draft list, not blind replay.
 
 ## Existing adoption signals (source review only)
 
@@ -60,3 +60,7 @@ The [bounded update brief](../tutorials/GUIDED_FIRST_ESTIMATE_UPDATE_BRIEF.md) r
 “Guided setup helps you try a sample estimate or prepare your own Draft and review a customer preview. Optional business setup can wait.”
 
 Do not claim seamless onboarding is proven, advertise a completion-time guarantee, imply practice is a live customer record, promise autosave/cross-device guide progress, or describe this review branch as released.
+
+## Safari review-entry correction — October 16
+
+Both Sign in role choices failed in desktop WebKit on the reviewed `mddems300` Demo build: the blur handler hid native links before their click completed. No console/API error occurred. The narrow landing-menu repair keeps null-focus transitions open and closes on outside pointer actions or real focus exit. Chromium and WebKit tests exercise the actual links for both roles at 1440/820/390px plus keyboard/dismissal; all 28 public landing cases pass locally. Existing Demo uses normal email/password authentication; role selection is not automatic Demo login. No auth configuration or role boundary changed. Updated hosted evidence is maintained in PR #586.

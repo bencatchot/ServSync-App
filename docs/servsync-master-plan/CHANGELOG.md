@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Safari sign-in menu entry repair
+
+- Issue #585 / draft PR #586: reproduced both landing-page sign-in choices failing in WebKit on the exact reviewed Demo Preview. Safari blurs the summary with no next focus target before the native link click; the menu's blur handler closed it and hid the clicked link. Chromium desktop and mobile navigation reached the existing forms. No browser exception or backend failure caused this incident; the bug predates the onboarding changes.
+- Keep the role links visible through Safari's focus transition, retain close-on-focus-out for real focus destinations, and dismiss on outside pointer actions and Escape. Authentication, role checks, credentials and environment configuration are unchanged.
+- Local validation: 28 public browser checks passed, including actual homeowner/contractor clicks in Chromium and WebKit at desktop/tablet/mobile widths and keyboard/outside dismissal. Typecheck, production build, targeted lint and diff checks passed. Hosted verification is recorded in PR #586 after its automatic Preview build.
+- Prior explicitly approved Demo persistence acceptance also passed: one retained synthetic Draft and one unsent $125 Estimate, refresh/navigation/separate-login resume, and same-key launch retry with no duplicates. Private IDs remain outside the repository. Blind null-ID initial-save replay and fresh signup are not claimed.
+- Tutorial impact remains UPDATE REQUIRED for the guided-estimate TUT-002 replacement. No Help publication, shared migration, production deployment or merge.
+
 ## 2026-10-15 — Guided setup tutorial review package and PDF date correction
 
 - Issue #585 / draft PR #586 remains unmerged. A read-only local recorder reuses the established human pacing and media tools without invoking Demo seeding/reset or Help publication. Its 68.92-second captioned review shows actual isolated practice, customer PDF, refresh/resume, optional skipping and a fresh unsaved real Draft.
