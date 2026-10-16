@@ -1,10 +1,19 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Practice expiry and transfer recovery corrected
+
+- PR #588 remains local/test-only. Expiry is now enforced by database read policies; status-only reads and recovery use separate narrow capabilities.
+- Expired content no longer waits for an uncertain transfer. Detached payload-free operation identities, timestamp-bound admission, destination cancellation fencing and permanent Draft provenance preserve duplicate prevention through cleanup and receipt pruning. Fresh starts remove only the owner's expired local cycles.
+- Independent review identified a worker concurrency issue; atomic leases, bounded claims/retries and stale-result handling address it. Regression coverage includes revocation, outages, concurrent workers, late destination writes and cleanup/fresh-start races.
+- Ben requires no additional Supabase/Vercel projects. The [existing Demo reuse assessment](../features/PRACTICE_EXISTING_ENVIRONMENT_REUSE.md) records read-only deployed reset/RLS/function/capacity evidence, shared-runtime risks and the required new reviewed migration. The disposable schema guard remains intact.
+- Physical deletion and backup retention are distinguished from expiry access denial. No hosted worker, purge, resource, credential, shared migration, production change or sidebar change occurred.
+- Tutorial impact: NOT APPLICABLE to the local synthetic harness; hosted guidance remains a later gate.
+
 ## 2026-10-16 — Temporary Practice foundation prepared for review
 
 - Branch: `codex/temporary-practice-workspace`, based on main `5ea8fec`; issue #587, separate from onboarding PR #586.
 - Adds an isolated disposable PostgreSQL model, owner/tenant RLS tests, fixed 720-hour cycles, snapshot/Draft/file quotas, expiry warnings, explicit create-only transfer review into a synthetic destination, minimal receipts and dry-run cleanup. Reuses the existing composer/calculation/PDF code; ordinary defaults remain unchanged.
-- The local review harness uses synthetic fixtures only. No real account handoff, hosted Practice route, live importer, shared migration, credential, production data copy or scheduled purge is added. Pending transfers deliberately block cleanup. See [implementation and validation scope](../features/TEMPORARY_PRACTICE_FOUNDATION.md).
+- The local review harness uses synthetic fixtures only. No real account handoff, hosted Practice route, live importer, shared migration, credential, production data copy or scheduled purge is added. The subsequent retention correction below removes pending-transfer cleanup blockage. See [implementation and validation scope](../features/TEMPORARY_PRACTICE_FOUNDATION.md).
 - Validation: actual disposable PostgreSQL and isolated Chromium/WebKit browser tests; type/build/lint and repository checks recorded in the draft PR. A fixed-duration expiry test caught and corrected a daylight-saving-hour discrepancy. New foundation tests are included in PR quality checks.
 - Documentation impact: master plan/backlog/marketing inventory distinguish the local foundation and proposed retention defaults from unreleased hosted capabilities.
 - Tutorial impact: NOT APPLICABLE to this local-only harness and unchanged normal behavior. New hosted Practice guidance is a later gate; PR #586's TUT-002 replacement remains separate.

@@ -245,12 +245,15 @@ export function PracticeLocalReview() {
               {workspace && expired && (
                 <p role="alert" className="mt-2 font-bold">
                   This cycle has expired. Its content is unavailable and
-                  eligible for cleanup after pending transfers resolve.
+                  eligible for cleanup. Transfer recovery does not keep this
+                  content.
                 </p>
               )}
               <p className="mt-2 text-sm">
-                Cleanup is dry-run only in this harness. At most two retained
-                cycles per business; unresolved transfers can block cleanup and
+                Scheduled cleanup is not enabled. Starting a fresh cycle removes
+                your expired local Practice content. Transfer recovery keeps
+                only a small identity record. Access expires after 90 days;
+                physical pruning requires cleanup. Uncertain results never block
                 a fresh start.
               </p>
               {expired && (
@@ -533,7 +536,8 @@ export function PracticeLocalReview() {
                 Test destination Draft: <code>{receipt.destination_id}</code>.
                 Minimal receipt expires{" "}
                 {new Date(receipt.expires_at).toISOString()}; the destination
-                Draft is never purged by Practice cleanup.
+                Draft and its operation identity are never purged by Practice
+                cleanup.
               </p>
             )}
           </>

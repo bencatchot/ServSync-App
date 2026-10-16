@@ -132,13 +132,23 @@ export async function createLocalFixture() {
     await query(
       destination,
       OWNER,
-      `
-      create table destination_drafts(id uuid primary key, contractor_id uuid not null, status text not null check(status='draft'), payload jsonb not null);
-      create table transfer_receipts(operation_id uuid primary key, contractor_id uuid not null, package_hash text not null, destination_id uuid not null references destination_drafts, created_at timestamptz not null default clock_timestamp(), expires_at timestamptz not null default clock_timestamp()+interval '2160 hours');
-      select '{}'::json;`,
+      readFileSync(
+        fileURLToPath(new URL("./destination-schema.sql", import.meta.url)),
+        "utf8",
+      ) + "select '{}'::json;",
       "postgres",
     );
-    const restart = () => command("pg_ctl", ["-D", `${dir}/data`, "-l", `${dir}/postgres.log`, "-m", "fast", "-w", "restart"]);
+    const restart = () =>
+      command("pg_ctl", [
+        "-D",
+        `${dir}/data`,
+        "-l",
+        `${dir}/postgres.log`,
+        "-m",
+        "fast",
+        "-w",
+        "restart",
+      ]);
     return { db, destination, close, restart };
   } catch (error) {
     close();

@@ -9,7 +9,14 @@ import {
   OTHER_CONTRACTOR,
   SNAPSHOT,
 } from "../../scripts/practice/local-fixture";
-import { commitToTestDestination } from "../../scripts/practice/test-destination";
+import {
+  acceptPreparedTestTransfer,
+  commitToTestDestination,
+  reconcileTestOperation,
+  reconcileTestOperations,
+  recordTestResolution,
+  pruneTestReceipts,
+} from "../../scripts/practice/test-destination";
 import { query, sql } from "../../server/practice/localDatabase";
 import { LocalPracticeStore } from "../../server/practice/store";
 import {
@@ -23,6 +30,7 @@ import { createWorkComposerLineDraft } from "../../src/features/work-composer/wo
 import {
   applyDisposableCleanup,
   practiceCleanupDryRun,
+  pruneDisposableOperations,
 } from "../../server/practice/cleanup";
 
 let fixture: Awaited<ReturnType<typeof createLocalFixture>>;
@@ -170,8 +178,13 @@ test("canonical money totals, blank versus zero, invalid inputs and warning thre
 });
 test("create-only transfer, explicit hash approval, retries and stripping fictional relationship IDs", async () => {
   const d = await store.save(workspace, randomUUID(), 0, draft());
-  const op = randomUUID();
-  const review = await store.review(workspace, d.id, d.revision, op);
+  const request = randomUUID();
+  const review = await store.review(workspace, d.id, d.revision, request);
+  const op = review.id;
+  assert.equal(
+    (await store.review(workspace, d.id, d.revision, request)).id,
+    op,
+  );
   assert.equal(review.payload?.local_contact_id, "");
   await assert.rejects(
     commitToTestDestination(fixture.destination, store, op, "bad"),
@@ -250,8 +263,24 @@ test("generated files are bounded and app cannot invoke cleanup or extend expiry
   );
 });
 test("cleanup is dry-run, exact-target guarded and idempotent; fresh cycle and destination survive", async () => {
-  await assert.rejects(query(fixture.db, OWNER, "delete from practice.workspaces; select '{}'::json;", "practice_cleanup"), /permission/);
-  await assert.rejects(query(fixture.db, OWNER, "select json_agg(payload) from practice.drafts;", "practice_cleanup"), /permission/);
+  await assert.rejects(
+    query(
+      fixture.db,
+      OWNER,
+      "delete from practice.workspaces; select '{}'::json;",
+      "practice_cleanup",
+    ),
+    /permission/,
+  );
+  await assert.rejects(
+    query(
+      fixture.db,
+      OWNER,
+      "select json_agg(payload) from practice.drafts;",
+      "practice_cleanup",
+    ),
+    /permission/,
+  );
   const { own, w } = await isolatedOwner();
   const d = await own.save(w.id, randomUUID(), 0, draft());
   await own.file(w.id, randomUUID(), new TextEncoder().encode("%PDF-owned"));
@@ -291,7 +320,7 @@ test("cleanup is dry-run, exact-target guarded and idempotent; fresh cycle and d
     applyDisposableCleanup(fixture.db, c, fixture.db.database),
     applyDisposableCleanup(fixture.db, c, fixture.db.database),
   ]);
-  assert.deepEqual(result.sort(), [false, true]);
+  assert.deepEqual(result.sort(), [false, false]); // fresh start already removed this expired cycle
   assert.equal((await own.workspaces())[0].id, fresh.id);
   assert.equal(
     await query(
@@ -313,7 +342,7 @@ test("cleanup is dry-run, exact-target guarded and idempotent; fresh cycle and d
   );
   assert.equal((await store.workspaces())[0].id, workspace); // unrelated tenant untouched
 });
-test("active transfer pins expired payloads until reconciliation; cleanup cannot race it", async () => {
+test("expired committing payloads can be purged and fresh cycles start while recovery survives", async () => {
   const { own, w } = await isolatedOwner();
   const d = await own.save(w.id, randomUUID(), 0, draft());
   const review = await own.review(w.id, d.id, d.revision, randomUUID());
@@ -326,18 +355,23 @@ test("active transfer pins expired payloads until reconciliation; cleanup cannot
   const c = (await practiceCleanupDryRun(fixture.db)).find(
     (c) => c.workspace_id === w.id,
   )!;
-  assert.equal(c.blocked, true);
-  await assert.rejects(
+  assert.equal(c.blocked, false);
+  const cleanup = await Promise.all([
     applyDisposableCleanup(fixture.db, c, fixture.db.database),
-    /Active transfer/,
-  );
-  await assert.rejects(own.start(SNAPSHOT), /pending transfer/);
-  // Synthetic reconciliation: verified destination receipt means the payload can be discarded.
-  await own.finishTransfer(review.id, randomUUID());
-  assert.equal((await own.transfer(review.id)).payload, null);
+    applyDisposableCleanup(fixture.db, c, fixture.db.database),
+  ]);
+  assert.deepEqual(cleanup.sort(), [false, true]);
+  assert.equal((await own.operation(review.id))?.status, "committing");
+  assert.ok(await own.start(SNAPSHOT));
+  await assert.rejects(own.transfer(review.id));
   assert.equal(
-    await applyDisposableCleanup(fixture.db, c, fixture.db.database),
-    true,
+    await query(
+      fixture.db,
+      OWNER,
+      `select to_json(count(*)) from practice.transfers where id='${review.id}';`,
+      "postgres",
+    ),
+    0,
   );
 });
 test("concurrent writers cannot exceed Draft quota; snapshots refresh without overwriting saved work", async () => {
@@ -397,14 +431,16 @@ test("terminal transfer prevents replay after finite minimal receipt retention",
     `update transfer_receipts set expires_at=now()-interval '1 second' where operation_id='${review.id}'; delete from transfer_receipts where expires_at<=now(); select '{}'::json;`,
     "postgres",
   );
-  await assert.rejects(
-    commitToTestDestination(
-      fixture.destination,
-      own,
-      review.id,
-      review.package_hash,
-    ),
-    /reconciliation/,
+  assert.equal(
+    (
+      await commitToTestDestination(
+        fixture.destination,
+        own,
+        review.id,
+        review.package_hash,
+      )
+    ).destination_id,
+    receipt.destination_id,
   );
   assert.equal(
     await query(
@@ -481,4 +517,449 @@ test("SQL text is escaped, and a remote database target is rejected before conne
     query({ ...fixture.db, database: "postgres" }, OWNER, "select '{}'::json;"),
     /Local database/,
   );
+});
+
+test("expiry is enforced by database reads and privileged recovery cannot read payloads", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  await own.file(w.id, randomUUID(), new TextEncoder().encode("%PDF-secret"));
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  await own.beginTransfer(r.id, r.package_hash);
+  await expire(w.id);
+  for (const table of ["workspaces", "drafts", "files", "transfers"]) {
+    assert.equal(
+      await query(
+        fixture.db,
+        own.actor,
+        `select to_json(count(*)) from practice.${table};`,
+      ),
+      0,
+      table,
+    );
+    await assert.rejects(
+      query(
+        fixture.db,
+        own.actor,
+        `select to_json(count(*)) from practice.${table};`,
+        "practice_reconcile",
+      ),
+      /permission/,
+    );
+  }
+  assert.equal((await own.workspaces())[0].snapshot, null);
+  assert.equal(await other.operation(r.id), null);
+  await assert.rejects(
+    query(fixture.db, own.actor, `select * from practice.operations;`),
+    /permission/,
+  );
+  await assert.rejects(
+    query(
+      fixture.db,
+      own.actor,
+      `select practice.resolve_operation('${r.id}','${own.contractor}','${r.package_hash}','complete','${randomUUID()}');`,
+    ),
+    /permission/,
+  );
+  await assert.rejects(
+    query(
+      fixture.db,
+      own.actor,
+      `update practice.transfers set status='complete',payload=null,destination_id='${randomUUID()}' where id='${r.id}';`,
+    ),
+    /permission/,
+  );
+  await query(
+    fixture.db,
+    OWNER,
+    `update practice.owners set enabled=false where contractor_id='${own.contractor}'; select '{}'::json;`,
+    "postgres",
+  );
+  assert.deepEqual(await own.workspaces(), []);
+  assert.equal(await own.operation(r.id), null);
+  await assert.rejects(
+    commitToTestDestination(fixture.destination, own, r.id, r.package_hash),
+  );
+});
+
+test("lost acknowledgement recovers after source purge and revoked ownership without another write", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  const identity = (await own.operation(r.id))!;
+  const receipt = await acceptPreparedTestTransfer(
+    fixture.destination,
+    own.contractor,
+    prepared,
+  );
+  await expire(w.id);
+  const c = (await practiceCleanupDryRun(fixture.db)).find(
+    (c) => c.workspace_id === w.id,
+  )!;
+  await applyDisposableCleanup(fixture.db, c, fixture.db.database);
+  await query(
+    fixture.db,
+    OWNER,
+    `update practice.owners set enabled=false where contractor_id='${own.contractor}';select '{}'::json;`,
+    "postgres",
+  );
+  await assert.rejects(
+    commitToTestDestination(fixture.destination, own, r.id, r.package_hash),
+  );
+  const recovered = await reconcileTestOperation(fixture.destination, identity);
+  assert.equal(recovered?.destination_id, receipt.destination_id);
+  assert.equal(
+    (await recordTestResolution(fixture.db, identity, recovered))?.status,
+    "complete",
+  );
+  const repeated = await Promise.all([
+    recordTestResolution(fixture.db, identity, recovered),
+    recordTestResolution(fixture.db, identity, recovered),
+  ]);
+  assert.ok(
+    repeated.every((r) => r?.destination_id === receipt.destination_id),
+  );
+  assert.equal(
+    await query(
+      fixture.destination,
+      OWNER,
+      `select to_json(count(*)) from destination_drafts where operation_id='${r.id}';`,
+      "postgres",
+    ),
+    1,
+  );
+  await assert.rejects(
+    reconcileTestOperation(fixture.destination, {
+      ...identity,
+      contractor_id: OTHER_CONTRACTOR,
+    }),
+    /identity conflict/,
+  );
+});
+
+test("destination cancellation fence serializes late commits and never erases an uncertain write", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  const identity = (await own.operation(r.id))!;
+  const past = new Date(Date.now() - 1000).toISOString();
+  // Narrow the trusted admission window to simulate its passage without waiting ten minutes.
+  const outcomes = await Promise.allSettled([
+    acceptPreparedTestTransfer(fixture.destination, own.contractor, {
+      ...prepared,
+      expires_at: past,
+    }),
+    reconcileTestOperation(fixture.destination, {
+      ...identity,
+      admission_deadline: past,
+    }),
+  ]);
+  assert.equal(outcomes[0].status, "rejected");
+  assert.equal(outcomes[1].status, "fulfilled");
+  const resolution = await reconcileTestOperation(fixture.destination, {
+    ...identity,
+    admission_deadline: past,
+  });
+  assert.equal(resolution?.status, "cancelled");
+  // Even a still-in-memory original package cannot write after the fence exists.
+  await assert.rejects(
+    acceptPreparedTestTransfer(fixture.destination, own.contractor, prepared),
+    /cancelled/,
+  );
+  assert.equal(
+    (await recordTestResolution(fixture.db, identity, resolution))?.status,
+    "cancelled",
+  );
+  assert.equal(
+    await query(
+      fixture.destination,
+      OWNER,
+      `select to_json(count(*)) from destination_drafts where operation_id='${r.id}';`,
+      "postgres",
+    ),
+    0,
+  );
+});
+
+test("admission is rechecked after waiting on the destination operation lock", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  // Wait until PostgreSQL confirms the blocker actually owns the operation lock.
+  const blocker = query(
+    fixture.destination,
+    OWNER,
+    `select pg_advisory_xact_lock(hashtextextended('${r.id}',0)); select pg_sleep(0.6);select '{}'::json;`,
+    "postgres",
+  );
+  let locked = false;
+  for (let i = 0; i < 30 && !locked; i++) {
+    locked = await query(
+      fixture.destination,
+      OWNER,
+      `select to_json(exists(select 1 from pg_locks where locktype='advisory' and granted));`,
+      "postgres",
+    );
+  }
+  assert.ok(locked);
+  await assert.rejects(
+    acceptPreparedTestTransfer(fixture.destination, own.contractor, {
+      ...prepared,
+      expires_at: new Date(Date.now() + 100).toISOString(),
+    }),
+    /expired/,
+  );
+  await blocker;
+});
+
+test("bounded recovery retries surface unknown outcomes and finite metadata purge cannot replay stale IDs", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  for (let i = 0; i < 12; i++) {
+    await query(
+      fixture.db,
+      OWNER,
+      `update practice.operations set next_attempt_at=clock_timestamp()-interval '1 hour' where id='${r.id}';select '{}'::json;`,
+      "postgres",
+    );
+    await reconcileTestOperations(fixture.db, {
+      ...fixture.destination,
+      database: "servsync_destination_local_deadbeef",
+    });
+  }
+  const identity = (await own.operation(r.id))!;
+  assert.equal(identity.status, "needs_review");
+  assert.equal(identity.attempts, 12);
+  await reconcileTestOperations(fixture.db, fixture.destination);
+  assert.equal((await own.operation(r.id))?.attempts, 12);
+  await expire(w.id);
+  assert.ok(await own.start(SNAPSHOT));
+  await query(
+    fixture.db,
+    OWNER,
+    `update practice.operations set retain_until=clock_timestamp()-interval '1 second' where id='${r.id}';select '{}'::json;`,
+    "postgres",
+  );
+  const pruned = await pruneDisposableOperations(fixture.db);
+  assert.ok(pruned.unresolved >= 1);
+  assert.equal(await own.operation(r.id), null);
+  const oldPrefix = (Date.now() - 91 * 86400000).toString(16).padStart(12, "0");
+  const agedId =
+    oldPrefix.slice(0, 8) + "-" + oldPrefix.slice(8) + prepared.id.slice(13);
+  // An old server ID remains expired even if a caller tries to renew the supplied deadline.
+  await assert.rejects(
+    acceptPreparedTestTransfer(fixture.destination, own.contractor, {
+      ...prepared,
+      id: agedId,
+      expires_at: new Date(Date.now() + 600000).toISOString(),
+    }),
+    /expired/,
+  );
+  await assert.rejects(
+    commitToTestDestination(fixture.destination, own, r.id, r.package_hash),
+  );
+});
+
+test("source and receipt pruning preserve permanent destination identity and tenant bounds", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  const receipt = await acceptPreparedTestTransfer(
+    fixture.destination,
+    own.contractor,
+    prepared,
+  );
+  await query(
+    fixture.destination,
+    OWNER,
+    `update transfer_receipts set expires_at=clock_timestamp()-interval '1 second' where operation_id='${r.id}';select '{}'::json;`,
+    "postgres",
+  );
+  assert.ok(await pruneTestReceipts(fixture.destination));
+  const recovered = await acceptPreparedTestTransfer(
+    fixture.destination,
+    own.contractor,
+    { ...prepared, expires_at: "2000-01-01T00:00:00Z" },
+  );
+  assert.equal(recovered.destination_id, receipt.destination_id);
+  await assert.rejects(
+    acceptPreparedTestTransfer(fixture.destination, OTHER_CONTRACTOR, prepared),
+    /identity conflict/,
+  );
+  await assert.rejects(
+    acceptPreparedTestTransfer(fixture.destination, own.contractor, {
+      ...prepared,
+      package_hash: "0".repeat(64),
+    }),
+    /identity conflict/,
+  );
+  await assert.rejects(
+    query(
+      fixture.destination,
+      OWNER,
+      "select * from destination_drafts;",
+      "practice_destination_reconcile",
+    ),
+    /permission/,
+  );
+  await assert.rejects(
+    query(
+      fixture.destination,
+      OWNER,
+      `select destination_accept('${r.id}','${own.contractor}','${r.package_hash}',now(),'{}');`,
+      "practice_destination_reconcile",
+    ),
+    /permission/,
+  );
+});
+
+test("concurrent workers claim once and stale retries cannot consume the budget or overwrite completion", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  const batches = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      query<
+        import("../../src/features/practice/contracts").PracticeOperation[]
+      >(
+        fixture.db,
+        OWNER,
+        "select coalesce(jsonb_agg(o),'[]'::jsonb) from practice.reconciliation_batch(20) o;",
+        "practice_reconcile",
+      ),
+    ),
+  );
+  const claims = batches.flat().filter((o) => o.id === r.id);
+  assert.equal(claims.length, 1);
+  assert.equal((await own.operation(r.id))?.attempts, 1);
+  const receipt = await acceptPreparedTestTransfer(
+    fixture.destination,
+    own.contractor,
+    prepared,
+  );
+  const complete = await reconcileTestOperation(fixture.destination, claims[0]);
+  await recordTestResolution(fixture.db, claims[0], complete);
+  const stale = await Promise.all(
+    Array.from({ length: 15 }, () =>
+      recordTestResolution(fixture.db, claims[0], null),
+    ),
+  );
+  assert.ok(
+    stale.every(
+      (o) =>
+        o?.status === "complete" &&
+        o.attempts === 1 &&
+        o.destination_id === receipt.destination_id,
+    ),
+  );
+  await query(
+    fixture.db,
+    OWNER,
+    `update practice.operations set retain_until=clock_timestamp()-interval '1 second' where id='${r.id}';select '{}'::json;`,
+    "postgres",
+  );
+  await pruneDisposableOperations(fixture.db);
+  assert.equal(
+    await recordTestResolution(fixture.db, claims[0], complete),
+    null,
+  );
+});
+
+test("fresh start races cleanup and committed-write reconciliation without losing either cycle or destination", async () => {
+  const { own, w } = await isolatedOwner();
+  const d = await own.save(w.id, randomUUID(), 0, draft());
+  const r = await own.review(w.id, d.id, d.revision, randomUUID());
+  const prepared = await own.beginTransfer(r.id, r.package_hash);
+  const identity = (await own.operation(r.id))!;
+  const receipt = await acceptPreparedTestTransfer(
+    fixture.destination,
+    own.contractor,
+    prepared,
+  );
+  const resolution = await reconcileTestOperation(
+    fixture.destination,
+    identity,
+  );
+  await expire(w.id);
+  const c = (await practiceCleanupDryRun(fixture.db)).find(
+    (c) => c.workspace_id === w.id,
+  )!;
+  const [fresh, , resolved] = await Promise.all([
+    own.start(SNAPSHOT),
+    applyDisposableCleanup(fixture.db, c, fixture.db.database),
+    recordTestResolution(fixture.db, identity, resolution),
+  ]);
+  assert.equal((await own.workspaces())[0].id, fresh.id);
+  assert.equal(resolved?.destination_id, receipt.destination_id);
+  assert.equal((await own.operation(r.id))?.status, "complete");
+  assert.equal(
+    await query(
+      fixture.destination,
+      OWNER,
+      `select to_json(count(*)) from destination_drafts where operation_id='${r.id}';`,
+      "postgres",
+    ),
+    1,
+  );
+});
+
+test("an admissible destination commit races a cancellation fence with exactly one durable outcome", async () => {
+  for (let i = 0; i < 4; i++) {
+    const { own, w } = await isolatedOwner();
+    const d = await own.save(w.id, randomUUID(), 0, draft());
+    const r = await own.review(w.id, d.id, d.revision, randomUUID());
+    const prepared = await own.beginTransfer(r.id, r.package_hash);
+    const identity = (await own.operation(r.id))!;
+    // Concurrent calls may observe opposite sides of a deadline; emulate that clock boundary.
+    // Whichever obtains the shared operation lock first establishes the sole durable result.
+    const jobs = [
+      () =>
+        acceptPreparedTestTransfer(
+          fixture.destination,
+          own.contractor,
+          prepared,
+        ),
+      () =>
+        reconcileTestOperation(fixture.destination, {
+          ...identity,
+          admission_deadline: "2000-01-01T00:00:00Z",
+        }),
+    ];
+    await Promise.allSettled((i % 2 ? jobs.reverse() : jobs).map((f) => f()));
+    const result = await reconcileTestOperation(fixture.destination, identity);
+    const count = await query<number>(
+      fixture.destination,
+      OWNER,
+      `select to_json(count(*)) from destination_drafts where operation_id='${r.id}';`,
+      "postgres",
+    );
+    assert.ok(result);
+    assert.equal(count, result.status === "complete" ? 1 : 0);
+    if (result.status === "cancelled")
+      await assert.rejects(
+        acceptPreparedTestTransfer(
+          fixture.destination,
+          own.contractor,
+          prepared,
+        ),
+        /cancelled/,
+      );
+    else
+      assert.equal(
+        (
+          await acceptPreparedTestTransfer(
+            fixture.destination,
+            own.contractor,
+            prepared,
+          )
+        ).destination_id,
+        result.destination_id,
+      );
+  }
 });

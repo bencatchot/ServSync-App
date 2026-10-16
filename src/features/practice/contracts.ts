@@ -63,6 +63,18 @@ export type PracticeReview = {
   total_cents: number;
   payload: SharedDraftComposerDraft | null;
 };
+export type PracticeOperation = {
+  id: string;
+  contractor_id: string;
+  workspace_id: string;
+  package_hash: string;
+  admission_deadline: string;
+  status: "committing" | "complete" | "cancelled" | "needs_review";
+  destination_id: string | null;
+  attempts: number;
+  lease_token?: string | null;
+  retain_until: string;
+};
 export type PracticeReceipt = {
   operation_id: string;
   destination_id: string;

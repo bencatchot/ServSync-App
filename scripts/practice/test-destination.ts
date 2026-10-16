@@ -1,5 +1,4 @@
-// Synthetic destination ONLY. This is NOT the real ServSync Draft import API.
-import { randomUUID } from "node:crypto";
+// Synthetic destination ONLY. Never creates or resolves real ServSync Drafts.
 import {
   query,
   sql,
@@ -7,18 +6,96 @@ import {
   type LocalDatabase,
 } from "../../server/practice/localDatabase";
 import { LocalPracticeStore } from "../../server/practice/store";
-import type { PracticeReceipt } from "../../src/features/practice/contracts";
+import type {
+  PracticeOperation,
+  PracticeReceipt,
+  PracticeReview,
+} from "../../src/features/practice/contracts";
 
-export async function testReceipt(
+type Resolution = PracticeReceipt & { status: "complete" | "cancelled" };
+const WORKER = "00000000-0000-4000-8000-000000000000";
+
+export async function acceptPreparedTestTransfer(
   db: LocalDatabase,
-  store: LocalPracticeStore,
-  operation: string,
+  contractor: string,
+  transfer: PracticeReview,
 ) {
-  return query<PracticeReceipt | null>(
+  // Only trusted test-server code can call this; the browser never supplies this package/deadline.
+  return query<PracticeReceipt>(
     db,
-    store.actor,
-    `select (select row_to_json(r) from transfer_receipts r where operation_id=${sql(uuid(operation))} and contractor_id=${sql(store.contractor)});`,
-    "postgres",
+    WORKER,
+    `select destination_accept(${sql(uuid(transfer.id))},${sql(uuid(contractor))},${sql(transfer.package_hash)},${sql(transfer.expires_at)}::timestamptz,${sql(transfer.payload)}::jsonb);`,
+    "practice_destination",
+  );
+}
+export async function reconcileTestOperation(
+  db: LocalDatabase,
+  operation: PracticeOperation,
+) {
+  return query<Resolution | null>(
+    db,
+    WORKER,
+    `select destination_reconcile(${sql(uuid(operation.id))},${sql(uuid(operation.contractor_id))},${sql(operation.package_hash)},${sql(operation.admission_deadline)}::timestamptz);`,
+    "practice_destination_reconcile",
+  );
+}
+export async function recordTestResolution(
+  db: LocalDatabase,
+  operation: PracticeOperation,
+  result: Resolution | null,
+) {
+  return query<PracticeOperation | null>(
+    db,
+    WORKER,
+    `select to_json(practice.resolve_operation(${sql(operation.id)},${sql(operation.contractor_id)},${sql(operation.package_hash)},${sql(result?.status ?? "retry")},${sql(result?.destination_id ?? null)},${sql(operation.lease_token ?? null)}));`,
+    "practice_reconcile",
+  );
+}
+export async function reconcileTestOperations(
+  source: LocalDatabase,
+  destination: LocalDatabase,
+  batchSize = 20,
+) {
+  if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 20)
+    throw new Error("Recovery batch must contain 1–20 operations.");
+  const batch = await query<PracticeOperation[]>(
+    source,
+    WORKER,
+    `select coalesce(jsonb_agg(o),'[]'::jsonb) from practice.reconciliation_batch(${batchSize}) o;`,
+    "practice_reconcile",
+  );
+  const results = [];
+  for (const operation of batch) {
+    let result: Resolution | null = null;
+    try {
+      result = await reconcileTestOperation(destination, operation);
+    } catch {
+      /* Unknown destination outcome: never infer cancellation or recreate work. */
+    }
+    try {
+      const recorded = await recordTestResolution(source, operation, result);
+      results.push({
+        operation: operation.id,
+        status: recorded?.status ?? "metadata_expired",
+        attempts: recorded?.attempts ?? operation.attempts,
+      });
+    } catch {
+      // A stale/conflicting/pruned item must not starve unrelated recovery work.
+      results.push({
+        operation: operation.id,
+        status: "recovery_pending",
+        attempts: operation.attempts,
+      });
+    }
+  }
+  return results;
+}
+export async function pruneTestReceipts(db: LocalDatabase) {
+  return query<number>(
+    db,
+    WORKER,
+    `select to_json(destination_prune(${sql(db.database)}));`,
+    "practice_destination_reconcile",
   );
 }
 export async function commitToTestDestination(
@@ -27,44 +104,36 @@ export async function commitToTestDestination(
   operation: string,
   hash: string,
 ) {
-  // Always re-authorize the source binding before receipt recovery too.
-  let transfer = await store.transfer(operation);
+  // Ordinary requests recheck ownership. The separate worker can recover already-authorized
+  // outcomes after revocation, but has no payload or authority to create a new destination.
+  const identity = await store.operation(operation);
+  if (identity) {
+    if (identity.package_hash !== hash)
+      throw new Error("Approval does not match this transfer.");
+    const result = await reconcileTestOperation(db, identity);
+    if (result) {
+      await recordTestResolution(store.db, identity, result);
+      if (result.status === "complete") return result;
+      throw new Error(
+        "Transfer was cancelled after its admission deadline. No destination Draft was created.",
+      );
+    }
+    throw new Error(
+      "Transfer is pending reconciliation; do not start a new operation.",
+    );
+  }
+  const transfer = await store.transfer(operation);
   if (transfer.package_hash !== hash)
     throw new Error("Approval does not match this transfer.");
-  const recover = async () => {
-    const receipt = await testReceipt(db, store, operation);
-    if (receipt && receipt.package_hash !== hash)
-      throw new Error("Operation ID is already bound to another package.");
-    if (receipt && transfer.status === "committing")
-      await store
-        .finishTransfer(operation, receipt.destination_id)
-        .catch(async () => {
-          if ((await store.transfer(operation)).status !== "complete")
-            throw new Error(
-              "Receipt exists; Practice reconciliation still pending.",
-            );
-        });
-    return receipt;
-  };
-  const previous = await recover();
-  if (previous) return previous;
   if (transfer.status !== "review")
     throw new Error(
       "Transfer is pending reconciliation; do not start a new operation.",
     );
-  transfer = await store.beginTransfer(operation, hash);
-  const destinationId = randomUUID();
-  // Both insertions commit together in a separate database. No provider/lifecycle calls exist here.
-  const receipt = await query<PracticeReceipt>(
+  const prepared = await store.beginTransfer(operation, hash);
+  const receipt = await acceptPreparedTestTransfer(
     db,
-    store.actor,
-    `
-    select pg_advisory_xact_lock(hashtextextended(${sql(operation)},0));
-    do $$ begin if exists(select 1 from transfer_receipts where operation_id=${sql(operation)} and (package_hash<>${sql(hash)} or contractor_id<>${sql(store.contractor)}::uuid)) then raise exception 'Transfer identity conflict'; end if; end $$;
-    insert into destination_drafts(id,contractor_id,status,payload) select ${sql(destinationId)},${sql(store.contractor)},'draft',${sql(transfer.payload)}::jsonb where not exists(select 1 from transfer_receipts where operation_id=${sql(operation)});
-    insert into transfer_receipts(operation_id,contractor_id,package_hash,destination_id) values(${sql(operation)},${sql(store.contractor)},${sql(hash)},${sql(destinationId)}) on conflict(operation_id) do nothing;
-    select row_to_json(r) from transfer_receipts r where operation_id=${sql(operation)};`,
-    "postgres",
+    store.contractor,
+    prepared,
   );
   await store.finishTransfer(operation, receipt.destination_id);
   return receipt;

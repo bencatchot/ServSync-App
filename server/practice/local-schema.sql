@@ -10,9 +10,10 @@ do $$ begin
 end $$;
 create role practice_app nologin;
 create role practice_cleanup nologin;
+create role practice_reconcile nologin;
 create schema practice;
 revoke all on schema practice from public;
-grant usage on schema practice to practice_app, practice_cleanup;
+grant usage on schema practice to practice_app, practice_cleanup, practice_reconcile;
 create table practice.environment (purpose text primary key check (purpose = 'disposable-local-practice'));
 insert into practice.environment values ('disposable-local-practice');
 create table practice.owners (contractor_id uuid primary key, owner_id uuid not null, enabled boolean not null default true);
@@ -45,15 +46,38 @@ create table practice.files (
   bytes bytea not null check (octet_length(bytes) between 1 and 5242880),
   mime_type text not null check (mime_type = 'application/pdf')
 );
+-- Server-minted time-bound IDs prevent renewing admission by reusing a pruned operation.
+create function practice.new_operation_id() returns uuid language sql volatile as $$
+  select (substr(h,1,8)||'-'||substr(h,9,4)||'-7'||substr(r,14,3)||'-'||substr(r,17,4)||'-'||substr(r,21,12))::uuid
+  from (select right(encode(int8send(floor(extract(epoch from clock_timestamp())*1000)::bigint),'hex'),12) h, replace(gen_random_uuid()::text,'-','') r) v
+$$;
+create function practice.operation_deadline(operation uuid) returns timestamptz language sql immutable as $$
+  select to_timestamp((('x'||substr(replace(operation::text,'-',''),1,12))::bit(48)::bigint)::numeric/1000)+interval '10 minutes'
+$$;
 create table practice.transfers (
-  id uuid primary key, workspace_id uuid not null, draft_id uuid not null,
+  id uuid primary key default practice.new_operation_id(), request_id uuid not null, workspace_id uuid not null, draft_id uuid not null,
   draft_revision integer not null, package_hash text not null check (package_hash ~ '^[a-f0-9]{64}$'),
   payload jsonb check (octet_length(payload::text) <= 1048576),
   total_cents bigint not null check (total_cents between 0 and 100000000),
   expires_at timestamptz not null, status text not null default 'review' check(status in ('review', 'committing', 'complete', 'cancelled')),
   destination_id uuid,
+  unique(workspace_id, request_id),
   foreign key(workspace_id, draft_id) references practice.drafts(workspace_id, id) on delete cascade
 );
+-- No payload, no FK to expiring content. Recovery never needs an expired Draft.
+create table practice.operations (
+  id uuid primary key, contractor_id uuid not null, workspace_id uuid not null,
+  package_hash text not null, admission_deadline timestamptz not null,
+  status text not null default 'committing' check(status in ('committing','complete','cancelled','needs_review')),
+  destination_id uuid, attempts integer not null default 0,
+  next_attempt_at timestamptz not null default clock_timestamp(),
+  lease_token uuid, lease_until timestamptz,
+  retain_until timestamptz not null default clock_timestamp()+interval '2160 hours'
+);
+alter table practice.operations enable row level security;
+alter table practice.operations force row level security;
+create index on practice.operations(next_attempt_at) where status='committing';
+create index on practice.operations(retain_until);
 create index on practice.drafts(workspace_id);
 create index on practice.files(workspace_id);
 create index on practice.transfers(workspace_id);
@@ -62,7 +86,7 @@ create index on practice.workspaces(contractor_id, expires_at);
 alter table practice.workspaces enable row level security;
 alter table practice.workspaces force row level security;
 create policy owner_workspace on practice.workspaces to practice_app
-  using (practice.owns(contractor_id)) with check (practice.owns(contractor_id));
+  using (practice.owns(contractor_id) and expires_at>clock_timestamp()) with check (practice.owns(contractor_id) and expires_at>clock_timestamp());
 do $$ declare t text; begin
   foreach t in array array['drafts', 'files', 'transfers'] loop
     execute format('alter table practice.%I enable row level security', t);
@@ -75,19 +99,21 @@ end $$;
 grant select on practice.workspaces, practice.drafts, practice.files, practice.transfers to practice_app;
 grant insert(id, contractor_id, snapshot) on practice.workspaces to practice_app;
 grant update(snapshot, revision) on practice.workspaces to practice_app;
-grant insert on practice.drafts, practice.files, practice.transfers to practice_app;
+grant insert on practice.drafts, practice.files to practice_app;
+grant insert(request_id,workspace_id,draft_id,draft_revision,package_hash,payload,total_cents,expires_at) on practice.transfers to practice_app;
 grant update(payload, revision) on practice.drafts to practice_app;
-grant update(status, payload, destination_id) on practice.transfers to practice_app;
 
-create function practice.guard_workspace() returns trigger language plpgsql as $$
+
+create function practice.guard_workspace() returns trigger language plpgsql security definer set search_path=pg_catalog,practice as $$
 begin
+  if not practice.owns(new.contractor_id) then raise exception 'Practice owner required'; end if;
   -- Serialize starts/refreshes, so two clients cannot exceed a cycle quota.
   perform pg_advisory_xact_lock(hashtextextended(new.contractor_id::text, 0));
   if tg_op = 'INSERT' then
     new.expires_at := new.created_at + interval '720 hours';
     if exists(select 1 from practice.workspaces where contractor_id = new.contractor_id and expires_at > clock_timestamp()) then raise exception 'An active Practice cycle already exists'; end if;
-    if (select count(*) from practice.workspaces where contractor_id = new.contractor_id) >= 2 then raise exception 'Practice storage limit reached; expired-cycle cleanup needs operator review'; end if;
-    if exists(select 1 from practice.transfers t join practice.workspaces w on w.id=t.workspace_id where w.contractor_id=new.contractor_id and t.status='committing') then raise exception 'Resolve the pending transfer before starting again'; end if;
+    -- Only this authorized owner's expired content is removed. Detached identities survive.
+    delete from practice.workspaces where contractor_id=new.contractor_id and expires_at<=clock_timestamp();
   elsif old.expires_at <= clock_timestamp() then raise exception 'Practice cycle expired';
   end if;
   return new;
@@ -123,7 +149,7 @@ begin
       if new.status <> 'review' or new.destination_id is not null or new.payload is null then raise exception 'Transfers must begin with a review'; end if;
       select count(*) into n from practice.transfers where workspace_id=w.id;
       if n >= 20 then raise exception 'Practice transfer quota reached'; end if;
-      if new.expires_at > least(w.expires_at, clock_timestamp()+interval '10 minutes') then raise exception 'Review expiry exceeds cycle/review limit'; end if;
+      new.expires_at := least(w.expires_at, practice.operation_deadline(new.id));
     end if;
   end if;
   return new;
@@ -141,7 +167,7 @@ language sql security definer set search_path=pg_catalog,practice as $$
     (select count(*) from practice.drafts where workspace_id=w.id),
     (select count(*) from practice.files where workspace_id=w.id),
     (select coalesce(sum(octet_length(bytes)),0) from practice.files where workspace_id=w.id),
-    exists(select 1 from practice.transfers where workspace_id=w.id and (status='committing' or (status='review' and expires_at>clock_timestamp())))
+    false
   from practice.workspaces w where w.expires_at <= clock_timestamp()
 $$;
 create function practice.cleanup_disposable(expected_database text, target uuid, expected_expiry timestamptz) returns boolean
@@ -153,11 +179,90 @@ begin
   select * into w from practice.workspaces where id=target for update;
   if not found then return false; end if;
   if w.expires_at <> expected_expiry or w.expires_at > clock_timestamp() then raise exception 'Cleanup target changed or is not expired'; end if;
-  if exists(select 1 from practice.transfers where workspace_id=w.id and (status='committing' or (status='review' and expires_at>clock_timestamp()))) then raise exception 'Active transfer blocks cleanup'; end if;
+  -- In-flight identity is detached; deleting source content cannot delete destination work.
   delete from practice.workspaces where id=w.id;
   return true;
 end $$;
+-- Ordinary users can see expiry/status without reading expired payloads.
+create function practice.workspace_status(contractor uuid) returns table(id uuid,created_at timestamptz,expires_at timestamptz,revision integer,snapshot jsonb)
+language sql security definer set search_path=pg_catalog,practice as $$
+  select w.id,w.created_at,w.expires_at,w.revision,case when w.expires_at>clock_timestamp() then w.snapshot else null end
+  from practice.workspaces w where w.contractor_id=contractor and practice.owns(contractor) order by w.created_at desc
+$$;
+create function practice.operation_status(contractor uuid, operation uuid) returns setof practice.operations
+language sql security definer set search_path=pg_catalog,practice as $$
+  select * from practice.operations o where o.id=operation and o.contractor_id=contractor and practice.owns(contractor) and o.retain_until>clock_timestamp()
+$$;
+create function practice.begin_transfer(contractor uuid, operation uuid, approved_hash text) returns practice.transfers
+language plpgsql security definer set search_path=pg_catalog,practice as $$
+declare t practice.transfers; w practice.workspaces;
+begin
+  if not practice.owns(contractor) then raise exception 'Practice owner required'; end if;
+  select w0.* into w from practice.workspaces w0 join practice.transfers t0 on t0.workspace_id=w0.id where t0.id=operation and w0.contractor_id=contractor for update of w0;
+  select * into t from practice.transfers where id=operation for update;
+  if w.id is null or w.expires_at<=clock_timestamp() or t.status<>'review' or t.expires_at<=clock_timestamp() or t.package_hash<>approved_hash
+    or not exists(select 1 from practice.drafts where id=t.draft_id and workspace_id=w.id and revision=t.draft_revision) then raise exception 'Transfer review unavailable, expired or stale'; end if;
+  update practice.transfers set status='committing' where id=operation returning * into t;
+  insert into practice.operations(id,contractor_id,workspace_id,package_hash,admission_deadline) values(t.id,contractor,w.id,t.package_hash,t.expires_at);
+  return t;
+end $$;
+create function practice.cancel_review(contractor uuid, operation uuid) returns void
+language plpgsql security definer set search_path=pg_catalog,practice as $$
+declare w practice.workspaces;
+begin
+  if not practice.owns(contractor) then raise exception 'Practice owner required'; end if;
+  select w0.* into w from practice.workspaces w0 join practice.transfers t on t.workspace_id=w0.id where t.id=operation and w0.contractor_id=contractor for update of w0;
+  if w.id is null or w.expires_at<=clock_timestamp() then raise exception 'Practice cycle unavailable'; end if;
+  update practice.transfers set status='cancelled',payload=null where id=operation and status='review';
+end $$;
+-- Worker has no table grants or expired-content reader. These functions expose only minimal identities.
+create function practice.reconciliation_batch(batch_size integer) returns setof practice.operations
+language plpgsql security definer set search_path=pg_catalog,practice as $$
+begin
+  update practice.operations set status='needs_review',lease_token=null,lease_until=null
+    where status='committing' and attempts>=12 and coalesce(lease_until,'-infinity'::timestamptz)<=clock_timestamp();
+  return query with candidates as (
+    select id from practice.operations where status='committing' and attempts<12 and next_attempt_at<=clock_timestamp()
+      and coalesce(lease_until,'-infinity'::timestamptz)<=clock_timestamp() and retain_until>clock_timestamp()
+    order by next_attempt_at,id limit greatest(0,least(batch_size,20)) for update skip locked
+  ) update practice.operations o set attempts=o.attempts+1,lease_token=gen_random_uuid(),lease_until=clock_timestamp()+interval '5 minutes',
+    next_attempt_at=clock_timestamp()+interval '1 hour' from candidates c where o.id=c.id returning o.*;
+end $$;
+create function practice.resolve_operation(operation uuid, contractor uuid, expected_hash text, outcome text, destination uuid, attempt_token uuid default null) returns practice.operations
+language plpgsql security definer set search_path=pg_catalog,practice as $$
+declare o practice.operations; workspace uuid;
+begin
+  select workspace_id into workspace from practice.operations where id=operation;
+  perform 1 from practice.workspaces where id=workspace for update;
+  select * into o from practice.operations where id=operation for update;
+  if o.id is null or o.retain_until<=clock_timestamp() then return null; end if;
+  if o.contractor_id<>contractor or o.package_hash<>expected_hash then raise exception 'Recovery identity unavailable'; end if;
+  if outcome not in ('complete','cancelled','retry') or (outcome='complete')<>(destination is not null) then raise exception 'Invalid recovery result'; end if;
+  if o.status in ('complete','cancelled') then
+    if outcome<>'retry' and (o.status<>outcome or o.destination_id is distinct from destination) then raise exception 'Recovery result conflict'; end if;
+    return o;
+  end if;
+  if outcome='retry' then
+    if attempt_token is null or o.lease_token is distinct from attempt_token or o.lease_until<=clock_timestamp() then return o; end if;
+    update practice.operations set status=case when attempts>=12 then 'needs_review' else 'committing' end,
+      lease_token=null,lease_until=null where id=operation returning * into o;
+  else
+    update practice.transfers set status=outcome,payload=null,destination_id=destination where id=operation and status='committing';
+    update practice.operations set status=outcome,destination_id=destination,lease_token=null,lease_until=null where id=operation returning * into o;
+  end if;
+  return o;
+end $$;
+create function practice.prune_operations(expected_database text) returns jsonb
+language plpgsql security definer set search_path=pg_catalog,practice as $$
+declare result jsonb;
+begin
+  if current_database()<>expected_database or current_database() !~ '^servsync_practice_local_[a-f0-9]+$' then raise exception 'Cleanup target mismatch'; end if;
+  with removed as (delete from practice.operations where retain_until<=clock_timestamp() returning status)
+  select jsonb_build_object('removed',count(*),'unresolved',count(*) filter(where status in ('committing','needs_review'))) into result from removed;
+  return result;
+end $$;
 revoke execute on all functions in schema practice from public;
-grant execute on function practice.actor(), practice.owns(uuid), practice.guard_workspace(), practice.guard_child() to practice_app;
-grant execute on function practice.cleanup_plan(), practice.cleanup_disposable(text,uuid,timestamptz) to practice_cleanup;
+grant execute on function practice.actor(), practice.owns(uuid), practice.guard_workspace(), practice.guard_child(), practice.new_operation_id(), practice.operation_deadline(uuid), practice.workspace_status(uuid), practice.operation_status(uuid,uuid), practice.begin_transfer(uuid,uuid,text), practice.cancel_review(uuid,uuid) to practice_app;
+grant execute on function practice.cleanup_plan(), practice.cleanup_disposable(text,uuid,timestamptz), practice.prune_operations(text) to practice_cleanup;
+grant execute on function practice.reconciliation_batch(integer), practice.resolve_operation(uuid,uuid,text,text,uuid,uuid) to practice_reconcile;
 commit;

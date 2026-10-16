@@ -29,3 +29,13 @@ export async function applyDisposableCleanup(
     "practice_cleanup",
   );
 }
+
+// Finite recovery metadata only. Reports unresolved removals; never touches destination Drafts.
+export async function pruneDisposableOperations(db: LocalDatabase) {
+  return query<{ removed: number; unresolved: number }>(
+    db,
+    "00000000-0000-4000-8000-000000000000",
+    `select practice.prune_operations(${sql(db.database)});`,
+    "practice_cleanup",
+  );
+}

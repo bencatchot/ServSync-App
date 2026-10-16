@@ -5,6 +5,7 @@ import {
   sanitizeSnapshot,
   validatePracticePreview,
   type PracticeDraft,
+  type PracticeOperation,
   type PracticeReview,
   type PracticeSnapshot,
   type PracticeWorkspace,
@@ -58,12 +59,16 @@ export class LocalPracticeStore {
     );
   }
   async workspaces() {
-    // Expired workspace payloads are deliberately excluded even before dry-run cleanup is enabled.
     return this.run<PracticeWorkspace[]>(
-      rows(
-        `select id,created_at,expires_at,revision,case when expires_at>clock_timestamp() then snapshot else null end as snapshot from practice.workspaces where contractor_id=${sql(this.contractor)} order by created_at desc`,
-      ),
+      rows(`select * from practice.workspace_status(${sql(this.contractor)})`),
     );
+  }
+  async operation(operation: string) {
+    return this.run<PracticeOperation[]>(
+      rows(
+        `select * from practice.operation_status(${sql(this.contractor)},${sql(uuid(operation))})`,
+      ),
+    ).then((r) => r[0] ?? null);
   }
   async refresh(id: string, revision: number, snapshot: PracticeSnapshot) {
     return one(
@@ -133,28 +138,24 @@ export class LocalPracticeStore {
       payload,
     });
     const result = await this.run<PracticeReview[]>(
-      returning(`insert into practice.transfers(id,workspace_id,draft_id,draft_revision,package_hash,payload,total_cents,expires_at)
+      returning(`insert into practice.transfers(request_id,workspace_id,draft_id,draft_revision,package_hash,payload,total_cents,expires_at)
       select ${sql(uuid(operation))},w.id,d.id,d.revision,${sql(hash)},${sql(payload)}::jsonb,${validated.totalCents},least(w.expires_at,clock_timestamp()+interval '10 minutes')
       from practice.workspaces w join practice.drafts d on d.workspace_id=w.id where w.id=${sql(uuid(workspace))} and w.contractor_id=${sql(this.contractor)} and d.id=${sql(uuid(draftId))} and d.revision=${sql(revision)}::int
-      on conflict(id) do nothing`),
+      on conflict(workspace_id,request_id) do nothing`),
     );
     if (result.length) return one(result);
     const existing = one(
       await this.run<PracticeReview[]>(
         rows(
-          `select * from practice.transfers where id=${sql(uuid(operation))} and package_hash=${sql(hash)} and status='review' and expires_at>clock_timestamp()`,
+          `select * from practice.transfers where request_id=${sql(uuid(operation))} and workspace_id=${sql(uuid(workspace))} and package_hash=${sql(hash)} and status='review' and expires_at>clock_timestamp()`,
         ),
       ),
     );
     return existing;
   }
   async beginTransfer(operation: string, approvedHash: string) {
-    // Lock the workspace first, the same order used by cleanup and content writes.
-    return one(
-      await this.run<
-        PracticeReview[]
-      >(`select w.id from practice.workspaces w join practice.transfers t on t.workspace_id=w.id where t.id=${sql(uuid(operation))} and w.contractor_id=${sql(this.contractor)} for update of w;
-      ${returning(`update practice.transfers t set status='committing' from practice.workspaces w, practice.drafts d where t.id=${sql(operation)} and w.id=t.workspace_id and w.contractor_id=${sql(this.contractor)} and d.id=t.draft_id and d.workspace_id=w.id and d.revision=t.draft_revision and t.status='review' and t.package_hash=${sql(approvedHash)} and t.expires_at>clock_timestamp() and w.expires_at>clock_timestamp()`)}`),
+    return this.run<PracticeReview>(
+      `select to_json(practice.begin_transfer(${sql(this.contractor)},${sql(uuid(operation))},${sql(approvedHash)}));`,
     );
   }
   async transfer(operation: string) {
@@ -167,19 +168,18 @@ export class LocalPracticeStore {
     );
   }
   async finishTransfer(operation: string, destination: string) {
-    return one(
-      await this.run<PracticeReview[]>(
-        returning(
-          `update practice.transfers set status='complete',payload=null,destination_id=${sql(uuid(destination))} where id=${sql(uuid(operation))} and status='committing' and exists(select 1 from practice.workspaces w where w.id=workspace_id and w.contractor_id=${sql(this.contractor)})`,
-        ),
-      ),
+    const identity = await this.operation(operation);
+    if (!identity) throw new Error("Recovery identity unavailable.");
+    return query<PracticeOperation>(
+      this.db,
+      this.actor,
+      `select to_json(practice.resolve_operation(${sql(uuid(operation))},${sql(this.contractor)},${sql(identity.package_hash)},'complete',${sql(uuid(destination))}));`,
+      "practice_reconcile",
     );
   }
   async cancelReview(operation: string) {
-    return this.run<PracticeReview[]>(
-      returning(
-        `update practice.transfers set status='cancelled',payload=null where id=${sql(uuid(operation))} and status='review' and exists(select 1 from practice.workspaces w where w.id=workspace_id and w.contractor_id=${sql(this.contractor)})`,
-      ),
+    return this.run(
+      `select to_json(practice.cancel_review(${sql(this.contractor)},${sql(uuid(operation))}));`,
     );
   }
 }

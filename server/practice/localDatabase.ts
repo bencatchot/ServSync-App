@@ -26,7 +26,13 @@ export async function query<T>(
   db: LocalDatabase,
   actor: string,
   statement: string,
-  role: "practice_app" | "practice_cleanup" | "postgres" = "practice_app",
+  role:
+    | "practice_app"
+    | "practice_cleanup"
+    | "practice_reconcile"
+    | "practice_destination"
+    | "practice_destination_reconcile"
+    | "postgres" = "practice_app",
 ): Promise<T> {
   const socket = realpathSync(db.socket);
   if (
