@@ -1,5 +1,9 @@
 # ServSync Marketing Product Inventory
 
+## Temporary Practice — local development only, October 16
+
+An owner-only temporary Practice foundation is being reviewed locally with fictional business/customer data. It is not an available hosted feature. Do not advertise a full account mirror, cross-device Practice access, automatic monthly deletion, guaranteed warning delivery, live transfers or seamless setup. The proposed retention default is 30 days with in-app warnings; offline users may miss them and unresolved transfers can delay cleanup. Future factual wording, only after rollout verification: “Practice with your business setup and review selected work before creating live Drafts.” See the [local foundation and rollout gates](features/TEMPORARY_PRACTICE_FOUNDATION.md).
+
 Mobile status, September 9, 2026: an iPhone/Android **Demo prototype is in development** under FB-015. Do not advertise a downloadable mobile app, app-store availability, push notifications, native deep links, or offline operation. Existing public mobile-web claims remain the supported offering.
 
 

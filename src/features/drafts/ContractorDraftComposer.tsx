@@ -31,6 +31,7 @@ import {
 } from './draftCustomerOptions';
 
 type ContractorDraftComposerProps = {
+  estimatePracticeOnly?: boolean;
   draft: SharedDraftComposerDraft;
   customerOptions: DraftCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
@@ -80,6 +81,7 @@ function formatDraftLaborHours(value: number) {
 }
 
 export function ContractorDraftComposer({
+  estimatePracticeOnly = false,
   draft,
   customerOptions,
   checklistOptions = [],
@@ -406,7 +408,7 @@ export function ContractorDraftComposer({
         />
       ))}
 
-      <details open={notesOpen} onToggle={event => setNotesOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-white px-3 py-2">
+      {!estimatePracticeOnly && <details open={notesOpen} onToggle={event => setNotesOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-white px-3 py-2">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700">
           Private notes <span className="flex items-center gap-2 text-xs font-normal text-slate-500">{draft.notes.trim() ? 'Notes added' : 'Optional'} <ChevronDown size={16} className="transition group-open:rotate-180" /></span>
         </summary>
@@ -425,7 +427,7 @@ export function ContractorDraftComposer({
       </p>
 
         </div>
-      </details>
+      </details>}
       </section>
 
       <section aria-label="Scope and pricing" className="space-y-4 border-t border-slate-200 pt-5">
@@ -434,6 +436,7 @@ export function ContractorDraftComposer({
         {composerField('Work format', (
           <select
             data-testid="durable-draft-work-format"
+            disabled={estimatePracticeOnly}
             className={fieldClass()}
             value={draft.work_format}
             onChange={event => updateWorkFormat(event.target.value as SharedDraftComposerDraft['work_format'])}
@@ -608,6 +611,7 @@ export function ContractorDraftComposer({
         <div className="space-y-3">
           {displayedLines.map((line, index) => (
             <WorkComposerLineItemRow
+              hidePrivateDetails={estimatePracticeOnly}
               key={line.id}
               line={line}
               index={index}
@@ -748,7 +752,7 @@ export function ContractorDraftComposer({
       {isChecklistDraft ? (
         <p className="rounded-xl bg-blue-50 px-3 py-3 text-sm text-blue-950">This checklist creates a Job. You can complete its findings and report after creating it.</p>
       ) : (
-        <DraftOutcomeSelector
+        estimatePracticeOnly ? <p className="rounded-xl bg-amber-50 p-3 font-semibold">Practice estimate — no customer delivery or payments.</p> : <DraftOutcomeSelector
           value={draft.intended_output}
           onChange={updateIntent}
           disabled={interactionDisabled}

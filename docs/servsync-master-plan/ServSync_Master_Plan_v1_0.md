@@ -31,6 +31,10 @@ Current documentation hierarchy:
 
 # Version Control and How to Use This Document
 
+## Temporary Practice workspace — October 16 local foundation
+
+The owner approved beginning an ongoing, owner-only Practice workspace with business/pricing/template snapshots, fictional customers and explicit create-only transfer review. He requested roughly monthly cleanup; a fixed 720-hour cycle with seven-day/one-day in-app warnings is the proposed initial default. The [local foundation specification](../features/TEMPORARY_PRACTICE_FOUNDATION.md) records persistence, bounded quotas, dry-run cleanup, pending-transfer protection and finite minimal receipt retention. This is local/test implementation, not a released account capability. Same-account handoff, isolated hosted infrastructure, real snapshot export/live import, production cleanup and cross-device rollout remain approval/validation gates. Team access and copying actual customer records are outside the first slice. Onboarding PR #586 stays separate.
+
 | Field | Value |
 | --- | --- |
 | Document name | ServSync Master Plan v1.0 Updated Draft |

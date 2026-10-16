@@ -761,7 +761,7 @@ export type InvoicePdfContext = {
 
 export async function createEstimatePdf(
   estimate: Estimate,
-  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
+  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null; practice?: boolean },
 ) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -943,7 +943,14 @@ export async function createEstimatePdf(
     addWrappedText(estimate.terms, margin, contentW, 10, 5);
   }
 
-  const fileName = `${safeFileName(`${context.contractorName}-${estimate.title}`)}.pdf`;
+  if (context.practice) {
+    for (let page = 1; page <= pdf.getNumberOfPages(); page += 1) {
+      pdf.setPage(page);
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(146, 64, 14);
+      pdf.text('PRACTICE - NOT A LIVE DOCUMENT', pageW / 2, pageH - 6, { align: 'center' });
+    }
+  }
+  const fileName = `${context.practice ? 'PRACTICE-' : ''}${safeFileName(`${context.contractorName}-${estimate.title}`)}.pdf`;
   return { blob: pdf.output('blob'), fileName };
 }
 

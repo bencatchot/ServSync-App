@@ -6,6 +6,10 @@ Last reconciled against `origin/main` at `97f529db9783fb12c04a9b43b65b9682932bd4
 
 ## Purpose
 
+### Temporary Practice workspace — initial local foundation
+
+[Issue #587](https://github.com/bencatchot/ServSync-App/issues/587) implements the owner-approved first foundation on a separate branch from onboarding PR #586. Real disposable PostgreSQL tests and a local synthetic review screen cover fixed expiry, bounded storage, owner/tenant policies, explicit transfer review and guarded dry-run cleanup. Hosted infrastructure/account handoff, actual business snapshots, real live Draft import/reconciliation, operational retention and hosted cross-device verification remain open. No production purge or feature rollout is enabled. See [scope, evidence and gates](../features/TEMPORARY_PRACTICE_FOUNDATION.md).
+
 This document is the active ServSync feature backlog. It contains unfinished product outcomes only.
 
 Completed v1 milestones are archived in [ServSync Completed Features](ServSync_Completed_Features.md). Detailed implementation history, PR sequencing, validation notes, SQL rollout notes, and operational reports belong in [CHANGELOG.md](CHANGELOG.md), not repeated inside active backlog entries.

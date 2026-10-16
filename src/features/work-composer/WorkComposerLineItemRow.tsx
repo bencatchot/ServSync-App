@@ -22,6 +22,7 @@ type WritingAssistInputProps = {
 };
 
 type WorkComposerLineItemRowProps = {
+  hidePrivateDetails?: boolean;
   line: WorkComposerLineDraft;
   index: number;
   itemLabel: 'estimate' | 'invoice' | 'draft job' | 'draft estimate' | 'draft';
@@ -64,6 +65,7 @@ function workComposerLineTotalLabel(line: WorkComposerLineDraft) {
 }
 
 export function WorkComposerLineItemRow({
+  hidePrivateDetails = false,
   line,
   index,
   itemLabel,
@@ -229,7 +231,7 @@ export function WorkComposerLineItemRow({
       </select>
     </WorkComposerField>
   );
-  const roomField = isDraftScope ? (
+  const roomField = isDraftScope && !hidePrivateDetails ? (
     <WorkComposerField label="Room">
       <input
         aria-label={`${inputPrefix} line item ${index + 1} room`}
@@ -240,7 +242,7 @@ export function WorkComposerLineItemRow({
       />
     </WorkComposerField>
   ) : null;
-  const locationField = isDraftScope ? (
+  const locationField = isDraftScope && !hidePrivateDetails ? (
     <WorkComposerField label="Location">
       <input
         aria-label={`${inputPrefix} line item ${index + 1} location`}
@@ -251,7 +253,7 @@ export function WorkComposerLineItemRow({
       />
     </WorkComposerField>
   ) : null;
-  const internalNotesField = isDraftScope ? (
+  const internalNotesField = isDraftScope && !hidePrivateDetails ? (
     <div className="lg:col-span-2">
       <WorkComposerField label="Internal notes">
         <input
