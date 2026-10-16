@@ -1,4 +1,4 @@
-// Draft integration seam only: deliberately not imported by the app or local harness.
+// Demo-only integration, reached through the default-off isolated Practice entry.
 // Uses an existing Demo user's token. This is not a restricted replacement Auth session.
 import {
   sanitizePracticeDraft,
@@ -7,9 +7,20 @@ import {
 } from "./contracts";
 
 export const PRACTICE_DEMO_ORIGIN = "https://bdytwgejqnlblhrnqxkp.supabase.co";
+export class DemoPracticeRequestError extends Error {
+  constructor(public readonly kind: "conflict" | "denied" | "unavailable") {
+    super(
+      kind === "conflict"
+        ? "Practice changed elsewhere. Reload saved work, then choose the saved Draft to review it before retrying."
+        : "Demo Practice is unavailable or access was denied.",
+    );
+  }
+}
 export type DemoPracticeState = {
   status: "not_started" | "active" | "expired";
   serverNow: string;
+  // Conservative monotonic deadline; computed locally, never trusted from the server payload.
+  accessDeadline?: number;
   workspace:
     | (Omit<PracticeWorkspace, "snapshot"> & {
         snapshot: PracticeWorkspace["snapshot"] | null;
@@ -84,29 +95,37 @@ export function createDemoPracticeTransport(options: {
       throw new Error(
         "An authenticated, non-anonymous Demo user token is required.",
       );
-    const response = await (options.fetchImpl ?? fetch)(
-      `${PRACTICE_DEMO_ORIGIN}/rest/v1/rpc/servsync_practice_demo`,
-      {
-        method: "POST",
-        headers: {
-          apikey: options.publicKey,
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await (options.fetchImpl ?? fetch)(
+        `${PRACTICE_DEMO_ORIGIN}/rest/v1/rpc/servsync_practice_demo`,
+        {
+          method: "POST",
+          headers: {
+            apikey: options.publicKey,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ command, arguments: args }),
+          redirect: "error",
+          credentials: "omit",
+          cache: "no-store",
+          signal: controller.signal,
         },
-        body: JSON.stringify({ command, arguments: args }),
-        redirect: "error",
-        credentials: "omit",
-        cache: "no-store",
-      },
-    );
-    // Avoid displaying backend internals, payloads or credentials in errors/logs.
-    if (!response.ok)
-      throw new Error(
-        response.status === 409
-          ? "Practice changed. Reload before saving."
-          : "Demo Practice is unavailable or access was denied.",
       );
-    return await response.json();
+      if (!response.ok)
+        throw new DemoPracticeRequestError(
+          response.status === 409
+            ? "conflict"
+            : [401, 403].includes(response.status)
+              ? "denied"
+              : "unavailable",
+        );
+      return await response.json();
+    } finally {
+      clearTimeout(timeout);
+    }
   };
   const draft = (value: PracticeDraft): PracticeDraft => ({
     ...value,
@@ -122,8 +141,17 @@ export function createDemoPracticeTransport(options: {
   const state = async (
     command: "state" | "start",
   ): Promise<DemoPracticeState> => {
+    const started = performance.now();
     const value = (await call(command)) as DemoPracticeState;
-    return { ...value, drafts: value.drafts.map(draft) };
+    return {
+      ...value,
+      accessDeadline: value.workspace
+        ? started +
+          Date.parse(value.workspace.expires_at) -
+          Date.parse(value.serverNow)
+        : undefined,
+      drafts: value.drafts.map(draft),
+    };
   };
   return {
     state: () => state("state"),

@@ -670,3 +670,22 @@ test("disabled/wrong project/privileged key/non-Demo token fail before any netwo
   }
   assert.equal(calls, 0);
 });
+
+test("UI gate requires explicit flag and both exact Demo destination identifiers", async () => {
+  const { demoPracticeEnabled, DEMO_PRACTICE_REF, DEMO_PRACTICE_URL } =
+    await import("../../src/features/practice/demoAccess");
+  const correct = {
+    VITE_SERVSYNC_DEMO_PRACTICE_ENABLED: "true",
+    VITE_SERVSYNC_DEMO_PROJECT_REF: DEMO_PRACTICE_REF,
+    VITE_SUPABASE_URL: DEMO_PRACTICE_URL,
+  };
+  assert.equal(demoPracticeEnabled({}), false);
+  assert.equal(demoPracticeEnabled(correct), true);
+  for (const field of Object.keys(correct)) {
+    assert.equal(
+      demoPracticeEnabled({ ...correct, [field]: undefined }),
+      false,
+    );
+    assert.equal(demoPracticeEnabled({ ...correct, [field]: "wrong" }), false);
+  }
+});

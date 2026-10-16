@@ -113,7 +113,8 @@
     "typecheck:practice": "tsc --noEmit -p tsconfig.practice.json",
     "test:practice": "node --import tsx --test tests/practice/foundation.test.ts tests/practice/demo-integration.test.ts",
     "test:practice:browser": "playwright test --config scripts/practice/playwright.config.ts",
-    "test:practice:demo": "node --import tsx --test tests/practice/demo-integration.test.ts"
+    "test:practice:demo": "node --import tsx --test tests/practice/demo-integration.test.ts",
+    "test:practice:demo:browser": "playwright test --config scripts/practice/demo-playwright.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1110.0",

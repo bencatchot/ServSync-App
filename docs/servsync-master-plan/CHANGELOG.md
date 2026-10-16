@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Default-off synthetic Demo Practice UI prepared
+
+- Added an isolated `/#/practice-demo` entry, exact Demo/build gating, existing-session handling and synthetic state/start/save editor using the reviewed installed RPC. No normal App/business queries load in this entry; no hosted pilot or setting was enabled.
+- Added saved-Draft resume, lost-response/revision handling, unsaved navigation warnings, account-change isolation, expiry notices and watermarked PDF preview. Independent review identified initial-access overlap and delayed-response expiry gaps; serialized checks and conservative monotonic deadlines fix both.
+- All 18 desktop Chromium/mobile WebKit browser checks passed independently; 42 real PostgreSQL checks, full/Practice types, lint baseline and build passed. Tutorial impact: NONE after read-only Demo catalog searches returned no matching published/current guidance. Local browser tests exercise the actual reviewed SQL in disposable PostgreSQL with synthetic Auth/HTTP. They cover desktop/mobile, $250.50 totals, interruption/retry/conflict, late account responses, expiry/revocation and public document entry. The latter exposed WebKit's late paired hash event; matching navigation URLs now preserves the consumed access token.
+- [UI review and smallest next approval](../features/PRACTICE_DEMO_UI_REVIEW.md) names the existing Demo reviewer account and a branch-only, 24-hour synthetic pilot proposal. Installation report/Applied ledger are published with this UI draft. Installed SQL is unchanged; no activation, access/config changes, real-data copy, renewal, cleanup, merge or manual deployment.
+
 ## 2026-10-16 — Approved Practice Demo SQL installed, feature still inactive
 
 - Applied only approved SQL hash `4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4` from `4618568` to existing Demo, migration `20261016180520`. No pilot bindings, cycles or Drafts.

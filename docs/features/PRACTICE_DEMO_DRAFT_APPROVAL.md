@@ -25,9 +25,9 @@ Primary references checked against current docs/changelog:
 - [PostgREST JWT authentication](https://docs.postgrest.org/en/stable/references/auth.html) and [transaction-local request claims](https://docs.postgrest.org/en/stable/references/transactions.html#request-headers-cookies-and-jwt-claims).
 - [API auto-exposure change](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically): explicit revokes remain necessary for existing legacy defaults. [PostgreSQL minor release changes](https://supabase.com/changelog/postgres-15-19-17-11-breaking-changes) do not require any extension/operator change for this draft.
 
-## Smallest next hosted approval
+## Historical SQL-only approval — completed
 
-Approve installation of **only** `server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql` into existing **ServSync Demo Supabase `bdytwgejqnlblhrnqxkp`**, followed by bounded read-only catalog, permission and existing-object fingerprint/advisor/parity checks. **Keep the pilot table empty.** No pilot activation, customer data, cleanup, session/configuration change, Vercel deployment, merge or new project is included. The earlier approval does not authorize these revised bytes, and no installation retry has occurred.
+The approved request was installation of **only** `server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql` into existing **ServSync Demo Supabase `bdytwgejqnlblhrnqxkp`**, followed by bounded read-only catalog, permission and existing-object fingerprint/advisor/parity checks. **Keep the pilot table empty.** No pilot activation, customer data, cleanup, session/configuration change, Vercel deployment, merge or new project is included. Fresh exact-byte approval was subsequently received and this installation completed as recorded above.
 
 Revised SQL SHA-256: `4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4`.
 
@@ -43,7 +43,7 @@ Future UI hosting, if separately approved, would reuse Vercel `servsync-demo` / 
 - Explicit new-object revokes remove legacy automatic grants before commit. Name collisions abort rather than replace existing objects. No global default privileges change.
 - Commands remain `state`, idempotent `start`, revision-checked `save`, with 50 Drafts, 100 lines and bounded text/numbers. Snapshot is fixed fictional data; no caller-supplied snapshot, identity, private IDs/costs/notes or unexpected payload fields. Free text cannot distinguish real from fictional content, so any later approved pilot must use synthetic data only.
 - One 720-hour cycle per pilot. Expiry hides payloads/snapshot, denies further writes and does not delete retained rows. No renewal, import, send, charge, transfer or cleanup command exists.
-- The existing Demo transport remains unmounted/default-off, pinned to exact Demo origin/RPC, no redirects/cookies, minimal reconstructed payload. No new credential, session bridge or production handoff.
+- The Demo transport is now wired through an isolated default-off UI entry (see [UI review](PRACTICE_DEMO_UI_REVIEW.md)) and remains, pinned to exact Demo origin/RPC, no redirects/cookies, minimal reconstructed payload. No new credential, session bridge or production handoff.
 
 ## Preconditions and acceptance for a separately approved installation
 
@@ -66,3 +66,7 @@ Future UI hosting, if separately approved, would reuse Vercel `servsync-demo` / 
 This draft permits one synthetic cycle per separately approved pilot, physically retained after access expiry. Renewal/purge and backup handling remain explicit decisions. Hosted UI, a Demo reviewer identity binding, same-login real setup snapshots, real Draft import/reconciliation, cleanup and cross-device acceptance remain separate reviewed work. No new projects are proposed.
 
 Tutorial impact: **NOT APPLICABLE** to this unmounted source-only revision. Hosted UI implementation and validation must precede Help Studio freshness review. PR #586's TUT-002 follow-up remains separate. Marketing may describe only a synthetic Practice prototype in development; no hosted, seamless, same-login or deletion guarantee is supported.
+
+## Current next step
+
+The installation is complete; do not apply this SQL again. The default-off UI draft and exact existing reviewer identity are documented in [the bounded UI/pilot approval](PRACTICE_DEMO_UI_REVIEW.md). Historical evidence below describes the earlier SQL review and does not claim current hosted UI acceptance.
