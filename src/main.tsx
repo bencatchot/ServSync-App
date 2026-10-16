@@ -2,23 +2,26 @@ import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { RequestFreeEstimateDeliveryLookup, RequestFreeFinalizedReportLookup, RequestFreeInvoiceDeliveryLookup } from './types';
 import './index.css';
+import { allowPracticeNavigation } from './features/practice/demoNavigation';
 
 type EntryRequest =
   | { kind: 'app' }
+  | { kind: 'practice' }
   | { kind: 'invoice'; bootstrapToken: string | null }
   | { kind: 'estimate'; bootstrapToken: string | null }
   | { kind: 'report'; bootstrapToken: string | null };
 
 let root: Root;
+let mountedUrl = window.location.href;
 let mountedKind: EntryRequest['kind'] | null = null;
 let renderRevision = 0;
-let suppressPairedHashChange = false;
-let suppressionTimer: number | null = null;
+let pairedHashUrl: string | null = null;
 let activeDeliveryRequest: { controller: AbortController; settled: Promise<void> } | null = null;
 
 function consumeEntryRequest(): EntryRequest {
   const rawHash = window.location.hash.replace(/^#\/?/, '');
   const [route, query = ''] = rawHash.split('?');
+  if (route === 'practice-demo') return { kind: 'practice' };
   if (route !== 'invoice-delivery' && route !== 'estimate-delivery' && route !== 'report-delivery') return { kind: 'app' };
 
   const params = new URLSearchParams(query);
@@ -187,8 +190,9 @@ async function renderReport(entry: Extract<EntryRequest, { kind: 'report' }>, re
 }
 
 async function renderEntry(entry: EntryRequest, force = false) {
-  if (!force && entry.kind === mountedKind && (entry.kind === 'app' || entry.bootstrapToken === null)) return;
+  if (!force && entry.kind === mountedKind && (entry.kind === 'app' || entry.kind === 'practice' || entry.bootstrapToken === null)) return;
 
+  mountedUrl = window.location.href;
   const revision = ++renderRevision;
   mountedKind = null;
   root.render(null);
@@ -213,6 +217,14 @@ async function renderEntry(entry: EntryRequest, force = false) {
     return;
   }
 
+  if (entry.kind === 'practice') {
+    const { PracticeDemoEntry } = await import('./features/practice/PracticeDemoEntry');
+    if (revision !== renderRevision) return;
+    root.render(<StrictMode><PracticeDemoEntry /></StrictMode>);
+    mountedKind = 'practice';
+    return;
+  }
+
   const { default: App } = await import('./App');
   if (revision !== renderRevision) return;
   root.render(
@@ -223,23 +235,27 @@ async function renderEntry(entry: EntryRequest, force = false) {
   mountedKind = 'app';
 }
 
-const onHashChange = () => {
-  if (suppressPairedHashChange) {
-    suppressPairedHashChange = false;
-    if (suppressionTimer !== null) window.clearTimeout(suppressionTimer);
-    suppressionTimer = null;
+const onHashChange = (event: HashChangeEvent) => {
+  // WebKit can deliver the paired event after a zero-delay timer. Match the
+  // navigation itself so a second render cannot discard a consumed access token.
+  const paired = event.newURL === pairedHashUrl;
+  pairedHashUrl = null;
+  if (paired) return;
+  if (mountedKind === 'practice' && !allowPracticeNavigation()) {
+    window.history.replaceState(null, '', mountedUrl);
     return;
   }
   void renderEntry(consumeEntryRequest(), true);
 };
 
 const onPopState = () => {
-  suppressPairedHashChange = true;
-  if (suppressionTimer !== null) window.clearTimeout(suppressionTimer);
-  suppressionTimer = window.setTimeout(() => {
-    suppressPairedHashChange = false;
-    suppressionTimer = null;
-  }, 0);
+  pairedHashUrl = new URL(mountedUrl).hash !== window.location.hash
+    ? window.location.href
+    : null;
+  if (mountedKind === 'practice' && !allowPracticeNavigation()) {
+    window.history.pushState(null, '', mountedUrl);
+    return;
+  }
   void renderEntry(consumeEntryRequest(), true);
 };
 
@@ -257,7 +273,7 @@ if (import.meta.hot) {
     activeDeliveryRequest?.controller.abort();
     window.removeEventListener('hashchange', onHashChange);
     window.removeEventListener('popstate', onPopState);
-    if (suppressionTimer !== null) window.clearTimeout(suppressionTimer);
+    pairedHashUrl = null;
   });
 }
 

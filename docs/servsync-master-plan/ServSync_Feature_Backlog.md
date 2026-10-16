@@ -6,6 +6,12 @@ Last reconciled against `origin/main` at `97f529db9783fb12c04a9b43b65b9682932bd4
 
 ## Purpose
 
+### Temporary Practice workspace — initial local foundation
+
+[Issue #587](https://github.com/bencatchot/ServSync-App/issues/587) remains separate from guided-onboarding PR #586. The approved Demo SQL is installed, and a separately approved single-account, 24-hour synthetic pilot completed start/save/refresh/resume/watermarked PDF acceptance on the existing Preview. That pilot is not a broader rollout; expiry, saved synthetic content and installed SQL are preserved. The subsequent [local improvement pass](../features/PRACTICE_DEMO_IMPROVEMENTS_REVIEW.md) fixes input recovery/navigation, offers sample or blank starts and simplifies mobile actions. It is tested locally and approved for UI-only branch publication and Demo Preview verification. Its separate response-only SQL draft is unapplied; actual earliest-deadline display needs separate shared-application approval and existing function-owner capability. The legacy response shows an honest unavailable-deadline message.
+
+The published UI passed bounded hosted desktop Safari save/resume/PDF acceptance; hosted Escape/focus subsequently passed without writes. A [clearer sign-in entry and narrow mobile review](../features/PRACTICE_DEMO_ROUGH_EDGES_REVIEW.md) are verified locally and owner-approved for publication. Next: verify the published entry on its exact Demo Preview, and separately decide whether to rehearse the bounded maintenance proposal for the deadline response. No existing authorized owner-capable route was found; no privileges or SQL changed. Hosted cross-device/physical-phone PDF acceptance, actual business snapshots, live Draft import/reconciliation, renewal and retention cleanup remain open. No new project, production purge or broad rollout is enabled. See [foundation scope](../features/TEMPORARY_PRACTICE_FOUNDATION.md) and [installation evidence](../features/PRACTICE_DEMO_INSTALLATION_2026-10-16.md).
+
 This document is the active ServSync feature backlog. It contains unfinished product outcomes only.
 
 Completed v1 milestones are archived in [ServSync Completed Features](ServSync_Completed_Features.md). Detailed implementation history, PR sequencing, validation notes, SQL rollout notes, and operational reports belong in [CHANGELOG.md](CHANGELOG.md), not repeated inside active backlog entries.

@@ -1,0 +1,707 @@
+import { after, before, test } from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import {
+  createLocalFixture,
+  OWNER,
+  SNAPSHOT,
+} from "../../scripts/practice/local-fixture";
+import { query, sql } from "../../server/practice/localDatabase";
+import {
+  createDemoPracticeTransport,
+  demoPracticePayload,
+  PRACTICE_DEMO_ORIGIN,
+  type DemoPracticeState,
+} from "../../src/features/practice/demoTransport";
+import { createBlankSharedDraftComposerDraft } from "../../src/features/drafts/draftComposerMappings";
+import { createWorkComposerLineDraft } from "../../src/features/work-composer/workComposerDrafts";
+import { validatePracticePreview } from "../../src/features/practice/contracts";
+
+const migration = readFileSync(
+  new URL(
+    "../../server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+let fixture: Awaited<ReturnType<typeof createLocalFixture>>;
+let managedBefore: unknown;
+const admin = <T = unknown>(statement: string) =>
+  query<T>(fixture.db, OWNER, statement, "postgres");
+const managedFingerprint = () =>
+  admin(`select jsonb_build_object(
+  'schema',(select jsonb_build_object('owner',nspowner,'acl',nspacl) from pg_namespace where nspname='auth'),
+  'functions',(select jsonb_agg(jsonb_build_object('owner',proowner,'acl',proacl,'definition',pg_get_functiondef(oid)) order by proname)
+    from pg_proc where pronamespace='auth'::regnamespace),
+  'roles',(select jsonb_agg(jsonb_build_object('name',rolname,'super',rolsuper,'create',rolcreaterole,'bypass',rolbypassrls) order by rolname)
+    from pg_roles where rolname in ('demo_installer','supabase_admin','supabase_auth_admin')),
+  'managedMembership',(select coalesce(jsonb_agg(to_jsonb(m) order by roleid,member),'[]') from pg_auth_members m
+    where roleid in ('supabase_admin'::regrole,'supabase_auth_admin'::regrole)
+      or member in ('supabase_admin'::regrole,'supabase_auth_admin'::regrole)));`);
+const claimsFor = (actor: string, overrides = {}) => ({
+  sub: actor,
+  role: "authenticated",
+  is_anonymous: false,
+  iss: `${PRACTICE_DEMO_ORIGIN}/auth/v1`,
+  ...overrides,
+});
+const asUser = <T = unknown>(
+  actor: string,
+  statement: string,
+  overrides = {},
+) =>
+  admin<T>(
+    `set session authorization authenticated; set local request.jwt.claims=${sql(claimsFor(actor, overrides))}; ${statement}`,
+  );
+const rpc = (
+  actor: string,
+  command: string,
+  args: unknown = {},
+  overrides = {},
+) =>
+  asUser<
+    Omit<DemoPracticeState, "workspace"> & {
+      workspace: NonNullable<DemoPracticeState["workspace"]>;
+    }
+  >(
+    actor,
+    `select public.servsync_practice_demo(${sql(command)},${sql(args)}::jsonb);`,
+    overrides,
+  );
+const payload = () =>
+  demoPracticePayload(
+    createBlankSharedDraftComposerDraft({
+      title: "Fictional repair",
+      scope: "Synthetic fixture only",
+      line_items: [
+        createWorkComposerLineDraft({
+          line_title: "Repair",
+          unit_price: "125.25",
+          quantity: "2",
+        }),
+      ],
+    }),
+  );
+async function pilot() {
+  const actor = randomUUID(),
+    tenant = randomUUID();
+  await admin(
+    `insert into servsync_practice_demo.pilots values(${sql(actor)},${sql(tenant)},true,clock_timestamp()+interval '31 days'); select null::json;`,
+  );
+  return actor;
+}
+before(async () => {
+  fixture = await createLocalFixture();
+  await admin(`create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
+    -- Match the observed hosted operator, including its existing BYPASSRLS attribute.
+    create role demo_installer nologin createrole createdb nosuperuser inherit bypassrls;
+    create role supabase_admin nologin; create role supabase_auth_admin nologin;
+    create role dashboard_user nologin;
+    grant create on database "${fixture.db.database}" to demo_installer;
+    grant usage,create on schema public to demo_installer;
+    -- Model legacy Supabase defaults; the draft must remove accidental ambient grants.
+    alter default privileges for role demo_installer grant execute on functions to anon,authenticated,service_role;
+    alter default privileges for role demo_installer grant all on tables to anon,authenticated,service_role;
+    create schema auth authorization supabase_admin;
+    create function auth.uid() returns uuid language sql stable as $$select (current_setting('request.jwt.claims',true)::jsonb->>'sub')::uuid$$;
+    create function auth.jwt() returns jsonb language sql stable as $$select current_setting('request.jwt.claims',true)::jsonb$$;
+    alter function auth.uid() owner to supabase_auth_admin;
+    alter function auth.jwt() owner to supabase_auth_admin;
+    grant usage on schema auth to anon,authenticated,service_role,demo_installer;
+    grant usage,create on schema auth to supabase_auth_admin,dashboard_user;
+    -- Actual managed ACL: PUBLIC helper EXECUTE, no PUBLIC schema USAGE or grant option.
+    grant execute on function auth.uid(),auth.jwt() to dashboard_user;
+    grant execute on function auth.jwt() to demo_installer;
+    -- Sentinel table: an accidental write to this fixture aborts the test. Hosted triggers are not simulated.
+    create table public.practice_test_business_tripwire(id uuid);
+    create function public.practice_test_no_write() returns trigger language plpgsql as $$begin raise exception 'OUTBOUND BUSINESS WRITE'; end$$;
+    create trigger no_write before insert or update or delete on public.practice_test_business_tripwire for each statement execute function public.practice_test_no_write();
+    select null::json;`);
+  managedBefore = await managedFingerprint();
+  assert.deepEqual(
+    await admin(`select jsonb_build_object(
+    'super',(select rolsuper from pg_roles where rolname='demo_installer'),
+    'bypass',(select rolbypassrls from pg_roles where rolname='demo_installer'),
+    'usage',has_schema_privilege('demo_installer','auth','USAGE'),
+    'usageGrant',has_schema_privilege('demo_installer','auth','USAGE WITH GRANT OPTION'),
+    'uidExecute',has_function_privilege('demo_installer','auth.uid()','EXECUTE'),
+    'uidGrant',has_function_privilege('demo_installer','auth.uid()','EXECUTE WITH GRANT OPTION'),
+    'jwtGrant',has_function_privilege('demo_installer','auth.jwt()','EXECUTE WITH GRANT OPTION'),
+    'schemaOwnerSet',pg_has_role('demo_installer','supabase_admin','SET'),
+    'helperOwnerSet',pg_has_role('demo_installer','supabase_auth_admin','SET'),
+    'schemaOwnerInherit',pg_has_role('demo_installer','supabase_admin','USAGE'),
+    'helperOwnerInherit',pg_has_role('demo_installer','supabase_auth_admin','USAGE'));`),
+    {
+      super: false,
+      bypass: true,
+      usage: true,
+      usageGrant: false,
+      uidExecute: true,
+      uidGrant: false,
+      jwtGrant: false,
+      schemaOwnerSet: false,
+      helperOwnerSet: false,
+      schemaOwnerInherit: false,
+      helperOwnerInherit: false,
+    },
+  );
+  await assert.rejects(admin(migration), /Verified Demo target/);
+  await assert.rejects(
+    admin(
+      `set local servsync.reviewed_demo_target='uqgtheclhxqlnjpfmheq'; ${migration}`,
+    ),
+    /Verified Demo target/,
+  );
+  await admin(
+    `set session authorization demo_installer; set local servsync.reviewed_demo_target='bdytwgejqnlblhrnqxkp'; ${migration} select null::json;`,
+  );
+  const before = await admin(`select jsonb_build_object('owner',proowner,'acl',proacl,'definer',prosecdef,'config',proconfig) from pg_proc where oid='servsync_practice_demo.dispatch(text,jsonb)'::regprocedure;`);
+  const responseDraft = readFileSync(new URL('../../server/practice/demo-draft/20261016193850_practice_demo_access_deadline_response.sql', import.meta.url), 'utf8');
+  await admin(`set local servsync.reviewed_demo_target='bdytwgejqnlblhrnqxkp'; ${responseDraft} select null::json;`);
+  assert.deepEqual(await admin(`select jsonb_build_object('owner',proowner,'acl',proacl,'definer',prosecdef,'config',proconfig) from pg_proc where oid='servsync_practice_demo.dispatch(text,jsonb)'::regprocedure;`), before);
+
+});
+after(() => fixture?.close());
+
+test("draft installer requires target acknowledgement; disposable installer still rejects auth catalogs", async () => {
+  const local = readFileSync(
+    new URL("../../server/practice/local-schema.sql", import.meta.url),
+    "utf8",
+  );
+  await assert.rejects(admin(local), /Disposable|disposable|local/i);
+  assert.equal(
+    await admin("select to_json(count(*)) from servsync_practice_demo.pilots;"),
+    0,
+  );
+});
+test("non-superuser installation leaves no ambient function grants, role switching or schema-create capability", async () => {
+  const evidence = await admin(`select json_build_object(
+    'anonDispatch',has_function_privilege('anon','servsync_practice_demo.dispatch(text,jsonb)','EXECUTE'),
+    'serviceDispatch',has_function_privilege('service_role','servsync_practice_demo.dispatch(text,jsonb)','EXECUTE'),
+    'authDispatch',has_function_privilege('authenticated','servsync_practice_demo.dispatch(text,jsonb)','EXECUTE'),
+    'authHelper',has_function_privilege('authenticated','servsync_practice_demo.synthetic_snapshot()','EXECUTE'),
+    'create',has_schema_privilege('servsync_practice_demo_executor','servsync_practice_demo','CREATE'),
+    'installerSet',pg_has_role('demo_installer','servsync_practice_demo_executor','SET'),
+    'installerInherit',pg_has_role('demo_installer','servsync_practice_demo_executor','USAGE'));`);
+  assert.deepEqual(evidence, {
+    anonDispatch: false,
+    serviceDispatch: false,
+    authDispatch: true,
+    authHelper: false,
+    create: false,
+    installerSet: false,
+    installerInherit: false,
+  });
+});
+test("managed Auth ACLs and authority are unchanged; executor uses no managed schema privilege", async () => {
+  assert.deepEqual(await managedFingerprint(), managedBefore);
+  assert.deepEqual(
+    await admin(`select jsonb_build_object(
+    'authUsage',has_schema_privilege('servsync_practice_demo_executor','auth','USAGE'),
+    'inheritedUidExecute',has_function_privilege('servsync_practice_demo_executor','auth.uid()','EXECUTE'),
+    'runtimeBypass',(select rolbypassrls from pg_roles where rolname='servsync_practice_demo_executor'),
+    'runtimeLogin',(select rolcanlogin from pg_roles where rolname='servsync_practice_demo_executor'),
+    'identityDefiner',(select prosecdef from pg_proc where oid='servsync_practice_demo.request_actor()'::regprocedure),
+    'identityArgs',(select pronargs from pg_proc where oid='servsync_practice_demo.request_actor()'::regprocedure),
+    'dispatcherOwner',(select pg_get_userbyid(proowner) from pg_proc where oid='servsync_practice_demo.dispatch(text,jsonb)'::regprocedure),
+    'authIdentityExecute',has_function_privilege('authenticated','servsync_practice_demo.request_actor()','EXECUTE'),
+    'elevatedFunctions',(select count(*) from pg_proc where pronamespace='servsync_practice_demo'::regnamespace and prosecdef));`),
+    {
+      authUsage: false,
+      inheritedUidExecute: true,
+      runtimeBypass: false,
+      runtimeLogin: false,
+      identityDefiner: false,
+      identityArgs: 0,
+      dispatcherOwner: "servsync_practice_demo_executor",
+      authIdentityExecute: false,
+      elevatedFunctions: 1,
+    },
+  );
+  await assert.rejects(
+    admin(
+      `set session authorization servsync_practice_demo_executor; select auth.uid();`,
+    ),
+    /permission denied for schema auth/,
+  );
+  await assert.rejects(
+    asUser(await pilot(), "select servsync_practice_demo.request_actor();"),
+    /permission denied/,
+  );
+});
+test("request identity fails closed on missing, malformed and mistyped claims without legacy or header fallbacks", async () => {
+  const actor = await pilot();
+  for (const claims of [
+    "",
+    "{",
+    "null",
+    "[]",
+    '"scalar"',
+    "{}",
+    ...[
+      { sub: null },
+      { sub: 42 },
+      { sub: "not-a-uuid" },
+      { role: null },
+      { role: "service_role" },
+      { iss: null },
+      { iss: "https://uqgtheclhxqlnjpfmheq.supabase.co/auth/v1" },
+      { is_anonymous: null },
+      { is_anonymous: true },
+      { is_anonymous: "false" },
+      { is_anonymous: 0 },
+    ].map((overrides) => JSON.stringify(claimsFor(actor, overrides))),
+  ]) {
+    await assert.rejects(
+      admin(`set session authorization authenticated;
+      set local request.jwt.claims=${sql(claims)};
+      set local request.jwt.claim.sub=${sql(actor)};
+      set local request.jwt.claim=${sql(claimsFor(actor))};
+      set local request.headers=${sql({ sub: actor, role: "authenticated", is_anonymous: false })};
+      select public.servsync_practice_demo('start');`),
+      /Demo pilot required/,
+    );
+  }
+  await assert.rejects(
+    admin(
+      "set session authorization authenticated; select public.servsync_practice_demo('state');",
+    ),
+    /Demo pilot required/,
+  );
+  for (const field of ["sub", "iss", "role", "is_anonymous"]) {
+    const claims: Record<string, unknown> = claimsFor(actor);
+    delete claims[field];
+    await assert.rejects(
+      admin(`set session authorization authenticated; set local request.jwt.claims=${sql(claims)};
+      select public.servsync_practice_demo('start');`),
+      /Demo pilot required/,
+    );
+  }
+  // A caller-selected identity in arguments/metadata cannot replace validated server claims.
+  await assert.rejects(
+    rpc(randomUUID(), "start", { actor }, { user_metadata: claimsFor(actor) }),
+    /Demo pilot required/,
+  );
+  assert.equal(
+    await admin("select to_json(count(*)) from servsync_practice_demo.cycles;"),
+    0,
+  );
+});
+test("transaction-local identity clears on a reused connection and spoof sources cannot select another tenant", async () => {
+  const actor = await pilot(),
+    other = await pilot();
+  const own = await rpc(actor, "start"),
+    foreign = await rpc(other, "start");
+  const result = await asUser<{ id: string }>(
+    actor,
+    `set local request.jwt.claim.sub=${sql(other)};
+    set local request.headers=${sql(claimsFor(other))};
+    select jsonb_build_object('id',public.servsync_practice_demo('state')->'workspace'->>'id');`,
+    { user_metadata: claimsFor(other) },
+  );
+  assert.equal(result.id, own.workspace.id);
+  assert.notEqual(result.id, foreign.workspace.id);
+  // Both transactions share one psql connection; only server-injected SET LOCAL has identity.
+  await assert.rejects(
+    admin(`set session authorization authenticated;
+    set local request.jwt.claims=${sql(claimsFor(actor))};
+    do $$begin perform public.servsync_practice_demo('state'); end$$;
+    commit; begin; select public.servsync_practice_demo('state');`),
+    /Demo pilot required/,
+  );
+  assert.deepEqual(
+    await admin(`set local request.jwt.claims=${sql(claimsFor(actor))};
+    set local role servsync_practice_demo_executor;
+    select jsonb_agg(id) from servsync_practice_demo.cycles;`),
+    [own.workspace.id],
+  );
+});
+test("anon, service role, anonymous users and unregistered users cannot enter; user_metadata cannot grant access", async () => {
+  for (const role of ["anon", "service_role"])
+    await assert.rejects(
+      admin(
+        `set local role ${role}; select public.servsync_practice_demo('start');`,
+      ),
+      /permission denied/,
+    );
+  const actor = await pilot();
+  await assert.rejects(
+    rpc(actor, "start", {}, { is_anonymous: true }),
+    /pilot required/,
+  );
+  await assert.rejects(
+    rpc(actor, "start", {}, { is_anonymous: null }),
+    /pilot required/,
+  );
+  await assert.rejects(
+    rpc(
+      randomUUID(),
+      "start",
+      {},
+      { user_metadata: { owner_id: actor, practice_enabled: true } },
+    ),
+    /pilot required/,
+  );
+});
+test("start is idempotent and snapshot matches synthetic fixtures, never accepts input snapshot", async () => {
+  const actor = await pilot();
+  await assert.rejects(
+    rpc(actor, "start", { snapshot: { business: { name: "Real business" } } }),
+    /Unexpected/,
+  );
+  const [a, b] = await Promise.all([rpc(actor, "start"), rpc(actor, "start")]);
+  assert.equal(a.workspace.id, b.workspace.id);
+  assert.deepEqual(a.workspace.snapshot, SNAPSHOT);
+  assert.equal(
+    Date.parse(a.workspace.expires_at) - Date.parse(a.workspace.created_at),
+    30 * 86400000,
+  );
+});
+test("cross-tenant cycle IDs and raw table access fail; private function has the same access checks", async () => {
+  const a = await pilot(),
+    b = await pilot();
+  const ca = await rpc(a, "start"),
+    cb = await rpc(b, "start");
+  await assert.rejects(
+    rpc(b, "save", {
+      workspace_id: ca.workspace.id,
+      draft_id: randomUUID(),
+      expected_revision: 0,
+      payload: payload(),
+    }),
+    /Active Practice/,
+  );
+  assert.notEqual(ca.workspace.id, cb.workspace.id);
+  for (const table of ["pilots", "cycles", "drafts"])
+    await assert.rejects(
+      asUser(
+        a,
+        `select row_to_json(x) from servsync_practice_demo.${table} x;`,
+      ),
+      /permission denied/,
+    );
+  await assert.rejects(
+    asUser(
+      randomUUID(),
+      "select servsync_practice_demo.dispatch('start','{}');",
+    ),
+    /pilot required/,
+  );
+  await assert.rejects(
+    asUser(
+      a,
+      "set local role servsync_practice_demo_executor; select null::json;",
+    ),
+    /permission denied/,
+  );
+});
+test("direct RPC rejects private fields, nested customer IDs, malformed/null fields, oversized lines and unsupported operations", async () => {
+  const a = await pilot(),
+    c = await rpc(a, "start");
+  const good = payload();
+  for (const bad of [
+    { ...good, notes: "private" },
+    { ...good, snapshot: SNAPSHOT },
+    { ...good, labor_mode: null },
+    {
+      ...good,
+      line_items: [{ ...good.line_items[0], customer_id: randomUUID() }],
+    },
+    { ...good, line_items: [{ ...good.line_items[0], quantity: "-1" }] },
+    { ...good, line_items: Array(101).fill(good.line_items[0]) },
+    { ...good, scope: "x".repeat(10001) },
+  ]) {
+    await assert.rejects(
+      rpc(a, "save", {
+        workspace_id: c.workspace.id,
+        draft_id: randomUUID(),
+        expected_revision: 0,
+        payload: bad,
+      }),
+      /Invalid|Too many/,
+    );
+  }
+  for (const command of [
+    "send",
+    "transfer",
+    "cleanup",
+    "refresh",
+    "export",
+    "charge",
+  ])
+    await assert.rejects(rpc(a, command), /Unsupported/);
+  assert.deepEqual((await rpc(a, "state")).drafts, []);
+});
+test("save/reload, concurrent CAS and lost-ack retry preserve one accurate draft", async () => {
+  const actor = await pilot(),
+    c = await rpc(actor, "start"),
+    id = randomUUID();
+  const args = {
+    workspace_id: c.workspace.id,
+    draft_id: id,
+    expected_revision: 0,
+    payload: payload(),
+  };
+  const saved = await rpc(actor, "save", args);
+  assert.deepEqual(await rpc(actor, "save", args), saved);
+  const results = await Promise.allSettled([
+    rpc(actor, "save", {
+      ...args,
+      expected_revision: 1,
+      payload: { ...payload(), title: "One" },
+    }),
+    rpc(actor, "save", {
+      ...args,
+      expected_revision: 1,
+      payload: { ...payload(), title: "Two" },
+    }),
+  ]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  const state = await rpc(actor, "state");
+  assert.equal(state.drafts.length, 1);
+  assert.equal(state.drafts[0].revision, 2);
+  assert.equal(
+    validatePracticePreview(state.drafts[0].payload).totalCents,
+    25050,
+  );
+  await assert.rejects(rpc(actor, "save", args), /revision conflict/);
+});
+test("expiry hides draft payloads and snapshots, rejects writes/renewal, never deletes stored content", async () => {
+  const a = await pilot(),
+    c = await rpc(a, "start");
+  await rpc(a, "save", {
+    workspace_id: c.workspace.id,
+    draft_id: randomUUID(),
+    expected_revision: 0,
+    payload: payload(),
+  });
+  await admin(
+    `update servsync_practice_demo.cycles set expires_at=clock_timestamp()-interval '1 second' where user_id=${sql(a)};select null::json;`,
+  );
+  const expired = await rpc(a, "state");
+  assert.equal(expired.status, "expired");
+  assert.equal(expired.workspace.snapshot, null);
+  assert.deepEqual(expired.drafts, []);
+  await assert.rejects(rpc(a, "start"), /expired/);
+  await assert.rejects(
+    rpc(a, "save", {
+      workspace_id: c.workspace.id,
+      draft_id: randomUUID(),
+      expected_revision: 0,
+      payload: payload(),
+    }),
+    /Active Practice/,
+  );
+  assert.equal(
+    await admin(
+      `select to_json(count(*)) from servsync_practice_demo.drafts where cycle_id=${sql(c.workspace.id)};`,
+    ),
+    1,
+  );
+  assert.equal(
+    await admin(
+      `set local request.jwt.claims=${sql(claimsFor(a))};set local role servsync_practice_demo_executor;select to_json(count(*)) from servsync_practice_demo.drafts where cycle_id=${sql(c.workspace.id)};`,
+    ),
+    0,
+  );
+});
+test("revoking or expiring pilot access denies reads even with a previously valid JWT", async () => {
+  for (const change of [
+    "enabled=false",
+    "access_until=clock_timestamp()-interval '1 second'",
+  ]) {
+    const a = await pilot();
+    await rpc(a, "start");
+    await admin(
+      `update servsync_practice_demo.pilots set ${change} where user_id=${sql(a)};select null::json;`,
+    );
+    await assert.rejects(rpc(a, "state"), /pilot required/);
+  }
+});
+test("quota bounds accumulation; no cleanup, cross-schema FKs or business capabilities are created", async () => {
+  const a = await pilot(),
+    c = await rpc(a, "start");
+  await admin(
+    `insert into servsync_practice_demo.drafts(id,cycle_id,payload) select gen_random_uuid(),${sql(c.workspace.id)},${sql(payload())}::jsonb from generate_series(1,50);select null::json;`,
+  );
+  await assert.rejects(
+    rpc(a, "save", {
+      workspace_id: c.workspace.id,
+      draft_id: randomUUID(),
+      expected_revision: 0,
+      payload: payload(),
+    }),
+    /limit reached/,
+  );
+  const evidence = await admin(
+    `select json_build_object('businessRows',(select count(*) from public.practice_test_business_tripwire),'deleteGrant',has_table_privilege('servsync_practice_demo_executor','servsync_practice_demo.drafts','DELETE'),'crossSchemaFK',(select count(*) from pg_constraint where connamespace='servsync_practice_demo'::regnamespace and contype='f' and confrelid not in(select oid from pg_class where relnamespace='servsync_practice_demo'::regnamespace)),'bypass',(select rolbypassrls from pg_roles where rolname='servsync_practice_demo_executor'),'triggers',(select count(*) from pg_trigger where not tgisinternal and tgrelid in(select oid from pg_class where relnamespace='servsync_practice_demo'::regnamespace)));`,
+  );
+  assert.deepEqual(evidence, {
+    businessRows: 0,
+    deleteGrant: false,
+    crossSchemaFK: 0,
+    bypass: false,
+    triggers: 0,
+  });
+});
+
+const jwt = (claims: object) =>
+  `e30.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.synthetic-signature`;
+test("transport targets only exact Demo RPC, strips private fields, and integrates with actual PostgreSQL", async () => {
+  const actor = await pilot();
+  const calls: Array<{ url: string; body: unknown }> = [];
+  // Mock HTTP/Auth only: statements execute the real draft migration against disposable PostgreSQL.
+  const fetchImpl: typeof fetch = async (input, options) => {
+    const body = JSON.parse(String(options?.body));
+    calls.push({ url: String(input), body });
+    assert.equal(options?.redirect, "error");
+    assert.equal(options?.credentials, "omit");
+    return Response.json(await rpc(actor, body.command, body.arguments));
+  };
+  const transport = createDemoPracticeTransport({
+    enabled: true,
+    origin: PRACTICE_DEMO_ORIGIN,
+    publicKey: "sb_publishable_synthetic",
+    getAccessToken: async () => jwt(claimsFor(actor)),
+    fetchImpl,
+  });
+  const c = await transport.start();
+  const draft = {
+    ...payload(),
+    notes: "NEVER COPY",
+    local_contact_id: randomUUID(),
+    cost: 900,
+    provider_token: "NEVER COPY",
+  };
+  await transport.save(c.workspace!.id, randomUUID(), 0, draft);
+  const state = await transport.state();
+  assert.equal(
+    validatePracticePreview(state.drafts[0].payload).totalCents,
+    25050,
+  );
+  assert.equal(calls.length, 3);
+  assert(
+    calls.every(
+      (call) =>
+        call.url ===
+        `${PRACTICE_DEMO_ORIGIN}/rest/v1/rpc/servsync_practice_demo`,
+    ),
+  );
+  assert(!JSON.stringify(calls).includes("NEVER COPY"));
+  assert.deepEqual(Object.keys(transport).sort(), ["save", "start", "state"]);
+});
+test("blank lines resume and Unicode bounds match the real composer after direct RPC saves", async () => {
+  const actor = await pilot();
+  const transport = createDemoPracticeTransport({
+    enabled: true,
+    origin: PRACTICE_DEMO_ORIGIN,
+    publicKey: "sb_publishable_synthetic",
+    getAccessToken: async () => jwt(claimsFor(actor)),
+    fetchImpl: async (_input, options) => {
+      const body = JSON.parse(String(options?.body));
+      return Response.json(await rpc(actor, body.command, body.arguments));
+    },
+  });
+  const c = await transport.start();
+  const blank = createBlankSharedDraftComposerDraft({
+    title: "😀".repeat(100),
+    line_items: [createWorkComposerLineDraft()],
+  });
+  const saved = await transport.save(c.workspace!.id, randomUUID(), 0, blank);
+  assert.equal(saved.payload.line_items[0].line_title, "");
+  const resumed = await transport.state();
+  assert.equal(resumed.drafts.length, 1);
+  assert.equal(resumed.drafts[0].payload.title, blank.title);
+  await assert.rejects(
+    rpc(actor, "save", {
+      workspace_id: c.workspace!.id,
+      draft_id: randomUUID(),
+      expected_revision: 0,
+      payload: { ...payload(), title: "😀".repeat(101) },
+    }),
+    /Invalid/,
+  );
+  await assert.rejects(
+    rpc(actor, "save", {
+      workspace_id: c.workspace!.id,
+      draft_id: randomUUID(),
+      expected_revision: 0,
+      payload: {
+        ...payload(),
+        line_items: [
+          { ...payload().line_items[0], line_title: "😀".repeat(251) },
+        ],
+      },
+    }),
+    /Invalid/,
+  );
+});
+test("disabled/wrong project/privileged key/non-Demo token fail before any network request", async () => {
+  let calls = 0;
+  const base = {
+    enabled: true,
+    origin: PRACTICE_DEMO_ORIGIN,
+    publicKey: "sb_publishable_synthetic",
+    getAccessToken: async () => jwt(claimsFor(randomUUID())),
+    fetchImpl: async () => {
+      calls++;
+      return Response.json({});
+    },
+  };
+  for (const changes of [
+    { enabled: undefined },
+    { enabled: false },
+    { origin: "https://uqgtheclhxqlnjpfmheq.supabase.co" },
+    { origin: `${PRACTICE_DEMO_ORIGIN}/` },
+    { publicKey: "sb_secret_fake" },
+    { publicKey: jwt({ role: "service_role", ref: "bdytwgejqnlblhrnqxkp" }) },
+    {
+      getAccessToken: async () =>
+        jwt(
+          claimsFor(randomUUID(), {
+            iss: "https://uqgtheclhxqlnjpfmheq.supabase.co/auth/v1",
+          }),
+        ),
+    },
+    {
+      getAccessToken: async () =>
+        jwt(claimsFor(randomUUID(), { is_anonymous: true })),
+    },
+  ]) {
+    await assert.rejects(
+      createDemoPracticeTransport({ ...base, ...changes }).state(),
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test("UI gate requires explicit flag and both exact Demo destination identifiers", async () => {
+  const { demoPracticeEnabled, DEMO_PRACTICE_REF, DEMO_PRACTICE_URL } =
+    await import("../../src/features/practice/demoAccess");
+  const correct = {
+    VITE_SERVSYNC_DEMO_PRACTICE_ENABLED: "true",
+    VITE_SERVSYNC_DEMO_PROJECT_REF: DEMO_PRACTICE_REF,
+    VITE_SUPABASE_URL: DEMO_PRACTICE_URL,
+  };
+  assert.equal(demoPracticeEnabled({}), false);
+  assert.equal(demoPracticeEnabled(correct), true);
+  for (const field of Object.keys(correct)) {
+    assert.equal(
+      demoPracticeEnabled({ ...correct, [field]: undefined }),
+      false,
+    );
+    assert.equal(demoPracticeEnabled({ ...correct, [field]: "wrong" }), false);
+  }
+});
+
+test('response-only draft returns current pilot deadline without changing cycle or save identity', async () => {
+  const actor = await pilot();
+  const initial = await rpc(actor, 'start');
+  await admin(`update servsync_practice_demo.pilots set access_until=clock_timestamp()+interval '2 hours' where user_id=${sql(actor)}; select null::json;`);
+  const state = await rpc(actor, 'state');
+  assert.ok(state.accessExpiresAt);
+  assert.ok(Date.parse(state.accessExpiresAt) < Date.parse(state.workspace.expires_at));
+  assert.equal(state.workspace.id, initial.workspace.id);
+  assert.equal(state.workspace.expires_at, initial.workspace.expires_at);
+});

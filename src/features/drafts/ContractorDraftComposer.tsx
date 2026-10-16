@@ -31,6 +31,10 @@ import {
 } from './draftCustomerOptions';
 
 type ContractorDraftComposerProps = {
+  estimatePracticeOnly?: boolean;
+  actionBarExtra?: ReactNode;
+  inlineFeedback?: ReactNode;
+  backLabel?: string;
   draft: SharedDraftComposerDraft;
   customerOptions: DraftCustomerOption[];
   checklistOptions?: DraftChecklistSourceOption[];
@@ -80,6 +84,10 @@ function formatDraftLaborHours(value: number) {
 }
 
 export function ContractorDraftComposer({
+  estimatePracticeOnly = false,
+  actionBarExtra,
+  inlineFeedback,
+  backLabel = 'Back to Work',
   draft,
   customerOptions,
   checklistOptions = [],
@@ -120,7 +128,7 @@ export function ContractorDraftComposer({
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
   const templateApplyResetTimer = useRef<number | null>(null);
   const [notesOpen, setNotesOpen] = useState(Boolean(draft.notes.trim()));
-  const [laborSettingsOpen, setLaborSettingsOpen] = useState(Boolean(Number(draft.labor_rate) || Number(draft.job_labor_hours)));
+  const [laborSettingsOpen, setLaborSettingsOpen] = useState(!estimatePracticeOnly && Boolean(Number(draft.labor_rate) || Number(draft.job_labor_hours)));
   const laborSettingsRef = useRef<HTMLDetailsElement>(null);
   const standardIntent = useRef<DraftIntendedOutput | null>(draft.work_format === 'standard' ? draft.intended_output : null);
   const previousChecklist = useRef(draft.checklist_source);
@@ -304,18 +312,19 @@ export function ContractorDraftComposer({
 
   return (
     <div className="draft-editor space-y-5 [&_input]:scroll-mt-40 [&_textarea]:scroll-mt-40 [&_select]:scroll-mt-40" data-testid="shared-draft-composer">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      {!estimatePracticeOnly && <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <p className="max-w-2xl text-sm leading-6 text-slate-600">Describe the work, then choose your next step. Nothing is sent from this Draft.</p>
         <span className="w-fit shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Private Draft</span>
-      </div>
+      </div>}
 
       <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="draft-action-bar">
         <div className="flex min-w-0 flex-col gap-0.5 text-sm">
+          {estimatePracticeOnly && <span className="text-xs font-bold text-amber-800">Practice only · Nothing is sent</span>}
           <span className="text-xs text-slate-600">{isChecklistDraft ? 'Inspection Checklist' : totalsTitle}</span>
           {!isChecklistDraft ? <strong className="text-slate-950">{totalLabel}</strong> : null}
         </div>
         {!isChecklistDraft && (hasUnpricedLines || (showEstimateLaborControls && totals.missingLaborRate)) ? <p className="w-full text-xs font-medium text-amber-800">Total excludes items or labor still needing a price.</p> : null}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={estimatePracticeOnly ? "flex w-full items-center gap-2 sm:w-auto" : "flex flex-wrap items-center gap-2"}>
         {launchLabel && onLaunch ? (
           <button type="button" onClick={onLaunch} disabled={launchDisabled || launchBusy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" data-testid="durable-draft-create-output">
             {launchBusy ? <Loader2 className="animate-spin" size={16} /> : <FileText size={16} />}
@@ -326,17 +335,19 @@ export function ContractorDraftComposer({
           <Save size={16} />
           {saving ? 'Saving...' : 'Save Draft'}
         </button>
+        {actionBarExtra}
         {onDiscardPreparedLaunch ? <button type="button" onClick={onDiscardPreparedLaunch} disabled={launchBusy} className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 disabled:opacity-50">Discard unused attempt</button> : null}
 
         </div>
       </div>
 
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
+      {inlineFeedback}
 
       <fieldset disabled={interactionDisabled} className="contents" aria-label="Draft planning fields">
       <section aria-label="Customer and work" className="space-y-4 pt-2">
-        <div><h3 className="text-base font-bold text-slate-950">1. Customer &amp; work</h3><p className="mt-1 text-sm text-slate-500">Start with the work you have in mind. You can add a customer later.</p></div>
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
+        <div><h3 className="text-base font-bold text-slate-950">{estimatePracticeOnly ? '1. Describe the work' : '1. Customer & work'}</h3><p className="mt-1 text-sm text-slate-500">{estimatePracticeOnly ? 'Fictional Customer · Fictional property' : 'Start with the work you have in mind. You can add a customer later.'}</p></div>
+      {!estimatePracticeOnly && <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
         <DraftCustomerCombobox
           testId="durable-draft-customer"
           options={customerOptions}
@@ -377,9 +388,9 @@ export function ContractorDraftComposer({
             ))}
           </select>
         ))}
-      </div>
+      </div>}
       {customerCreationPanel}
-      {subjectTypeLocked ? (
+      {subjectTypeLocked && !estimatePracticeOnly ? (
         <p className="text-xs font-medium text-slate-500">
           This saved Draft keeps its original customer type. You can choose another customer of the same type.
         </p>
@@ -406,7 +417,7 @@ export function ContractorDraftComposer({
         />
       ))}
 
-      <details open={notesOpen} onToggle={event => setNotesOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-white px-3 py-2">
+      {!estimatePracticeOnly && <details open={notesOpen} onToggle={event => setNotesOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-white px-3 py-2">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700">
           Private notes <span className="flex items-center gap-2 text-xs font-normal text-slate-500">{draft.notes.trim() ? 'Notes added' : 'Optional'} <ChevronDown size={16} className="transition group-open:rotate-180" /></span>
         </summary>
@@ -425,15 +436,16 @@ export function ContractorDraftComposer({
       </p>
 
         </div>
-      </details>
+      </details>}
       </section>
 
       <section aria-label="Scope and pricing" className="space-y-4 border-t border-slate-200 pt-5">
-        <div><h3 className="text-base font-bold text-slate-950">2. Scope &amp; pricing</h3><p className="mt-1 text-sm text-slate-500">Build a work list or start from an inspection checklist.</p></div>
-      <div className="grid gap-3 md:grid-cols-2">
+        <div><h3 className="text-base font-bold text-slate-950">2. Scope &amp; pricing</h3><p className="mt-1 text-sm text-slate-500">{estimatePracticeOnly ? 'Adjust the example quantities and prices, or add your own fictional lines.' : 'Build a work list or start from an inspection checklist.'}</p></div>
+      {!estimatePracticeOnly && <div className="grid gap-3 md:grid-cols-2">
         {composerField('Work format', (
           <select
             data-testid="durable-draft-work-format"
+            disabled={estimatePracticeOnly}
             className={fieldClass()}
             value={draft.work_format}
             onChange={event => updateWorkFormat(event.target.value as SharedDraftComposerDraft['work_format'])}
@@ -442,7 +454,7 @@ export function ContractorDraftComposer({
             <option value="inspection_checklist">Inspection Checklist</option>
           </select>
         ))}
-      </div>
+      </div>}
       {!isChecklistDraft && savedTemplateCount > 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-template-guidance">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -608,6 +620,7 @@ export function ContractorDraftComposer({
         <div className="space-y-3">
           {displayedLines.map((line, index) => (
             <WorkComposerLineItemRow
+              hidePrivateDetails={estimatePracticeOnly}
               key={line.id}
               line={line}
               index={index}
@@ -699,6 +712,7 @@ export function ContractorDraftComposer({
                 data-testid="durable-draft-labor-rate"
                 className={fieldClass()}
                 value={draft.labor_rate}
+                inputMode={estimatePracticeOnly ? 'decimal' : undefined}
                 onChange={event => onChange({ ...draft, labor_rate: event.target.value })}
                 placeholder="$0.00"
               />
@@ -743,12 +757,12 @@ export function ContractorDraftComposer({
       )}
 
       </section>
-      <section aria-label="Next step" className="space-y-4 border-t border-slate-200 pt-5">
+      {!estimatePracticeOnly && <section aria-label="Next step" className="space-y-4 border-t border-slate-200 pt-5">
         <div><h3 className="text-base font-bold text-slate-950">3. Next step</h3><p className="mt-1 text-sm text-slate-500">Save your progress, or choose what to create when you’re ready.</p></div>
       {isChecklistDraft ? (
         <p className="rounded-xl bg-blue-50 px-3 py-3 text-sm text-blue-950">This checklist creates a Job. You can complete its findings and report after creating it.</p>
       ) : (
-        <DraftOutcomeSelector
+        estimatePracticeOnly ? <p className="rounded-xl bg-amber-50 p-3 font-semibold">Practice estimate — no customer delivery or payments.</p> : <DraftOutcomeSelector
           value={draft.intended_output}
           onChange={updateIntent}
           disabled={interactionDisabled}
@@ -771,7 +785,7 @@ export function ContractorDraftComposer({
           Creating the Invoice makes a draft only and does not send it to the customer.
         </section>
       ) : null}
-      </section>
+      </section>}
       </fieldset>
 
       {!draft.intended_output ? (
@@ -781,7 +795,7 @@ export function ContractorDraftComposer({
 
         <button type="button" onClick={onBack} disabled={saving} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           <X size={16} />
-          Back to Work
+          {backLabel}
         </button>
     </div>
   );
