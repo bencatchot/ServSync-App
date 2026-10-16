@@ -113,6 +113,8 @@ test("provider/cleanup routes fail closed and cross-origin writes are rejected",
   request,
 }) => {
   const base = "http://127.0.0.1:5193";
+  expect((await request.get(`${base}/index.html`)).status()).toBe(403);
+  expect((await request.get(`${base}/src/supabaseClient.ts`)).status()).toBe(403);
   expect(
     (
       await request.post(`${base}/api/send-local-estimate-email`, { data: {} })

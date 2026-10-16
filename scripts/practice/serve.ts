@@ -30,6 +30,11 @@ async function body(req: IncomingMessage) {
 const server = await createServer({
   configFile: false,
   envFile: false,
+  // A shell with VITE_* variables must not connect this review server to a real backend.
+  define: {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(""),
+    "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(""),
+  },
   root: fileURLToPath(new URL("../../", import.meta.url)),
   server: { host: "127.0.0.1", port, strictPort: true },
   plugins: [
@@ -38,6 +43,22 @@ const server = await createServer({
       name: "local-practice-only",
       configureServer(vite) {
         vite.middlewares.use(async (req, res, next) => {
+          let pathname: string;
+          try {
+            pathname = decodeURIComponent(new URL(req.url ?? "/", origin).pathname);
+          } catch {
+            res.statusCode = 400;
+            res.end("Invalid local path");
+            return;
+          }
+          if (
+            (pathname.endsWith(".html") && pathname !== "/scripts/practice/index.html") ||
+            ["/src/main.tsx", "/src/App.tsx", "/src/supabaseClient.ts"].some((path) => pathname.endsWith(path))
+          ) {
+            res.statusCode = 403;
+            res.end("Only the isolated Practice review entry is available.");
+            return;
+          }
           if (req.url === "/") {
             res.writeHead(302, { location: "/scripts/practice/index.html" });
             res.end();
