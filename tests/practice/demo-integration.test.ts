@@ -26,8 +26,19 @@ const migration = readFileSync(
   "utf8",
 );
 let fixture: Awaited<ReturnType<typeof createLocalFixture>>;
+let managedBefore: unknown;
 const admin = <T = unknown>(statement: string) =>
   query<T>(fixture.db, OWNER, statement, "postgres");
+const managedFingerprint = () =>
+  admin(`select jsonb_build_object(
+  'schema',(select jsonb_build_object('owner',nspowner,'acl',nspacl) from pg_namespace where nspname='auth'),
+  'functions',(select jsonb_agg(jsonb_build_object('owner',proowner,'acl',proacl,'definition',pg_get_functiondef(oid)) order by proname)
+    from pg_proc where pronamespace='auth'::regnamespace),
+  'roles',(select jsonb_agg(jsonb_build_object('name',rolname,'super',rolsuper,'create',rolcreaterole,'bypass',rolbypassrls) order by rolname)
+    from pg_roles where rolname in ('demo_installer','supabase_admin','supabase_auth_admin')),
+  'managedMembership',(select coalesce(jsonb_agg(to_jsonb(m) order by roleid,member),'[]') from pg_auth_members m
+    where roleid in ('supabase_admin'::regrole,'supabase_auth_admin'::regrole)
+      or member in ('supabase_admin'::regrole,'supabase_auth_admin'::regrole)));`);
 const claimsFor = (actor: string, overrides = {}) => ({
   sub: actor,
   role: "authenticated",
@@ -83,23 +94,58 @@ async function pilot() {
 before(async () => {
   fixture = await createLocalFixture();
   await admin(`create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
-    create role demo_installer nologin createrole nosuperuser nobypassrls;
+    -- Match the observed hosted operator, including its existing BYPASSRLS attribute.
+    create role demo_installer nologin createrole createdb nosuperuser inherit bypassrls;
+    create role supabase_admin nologin; create role supabase_auth_admin nologin;
+    create role dashboard_user nologin;
     grant create on database "${fixture.db.database}" to demo_installer;
     grant usage,create on schema public to demo_installer;
     -- Model legacy Supabase defaults; the draft must remove accidental ambient grants.
     alter default privileges for role demo_installer grant execute on functions to anon,authenticated,service_role;
     alter default privileges for role demo_installer grant all on tables to anon,authenticated,service_role;
-    create schema auth;
+    create schema auth authorization supabase_admin;
     create function auth.uid() returns uuid language sql stable as $$select (current_setting('request.jwt.claims',true)::jsonb->>'sub')::uuid$$;
     create function auth.jwt() returns jsonb language sql stable as $$select current_setting('request.jwt.claims',true)::jsonb$$;
-    grant usage on schema auth to authenticated;
-    grant usage on schema auth to demo_installer with grant option;
-    grant execute on function auth.uid(), auth.jwt() to demo_installer with grant option;
+    alter function auth.uid() owner to supabase_auth_admin;
+    alter function auth.jwt() owner to supabase_auth_admin;
+    grant usage on schema auth to anon,authenticated,service_role,demo_installer;
+    grant usage,create on schema auth to supabase_auth_admin,dashboard_user;
+    -- Actual managed ACL: PUBLIC helper EXECUTE, no PUBLIC schema USAGE or grant option.
+    grant execute on function auth.uid(),auth.jwt() to dashboard_user;
+    grant execute on function auth.jwt() to demo_installer;
     -- Sentinel table: an accidental write to this fixture aborts the test. Hosted triggers are not simulated.
     create table public.practice_test_business_tripwire(id uuid);
     create function public.practice_test_no_write() returns trigger language plpgsql as $$begin raise exception 'OUTBOUND BUSINESS WRITE'; end$$;
     create trigger no_write before insert or update or delete on public.practice_test_business_tripwire for each statement execute function public.practice_test_no_write();
     select null::json;`);
+  managedBefore = await managedFingerprint();
+  assert.deepEqual(
+    await admin(`select jsonb_build_object(
+    'super',(select rolsuper from pg_roles where rolname='demo_installer'),
+    'bypass',(select rolbypassrls from pg_roles where rolname='demo_installer'),
+    'usage',has_schema_privilege('demo_installer','auth','USAGE'),
+    'usageGrant',has_schema_privilege('demo_installer','auth','USAGE WITH GRANT OPTION'),
+    'uidExecute',has_function_privilege('demo_installer','auth.uid()','EXECUTE'),
+    'uidGrant',has_function_privilege('demo_installer','auth.uid()','EXECUTE WITH GRANT OPTION'),
+    'jwtGrant',has_function_privilege('demo_installer','auth.jwt()','EXECUTE WITH GRANT OPTION'),
+    'schemaOwnerSet',pg_has_role('demo_installer','supabase_admin','SET'),
+    'helperOwnerSet',pg_has_role('demo_installer','supabase_auth_admin','SET'),
+    'schemaOwnerInherit',pg_has_role('demo_installer','supabase_admin','USAGE'),
+    'helperOwnerInherit',pg_has_role('demo_installer','supabase_auth_admin','USAGE'));`),
+    {
+      super: false,
+      bypass: true,
+      usage: true,
+      usageGrant: false,
+      uidExecute: true,
+      uidGrant: false,
+      jwtGrant: false,
+      schemaOwnerSet: false,
+      helperOwnerSet: false,
+      schemaOwnerInherit: false,
+      helperOwnerInherit: false,
+    },
+  );
   await assert.rejects(admin(migration), /Verified Demo target/);
   await assert.rejects(
     admin(
@@ -142,6 +188,129 @@ test("non-superuser installation leaves no ambient function grants, role switchi
     installerSet: false,
     installerInherit: false,
   });
+});
+test("managed Auth ACLs and authority are unchanged; executor uses no managed schema privilege", async () => {
+  assert.deepEqual(await managedFingerprint(), managedBefore);
+  assert.deepEqual(
+    await admin(`select jsonb_build_object(
+    'authUsage',has_schema_privilege('servsync_practice_demo_executor','auth','USAGE'),
+    'inheritedUidExecute',has_function_privilege('servsync_practice_demo_executor','auth.uid()','EXECUTE'),
+    'runtimeBypass',(select rolbypassrls from pg_roles where rolname='servsync_practice_demo_executor'),
+    'runtimeLogin',(select rolcanlogin from pg_roles where rolname='servsync_practice_demo_executor'),
+    'identityDefiner',(select prosecdef from pg_proc where oid='servsync_practice_demo.request_actor()'::regprocedure),
+    'identityArgs',(select pronargs from pg_proc where oid='servsync_practice_demo.request_actor()'::regprocedure),
+    'dispatcherOwner',(select pg_get_userbyid(proowner) from pg_proc where oid='servsync_practice_demo.dispatch(text,jsonb)'::regprocedure),
+    'authIdentityExecute',has_function_privilege('authenticated','servsync_practice_demo.request_actor()','EXECUTE'),
+    'elevatedFunctions',(select count(*) from pg_proc where pronamespace='servsync_practice_demo'::regnamespace and prosecdef));`),
+    {
+      authUsage: false,
+      inheritedUidExecute: true,
+      runtimeBypass: false,
+      runtimeLogin: false,
+      identityDefiner: false,
+      identityArgs: 0,
+      dispatcherOwner: "servsync_practice_demo_executor",
+      authIdentityExecute: false,
+      elevatedFunctions: 1,
+    },
+  );
+  await assert.rejects(
+    admin(
+      `set session authorization servsync_practice_demo_executor; select auth.uid();`,
+    ),
+    /permission denied for schema auth/,
+  );
+  await assert.rejects(
+    asUser(await pilot(), "select servsync_practice_demo.request_actor();"),
+    /permission denied/,
+  );
+});
+test("request identity fails closed on missing, malformed and mistyped claims without legacy or header fallbacks", async () => {
+  const actor = await pilot();
+  for (const claims of [
+    "",
+    "{",
+    "null",
+    "[]",
+    '"scalar"',
+    "{}",
+    ...[
+      { sub: null },
+      { sub: 42 },
+      { sub: "not-a-uuid" },
+      { role: null },
+      { role: "service_role" },
+      { iss: null },
+      { iss: "https://uqgtheclhxqlnjpfmheq.supabase.co/auth/v1" },
+      { is_anonymous: null },
+      { is_anonymous: true },
+      { is_anonymous: "false" },
+      { is_anonymous: 0 },
+    ].map((overrides) => JSON.stringify(claimsFor(actor, overrides))),
+  ]) {
+    await assert.rejects(
+      admin(`set session authorization authenticated;
+      set local request.jwt.claims=${sql(claims)};
+      set local request.jwt.claim.sub=${sql(actor)};
+      set local request.jwt.claim=${sql(claimsFor(actor))};
+      set local request.headers=${sql({ sub: actor, role: "authenticated", is_anonymous: false })};
+      select public.servsync_practice_demo('start');`),
+      /Demo pilot required/,
+    );
+  }
+  await assert.rejects(
+    admin(
+      "set session authorization authenticated; select public.servsync_practice_demo('state');",
+    ),
+    /Demo pilot required/,
+  );
+  for (const field of ["sub", "iss", "role", "is_anonymous"]) {
+    const claims: Record<string, unknown> = claimsFor(actor);
+    delete claims[field];
+    await assert.rejects(
+      admin(`set session authorization authenticated; set local request.jwt.claims=${sql(claims)};
+      select public.servsync_practice_demo('start');`),
+      /Demo pilot required/,
+    );
+  }
+  // A caller-selected identity in arguments/metadata cannot replace validated server claims.
+  await assert.rejects(
+    rpc(randomUUID(), "start", { actor }, { user_metadata: claimsFor(actor) }),
+    /Demo pilot required/,
+  );
+  assert.equal(
+    await admin("select to_json(count(*)) from servsync_practice_demo.cycles;"),
+    0,
+  );
+});
+test("transaction-local identity clears on a reused connection and spoof sources cannot select another tenant", async () => {
+  const actor = await pilot(),
+    other = await pilot();
+  const own = await rpc(actor, "start"),
+    foreign = await rpc(other, "start");
+  const result = await asUser<{ id: string }>(
+    actor,
+    `set local request.jwt.claim.sub=${sql(other)};
+    set local request.headers=${sql(claimsFor(other))};
+    select jsonb_build_object('id',public.servsync_practice_demo('state')->'workspace'->>'id');`,
+    { user_metadata: claimsFor(other) },
+  );
+  assert.equal(result.id, own.workspace.id);
+  assert.notEqual(result.id, foreign.workspace.id);
+  // Both transactions share one psql connection; only server-injected SET LOCAL has identity.
+  await assert.rejects(
+    admin(`set session authorization authenticated;
+    set local request.jwt.claims=${sql(claimsFor(actor))};
+    do $$begin perform public.servsync_practice_demo('state'); end$$;
+    commit; begin; select public.servsync_practice_demo('state');`),
+    /Demo pilot required/,
+  );
+  assert.deepEqual(
+    await admin(`set local request.jwt.claims=${sql(claimsFor(actor))};
+    set local role servsync_practice_demo_executor;
+    select jsonb_agg(id) from servsync_practice_demo.cycles;`),
+    [own.workspace.id],
+  );
 });
 test("anon, service role, anonymous users and unregistered users cannot enter; user_metadata cannot grant access", async () => {
   for (const role of ["anon", "service_role"])

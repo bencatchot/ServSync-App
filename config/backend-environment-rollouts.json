@@ -5,11 +5,11 @@
   "foundations": [
     {
       "id": "practice-demo-review-draft",
-      "artifact": "server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql (SHA-256 ff2d31be3f530ebeb9c48e98ae3f160722d31d086461796e64a21bc932b9d0b6)",
+      "artifact": "server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql (SHA-256 4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4)",
       "environments": {
         "demo": {
           "status": "Pending",
-          "reason": "Source-only reviewed draft for existing Demo bdytwgejqnlblhrnqxkp. No installation, pilot access, settings, cleanup or deployment approved. See docs/features/PRACTICE_DEMO_DRAFT_APPROVAL.md."
+          "reason": "Prior approved bytes were blocked at read-only preflight; no SQL was attempted. Revised source removes managed Auth grants and reads PostgREST-validated request claims with unchanged tenant RLS. New hash requires fresh exact-byte approval. Allowlist stays empty; no install retry, access/configuration change, cleanup or deployment. See docs/features/PRACTICE_DEMO_DRAFT_APPROVAL.md."
         },
         "production": {
           "status": "N/A",

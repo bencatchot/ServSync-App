@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Practice draft revised for managed installer permissions
+
+- The prior approved Demo installation stopped at read-only preflight; no SQL was attempted. The local fixture had incorrectly supplied Auth grant options. It now models the observed managed owners/ACLs and non-superuser installer, including existing BYPASSRLS.
+- Revised uninstalled SQL reads PostgREST-validated transaction-local claims through a private invoker helper. No managed Auth grants, elevated identity helper, alternate credential or managed owner switch is needed. Restricted executor, FORCE RLS, current pilot binding and tenant/expiry checks remain.
+- Three added real PostgreSQL regressions cover managed authority preservation, strict claims/spoof rejection and pooled-session identity clearing; all 41 combined tests pass. Independent review reran all 16 Demo checks and found no blocking issue in local scope. Read-only Demo API probes confirmed private-schema exclusion and unsigned-JWT rejection. The approval packet and Pending rollout hash were replaced; the previous approval does not authorize these bytes.
+- No hosted installation retry, permission/settings change, pilot activation, new project, production mutation or deployment. Tutorial impact: NOT APPLICABLE; source remains unmounted.
+
 ## 2026-10-16 — Practice draft published; local process-result race corrected
 
 - Owner authorized publishing the reviewed Demo draft to PR #588 with only ordinary non-Practice Preview builds. No automatic migration route exists; the reviewed SQL hash is unchanged and hosted installation/access remains unapproved.

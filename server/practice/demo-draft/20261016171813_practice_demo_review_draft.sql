@@ -13,8 +13,24 @@ create role servsync_practice_demo_executor nologin noinherit nobypassrls;
 create schema servsync_practice_demo;
 revoke all on schema servsync_practice_demo from public, anon, authenticated, service_role;
 grant usage on schema servsync_practice_demo to authenticated, servsync_practice_demo_executor;
-grant usage on schema auth to servsync_practice_demo_executor;
-grant execute on function auth.uid(), auth.jwt() to servsync_practice_demo_executor;
+
+-- PostgREST verifies the JWT signature/time claims before setting request.jwt.claims.
+-- Read that documented transaction-local identity without access to managed auth objects.
+-- This is NOT a JWT verifier: direct SQL credentials can set GUCs and are outside this
+-- API trust boundary. Never expose a generic SQL/settings RPC or take identity arguments.
+create function servsync_practice_demo.request_actor() returns uuid
+language plpgsql stable security invoker set search_path=pg_catalog as $$
+declare claims jsonb;
+begin
+  claims:=nullif(current_setting('request.jwt.claims',true),'')::jsonb;
+  if jsonb_typeof(claims) is distinct from 'object'
+    or claims->>'iss' is distinct from 'https://bdytwgejqnlblhrnqxkp.supabase.co/auth/v1'
+    or claims->>'role' is distinct from 'authenticated'
+    or claims->'is_anonymous' is distinct from 'false'::jsonb
+    or jsonb_typeof(claims->'sub') is distinct from 'string' then return null; end if;
+  return (claims->>'sub')::uuid;
+exception when invalid_text_representation then return null;
+end $$;
 
 -- Empty by default. Only a separately approved operator can provision/revoke a pilot.
 -- tenant_id is a synthetic namespace, never an FK to resettable Demo/business records.
@@ -41,10 +57,10 @@ alter table servsync_practice_demo.cycles force row level security;
 alter table servsync_practice_demo.drafts enable row level security;
 alter table servsync_practice_demo.drafts force row level security;
 create policy pilot_self on servsync_practice_demo.pilots to servsync_practice_demo_executor
-  using(user_id=(select auth.uid()) and enabled and access_until>clock_timestamp());
+  using(user_id=(select servsync_practice_demo.request_actor()) and enabled and access_until>clock_timestamp());
 create policy cycle_self on servsync_practice_demo.cycles to servsync_practice_demo_executor
-  using(user_id=(select auth.uid()) and exists(select 1 from servsync_practice_demo.pilots p where p.tenant_id=cycles.tenant_id))
-  with check(user_id=(select auth.uid()) and exists(select 1 from servsync_practice_demo.pilots p where p.tenant_id=cycles.tenant_id));
+  using(user_id=(select servsync_practice_demo.request_actor()) and exists(select 1 from servsync_practice_demo.pilots p where p.tenant_id=cycles.tenant_id))
+  with check(user_id=(select servsync_practice_demo.request_actor()) and exists(select 1 from servsync_practice_demo.pilots p where p.tenant_id=cycles.tenant_id));
 create policy draft_active_self on servsync_practice_demo.drafts to servsync_practice_demo_executor
   using(exists(select 1 from servsync_practice_demo.cycles c where c.id=drafts.cycle_id and c.expires_at>clock_timestamp()))
   with check(exists(select 1 from servsync_practice_demo.cycles c where c.id=drafts.cycle_id and c.expires_at>clock_timestamp()));
@@ -109,10 +125,10 @@ end $$;
 -- Private SECURITY DEFINER owned by a non-login, non-BYPASSRLS role, with narrow table grants.
 create function servsync_practice_demo.dispatch(command text, arguments jsonb) returns jsonb
 language plpgsql security definer set search_path=pg_catalog,servsync_practice_demo as $$
-declare actor uuid:=auth.uid(); p servsync_practice_demo.pilots;
+declare actor uuid:=servsync_practice_demo.request_actor(); p servsync_practice_demo.pilots;
   c servsync_practice_demo.cycles; d servsync_practice_demo.drafts; expected integer; captured_now timestamptz;
 begin
-  if actor is null or coalesce((auth.jwt()->>'is_anonymous')::boolean,true) then
+  if actor is null then
     raise exception 'Demo pilot required' using errcode='42501';
   end if;
   select * into p from servsync_practice_demo.pilots where user_id=actor;
