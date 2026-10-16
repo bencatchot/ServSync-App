@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Practice draft published; local process-result race corrected
+
+- Owner authorized publishing the reviewed Demo draft to PR #588 with only ordinary non-Practice Preview builds. No automatic migration route exists; the reviewed SQL hash is unchanged and hosted installation/access remains unapproved.
+- Initial CI passed all 13 Demo cases but failed an existing concurrent-recovery assertion. Independent investigation demonstrated an exit-before-stdout-drain race in the local PostgreSQL subprocess transport. It now waits for close, prints SQL NULL explicitly and rejects missing output. A deterministic delayed-writer regression and better concurrent-result diagnostics bring local coverage to 38 passing tests. Exact attribution of the earlier CI failure remains inferred.
+- Approval packet clarifies existing Auth-helper grants, empty-allowlist denial and separately gated post-commit rollback. Tutorial impact: NOT APPLICABLE; no normal UI or hosted Practice behavior changes.
+
 ## 2026-10-16 — Existing Demo Practice integration prepared, not activated
 
 - Prepared a separately guarded migration draft outside automatic migration discovery and an unmounted/default-off Demo transport. Private storage, an empty pilot allowlist, fixed synthetic snapshots, 720-hour expiry, bounded revisioned saves and explicit grants are covered by 13 new actual PostgreSQL tests; the combined Practice suite passes 37/37.

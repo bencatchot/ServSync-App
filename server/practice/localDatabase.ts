@@ -49,6 +49,8 @@ export async function query<T>(
       [
         "-X",
         "-qAt",
+        "-P",
+        "null=null",
         "-v",
         "ON_ERROR_STOP=1",
         "-h",
@@ -74,14 +76,14 @@ export async function query<T>(
       error += d;
     });
     child.on("error", reject);
-    child.on("exit", (code) => {
+    // `exit` can precede the final stdout data event. Wait for stdio to drain;
+    // otherwise concurrent psql processes can manufacture a missing/null result.
+    child.on("close", (code) => {
       if (code !== 0) return reject(new Error(error.trim()));
+      const result = output.trim().split("\n").filter(Boolean).at(-1);
+      if (!result) return reject(new Error("Missing database result."));
       try {
-        resolve(
-          JSON.parse(
-            output.trim().split("\n").filter(Boolean).at(-1) ?? "null",
-          ) as T,
-        );
+        resolve(JSON.parse(result) as T);
       } catch {
         reject(new Error("Invalid database result."));
       }

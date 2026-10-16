@@ -1,6 +1,7 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import {
   createLocalFixture,
   OWNER,
@@ -850,13 +851,18 @@ test("concurrent workers claim once and stale retries cannot consume the budget 
       recordTestResolution(fixture.db, claims[0], null),
     ),
   );
-  assert.ok(
-    stale.every(
-      (o) =>
-        o?.status === "complete" &&
-        o.attempts === 1 &&
-        o.destination_id === receipt.destination_id,
-    ),
+  assert.deepEqual(
+    stale.map((o) => ({
+      status: o?.status,
+      attempts: o?.attempts,
+      destination: o?.destination_id,
+    })),
+    Array.from({ length: 15 }, () => ({
+      status: "complete",
+      attempts: 1,
+      destination: receipt.destination_id,
+    })),
+    "Stale retries must preserve the completed operation and claimed attempt count",
   );
   await query(
     fixture.db,
@@ -962,4 +968,31 @@ test("an admissible destination commit races a cancellation fence with exactly o
         result.destination_id,
       );
   }
+});
+
+test("local query waits for stdout close and distinguishes missing output from SQL null", async () => {
+  // Deterministic process contract: the launcher exits before its inherited stdout writer.
+  // This reproduces exit-before-drain ordering without changing database behavior.
+  const launcher = `${fixture.db.socket}/delayed-output.cjs`;
+  writeFileSync(
+    launcher,
+    `#!/usr/bin/env node
+const {spawn}=require('node:child_process');
+process.stdin.resume();
+process.stdin.on('end',()=>{
+ const writer=spawn(process.execPath,['-e',"setTimeout(()=>process.stdout.write(JSON.stringify({status:'complete',attempts:1})),40)"],{stdio:['ignore','inherit','ignore']});
+ writer.unref();
+});
+`,
+    { mode: 0o700 },
+  );
+  assert.deepEqual(
+    await query({ ...fixture.db, psql: launcher }, OWNER, "select null::json;"),
+    { status: "complete", attempts: 1 },
+  );
+  await assert.rejects(
+    query(fixture.db, OWNER, "select null::json where false;"),
+    /Missing database result/,
+  );
+  assert.equal(await query(fixture.db, OWNER, "select null::json;"), null);
 });
