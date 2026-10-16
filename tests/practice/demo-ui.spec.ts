@@ -50,9 +50,9 @@ async function control(
   expect(r.ok()).toBe(true);
   return r.json();
 }
-async function bridge(context: BrowserContext, actor = OWNER) {
+async function bridge(context: BrowserContext, actor = OWNER, signedIn = true) {
   const unexpected: string[] = [];
-  await context.addInitScript(
+  if (signedIn) await context.addInitScript(
     ({ key, value }) => localStorage.setItem(key, JSON.stringify(value)),
     { key: storageKey, value: session(actor) },
   );
@@ -138,11 +138,42 @@ test("default-off entry loads no Auth client, app or RPC", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Practice pilot is not enabled" }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to the regular app" })).not.toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("link", { name: "Sign in to Demo" })).toHaveCount(0);
   expect(
     requests.filter((u) =>
       /supabaseClient|\/src\/App\.tsx|supabase\.co/.test(u),
     ),
   ).toEqual([]);
+});
+
+test("signed-out Practice offers the existing Demo sign-in and retains a safe return tab", async ({ page, context }, info) => {
+  await bridge(context, OWNER, false);
+  const requests: string[] = [];
+  page.on("request", request => requests.push(request.url()));
+  await page.goto("/#/practice-demo");
+  await expect(page.getByRole("heading", { name: "Demo sign-in required" })).toBeVisible();
+  const signIn = page.getByRole("link", { name: "Sign in to Demo", exact: true });
+  await expect(signIn).toHaveAttribute("href", "#/contractor");
+  await expect(signIn).toHaveAccessibleDescription("Opens a new tab. After signing in, return to this tab to continue Practice.");
+  expect((await signIn.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(requests.some(url => url === rpc || url.includes("/src/App.tsx"))).toBe(false);
+  await page.screenshot({ path: info.outputPath("demo-sign-in-entry.png"), fullPage: true });
+  const popupPromise = context.waitForEvent("page");
+  await signIn.click();
+  const signInTab = await popupPromise;
+  await expect(signInTab).toHaveURL(`${base}/#/contractor`);
+  await expect(signInTab.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+  expect(await signInTab.evaluate(() => window.opener === null)).toBe(true);
+  await expect(page).toHaveURL(`${base}/#/practice-demo`);
+  expect(requests.filter(url => url === rpc)).toEqual([]);
+  // Model the existing cross-tab Auth event; no real credentials or Auth endpoint.
+  await broadcast(signInTab, "SIGNED_IN", OWNER);
+  await page.bringToFront();
+  await expect(page.getByRole("heading", { name: "Choose how to start" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in to Demo" })).toHaveCount(0);
+  await expect(page).toHaveURL(`${base}/#/practice-demo`);
+  await signInTab.close();
 });
 
 test("actual SQL saves, reloads, resumes in another browser context and produces accurate marked PDF", async ({
@@ -607,4 +638,40 @@ test('pending deadline response uses earliest access expiry; legacy response nev
   await expect(page.getByLabel('Practice access deadline')).toContainText('Access ends');
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 6000 });
   await expect(page.getByRole('alert')).toContainText('Practice access has ended');
+});
+
+
+test("narrow mobile layout keeps touch actions and PDF controls reachable", async ({ page, context }, info) => {
+  await bridge(context);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/#/practice-demo");
+  const press = async (name: string) => {
+    const button = page.getByRole("button", { name, exact: true });
+    if (info.project.name === "mobile-webkit") await button.tap();
+    else await button.click();
+  };
+  await press("Try sample repair");
+  for (const name of ["Save Draft", "Preview Practice estimate"]) {
+    const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.screenshot({ path: info.outputPath("practice-320px.png"), fullPage: true });
+  await press("Preview Practice estimate");
+  const dialog = page.getByRole("dialog", { name: "Practice estimate preview" });
+  await expect(dialog).toContainText("$275.00");
+  for (const control of [page.getByRole("button", { name: "Close preview" }), page.getByRole("link", { name: "Download watermarked PDF" })]) {
+    const box = await control.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(568);
+  }
+  await page.screenshot({ path: info.outputPath("practice-pdf-320px.png") });
+  await press("Close preview");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Preview Practice estimate" })).toBeFocused();
 });

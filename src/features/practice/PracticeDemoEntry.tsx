@@ -42,7 +42,7 @@ export function PracticeDemoEntry() {
               : null,
           );
           setStatus(
-            "Sign in to the existing Demo account approved for this pilot, then return here.",
+            "Use the existing Demo account approved for this pilot.",
           );
         });
         unsubscribe = () => data.subscription.unsubscribe();
@@ -86,11 +86,19 @@ export function PracticeDemoEntry() {
             : "This optional synthetic pilot is currently unavailable. No Practice requests have been made."}
         </p>
         <a
-          className="inline-block rounded-lg border px-4 py-3 font-semibold"
+          className="inline-flex min-h-11 items-center rounded-lg border px-4 py-3 font-semibold"
           href="#/contractor"
+          target={enabled ? "_blank" : undefined}
+          rel={enabled ? "noopener noreferrer" : undefined}
+          aria-describedby={enabled ? "practice-sign-in-return" : undefined}
         >
-          Go to the regular app
+          {enabled ? "Sign in to Demo" : "Go to the regular app"}
         </a>
+        {enabled && (
+          <p id="practice-sign-in-return" className="text-sm text-slate-600">
+            Opens a new tab. After signing in, return to this tab to continue Practice.
+          </p>
+        )}
       </main>
     );
   return <PracticeDemoReview key={session.actor} transport={transport} />;

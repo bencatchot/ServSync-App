@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-16 — Demo sign-in clarification approved for Preview publication
+
+- Replaced the enabled, signed-out Practice entry’s ambiguous regular-app link with Sign in to Demo, opening the existing sign-in in a separate tab and explaining how to return. Auth/role/default-off behavior is unchanged.
+- All 28 desktop/emulated-mobile browser cases, full/Practice types, lint baseline and build pass. Added same-origin/no-opener/cross-tab resume coverage and 320px touch/PDF reachability checks. Independent diff/visual review found no blocker. Hosted Escape/focus verified on the existing published Preview without writes; no physical-iPhone claim.
+- [Local review and deadline maintenance proposal](../features/PRACTICE_DEMO_ROUGH_EDGES_REVIEW.md) explains the intentional ownership barrier, absence of an existing authorized owner-capable connection, and a conditional single-transaction temporary-INHERIT candidate requiring separate approval/rehearsal. No SQL, grants, owners or records changed; owner approved UI/tests/docs publication and Demo Preview verification. Tutorial impact: NONE after final read-only catalog check.
+
 ## 2026-10-16 — Practice improvements verified locally, UI-only publication approved
 
 - Added sample/blank starts, compact Practice-only guidance and one-row Save/Preview actions, working return-to-drafts navigation, inline currency/description recovery, and PDF-close keyboard focus restoration. Shared real-editor defaults remain unchanged.
