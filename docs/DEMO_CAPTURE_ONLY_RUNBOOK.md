@@ -46,3 +46,5 @@ npm run test:demo-capture:browser
 ```
 
 The browser integration test uses explicitly synthetic HTML and intercepts all traffic locally. It verifies real browser motion, GET conversion, and blocked writes without contacting live services. Its generated video is test evidence, not a ServSync product demonstration.
+
+For capture-tooling-only pull requests, use the repository's exact `Tutorial impact: NOT APPLICABLE` field and a separate `Tutorial evidence:` explanation. The quality workflow parses those field names; a prose-only freshness statement does not satisfy it.
