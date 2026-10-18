@@ -108,7 +108,9 @@
     "mobile:android": "cap open android",
     "mobile:test": "node --import tsx --test tests/mobile/*.test.mjs tests/mobile/*.test.ts",
     "test:contractor-prospects": "bash scripts/validation/validate-admin-contractor-prospects.sh",
-    "test:rpc-business-conflicts": "bash scripts/validation/validate-rpc-business-conflict-no-retry.sh && node --test tests/architecture/rpc-business-conflict-policy.test.mjs && node --import tsx --test tests/marketing/marketing-publishing-queue.test.ts"
+    "test:rpc-business-conflicts": "bash scripts/validation/validate-rpc-business-conflict-no-retry.sh && node --test tests/architecture/rpc-business-conflict-policy.test.mjs && node --import tsx --test tests/marketing/marketing-publishing-queue.test.ts",
+    "demo:capture-existing": "node scripts/demo/capture-existing-demo.mjs",
+    "test:demo-capture:browser": "node tests/demo-recorder/capture-only-browser.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1110.0",
