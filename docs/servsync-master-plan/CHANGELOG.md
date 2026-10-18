@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-18 — Existing Demo records can be captured without reseeding
+
+- Branch: `codex/demo-capture-only`, based on main `5ea8fec`.
+- Change/reason: add a separate capture-only recorder entrypoint, exact Demo network policy, tests, and operator runbook. User signs in directly in an unrecorded ephemeral browser; only the existing fictional request and confirmed appointment are filmed. No environment/credential files, fixture imports, saved sessions, microphone, or desktop capture are used.
+- Validation: 68 recorder tests passed. A fully mocked browser integration proved real motion and write blocking without live network. Live Demo homeowner capture produced 23.4 seconds at 1440×1000/25fps, no audio, full decode success, and 12 changing sampled frame pairs. Exact request snapshot was unchanged after capture; server access denials were zero. Contractor live capture and continuous playback review remain unverified.
+- Backlog impact: FB-034A records the capture-only capability and remaining role verification. Master plan and marketing claims unchanged; this is internal tooling, not publishing approval.
+- Tutorial impact: NOT APPLICABLE — no end-user UI or workflow changes.
+- Follow-ups: use the runbook for future captures. Prior local-file browser playback denial remains in force. No merge, deployment, shared database mutation, permission/settings change, upload, or publication.
+
 ## 2026-10-02 — Recurring contractor browser smoke selectors repaired
 
 - Branch: `codex/recurring-role-smoke-repair`, based on current main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.
