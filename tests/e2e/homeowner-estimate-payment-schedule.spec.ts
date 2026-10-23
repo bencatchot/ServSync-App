@@ -78,7 +78,8 @@ test.describe('homeowner estimate payment schedule display', () => {
     expect(contractorScheduleSource).toContain('Full invoice on completion');
     expect(contractorScheduleSource).toContain('Deposit + final');
     expect(contractorScheduleSource).toContain('Custom schedule');
-    expect(saveSource).toContain(".from('estimate_payment_schedule_items')");
-    expect(saveSource).toContain('.insert(scheduleForSave.rows.map(row => ({');
+    expect(saveSource).toContain("supabase.rpc('servsync_save_estimate_draft_idempotent'");
+    expect(saveSource).toContain('payment_schedule_items: scheduleForSave.rows');
+    expect(saveSource).not.toContain(".from('estimate_payment_schedule_items')");
   });
 });

@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-23 — Linked Invoice recovery clarified in workflow review
+
+- When a payment-schedule row links to an Invoice that is absent from the loaded list, show Invoice linked and refresh guidance instead of Not requested; withhold another create action until details load. Existing server, role and billing rules are unchanged.
+- Added missing-record/reload/void-replacement regressions and corrected an obsolete schedule-save source assertion to the existing idempotent RPC contract. See [bounded review and exact acceptance limits](../qa/REQUEST_TO_INVOICE_REVIEW_2026-10-23.md).
+- Onboarding fresh-signup/TUT-002 and business-aware Practice access/integration gates remain open; no renewal, SQL, sends, payments, cleanup or Production release.
+
 ## 2026-10-02 — Recurring contractor browser smoke selectors repaired
 
 - Branch: `codex/recurring-role-smoke-repair`, based on current main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.
