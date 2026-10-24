@@ -151,7 +151,7 @@ export async function recordReview(outputDirectory, env = process.env) {
     await hold(2000);
     await click(page.getByRole('button', { name: 'Open first-estimate guide' }));
     await hold(3000);
-    scene('real', 'Start a real estimate opens a fresh Draft. Select the real customer and property when ready. Save before leaving. Sending remains separate.');
+    scene('real', 'Start a real estimate opens a fresh Draft. Preview before choosing a customer. Add or select a customer before Save Draft. Sending remains separate.');
     await click(page.getByRole('button', { name: 'Start a real estimate' }));
     await expect(page.getByLabel('What needs doing?')).toHaveValue('');
     await expect(page.getByRole('combobox', { name: 'Customer', exact: true })).toHaveValue('');

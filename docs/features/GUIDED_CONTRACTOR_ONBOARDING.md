@@ -73,7 +73,7 @@ Using the existing inline contractor-only customer flow, the fixture saved a Dra
 
 Twelve existing focused checks passed: six guide/PDF/browser/domain checks, including desktop/mobile layouts, and six signup-confirmation source checks. Three fixture-preservation unit tests also passed. Source checks are not email-delivery evidence. Physical-device, additional staff-role and public-signup/confirmation checks remain unverified. Private fixture identifiers, credentials and receipts are kept outside this repository.
 
-Tutorial impact remains **UPDATE REQUIRED** for TUT-002. Its replacement/addendum must explain customer selection before saving a real Draft. The earlier review video is historical evidence, not an updated publication of this wording; the existing Help approval/publication gate remains.
+Tutorial impact remains **UPDATE REQUIRED** for TUT-002. Its replacement/addendum must explain customer selection before saving a real Draft. The October 24 local review candidate includes this wording; it is not a published replacement. The existing Help approval/publication gate remains. Actual desktop Safari on the protected `4cel844ru` Demo Preview separately verified normal sign-in, corrected guide/editor copy and the retained $250.50 Draft Estimate/customer PDF. Initial setup and creation were tested through the local frontend against real Demo, not repeated in the hosted smoke check.
 
 ## Safari review-entry correction — October 16
 

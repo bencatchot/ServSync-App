@@ -2,22 +2,22 @@
   "schema": "servsync-local-help-review-v1",
   "local_review_only": true,
   "ingestible_help_package": false,
-  "source_commit": "fc4d2d770ab536a1c41151a73601d8326bf39361",
-  "application_commit": "fc4d2d770ab536a1c41151a73601d8326bf39361",
+  "source_commit": "d4781a261e5cf7e777c59470b3ae30d1b99917e0",
+  "application_commit": "d4781a261e5cf7e777c59470b3ae30d1b99917e0",
   "recorded_origin": "http://127.0.0.1:5180",
-  "recorder_sha256": "087cd48d2da4a0f0df7468bf9d28d1497bfa1250386b92244aae31dfd928fdb3",
+  "recorder_sha256": "c0e3bf791a3391617191aabaf196b82122e2ae43168bec382adbabe028545e1e",
   "tutorial": "TUT-002 addendum candidate",
   "environment": "Demo",
   "business_mutation_attempts": 0,
   "fixture_policy": "Browser-local synthetic practice; real Draft remains unsaved; no seed/reset/delete.",
   "pacing_profile": "servsync-human-paced-v1",
   "narration": "Silent review; script prepared; no provider request.",
-  "duration_seconds": 68.92,
+  "duration_seconds": 69.48,
   "width": 1440,
   "height": 900,
-  "mp4_sha256": "9cb7b1850ba8c6d816751c0add76efa16ff07259208b24794d83250525f92d1b",
-  "captions_sha256": "6a1e3f8dc7167169602a4de0157ccdc9381fed3741526154c0b20601c034c4da",
-  "pdf_sha256": "9b2ef4bc9170e8343cd62aa312bfbe43941637c4104711db49c5af587c87728c",
+  "mp4_sha256": "9d8b4bdbc822c42c339dc713cfec6d4da479548bb1b764a409d908bfa7a2d9f8",
+  "captions_sha256": "5def14316fc6b3423bd86b2b8d94e252c0ad6ed4ab388a9635e0374851157649",
+  "pdf_sha256": "de2f5aeb0cc5b5874e15a51c6d1ac083f81e50813fc199e83dd0a8ecc8721fea",
   "scenes": [
     {
       "key": "entry",
@@ -26,47 +26,47 @@
     },
     {
       "key": "sample",
-      "start": 6.502000000000001,
+      "start": 6.501999999999999,
       "text": "Try an isolated sample. These fictional details and example rates cannot contact customers or save business records."
     },
     {
       "key": "scope",
-      "start": 14.702000000000002,
+      "start": 14.751,
       "text": "Describe the work, then review each quantity and price. The sample uses the same Draft editor as real work."
     },
     {
       "key": "preview",
-      "start": 27.448,
+      "start": 27.466,
       "text": "Preview the customer estimate. Check the scope and total. Review final tax and terms before separately sending a real Estimate."
     },
     {
       "key": "resume",
-      "start": 38.785000000000004,
+      "start": 38.802,
       "text": "Practice edits survive refresh in this tab. Guide choices stay in this browser. Save Draft is required for real work."
     },
     {
       "key": "optional",
-      "start": 46.825,
+      "start": 47.367999999999995,
       "text": "Service prices, contacts and teammates can wait. Skip optional setup and reopen the guide whenever you need it."
     },
     {
       "key": "real",
-      "start": 56.824,
-      "text": "Start a real estimate opens a fresh Draft. Select the real customer and property when ready. Save before leaving. Sending remains separate."
+      "start": 57.419,
+      "text": "Start a real estimate opens a fresh Draft. Preview before choosing a customer. Add or select a customer before Save Draft. Sending remains separate."
     },
     {
       "key": "end",
-      "start": 68.121,
+      "start": 68.834,
       "text": ""
     }
   ],
   "publication": "Not uploaded or published; no Help recording job created.",
   "verification": {
-    "full_playback": "passed at 68.92 seconds; no media error",
+    "full_playback": "passed at 69.48 seconds; no media error",
     "caption_cues": 15,
-    "caption_display": "showing; active cue visually verified with existing Help 1.25rem font",
-    "actual_pdf": "Preview generated date and $270 total visually and text verified",
-    "hosted_verification": "Corrected exact Demo Preview passed desktop/mobile read-only tests after explicit destination approval",
-    "player_html_sha256": "5d9cb913a4c78b25550892ab093fac11381126fc34f76be0b76888b3f55177c7"
+    "caption_display": "showing; active real-Draft cue visually verified",
+    "actual_pdf": "generated PDF content check rejects Invalid Date; preview contains $270 total",
+    "hosted_verification": "Application d4781a2 separately verified in actual desktop Safari on protected 4cel844ru Preview: normal login, corrected guide/editor, retained $250.50 Draft Estimate and PDF",
+    "player_html_sha256": "377c679834a8179cd4a1b8d604c265ce31f0ede2bca67532fe47008073174c02"
   }
 }

@@ -1,6 +1,6 @@
 # Guided onboarding — exact remaining acceptance scope
 
-Issue #585 / draft PR #586. The bounded Demo record test below was explicitly approved and completed on October 15. Fresh signup remains unverified. No test credentials or private record IDs belong in this document.
+Issue #585 / draft PR #586. The bounded Demo record test below was explicitly approved and completed on October 15. Post-confirmation fresh-account onboarding was separately approved and verified on October 24; public signup and email confirmation remain unverified. No test credentials or private record IDs belong in this document.
 
 ## Verified existing fixture
 
@@ -32,20 +32,22 @@ Expected retained footprint is **six product rows**: one `contractor_work_drafts
 
 Permitted mutation RPCs for this run are only `servsync_save_work_draft` and `servsync_launch_work_draft`, with payload checks binding them to this run and the verified fixture. The save payload must not remove items. Block notifications, email/SMS, payment, other outputs, deletes and all other write endpoints. The current recorder/read-only test deliberately permits neither mutation RPC.
 
-## Fresh-account signup and first-run acceptance — owner action required
+## Fresh-account onboarding — verified October 24
 
-No unused, never-onboarded hosted account has been identified in the established fixture evidence. The verified Marcus account already has a company and history; a new browser profile is not a new account. Do not create credentials, rotate passwords or clear existing records to manufacture this test.
+The owner separately approved one fictional, ordinary Demo contractor created through the supported Admin API and confirmed only for that new fixture. A private test password was used for normal sign-in. No existing account, global confirmation setting, role or policy changed; no signup or confirmation email was sent. A real inbox was not needed for this post-confirmation UI acceptance. This does not test public signup, legal-acceptance capture during signup, outbound confirmation delivery or confirmation-link redemption.
 
-To verify the actual signup/confirmation boundary, the owner must use **one owner-controlled dedicated test inbox not already registered in the Demo environment**, choose their own password in the ordinary contractor signup on the corrected Demo Preview, complete the existing legal acceptance and any confirmation email, then return to that same Preview. The owner should record only the test-account identifier and result through the approved local credential/session mechanism; passwords and confirmation tokens must not be relayed in chat or committed. No real customer inbox or invitation is involved.
+Using the real hosted Demo Auth/RPC/database with the branch frontend served locally, the fresh account passed: empty first entry, disabled real-estimate entry before business setup, isolated sample and generated PDF, edited sample refresh/resume, optional skip/reopen, required business-name validation, minimal fictional business save and refresh, clean sample-to-real transition, and customer PDF preview before choosing a customer. Mobile checks used a 390px Chromium viewport, not a physical phone.
 
-Expected minimum effects of that owner action: one Auth user, its application profile and the existing automatic referral-code record; normal authentication/audit metadata and confirmation delivery as required by existing Auth configuration. Use no referral/invite code. The browser-local sample/preview needs no customer, Estimate or payment record. If testing real business setup as well, save one synthetic contractor business profile using the existing required business-name field; keep optional branding, price imports, team and payment setup skipped. Existing normal security/legal rules remain in force.
+The existing Save Draft rule requires a customer. The test found guidance that implied otherwise; PR #586 now states that requirement in the guide, editor and real-work preview help. The normal name-only local-customer path created one fictional contact and its empty Home property, with no email, invitation or account. The UI then saved one Draft, reopened it after navigation, full refresh and a separate ordinary browser login, and explicitly created one unsent Draft Estimate. One material line with quantity 2 at $125.25 totals $250.50. Independent database reads confirmed one account, one business, one Draft and one Estimate; no additional Draft/Estimate was created in hosted smoke verification. The additional estimate allowance is consumed; do not rerun creation stages.
 
-After the owner completes that action, verify new-account first entry, empty states, sample preview, skip/reopen, refresh and business-details explanation without writes. Any hosted real Draft test for that fresh tenant needs its own synthetic customer/property fixture and separate scope; the existing-owner test above avoids that extra footprint. If the owner does not want a new retained test identity, leave true signup/email-confirmation acceptance explicitly unverified. No configuration changes or account deletion are needed or proposed.
+The published application at `d4781a261e5cf7e777c59470b3ae30d1b99917e0` was separately checked in actual desktop Safari at `https://servsync-demo-4cel844ru-bencatchots-projects.vercel.app/#/contractor`. Normal fictional-account sign-in, corrected guidance, empty real editor, retained Draft Estimate and its actual customer PDF passed. The PDF showed the fictional business, scope, material quantity 2 at $125.25 and $250.50 total. This hosted check was read-only; first business creation and estimate creation occurred through the local frontend against the same real Demo backend.
 
-## Narrow decisions
+Real Demo boundary checks allowed the fixture owner's own Draft read and denied both an unrelated contractor Draft read and an anonymous read. These do not substitute for separate Admin, Office, Field Tech or Viewer sessions. No physical iPhone or physical cross-device test was performed.
 
-1. Completed: exact corrected-Preview bypass approval and desktop/mobile read-only verification.
-2. Completed: the separately approved one-Draft/one-unsent-Estimate retained fixture test above. No approval to seed/reset or delete anything.
-3. Owner performs the one dedicated-inbox signup/confirmation if fresh-account acceptance is required; Codex does not create its credentials.
+## Remaining gates
 
-Help recording review is independent of these writes. Help ingestion, paid narration and publication remain outside this authorization.
+- Public signup, signup legal-acceptance capture, confirmation-email delivery and confirmation-link redemption remain untested. An owner-controlled inbox is needed only when exercising actual outbound email/link delivery, not for the completed post-confirmation fixture checks. No global authentication changes are proposed.
+- TUT-002 remains **UPDATE REQUIRED**. Refresh and review the local addendum before protected Help job binding, upload, approval and publication; verify the replacement after publication. Preserve the existing published revision meanwhile.
+- Physical-device and additional staff-role coverage remain explicit limits. No further fixture creation, Practice access renewal or production action is authorized by this acceptance record.
+
+No account cleanup, customer delivery, payment or Production mutation was performed. Private identifiers, credentials and retained-record receipts stay outside the public repository.

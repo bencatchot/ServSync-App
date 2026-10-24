@@ -23,14 +23,14 @@ Reuse PR #577's existing Demo Recorder and Help Studio process; do not duplicate
 | Scope and pricing | Real shared editor, two sample lines, $195 total | “Describe the work, then review quantities and prices. These rates are examples.” |
 | Preview | Preview customer estimate and PDF | “Check the customer view before continuing. Private Draft notes stay out of the document. Review final tax and terms on the created Estimate.” |
 | Resume | Refresh same tab; skip/reopen guide | “Practice edits survive refresh in this tab. Guide choices stay in this browser.” |
-| Real work | Start a real estimate; show blank customer/title | “Your real Draft starts fresh. Save Draft before leaving; resume from Work, then Drafts.” |
+| Real work | Start a real estimate; show blank customer/title | “Your real Draft starts fresh. Preview before choosing a customer. Add or select a customer before Save Draft; resume from Work, then Drafts.” |
 | Next steps | Optional prices/customers; existing Save/Create confirmation | “Add prices or customers when useful. Creating an Estimate and sending it are separate actions.” |
 
 Do not suggest cross-device guide progress, real-work autosave, a completion-time guarantee, or that preview sends a document. Audience and real-work permissions remain Owner/Admin/Office as supported by existing capabilities; do not broaden them to make a recording work.
 
 ## Remaining gate
 
-Codex owns the recording/update follow-up attached to #585/#586. Finish fresh-account and hosted save/resume acceptance, record against the final application, and review the resulting media before requesting protected publication approval. A local silent review recording/package is now prepared; no upload, paid narration, Help revision or Production publication was performed. Fresh Production contextual retrieval/playback and approved replacement publication/verification remain open. Do not mark the overall onboarding task complete while this gate is open.
+Codex owns the recording/update follow-up attached to #585/#586. Post-confirmation fresh-account and hosted save/resume acceptance are recorded separately from untested public signup/email confirmation. Record against the final application and review the resulting media before requesting protected publication approval. A local silent review recording/package is now prepared; no upload, paid narration, Help revision or Production publication was performed. Fresh Production contextual retrieval/playback and approved replacement publication/verification remain open. Do not mark the overall onboarding task complete while this gate is open.
 
 ## Prepared review package
 
@@ -39,3 +39,11 @@ The final local review is `~/Documents/Codex/2026-10-15/task-3/tut002-guided-set
 Visual review caught a real unsaved-PDF date defect; the narrow correction and its generated-PDF/saved-document regression checks passed before the final recording. It now displays “Preview generated” with a valid date. The corrected application's new hosted Preview passed desktop/mobile read-only tests after destination-specific approval, including PDF date assertions. The 68.92-second local recording passed complete playback with 15 loaded/visible captions and no media error. Recording provenance and hosted validation remain separately identified.
 
 This is a reviewable addendum candidate, not a replacement revision ready for publication. It intentionally lacks a persisted Help job ID and ingestible package claim. After owner review, any final narration, Help job/package binding, upload, approval or publication must follow the existing protected process; retain current TUT-002 revision 4 meanwhile. The detailed test decisions are in `docs/qa/GUIDED_ONBOARDING_REMAINING_ACCEPTANCE.md`.
+
+## October 24 refreshed review
+
+After application commit `d4781a261e5cf7e777c59470b3ae30d1b99917e0` passed local checks and actual desktop Safari Preview validation, authenticated Demo Help searches for onboarding, first estimate, estimate, Save Draft and Preview customer estimate returned zero matches across dashboard/Draft contexts. The preserved published TUT-002 package again passed its hash check and complete 62.44-second local playback. Its existing customer-first Save/Create/Send guidance is still useful; guided setup and customer preview remain absent. This is not fresh Production contextual playback.
+
+The October 24 local review supersedes the earlier candidate above: `~/Documents/Codex/2026-10-15/task-3/tut002-guided-setup-review-20261024/preview.html`. It records the verified application against real Demo using the existing recorder and existing synthetic recording fixture, with all business mutations forbidden. The final scene now explicitly says to add or select a customer before Save Draft. It is silent, 69.48 seconds at 1440×900; MP4 SHA-256 `9d8b4bdbc822c42c339dc713cfec6d4da479548bb1b764a409d908bfa7a2d9f8`. Zero business-mutation attempts occurred. Authentication is excluded from recorded media. Complete playback ended at 69.48 seconds with 15 loaded captions in showing mode and no media error; the current real-Draft caption was visually reviewed. MP4, VTT and PDF hashes match the manifest.
+
+The local package remains a review candidate, not an ingestible or published Help revision. The next protected scope is the existing Help job/package binding, upload, approval and replacement/addendum publication for TUT-002, followed by retrieval/playback verification. No paid narration is proposed. Preserve revision 4 until the approved replacement is verified. Public signup/email confirmation and physical-device checks remain separate acceptance limits.
