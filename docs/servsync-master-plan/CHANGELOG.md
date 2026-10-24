@@ -1,5 +1,10 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-24 — TUT-002 approved draft preparation
+
+- Prepared the owner-approved script and read-only review source without running the default reset/create recorder. Added a local source-validation and actual-request-binding adapter that reuses the existing Help packager and preserves all existing validation gates.
+- Nineteen focused recorder/source/narration checks passed. The live Help request still requires a normal platform-admin session; no job ID is fabricated. No paid narration, upload, publication, business-record mutation, Practice renewal or Production release. TUT-002 remains UPDATE REQUIRED.
+
 ## 2026-10-24 — Clarify customer selection before saving a real Draft
 
 - Issue #585 / draft PR #586: fresh post-confirmation Demo fixture testing reached a useful customer preview before adding a customer, then confirmed the existing customer requirement for Save Draft. Guide/editor/preview copy now makes that requirement explicit; validation and permissions are unchanged.
