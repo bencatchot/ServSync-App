@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-24 — Clarify customer selection before saving a real Draft
+
+- Issue #585 / draft PR #586: fresh post-confirmation Demo fixture testing reached a useful customer preview before adding a customer, then confirmed the existing customer requirement for Save Draft. Guide/editor/preview copy now makes that requirement explicit; validation and permissions are unchanged.
+- Isolated local-browser testing against the actual Demo backend covered minimal business setup, sample and real previews, optional skip/reopen, mobile layout, saved Draft refresh/separate-login resume and explicit creation of an unsent Estimate. Public signup and outbound confirmation email were not exercised. Sanitized scope and limits are in `docs/features/GUIDED_CONTRACTOR_ONBOARDING.md`.
+- Twelve focused guide/PDF/browser/domain and signup-confirmation source checks passed, plus three fixture-preservation unit tests. No Production change or merge. TUT-002 remains **UPDATE REQUIRED** and must include the customer-before-save distinction before publication.
+
 ## 2026-10-16 — Safari sign-in menu entry repair
 
 - Issue #585 / draft PR #586: reproduced both landing-page sign-in choices failing in WebKit on the exact reviewed Demo Preview. Safari blurs the summary with no next focus target before the native link click; the menu's blur handler closed it and hid the clicked link. Chromium desktop and mobile navigation reached the existing forms. No browser exception or backend failure caused this incident; the bug predates the onboarding changes.

@@ -341,7 +341,7 @@ export function ContractorDraftComposer({
 
       <fieldset disabled={interactionDisabled} className="contents" aria-label="Draft planning fields">
       <section aria-label="Customer and work" className="space-y-4 pt-2">
-        <div><h3 className="text-base font-bold text-slate-950">1. Customer &amp; work</h3><p className="mt-1 text-sm text-slate-500">Start with the work you have in mind. You can add a customer later.</p></div>
+        <div><h3 className="text-base font-bold text-slate-950">1. Customer &amp; work</h3><p className="mt-1 text-sm text-slate-500">Start with the work you have in mind. Choose a customer before saving this Draft.</p></div>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
         <DraftCustomerCombobox
           testId="durable-draft-customer"

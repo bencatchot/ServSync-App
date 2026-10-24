@@ -25,7 +25,7 @@ export function DraftEstimatePreview({ draft, businessName, businessLogoUrl, cus
   const record = draftEstimatePreview(draft);
   return <section className="rounded-xl border border-blue-200 bg-blue-50 p-4" aria-label="Customer preview">
     <h3 className="font-bold text-slate-950">Review before you send</h3>
-    <p className="mt-1 text-sm text-slate-600">Preview your scope, line items and total using the customer document layout. Private Draft notes stay private. Save Draft to resume real work; creating an Estimate does not send it.</p>
+    <p className="mt-1 text-sm text-slate-600">Preview your scope, line items and total using the customer document layout. Private Draft notes stay private.{!sample && ' Choose a customer before using Save Draft to resume real work. Creating an Estimate does not send it.'}</p>
     <button type="button" disabled={disabled || busy} className="mt-3 min-h-11 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50" onClick={async () => {
       const validation = estimatePreviewError(draft);
       if (validation) { setError(validation); return; }

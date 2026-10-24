@@ -10,7 +10,7 @@ Signup already asks name, email, password and explicit legal acceptance, with em
 
 The contractor dashboard previously displayed a broad business-profile prompt (including logo, website and description) and a seven-step checklist: profile, customer, Job, sent Estimate, sent Invoice, homeowner invitation and report. Completion depended on sending documents and performing the full lifecycle. That obscured the useful first-estimate outcome.
 
-The existing Work → Drafts path already provides optional-customer planning, durable Save Draft, guarded/idempotent output creation, role-aware capabilities, customer/property selection and deliberate Estimate sending. Its editor has scope, reusable pricing, labor models and accurate totals. Reuse it; do not create a second real-record lifecycle.
+The existing Work → Drafts path already provides planning and preview before customer selection, durable Save Draft after selecting a customer, guarded/idempotent output creation, role-aware capabilities, customer/property selection and deliberate Estimate sending. Its editor has scope, reusable pricing, labor models and accurate totals. Reuse it; do not create a second real-record lifecycle.
 
 ## Implemented scope
 
@@ -60,6 +60,20 @@ The [bounded update brief](../tutorials/GUIDED_FIRST_ESTIMATE_UPDATE_BRIEF.md) r
 “Guided setup helps you try a sample estimate or prepare your own Draft and review a customer preview. Optional business setup can wait.”
 
 Do not claim seamless onboarding is proven, advertise a completion-time guarantee, imply practice is a live customer record, promise autosave/cross-device guide progress, or describe this review branch as released.
+
+## Fresh post-confirmation fixture acceptance — October 24
+
+A separately approved, confirmed fictional contractor fixture allowed initial onboarding to be tested without a real inbox. This verifies the post-confirmation journey, not public signup, email delivery, confirmation-link redemption or legal-acceptance submission. No global Auth setting or existing identity was changed.
+
+The current PR source ran locally in an isolated Chromium browser against the real Demo backend, with an exact-origin network guard and bounded UI writes. This is distinct from deployed-Preview acceptance. The fresh account reached the guide before creating a business, previewed the isolated sample, retained edited sample quantities after refresh, skipped optional setup, and reopened the guide. Business-name validation prevented an empty save; a minimal fictional business unlocked real estimates without a logo, service catalog, service area or teammate setup. The real editor started empty and produced an accurate customer PDF before selecting a customer.
+
+This run exposed a guidance mismatch: existing Draft validation requires a customer before Save Draft, while the guide implied customer selection could wait until Estimate creation. The guide, shared editor and real-preview help now state that distinction explicitly. Validation, authorization and persistence rules are unchanged; sample help does not instruct users to save real records.
+
+Using the existing inline contractor-only customer flow, the fixture saved a Draft and resumed its customer, scope, quantity and decimal price through a separate normal login and full refresh. Explicit creation and its confirmation produced an unsent $250.50 Estimate; refresh preserved it. Read-only database checks confirmed the expected single Estimate and no Invoice. Ordinary-owner, foreign-contractor and anonymous Draft read checks exercised the real Demo backend. No send, payment, invitation, real customer data or Practice access was used.
+
+Twelve existing focused checks passed: six guide/PDF/browser/domain checks, including desktop/mobile layouts, and six signup-confirmation source checks. Three fixture-preservation unit tests also passed. Source checks are not email-delivery evidence. Physical-device, additional staff-role and public-signup/confirmation checks remain unverified. Private fixture identifiers, credentials and receipts are kept outside this repository.
+
+Tutorial impact remains **UPDATE REQUIRED** for TUT-002. Its replacement/addendum must explain customer selection before saving a real Draft. The earlier review video is historical evidence, not an updated publication of this wording; the existing Help approval/publication gate remains.
 
 ## Safari review-entry correction — October 16
 
