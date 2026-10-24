@@ -351,6 +351,8 @@ The homeowner experience should feel lightweight. Most homeowners will likely ha
 
 # 9. Contractor Experience
 
+Guided first-estimate direction (October 15 review branch, issue #585): first useful value is a customer preview, not sending an Estimate or completing every setup task. Keep a neutral small-contractor default with optional example trade selection, clearly isolated browser-local practice, the existing real Draft editor and explicit Save Draft/resume. Ask only required business details before customer documents; defer logo, library/import/team/payment setup. Preserve explicit Send and existing authorization/legal/billing gates. Guide progress is browser-local; real Draft persistence remains canonical. The branch is not released, and hosted new-account acceptance plus TUT-002 guidance review remain open.
+
 The contractor experience should be practical, not bloated. The contractor should quickly understand: how do I get seen, receive better-context requests, communicate, estimate, perform the job, invoice, and keep the customer relationship organized?
 
 - Contractor creates a profile with business details, service area, trade type, and future Discover content.

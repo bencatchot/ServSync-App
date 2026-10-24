@@ -9,6 +9,10 @@ This document describes what ServSync can honestly say during the controlled pri
 
 For new Codex-assisted internal draft preparation, use the machine-readable `config/marketing/servsync-marketing-truth-pack.v3.json` contract. The immutable v1 and v2 packs remain only for historical package replay and audit. The current pack is a conservative bounded projection of this inventory and current governed product documentation; it does not turn roadmap entries into marketable claims. Runtime AI generation, autonomous approval, publishing, and provider integrations remain unavailable.
 
+## Guided contractor setup — review branch only, October 15
+
+Issue #585 prepares guided setup to an Estimate Draft customer preview, isolated practice using fictional examples, optional setup and explicit Save Draft/resume. Once released, factual wording may be: “Try a sample estimate or prepare your own Draft and review a customer preview. Optional business setup can wait.” Practice cannot save business records, contact customers or collect payments. Guide progress is same-browser; practice edits are same-tab; real work must be explicitly saved. No proven “seamless” claim, completion-time guarantee, automated sending, new payment capability or cross-device onboarding promise. Fresh-account hosted acceptance and tutorial freshness remain open; do not market this branch as live.
+
 ## September 7 correction branch — release verification pending
 
 `codex/astra-audit-corrections-2026-09-07` makes the existing offer explicit: contractor use is currently free during beta, no credit card is required, and future paid plans will be explained before selection. This does not promise permanent free access. The branch also adds an in-app PDF preview and a connected-customer Calendar handoff to existing service requests. Shared appointments still require their supported request workflow; this is not external calendar sync or automated dispatch.

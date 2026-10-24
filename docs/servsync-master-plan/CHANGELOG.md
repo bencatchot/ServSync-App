@@ -1,5 +1,41 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-24 — TUT-002 approved draft preparation
+
+- Prepared the owner-approved script and read-only review source without running the default reset/create recorder. Added a local source-validation and actual-request-binding adapter that reuses the existing Help packager and preserves all existing validation gates.
+- Nineteen focused recorder/source/narration checks passed. The live Help request still requires a normal platform-admin session; no job ID is fabricated. No paid narration, upload, publication, business-record mutation, Practice renewal or Production release. TUT-002 remains UPDATE REQUIRED.
+
+## 2026-10-24 — Clarify customer selection before saving a real Draft
+
+- Issue #585 / draft PR #586: fresh post-confirmation Demo fixture testing reached a useful customer preview before adding a customer, then confirmed the existing customer requirement for Save Draft. Guide/editor/preview copy now makes that requirement explicit; validation and permissions are unchanged.
+- Isolated local-browser testing against the actual Demo backend covered minimal business setup, sample and real previews, optional skip/reopen, mobile layout, saved Draft refresh/separate-login resume and explicit creation of an unsent Estimate. Public signup and outbound confirmation email were not exercised. Sanitized scope and limits are in `docs/features/GUIDED_CONTRACTOR_ONBOARDING.md`.
+- Actual desktop Safari on the protected application Preview also passed normal fixture sign-in, corrected guide/editor and retained $250.50 Draft Estimate/customer PDF checks. A refreshed 69.48-second local TUT-002 review passed full playback with 15 captions and zero business-write attempts; it remains unpublished.
+- Twelve focused guide/PDF/browser/domain and signup-confirmation source checks passed, plus three fixture-preservation unit tests. No Production change or merge. TUT-002 remains **UPDATE REQUIRED** and must include the customer-before-save distinction before publication.
+
+## 2026-10-16 — Safari sign-in menu entry repair
+
+- Issue #585 / draft PR #586: reproduced both landing-page sign-in choices failing in WebKit on the exact reviewed Demo Preview. Safari blurs the summary with no next focus target before the native link click; the menu's blur handler closed it and hid the clicked link. Chromium desktop and mobile navigation reached the existing forms. No browser exception or backend failure caused this incident; the bug predates the onboarding changes.
+- Keep the role links visible through Safari's focus transition, retain close-on-focus-out for real focus destinations, and dismiss on outside pointer actions and Escape. Authentication, role checks, credentials and environment configuration are unchanged.
+- Local validation: 28 public browser checks passed, including actual homeowner/contractor clicks in Chromium and WebKit at desktop/tablet/mobile widths and keyboard/outside dismissal. Typecheck, production build, targeted lint and diff checks passed. Hosted verification is recorded in PR #586 after its automatic Preview build.
+- Prior explicitly approved Demo persistence acceptance also passed: one retained synthetic Draft and one unsent $125 Estimate, refresh/navigation/separate-login resume, and same-key launch retry with no duplicates. Private IDs remain outside the repository. Blind null-ID initial-save replay and fresh signup are not claimed.
+- Tutorial impact remains UPDATE REQUIRED for the guided-estimate TUT-002 replacement. No Help publication, shared migration, production deployment or merge.
+
+## 2026-10-15 — Guided setup tutorial review package and PDF date correction
+
+- Issue #585 / draft PR #586 remains unmerged. A read-only local recorder reuses the established human pacing and media tools without invoking Demo seeding/reset or Help publication. Its 68.92-second captioned review shows actual isolated practice, customer PDF, refresh/resume, optional skipping and a fresh unsaved real Draft.
+- The recording independently revealed an invalid Updated date in unsaved preview PDFs. A narrow optional preview-generation label fixes it; persisted Estimate dates and save/send/role behavior are unchanged. Six focused checks (including real PDF content and existing document date), authenticated local Demo read-only validation, two recorder safety tests, type/build/lint, GitHub quality and Preview builds passed.
+- Existing Demo Owner Marcus Bennett / Gulf Coast Home Services, Sarah Johnson and Demo Bay Home were verified read-only. The bounded remaining-acceptance plan specifies one retained Draft/item and one unsent Estimate/item/launch/audit, no deletion, and an owner-controlled dedicated-inbox signup for true fresh-account coverage. No proposed acceptance write has run.
+- Tutorial impact remains UPDATE REQUIRED. Local review package is prepared; no paid narration, upload, Help job/revision/publication, credential creation, shared migration or production deployment. The corrected hosted Demo Preview passed desktop/mobile read-only checks after exact-destination approval. Details: guided onboarding feature report, tutorial brief and `docs/qa/GUIDED_ONBOARDING_REMAINING_ACCEPTANCE.md`.
+
+## 2026-10-15 — Guided contractor first estimate prepared for review
+
+- Branch: `codex/guided-contractor-first-estimate`; issue #585; base `5ea8fec`.
+- Changes: replace the dashboard profile prompt/seven-step send-dependent checklist with a resumable optional guide; reuse the Draft editor for isolated practice and add customer PDF preview to eligible real Estimate Drafts. Preserve all existing persistence, launch/send, legal, billing and role boundaries.
+- Files: `src/features/onboarding/*`, Draft composer/workspace, `src/App.tsx`, focused onboarding tests, app-size baseline, this changelog, master plan, backlog, marketing inventory and `docs/features/GUIDED_CONTRACTOR_ONBOARDING.md`.
+- Validation: TypeScript/build/27 architecture tests; focused desktop/mobile browser and PDF checks; 29 existing Draft browser regressions; disposable PostgreSQL Estimate authority suite. Hosted and release acceptance evidence is distinguished in the feature report/PR.
+- Risks/follow-ups: same-browser guide progress and same-tab practice edits only; real work still requires Save Draft. Exact Demo Preview desktop/mobile checks passed. Fresh-account hosted persistence/duplicate-retry acceptance and the TUT-002 guidance replacement remain release gates; post-validation Demo Help search and hash-verified local published-package playback are recorded in the feature report and update brief. No merge, production deployment, shared SQL/data mutation, notifications, purchases, auth/permission/env changes or new dependencies.
+- Backlog Impact: FB-040 records the review-branch guided first-estimate slice and remaining acceptance/tutorial gates. Marketing wording remains conditional on release; no time-to-completion claim.
+
 ## 2026-10-02 — Recurring contractor browser smoke selectors repaired
 
 - Branch: `codex/recurring-role-smoke-repair`, based on current main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.
