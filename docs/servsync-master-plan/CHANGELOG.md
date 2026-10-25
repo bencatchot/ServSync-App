@@ -4,7 +4,7 @@
 
 - PR #591 hosted Demo QA reached request, estimate delivery/acceptance and job creation using one isolated fictional scenario. Calendar's Open request action then landed in a queue that excluded the job-linked request.
 - Explicit navigation now retains that request in the detailed queue and clears stale search text; the overview still excludes requests already carried into jobs. Existing ordering moved into the request feature module and the App architecture baseline decreased. No backend, role, notification, authentication or billing rules change.
-- Fourteen focused domain/source checks, typecheck, build and architecture validation pass. Hosted appointment/invoice continuation and final tutorial freshness review remain in progress. No Production merge or deployment.
+- Fourteen focused domain/source checks, typecheck, build and architecture validation pass. Hosted fictional request → accepted estimate → job → confirmed appointment → viewed deposit invoice passed, including rapid duplicate-click protection, fresh-session recovery and missing-invoice read fault injection on desktop/mobile. A sent/viewed invoice without a number now uses Invoice rather than the misleading Invoice draft caption. Preexisting records and prior Practice/onboarding fixtures remain preserved. Full scope and limits are recorded in the bounded QA report; tutorial evidence and exact-head checks are on PR591. No Production merge or deployment.
 
 ## 2026-10-25 — Safari homepage sign-in navigation repair isolated
 

@@ -1,6 +1,6 @@
 # Request-to-invoice usability review — October 23, 2026
 
-Implementation record: [#590](https://github.com/bencatchot/ServSync-App/issues/590). Baseline `origin/main` at `5ea8fec`. The onboarding and Practice checkouts remain separate and unchanged. This is a bounded source/domain/browser-fixture review, not a new hosted transaction-chain acceptance or a Production release.
+Historical October 23 baseline (superseded by the hosted continuation below where noted). Implementation record: [#590](https://github.com/bencatchot/ServSync-App/issues/590). Baseline `origin/main` at `5ea8fec`. The onboarding and Practice checkouts remain separate and unchanged. This is a bounded source/domain/browser-fixture review, not a new hosted transaction-chain acceptance or a Production release.
 
 ## Journey reviewed
 
@@ -37,10 +37,33 @@ Publication, exact commit, Preview status, tutorial freshness and any hosted sig
 
 No real customer notifications/invoices, charges, SQL application, new credentials/infrastructure, access grants, expiry extension, record deletion, merges or Production releases occurred.
 
-## October 25 hosted continuation (in progress)
+## October 25 hosted continuation — verified bounded scenario
 
-The owner authorized a bounded retained fictional Demo scenario using existing ordinary Demo identities: one request, estimate, job, appointment and invoice, zero payments. Current main after PR593 was integrated into this feature branch. Actual hosted request creation, $250.50 draft persistence, portal estimate delivery, homeowner acceptance and job creation passed; double-click Send, Accept and Create Job each issued one successful RPC. No external provider endpoint is permitted by the browser harness. Live read-only catalog inspection found no external notification triggers, cron scheduler, or network calls in the workflow RPCs/helpers. Internal fictional portal notifications remain enabled.
+The owner authorized one retained fictional Demo scenario using existing ordinary Demo identities: one request, estimate, job, appointment and invoice, zero payments. Current main after PR593 was integrated into this feature branch. No fixture reset or additional auth provisioning was used.
 
-A hosted scheduling dead end was reproduced: Calendar lists an open request after it becomes a Job, but its Open request link routes to a queue that filters out all job-linked requests. Preserve the explicitly selected request in the detailed queue while leaving the overview/intake exclusions unchanged, clear stale search text on explicit navigation, and retain existing scheduling/role/backend rules. Existing queue sorting moved to its owning feature module without changing priorities. Two focused regressions plus the existing 12 deposit/schedule checks pass; typecheck, build and architecture baseline pass. Hosted verification of the repaired navigation and the remaining appointment/invoice transitions is pending.
+### Actual hosted results
 
-The harness deliberately blocks read-marker writes and automatic job autosave; resulting fetch errors are harness limits, not proven application regressions. No earlier records are intentionally changed. Public evidence excludes private fixture identifiers. Tutorial freshness must be rechecked after final application validation; no Help media publication is authorized.
+- Existing fictional homeowner/contractor signed in normally to the protected Demo Preview. The browser permitted only reviewed workflow RPCs; provider endpoints, app APIs, direct table writes and unrelated mutations were blocked. Live read-only catalog inspection found no external delivery calls in the workflow RPCs/helpers, no notification webhook triggers and no cron scheduler. Internal fictional portal notifications remained enabled.
+- Homeowner UI created exactly one request for the existing fictional property/contractor. Contractor UI saved one linked estimate: two units at $125.25, total $250.50, deposit/final schedule $125.25 each. No auto-send occurred.
+- Explicit portal delivery, homeowner review/acceptance, and job creation succeeded. The persisted job and invoice retain the same request/estimate lineage.
+- Calendar's Open request action initially failed after job creation: the destination queue excluded all job-linked requests. The scoped repair retains only the explicitly opened request in the detailed queue, clears stale search text, and preserves normal overview exclusions and sorting. Actual hosted mouse and keyboard navigation, mobile layout, and stale-search recovery passed after the repair.
+- Contractor UI proposed one fictional time window; homeowner UI accepted it. The backend retained one confirmed appointment and both parties can see its confirmation. No real visit or automated reminder was initiated.
+- Request deposit created exactly one unsent $125.25 invoice. Rapid double-clicks on estimate Send, estimate Accept, Create Job, proposed-time Send/Accept and Request deposit each produced one successful RPC. Invoice Send likewise produced one successful action. This checks the observed browser behavior, not an exhaustive concurrency/load test.
+- The fictional homeowner could open the explicitly delivered portal invoice. The normal view RPC changed its status to Viewed. Invoice total/balance is $125.25, amount paid is zero. The contractor schedule now shows Viewed and, after the final caption repair, no longer calls an unnumbered sent/viewed invoice a draft.
+- Fresh authenticated browser contexts for both roles reopened the retained state. Normal refresh recovered the same invoice without new records.
+
+### Fault injection, layout and test scope
+
+Two read faults were kept separate from actual transaction evidence. Aborting all invoice reads caused the existing workspace load-error/retry surface. To exercise the linked-but-unloaded row specifically, the browser added an exclusion to the actual invoice read query while retaining the real schedule link; no success payload was fabricated and the database invoice stayed unchanged. Desktop and 390px mobile then showed **Invoice linked**, refresh guidance, and no second deposit-create button. Restoring the normal query and refreshing recovered Draft initially and Viewed after portal viewing. These cases passed again on application commit `7e01cebad97ce29f7e1c5ab503b84a257a304ee0`.
+
+Hosted evidence is automated Chromium with the actual Demo backend. Mobile invoice/request views had no horizontal overflow. This run is not native Safari, a physical iPhone, or two physical devices. Existing actor-role and backend checks remain active; new employee/admin role fixtures were not provisioned or exercised. Deposit billing through a confirmed appointment is verified; job completion, final invoicing, Home History filing and payments were deliberately not executed.
+
+Fourteen focused domain/source checks pass (two request-queue regressions and twelve existing deposit/schedule checks); these are not fourteen hosted journeys. Typecheck/build and architecture checks pass; lint retains the existing 76 warnings. Exact application-head quality CI: [40196852318](https://github.com/bencatchot/ServSync-App/actions/runs/40196852318). All three normal Preview builds passed. Final documentation-head CI and Preview are recorded on PR591.
+
+### Preservation and limitations
+
+Per-row hashes before/after match for every preexisting contractor-visible request, estimate and invoice; final additions are exactly one request, estimate, job, appointment and invoice. Read-only checks also confirm the original two Practice drafts retain their prior aggregate fingerprint, the third retained draft remains at revision 1, Practice access is expired, and the separate onboarding estimate remains an unsent draft with its previous amount/update time. Private IDs and credentials are excluded from this record.
+
+The harness blocked automatic read-marker writes and job autosave. Their fetch errors are harness restrictions, not proven application regressions. No external customer messages, emails/SMS, payments, production transactions, new credentials/access, shared SQL application, Help publication or Production merge occurred.
+
+Tutorial impact: NONE. After application validation, Demo contextual searches returned no matches; read-only published-catalog review found five relevant walkthroughs. Their retained media matched published hashes, completed full muted playback, and middle/end frames and transcripts were compared with the finished changes. No guidance depends on the broken Calendar link or incorrect Invoice caption. This is published-byte local playback, not a new authenticated in-app Help playback. PR586's separate TUT-002 replacement gate is unchanged. No new marketing claim or workflow/security boundary is introduced.
