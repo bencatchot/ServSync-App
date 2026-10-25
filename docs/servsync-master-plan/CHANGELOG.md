@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-25 — Safari homepage sign-in navigation repair isolated
+
+- Branch: `codex/safari-homepage-signin`, from current main `5ea8fec`; issue #592. Extracts the landing-menu fix already present in unmerged onboarding PR #586 so it can be reviewed independently.
+- Both Homeowner and Contractor links reproduce as broken on Production and current main in desktop WebKit: null-target blur hides the link before native navigation. Preserve the menu through that blur; retain outside-pointer, keyboard focus-out and Escape dismissal.
+- Eight focused Chromium/WebKit browser checks pass across desktop, tablet and mobile widths, including role navigation, keyboard, back/forward and reload. Protected Demo Preview validation also passed both roles at all three widths; actual desktop Safari native clicks and history reached both sign-in forms. Existing fictional Demo Homeowner/Contractor sessions retained their own role, return query, history and reload behavior. A WebKit profile-fetch warning reproduced unchanged on main and is documented as an existing limitation. PR #593 records exact commit/Preview evidence; physical phones remain untested. Typecheck and focused lint passed. Tutorial impact: NONE after published Help searches found no homepage/sign-in guidance matches.
+- No route destination, auth/session, permission, backend, customer-record or Production changes. No product-boundary or marketing-claim changes.
+
 ## 2026-10-23 — Linked Invoice recovery clarified in workflow review
 
 - When a payment-schedule row links to an Invoice that is absent from the loaded list, show Invoice linked and refresh guidance instead of Not requested; withhold another create action until details load. Existing server, role and billing rules are unchanged.
