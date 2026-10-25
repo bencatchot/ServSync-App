@@ -108,6 +108,25 @@ test.describe('Accepted Estimate Deposit Workflow', () => {
     expect(scheduleBillingPresentation(row, invoice({ status: 'partially_paid', amount_paid_cents: 50000 })).label).toBe('Partially Paid');
   });
 
+  test('a linked invoice missing from the loaded list never looks unrequested or offers another create', () => {
+    for (const invoiceType of ['deposit', 'progress', 'final', 'total'] as const) {
+      const row = schedule({ invoice_type: invoiceType, linked_invoice_id: 'invoice-1' });
+      const missingInvoice = invoiceForScheduleRow(row, []);
+      expect(missingInvoice).toBeNull();
+      expect(scheduleBillingPresentation(row, missingInvoice)).toEqual({
+        label: 'Invoice linked',
+        tone: 'neutral',
+        detail: 'Invoice details are unavailable. Refresh to load the linked Invoice before taking another billing action.',
+      });
+      expect(canRequestScheduleInvoice(row, missingInvoice, 1)).toBe(false);
+      expect(canRequestScheduleInvoice(row, undefined, 1)).toBe(false);
+      // A later successful load restores the existing draft/void/payment behavior.
+      expect(scheduleBillingPresentation(row, invoice({ status: 'draft' })).label).toBe('Requested - draft');
+      expect(canRequestScheduleInvoice(row, invoice({ status: 'void', amount_paid_cents: 0 }), 1)).toBe(true);
+      expect(canRequestScheduleInvoice(row, invoice({ status: 'void', amount_paid_cents: 1 }), 1)).toBe(false);
+    }
+  });
+
   test('validates partial offline payments against the remaining balance', () => {
     const target = invoice({ amount_paid_cents: 50000, status: 'partially_paid' });
     const draft = createOfflinePaymentDraft(target);

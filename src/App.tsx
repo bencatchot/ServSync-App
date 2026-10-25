@@ -1,3 +1,4 @@
+import { contractorRequestQueueRecords, sortContractorRequestRecords } from './features/requests/contractorQueue';
 import { PublicPostConsent } from './features/discover/PublicPostConsent';
 import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
 import { usePublicContractorProfile } from './features/discover/usePublicContractorProfile';
@@ -20896,6 +20897,7 @@ function ContractorDashboard({
   const [contractorCounterProposeDrafts, setContractorCounterProposeDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
   const [respondingToHomeownerApptId, setRespondingToHomeownerApptId] = useState<string | null>(null);
   const [contractorExpandedRequestIds, setContractorExpandedRequestIds] = useState<Set<string>>(new Set());
+  const [focusedContractorRequestId, setFocusedContractorRequestId] = useState<string | null>(null);
   const [contractorRequestView, setContractorRequestView] = useState<ContractorRequestView>('overview');
   const [contractorRequestSearch, setContractorRequestSearch] = useState('');
   const [closingSummaryDrafts, setClosingSummaryDrafts] = useState<Record<string, string>>({});
@@ -23127,6 +23129,8 @@ function ContractorDashboard({
   };
 
   const openContractorRequestInRequestsTab = (request: ServiceRequestSummary) => {
+    setFocusedContractorRequestId(request.id);
+    setContractorRequestSearch('');
     setContractorRequestView(contractorRequestQueueFor(request));
     setContractorExpandedRequestIds(new Set([request.id]));
     setContractorTab('requests');
@@ -24004,7 +24008,7 @@ function ContractorDashboard({
                       {formatMoney(row.calculated_amount_cents)} · {row.due_trigger?.trim() || 'Due date to be confirmed'}
                     </p>
                     <p className="mt-1 text-xs font-medium text-slate-600">{billingPresentation.detail}</p>
-                    {rowInvoice && <p className="mt-1 text-xs text-slate-500">{rowInvoice.invoice_number ? `Invoice ${rowInvoice.invoice_number}` : 'Invoice draft'} · {formatMoney(rowInvoice.total_cents)}</p>}
+                    {rowInvoice && <p className="mt-1 text-xs text-slate-500">{rowInvoice.invoice_number ? `Invoice ${rowInvoice.invoice_number}` : rowInvoice.status === 'draft' ? 'Invoice draft' : 'Invoice'} · {formatMoney(rowInvoice.total_cents)}</p>}
                     {rowInvoice?.status === 'void' && (
                       <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
                         The voided Invoice remains in history. A replacement draft uses this schedule amount and does not rewrite the old Invoice.
@@ -33891,27 +33895,20 @@ function ContractorDashboard({
             };
 
             const isContractorAttention = contractorRequestNeedsFollowUp;
-            const sortContractorRequests = (requests: ServiceRequestSummary[]) => [...requests].sort((a, b) => {
-              const attentionDelta = Number(isContractorAttention(b)) - Number(isContractorAttention(a));
-              if (attentionDelta) return attentionDelta;
-              const urgentDelta = Number(b.urgency === 'urgent') - Number(a.urgency === 'urgent');
-              if (urgentDelta) return urgentDelta;
-              const appointmentDelta = Number(Boolean(b.appointment)) - Number(Boolean(a.appointment));
-              if (appointmentDelta) return appointmentDelta;
-              return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-            });
+            const sortContractorRequests = (requests: ServiceRequestSummary[]) => sortContractorRequestRecords(requests, isContractorAttention);
+            const queueRecords = contractorRequestQueueRecords(serviceRequests, serviceRequestIdsWithJobs, contractorRequestView === 'overview' ? null : focusedContractorRequestId);
             const requestSections: Array<{ id: Extract<ContractorRequestView, 'new' | 'open' | 'closed'>; title: string; helper: string; requests: ServiceRequestSummary[] }> = [
               {
                 id: 'new',
                 title: 'New requests',
                 helper: 'Fresh homeowner requests that need your first response.',
-                requests: sortContractorRequests(requestPhaseServiceRequests.filter(r => r.status === 'open')),
+                requests: sortContractorRequests(queueRecords.filter(r => r.status === 'open')),
               },
               {
                 id: 'open',
                 title: 'Open',
                 helper: 'Active requests after the first response, including appointment scheduling and follow-up.',
-                requests: sortContractorRequests(requestPhaseServiceRequests.filter(r =>
+                requests: sortContractorRequests(queueRecords.filter(r =>
                   !['closed', 'declined'].includes(r.status)
                   && r.status !== 'open'
                 )),
@@ -33920,7 +33917,7 @@ function ContractorDashboard({
                 id: 'closed',
                 title: 'Closed',
                 helper: 'Completed, declined, cancelled, or invoiced requests.',
-                requests: sortContractorRequests(requestPhaseServiceRequests.filter(r => r.status === 'closed' || r.status === 'declined')),
+                requests: sortContractorRequests(queueRecords.filter(r => r.status === 'closed' || r.status === 'declined')),
               },
             ];
             const followUpRequests = sortContractorRequests(requestPhaseServiceRequests.filter(isContractorAttention));
