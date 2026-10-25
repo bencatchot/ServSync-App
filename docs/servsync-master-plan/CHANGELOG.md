@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-25 — Safari homepage sign-in navigation repair isolated
+
+- Branch: `codex/safari-homepage-signin`, from current main `5ea8fec`; issue #592. Extracts the landing-menu fix already present in unmerged onboarding PR #586 so it can be reviewed independently.
+- Both Homeowner and Contractor links reproduce as broken on Production and current main in desktop WebKit: null-target blur hides the link before native navigation. Preserve the menu through that blur; retain outside-pointer, keyboard focus-out and Escape dismissal.
+- Eight focused Chromium/WebKit browser checks pass across desktop, tablet and mobile widths, including native role navigation, keyboard, back/forward and reload. Exact Preview and existing-session evidence will be recorded in the PR after validation.
+- No route destination, auth/session, permission, backend, customer-record or Production changes. No product-boundary or marketing-claim changes.
+
 ## 2026-10-02 — Recurring contractor browser smoke selectors repaired
 
 - Branch: `codex/recurring-role-smoke-repair`, based on current main `749d1828a6a570f70d9ca0861b8b6a28153fd0fe`.
