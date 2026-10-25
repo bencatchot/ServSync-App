@@ -24008,7 +24008,7 @@ function ContractorDashboard({
                       {formatMoney(row.calculated_amount_cents)} · {row.due_trigger?.trim() || 'Due date to be confirmed'}
                     </p>
                     <p className="mt-1 text-xs font-medium text-slate-600">{billingPresentation.detail}</p>
-                    {rowInvoice && <p className="mt-1 text-xs text-slate-500">{rowInvoice.invoice_number ? `Invoice ${rowInvoice.invoice_number}` : 'Invoice draft'} · {formatMoney(rowInvoice.total_cents)}</p>}
+                    {rowInvoice && <p className="mt-1 text-xs text-slate-500">{rowInvoice.invoice_number ? `Invoice ${rowInvoice.invoice_number}` : rowInvoice.status === 'draft' ? 'Invoice draft' : 'Invoice'} · {formatMoney(rowInvoice.total_cents)}</p>}
                     {rowInvoice?.status === 'void' && (
                       <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
                         The voided Invoice remains in history. A replacement draft uses this schedule amount and does not rewrite the old Invoice.
