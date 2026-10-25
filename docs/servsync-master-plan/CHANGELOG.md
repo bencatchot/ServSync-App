@@ -1,5 +1,11 @@
 # ServSync Master Plan Changelog
 
+## 2026-10-25 — Job-linked request navigation repair in workflow QA
+
+- PR #591 hosted Demo QA reached request, estimate delivery/acceptance and job creation using one isolated fictional scenario. Calendar's Open request action then landed in a queue that excluded the job-linked request.
+- Explicit navigation now retains that request in the detailed queue and clears stale search text; the overview still excludes requests already carried into jobs. Existing ordering moved into the request feature module and the App architecture baseline decreased. No backend, role, notification, authentication or billing rules change.
+- Fourteen focused domain/source checks, typecheck, build and architecture validation pass. Hosted appointment/invoice continuation and final tutorial freshness review remain in progress. No Production merge or deployment.
+
 ## 2026-10-25 — Safari homepage sign-in navigation repair isolated
 
 - Branch: `codex/safari-homepage-signin`, from current main `5ea8fec`; issue #592. Extracts the landing-menu fix already present in unmerged onboarding PR #586 so it can be reviewed independently.
