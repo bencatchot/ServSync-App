@@ -207,6 +207,7 @@ export default function LandingPage() {
   const [audience, setAudience] = useState<Audience>("contractor");
   const [step, setStep] = useState(0);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const signInMenu = useRef<HTMLDetailsElement>(null);
   const currentStep = journey[step];
   const StepIcon = currentStep.icon;
 
@@ -218,6 +219,16 @@ export default function LandingPage() {
       requestAnimationFrame(() =>
         document.getElementById(section)?.scrollIntoView(),
       );
+  }, []);
+
+  useEffect(() => {
+    const closeSignInOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !signInMenu.current?.contains(event.target) && signInMenu.current) {
+        signInMenu.current.open = false;
+      }
+    };
+    document.addEventListener("pointerdown", closeSignInOutside);
+    return () => document.removeEventListener("pointerdown", closeSignInOutside);
   }, []);
 
   const closeMenu = (event: KeyboardEvent) => {
@@ -291,9 +302,12 @@ export default function LandingPage() {
           </nav>
           <div className="ss-header-actions">
             <details
+              ref={signInMenu}
               className="ss-signin-menu"
               onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget))
+                // Safari can blur summary with no focus target before an anchor's
+                // click. Keep links visible until their native navigation finishes.
+                if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget))
                   event.currentTarget.open = false;
               }}
               onKeyDown={(event) => {

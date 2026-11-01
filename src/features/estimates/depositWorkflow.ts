@@ -52,6 +52,13 @@ export function scheduleBillingPresentation(
   invoice: Invoice | null | undefined,
 ): ScheduleBillingPresentation {
   if (!invoice) {
+    if (row.linked_invoice_id) {
+      return {
+        label: 'Invoice linked',
+        tone: 'neutral',
+        detail: 'Invoice details are unavailable. Refresh to load the linked Invoice before taking another billing action.',
+      };
+    }
     return {
       label: row.invoice_type === 'deposit' ? 'Not requested' : 'Not invoiced',
       tone: 'muted',
@@ -83,5 +90,6 @@ export function canRequestScheduleInvoice(
   depositRowCount: number,
 ) {
   if (row.invoice_type === 'deposit' && depositRowCount !== 1) return false;
+  if (row.linked_invoice_id && !invoice) return false;
   return !invoice || (invoice.status === 'void' && invoice.amount_paid_cents === 0);
 }

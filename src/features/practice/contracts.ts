@@ -278,13 +278,15 @@ export function sanitizeSnapshot(input: unknown): PracticeSnapshot {
       )
         throw new Error("Invalid template price.");
       return {
-        line_type: lineType(l.line_type),
+        line_type: lineType(l.line_type === "equipment" ? "material" : l.line_type),
+        line_title: text(l.line_title ?? l.description, 500),
         description: text(l.description, 500),
         customer_description: text(l.customer_description ?? "", 2000),
         quantity: Number(numberInput(String(l.quantity), { positive: true })),
         unit: text(l.unit, 40),
         unit_price_cents: cents as number | null,
-        sort_order: i,
+        labor_hours: l.labor_hours == null ? null : Number(numberInput(String(l.labor_hours), { blank: true })),
+        sort_order: l.sort_order == null ? i : Number(numberInput(String(l.sort_order))),
       };
     });
     return {

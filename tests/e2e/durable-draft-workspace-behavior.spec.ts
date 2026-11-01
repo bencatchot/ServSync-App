@@ -222,6 +222,18 @@ async function installWorkspaceHarness(page: Page) {
         report_file_name: null, created_at: '2026-07-19T11:00:00.000Z', updated_at: '2026-07-19T11:00:00.000Z',
       },
     });
+    // React effects register deferred calls after render. Wait for the requested
+    // call instead of racing WebKit's effect scheduling; never resolve a different call.
+    async function pendingCall(kind: PendingCall['kind'], name: string, clientName?: string, last = false) {
+      const deadline = performance.now() + 3000;
+      do {
+        const matching = calls.filter(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
+        const call = last ? matching[matching.length - 1] : matching[0];
+        if (call) return call;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      } while (performance.now() < deadline);
+      throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
+    }
     const harness = {
       render,
       showList() { state.mode = 'list'; state.target = null; state.activeOutput = null; render(); },
@@ -239,28 +251,23 @@ async function installWorkspaceHarness(page: Page) {
         ];
         render();
       },
-      complete(kind: PendingCall['kind'], name: string, data: unknown, clientName?: string) {
-        const call = calls.find(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
-        if (!call) throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
+      async complete(kind: PendingCall['kind'], name: string, data: unknown, clientName?: string) {
+        const call = await pendingCall(kind, name, clientName);
         call.settled = true;
         call.resolve(kind === 'output' ? data : { data, error: null, status: 200 });
       },
-      completeLast(kind: PendingCall['kind'], name: string, data: unknown, clientName?: string) {
-        const matching = calls.filter(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
-        const call = matching[matching.length - 1];
-        if (!call) throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
+      async completeLast(kind: PendingCall['kind'], name: string, data: unknown, clientName?: string) {
+        const call = await pendingCall(kind, name, clientName, true);
         call.settled = true;
         call.resolve(kind === 'output' ? data : { data, error: null, status: 200 });
       },
-      fail(kind: PendingCall['kind'], name: string, clientName?: string) {
-        const call = calls.find(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
-        if (!call) throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
+      async fail(kind: PendingCall['kind'], name: string, clientName?: string) {
+        const call = await pendingCall(kind, name, clientName);
         call.settled = true;
         call.resolve({ data: null, error: { message: 'network failure' }, status: 503 });
       },
-      reject(kind: PendingCall['kind'], name: string, clientName?: string) {
-        const call = calls.find(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
-        if (!call) throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
+      async reject(kind: PendingCall['kind'], name: string, clientName?: string) {
+        const call = await pendingCall(kind, name, clientName);
         call.settled = true;
         call.reject(new Error('navigation failed'));
       },

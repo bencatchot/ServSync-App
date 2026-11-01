@@ -1,0 +1,72 @@
+{
+  "schema": "servsync-local-help-review-v1",
+  "local_review_only": true,
+  "ingestible_help_package": false,
+  "source_commit": "d4781a261e5cf7e777c59470b3ae30d1b99917e0",
+  "application_commit": "d4781a261e5cf7e777c59470b3ae30d1b99917e0",
+  "recorded_origin": "http://127.0.0.1:5180",
+  "recorder_sha256": "c0e3bf791a3391617191aabaf196b82122e2ae43168bec382adbabe028545e1e",
+  "tutorial": "TUT-002 addendum candidate",
+  "environment": "Demo",
+  "business_mutation_attempts": 0,
+  "fixture_policy": "Browser-local synthetic practice; real Draft remains unsaved; no seed/reset/delete.",
+  "pacing_profile": "servsync-human-paced-v1",
+  "narration": "Silent review; script prepared; no provider request.",
+  "duration_seconds": 69.48,
+  "width": 1440,
+  "height": 900,
+  "mp4_sha256": "9d8b4bdbc822c42c339dc713cfec6d4da479548bb1b764a409d908bfa7a2d9f8",
+  "captions_sha256": "5def14316fc6b3423bd86b2b8d94e252c0ad6ed4ab388a9635e0374851157649",
+  "pdf_sha256": "de2f5aeb0cc5b5874e15a51c6d1ac083f81e50813fc199e83dd0a8ecc8721fea",
+  "scenes": [
+    {
+      "key": "entry",
+      "start": 0,
+      "text": "Start with a sample or your own estimate. Review the business details customers will see. Optional branding can wait."
+    },
+    {
+      "key": "sample",
+      "start": 6.501999999999999,
+      "text": "Try an isolated sample. These fictional details and example rates cannot contact customers or save business records."
+    },
+    {
+      "key": "scope",
+      "start": 14.751,
+      "text": "Describe the work, then review each quantity and price. The sample uses the same Draft editor as real work."
+    },
+    {
+      "key": "preview",
+      "start": 27.466,
+      "text": "Preview the customer estimate. Check the scope and total. Review final tax and terms before separately sending a real Estimate."
+    },
+    {
+      "key": "resume",
+      "start": 38.802,
+      "text": "Practice edits survive refresh in this tab. Guide choices stay in this browser. Save Draft is required for real work."
+    },
+    {
+      "key": "optional",
+      "start": 47.367999999999995,
+      "text": "Service prices, contacts and teammates can wait. Skip optional setup and reopen the guide whenever you need it."
+    },
+    {
+      "key": "real",
+      "start": 57.419,
+      "text": "Start a real estimate opens a fresh Draft. Preview before choosing a customer. Add or select a customer before Save Draft. Sending remains separate."
+    },
+    {
+      "key": "end",
+      "start": 68.834,
+      "text": ""
+    }
+  ],
+  "publication": "Not uploaded or published; no Help recording job created.",
+  "verification": {
+    "full_playback": "passed at 69.48 seconds; no media error",
+    "caption_cues": 15,
+    "caption_display": "showing; active real-Draft cue visually verified",
+    "actual_pdf": "generated PDF content check rejects Invalid Date; preview contains $270 total",
+    "hosted_verification": "Application d4781a2 separately verified in actual desktop Safari on protected 4cel844ru Preview: normal login, corrected guide/editor, retained $250.50 Draft Estimate and PDF",
+    "player_html_sha256": "377c679834a8179cd4a1b8d604c265ce31f0ede2bca67532fe47008073174c02"
+  }
+}

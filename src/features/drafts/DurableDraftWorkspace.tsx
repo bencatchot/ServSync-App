@@ -1,3 +1,4 @@
+import { beginPracticeHandoffSave, completePracticeHandoffSave, PracticeHandoffError } from '../practice/businessPractice';
 import { type ReactNode, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
 import type { ContractorPriceBookItem, Estimate, EstimateTemplate, Inspection, Invoice } from '../../types';
@@ -81,6 +82,9 @@ import {
 } from './draftCustomerOptions';
 
 type DurableDraftWorkspaceProps = {
+  previewBusinessName?: string;
+  previewBusinessLogoUrl?: string;
+  onEstimatePreview?: () => void;
   client: DurableDraftSupabaseClient;
   mode: 'list' | 'editor';
   capabilities: DurableDraftCompatibilityCapabilities;
@@ -272,6 +276,7 @@ function durableDraftRowsAfterLaunchRefresh(
 }
 
 export function DurableDraftWorkspace({
+  previewBusinessName, previewBusinessLogoUrl, onEstimatePreview,
   client,
   mode,
   capabilities,
@@ -785,10 +790,12 @@ export function DurableDraftWorkspace({
         contractorId: capabilities.contractorId,
         removedDurableItemIds: removedItemIds,
       });
+      if (capturedTarget?.kind === 'new' && capturedTarget.practiceHandoff && !canonical?.draft.draftId) beginPracticeHandoffSave(capturedTarget.practiceHandoff);
       const response = await saveContractorWorkDraft(client, prepared.payload);
       const reconciled = reconcileCanonicalSaveResponse(prepared.submitted, response, removedItemIds);
-      if (!isCurrent()) return;
       const canonicalDraftId = reconciled.draft.draftId;
+      if (canonicalDraftId && capturedTarget?.kind === 'new' && capturedTarget.practiceHandoff) completePracticeHandoffSave(capturedTarget.practiceHandoff, canonicalDraftId);
+      if (!isCurrent()) return;
       if (!canonicalDraftId) throw new Error('DRAFT_RESPONSE_INVALID');
       setCanonical(reconciled);
       setForm(durableCanonicalStateToComposer(reconciled));
@@ -808,7 +815,7 @@ export function DurableDraftWorkspace({
     } catch (error) {
       if (!isCurrent()) return;
       setSaveState('failed');
-      setFeedback({ tone: 'error', title: durableDraftSafeMessage(error, 'save'), testId: 'durable-draft-save-error' });
+      setFeedback({ tone: 'error', title: error instanceof PracticeHandoffError ? error.message : durableDraftSafeMessage(error, 'save'), testId: 'durable-draft-save-error' });
       queueMicrotask(() => errorSummaryRef.current?.focus());
     } finally {
       if (saveOperation.current === operation) {
@@ -1083,6 +1090,10 @@ export function DurableDraftWorkspace({
   };
 
   const handleOpenLaunchConfirmation = () => {
+    if (target?.kind === 'new' && target.practiceHandoff && !canonical?.draft.draftId) {
+      setFeedback({ tone: 'error', title: 'Save this transferred Draft before creating an Estimate. Nothing has been sent.', testId: 'durable-draft-launch-error' });
+      return;
+    }
     if (!launchEnabled || capabilityLoading || saveLock.current || saveState === 'saving' || !form || !capabilities.contractorId || !capabilities.canPersistDraft) return;
     const outputType = form.intended_output;
     if (!outputType) return;
@@ -1745,8 +1756,12 @@ export function DurableDraftWorkspace({
   return (
     <div className="space-y-3">
       <div ref={errorSummaryRef} tabIndex={-1} className="outline-none" />
+      {target?.kind === 'new' && target.practiceHandoff && !canonical?.draft.draftId && <p className="rounded-xl bg-amber-50 p-3 text-sm">New unsaved Draft copied from Practice. Choose a real customer and Save Draft. Until then, leaving or reloading this editor discards changes made here; Practice can reopen the original transferred copy. After a save starts, check Work for the result before retrying. Nothing is sent by saving.</p>}
       <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : launchState.phase === 'preparing' ? 'Preparing launch protection' : launchState.phase === 'launching' ? `Creating ${outputFamilyLabel(outputType)}` : launchState.phase === 'reconciling_consumed' || launchState.phase === 'reconciling_lifecycle' ? 'Refreshing canonical Draft status' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
       <ContractorDraftComposer
+        previewBusinessName={capabilities.canLaunchEstimate ? previewBusinessName : undefined}
+        previewBusinessLogoUrl={previewBusinessLogoUrl}
+        onEstimatePreview={onEstimatePreview}
         draft={form}
         customerOptions={customerOptionsWithSavedSelection}
         checklistOptions={checklistOptions}
