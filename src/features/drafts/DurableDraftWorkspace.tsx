@@ -81,6 +81,9 @@ import {
 } from './draftCustomerOptions';
 
 type DurableDraftWorkspaceProps = {
+  previewBusinessName?: string;
+  previewBusinessLogoUrl?: string;
+  onEstimatePreview?: () => void;
   client: DurableDraftSupabaseClient;
   mode: 'list' | 'editor';
   capabilities: DurableDraftCompatibilityCapabilities;
@@ -272,6 +275,7 @@ function durableDraftRowsAfterLaunchRefresh(
 }
 
 export function DurableDraftWorkspace({
+  previewBusinessName, previewBusinessLogoUrl, onEstimatePreview,
   client,
   mode,
   capabilities,
@@ -1747,6 +1751,9 @@ export function DurableDraftWorkspace({
       <div ref={errorSummaryRef} tabIndex={-1} className="outline-none" />
       <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : launchState.phase === 'preparing' ? 'Preparing launch protection' : launchState.phase === 'launching' ? `Creating ${outputFamilyLabel(outputType)}` : launchState.phase === 'reconciling_consumed' || launchState.phase === 'reconciling_lifecycle' ? 'Refreshing canonical Draft status' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
       <ContractorDraftComposer
+        previewBusinessName={capabilities.canLaunchEstimate ? previewBusinessName : undefined}
+        previewBusinessLogoUrl={previewBusinessLogoUrl}
+        onEstimatePreview={onEstimatePreview}
         draft={form}
         customerOptions={customerOptionsWithSavedSelection}
         checklistOptions={checklistOptions}

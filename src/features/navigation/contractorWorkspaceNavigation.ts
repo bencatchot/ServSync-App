@@ -1,5 +1,6 @@
 export type ContractorWorkspaceTab =
   | 'overview'
+  | 'practice'
   | 'profile'
   | 'connections'
   | 'requests'
@@ -62,6 +63,7 @@ export type ContractorNavigationState = {
 
 const CONTRACTOR_TABS: readonly ContractorWorkspaceTab[] = [
   'overview',
+  'practice',
   'profile',
   'connections',
   'requests',
@@ -76,6 +78,10 @@ const CONTRACTOR_TABS: readonly ContractorWorkspaceTab[] = [
   'privacy',
   'support',
 ];
+
+export function isContractorWorkspaceTab(value: unknown): value is ContractorWorkspaceTab {
+  return typeof value === 'string' && CONTRACTOR_TABS.includes(value as ContractorWorkspaceTab);
+}
 
 const WORK_VIEWS: readonly ContractorWorkView[] = [
   'overview',
