@@ -1,5 +1,6 @@
 import { rememberFirstEstimatePreview } from './features/onboarding/progress';
-import { ContractorFirstEstimateGuide } from './features/onboarding/ContractorFirstEstimateGuide';
+import { useContractorPracticeAccess } from './features/navigation/useContractorPracticeAccess';
+import { ContractorPracticeWorkspace } from './features/onboarding/ContractorPracticeWorkspace';
 import { contractorRequestQueueRecords, sortContractorRequestRecords } from './features/requests/contractorQueue';
 import { PublicPostConsent } from './features/discover/PublicPostConsent';
 import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
@@ -21059,6 +21060,7 @@ function ContractorDashboard({
     canLaunchInvoice: false,
   });
   const [durableDraftCapabilityLoading, setDurableDraftCapabilityLoading] = useState(false);
+  const [practiceCapabilityResolvedFor, setPracticeCapabilityResolvedFor] = useState<string | null>(null);
   const [durableDraftCapabilityError, setDurableDraftCapabilityError] = useState('');
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
@@ -21137,6 +21139,7 @@ function ContractorDashboard({
       return;
     }
     setDurableDraftCapabilityLoading(true);
+    setPracticeCapabilityResolvedFor(null);
     setDurableDraftCapabilityError('');
     void loadDurableDraftCapabilities(supabase)
       .then(capabilities => {
@@ -21157,7 +21160,7 @@ function ContractorDashboard({
         }
       })
       .finally(() => {
-        if (!cancelled) setDurableDraftCapabilityLoading(false);
+        if (!cancelled) { setDurableDraftCapabilityLoading(false); setPracticeCapabilityResolvedFor(contractor.id); }
       });
     return () => { cancelled = true; };
   }, [profile.id, profile.role, contractor?.id]);
@@ -28345,6 +28348,7 @@ function ContractorDashboard({
   ];
   const contractorFeedbackPageLabel = {
     overview: 'Dashboard',
+    practice: 'Practice',
     profile: 'Business Profile',
     connections: 'Customers',
     requests: 'Service Requests',
@@ -31597,6 +31601,9 @@ function ContractorDashboard({
       setRevokingLocalClaimInviteId(null);
     }
   };
+  const canUsePractice = !SERVSYNC_DEMO_PRESENTATION_MODE && (durableDraftCapabilities.canLaunchEstimate || (!contractor?.id && !teamAccess));
+  useContractorPracticeAccess(contractorTab, setContractorTab, canUsePractice, loading || durableDraftCapabilityLoading || Boolean(contractor?.id && practiceCapabilityResolvedFor !== contractor.id));
+
   const contractorMobileNavItems: MobileNavItem[] = [
     {
       id: 'discover',
@@ -31644,6 +31651,7 @@ function ContractorDashboard({
       brand={{ name: contractorDraft.business_name || 'ServSync', subtitle: 'Contractor Portal' }}
       tabs={[
         { id: 'overview',     label: 'Dashboard',          icon: <LayoutDashboard size={17} />, group: 'Workspace' },
+        ...(!SERVSYNC_DEMO_PRESENTATION_MODE && (durableDraftCapabilities.canLaunchEstimate || (!contractor?.id && !teamAccess)) ? [{ id: 'practice', label: 'Practice', icon: <FileText size={17} />, group: 'Workspace' }] : []),
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
         { id: 'work',         label: 'Work',               icon: <ClipboardCheck size={17} />, group: 'Customer Work' },
         ...(canManageFinancialActions ? [{ id: 'financials', label: 'Financials', icon: <Receipt size={17} />, group: 'Customer Work' }] : []),
@@ -31832,8 +31840,8 @@ function ContractorDashboard({
         </section>
       )}
 
-      {contractorTab === 'overview' && !loading && !SERVSYNC_DEMO_PRESENTATION_MODE && (durableDraftCapabilities.canLaunchEstimate || (!contractor?.id && !teamAccess)) && (
-        <ContractorFirstEstimateGuide key={`${profile.id}:${contractor?.id}`} identity={`${profile.id}:${contractor?.id}`}
+      {!loading && !SERVSYNC_DEMO_PRESENTATION_MODE && (durableDraftCapabilities.canLaunchEstimate || (!contractor?.id && !teamAccess)) && (
+        <ContractorPracticeWorkspace activeTab={contractorTab} onOpenPractice={() => setContractorTab('practice')} key={`${profile.id}:${contractor?.id}`} identity={`${profile.id}:${contractor?.id}`}
           businessName={contractor?.business_name || ''} hasEstimates={estimates.length > 0}
           canStartReal={sharedDraftComposerEnabled && !durableDraftCohortSafeHold && !createEstimateCapability.disabled}
           onStartReal={startCleanDraftFirstEstimateComposer}

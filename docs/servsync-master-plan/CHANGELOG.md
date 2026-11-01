@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-01 — Put the reviewed sample estimate builder in Practice
+
+- Branch: `codex/guided-contractor-first-estimate`, continuing draft PR #586 from reconciled `8b5de3b`. Owner requested a dedicated Practice tab and a Dashboard “Try practice estimate builder” button.
+- Move the existing browser-local guide/sample composer, preserving sample/real choices, optional setup, PDF preview, clean real-Draft entry and existing eligibility. Keep inputs mounted across workspace/history navigation; direct links wait for capability resolution and denied destinations replace their history entry with Dashboard. Same-tab refresh still depends on available session storage. This imports none of PR #588's unfinished business snapshots/transfer/access work.
+- Files: `src/App.tsx`, `src/main.tsx`, navigation tab/hook and new Practice-access helper, new onboarding Practice wrapper, App budget (50,090 lines), new synthetic fixture/navigation test, guided-onboarding evidence, master plan, backlog, marketing inventory and this changelog. Existing released PR #591/#593 behavior is retained; entry-router adjustment is limited to the same contractor workspace.
+- Validation: all 12 new Chromium/WebKit Practice navigation cases pass, typecheck/build/lint (0 errors, 76 existing warnings) and 27 architecture checks pass. Independent source review found no remaining blockers after repairing remount, capability-loading and denied-history issues. All 57 focused regression cases pass, including one targeted rerun after existing Draft mock initialization raced; all six delivery-entry Chromium/WebKit checks pass with analytics mocked. Exact CI/Preview evidence is on PR #586. Three stale mobile-shell source assertions also fail on baseline/main; details are in the feature report. Existing build-size/Browserslist warnings remain. Local tests use synthetic fixtures and blocked external networking; no hosted persistence claim.
+- Backlog Impact: update FB-040's placement and next owner-review step; master plan and marketing inventory reflect the review-only Practice entry. PR #588 and legal #583 remain separate.
+- Tutorial impact: UPDATE REQUIRED, TUT-002. Future guidance must show Dashboard → Practice and mobile More → Practice. No tutorial/media work performed; no Production merge/release, credentials/access/security/settings change, migration, real signup, customer-data write or fixture reset.
+
 ## 2026-11-01 — Onboarding PR586 reconciled with released main
 
 - Branch: `codex/guided-contractor-first-estimate`; merge current main `4f0c8d2e` into reviewed onboarding head `32a1e348`, retaining both histories. No merge into main or Production release.

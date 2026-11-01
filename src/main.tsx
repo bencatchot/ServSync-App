@@ -11,6 +11,7 @@ type EntryRequest =
 
 let root: Root;
 let mountedKind: EntryRequest['kind'] | null = null;
+let mountedAppHash = '';
 let renderRevision = 0;
 let suppressPairedHashChange = false;
 let suppressionTimer: number | null = null;
@@ -186,7 +187,21 @@ async function renderReport(entry: Extract<EntryRequest, { kind: 'report' }>, re
   root.render(<StrictMode><RequestFreeFinalizedReportView lookup={lookup} /></StrictMode>);
 }
 
+function contractorWorkspaceHash(hash: string) {
+  const [path, query = ''] = hash.split('?');
+  if (path !== '#/contractor') return null;
+  const params = new URLSearchParams(query);
+  params.delete('practice');
+  params.sort();
+  return `${path}?${params}`;
+}
+
 async function renderEntry(entry: EntryRequest, force = false) {
+  // Practice history stays inside the mounted contractor workspace. Other entry routes,
+  // auth intents and token-delivery transitions retain their existing remount behavior.
+  if (entry.kind === 'app' && mountedKind === 'app'
+    && contractorWorkspaceHash(mountedAppHash) !== null
+    && contractorWorkspaceHash(mountedAppHash) === contractorWorkspaceHash(window.location.hash)) return;
   if (!force && entry.kind === mountedKind && (entry.kind === 'app' || entry.bootstrapToken === null)) return;
 
   const revision = ++renderRevision;
@@ -221,6 +236,7 @@ async function renderEntry(entry: EntryRequest, force = false) {
     </StrictMode>,
   );
   mountedKind = 'app';
+  mountedAppHash = window.location.hash;
 }
 
 const onHashChange = () => {
