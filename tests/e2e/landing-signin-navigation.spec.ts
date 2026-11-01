@@ -28,6 +28,13 @@ for (const browserName of ['chromium', 'webkit'] as const) {
           await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
           await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
           await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
+          await page.goBack();
+          await expect(page.locator('.ss-signin-menu')).toBeAttached();
+          await page.goForward();
+          await expect(page).toHaveURL(new RegExp(`#/${role.toLowerCase()}$`));
+          await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+          await page.reload();
+          await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
         }
         expect(errors).toEqual([]);
         await context.close();

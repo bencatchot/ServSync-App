@@ -78,3 +78,9 @@ Tutorial impact remains **UPDATE REQUIRED** for TUT-002. Its replacement/addendu
 ## Safari review-entry correction — October 16
 
 Both Sign in role choices failed in desktop WebKit on the reviewed `mddems300` Demo build: the blur handler hid native links before their click completed. No console/API error occurred. The narrow landing-menu repair keeps null-focus transitions open and closes on outside pointer actions or real focus exit. Chromium and WebKit tests exercise the actual links for both roles at 1440/820/390px plus keyboard/dismissal; all 28 public landing cases pass locally. Existing Demo uses normal email/password authentication; role selection is not automatic Demo login. No auth configuration or role boundary changed. Updated hosted evidence is maintained in PR #586.
+
+## November 1 — reconciliation with released fixes
+
+The existing PR #586 branch incorporates main `4f0c8d2e`, preserving the released PR #593 Safari landing navigation and PR #591 request-queue/linked-Invoice corrections. Landing source and the expanded history/reload test now match main exactly; they are no longer onboarding-only changes. The shared App imports retain both feature paths, and its line budget is 50,082. A separate source-delta comparison confirms that all other onboarding application additions/removals are unchanged from `32a1e348`.
+
+Validation uses a fresh isolated checkout, synthetic local component adapters, blank backend configuration for guide/Draft checks, and a fictional localhost backend for public navigation. No real sign-in, Demo records, signup/email, permissions, SQL, Help media or Practice access are exercised. The existing hosted evidence above remains historical and is not replaced by local tests. Current exact-head CI/Preview results are recorded on PR #586. TUT-002 remains UPDATE REQUIRED as separate work; the October 25 PR comment records completed request/source binding, while narration/publication/verification remain pending.

@@ -1,5 +1,34 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-01 — Onboarding PR586 reconciled with released main
+
+- Branch: `codex/guided-contractor-first-estimate`; merge current main `4f0c8d2e` into reviewed onboarding head `32a1e348`, retaining both histories. No merge into main or Production release.
+- Resolved App import, line-budget, changelog and duplicate landing-test conflicts. Preserve PR #591 request navigation/linked-Invoice behavior and PR #593 Safari navigation; landing source and its history/reload tests now match main. App budget is 50,082 lines. A separate source-delta comparison confirms that the remaining onboarding application changes are identical to the prior reviewed head.
+- Files: `src/App.tsx`, `scripts/validation/check-app-monolith-budget.mjs`, `tests/e2e/landing-signin-navigation.spec.ts`, this changelog, feature backlog, master plan, marketing inventory and guided-onboarding feature report. Main's released modules/tests and QA record are retained without modification.
+- Validation: typecheck/build, lint (0 errors, existing 76 warnings), App budget and 49 architecture/parity-tooling checks pass. Fifty-five local guide/PDF/Draft/domain/signup-source cases pass; all eight Chromium/WebKit navigation cases pass after correcting the synthetic test setup (14-case rerun also repeats six signup-source checks). Initial navigation failures displayed the expected missing-backend configuration screen, not a product regression. Browser requests are restricted to localhost; component persistence uses synthetic adapters. Desktop/mobile screenshots were reviewed. No hosted persistence, real signup, email delivery or physical-device acceptance is claimed. Existing build-size/Browserslist and dependency deprecation warnings remain.
+- Backlog Impact: update the next step to updated Preview review and distinguish completed historical post-confirmation acceptance from unverified public signup/device/role coverage. Master plan/marketing status wording is aligned without a new capability or released-product claim. Exact remote head, CI and Preview verification are recorded on PR #586 after publication.
+- Tutorial impact: UPDATE REQUIRED, carried forward for TUT-002. October 25 evidence already records the approved request/source binding; narration, publication and replacement verification remain separate. This reconciliation changes no guide/editor/PDF guidance and performs no Help search, recording, narration, spending or upload.
+- Limits: Practice #588 and legal #583 untouched; no shared SQL, credentials/access/security/settings change, account or customer-data write, fixture reset, Practice renewal, payment or Production action. Merge/release still needs separate approval.
+
+## 2026-10-25 — Job-linked request navigation repair in workflow QA
+
+- PR #591 hosted Demo QA reached request, estimate delivery/acceptance and job creation using one isolated fictional scenario. Calendar's Open request action then landed in a queue that excluded the job-linked request.
+- Explicit navigation now retains that request in the detailed queue and clears stale search text; the overview still excludes requests already carried into jobs. Existing ordering moved into the request feature module and the App architecture baseline decreased. No backend, role, notification, authentication or billing rules change.
+- Fourteen focused domain/source checks, typecheck, build and architecture validation pass. Hosted fictional request → accepted estimate → job → confirmed appointment → viewed deposit invoice passed, including rapid duplicate-click protection, fresh-session recovery and missing-invoice read fault injection on desktop/mobile. A sent/viewed invoice without a number now uses Invoice rather than the misleading Invoice draft caption. Preexisting records and prior Practice/onboarding fixtures remain preserved. Full scope and limits are recorded in the bounded QA report; tutorial evidence and exact-head checks are on PR591. No Production merge or deployment.
+
+## 2026-10-25 — Safari homepage sign-in navigation repair isolated
+
+- Branch: `codex/safari-homepage-signin`, from current main `5ea8fec`; issue #592. Extracts the landing-menu fix already present in unmerged onboarding PR #586 so it can be reviewed independently.
+- Both Homeowner and Contractor links reproduce as broken on Production and current main in desktop WebKit: null-target blur hides the link before native navigation. Preserve the menu through that blur; retain outside-pointer, keyboard focus-out and Escape dismissal.
+- Eight focused Chromium/WebKit browser checks pass across desktop, tablet and mobile widths, including role navigation, keyboard, back/forward and reload. Protected Demo Preview validation also passed both roles at all three widths; actual desktop Safari native clicks and history reached both sign-in forms. Existing fictional Demo Homeowner/Contractor sessions retained their own role, return query, history and reload behavior. A WebKit profile-fetch warning reproduced unchanged on main and is documented as an existing limitation. PR #593 records exact commit/Preview evidence; physical phones remain untested. Typecheck and focused lint passed. Tutorial impact: NONE after published Help searches found no homepage/sign-in guidance matches.
+- No route destination, auth/session, permission, backend, customer-record or Production changes. No product-boundary or marketing-claim changes.
+
+## 2026-10-23 — Linked Invoice recovery clarified in workflow review
+
+- When a payment-schedule row links to an Invoice that is absent from the loaded list, show Invoice linked and refresh guidance instead of Not requested; withhold another create action until details load. Existing server, role and billing rules are unchanged.
+- Added missing-record/reload/void-replacement regressions and corrected an obsolete schedule-save source assertion to the existing idempotent RPC contract. See [bounded review and exact acceptance limits](../qa/REQUEST_TO_INVOICE_REVIEW_2026-10-23.md).
+- Onboarding fresh-signup/TUT-002 and business-aware Practice access/integration gates remain open; no renewal, SQL, sends, payments, cleanup or Production release.
+
 ## 2026-10-24 — TUT-002 approved draft preparation
 
 - Prepared the owner-approved script and read-only review source without running the default reset/create recorder. Added a local source-validation and actual-request-binding adapter that reuses the existing Help packager and preserves all existing validation gates.
