@@ -1,6 +1,8 @@
 # ServSync Marketing Product Inventory
 
-## Business-aware Practice — November 1, unmerged Preview
+## Business-aware Practice — November 2 release scope
+
+The owner approved PR #588's Production merge after Preview review. Check the [PR release evidence](https://github.com/bencatchot/ServSync-App/pull/588) for the final deployed commit before presenting this scope as live. After verified release, supported wording is: “You can also practice with a copy of the prices and templates you've already set up.” Workflow: Practice → My pricing and templates → review and accept the setup copy → create a practice estimate → use a template or browse the copied Price Book. Explicit refresh supplies new estimates; existing practice estimates keep their frozen version. Bounded authenticated Demo Preview verification used clearly labeled fictional HVAC samples. It did not save/send a real customer Draft. The following paragraph records the original Preview boundary; durable/cross-device import remains deferred.
 
 The released app has the dedicated Practice tab/example builder. PR #588's new Preview adds owner-selected copies of business selling prices/templates, explicit refresh with frozen versions, same-tab practice resume, watermarked PDFs and a confirmed handoff into a new unsaved Work Draft. It does not send, charge, copy real customers or automatically save real work. No cross-device, full-account mirror, persistent importer, guaranteed recovery or automated cleanup claim is supported. Unsaved Work edits can be lost on close/reload; the original transferred copy is recoverable before the first Save only. Hosted business-data acceptance and Production release are not claimed. [Scope and evidence](features/PRACTICE_BUSINESS_SNAPSHOT_REVIEW.md). TUT-002 guidance remains separate and unfinished.
 

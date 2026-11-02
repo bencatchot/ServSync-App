@@ -1,6 +1,6 @@
-# Business-aware Practice — November 1 Preview slice
+# Business-aware Practice — browser-tab release slice
 
-Branch: `codex/temporary-practice-workspace`, PR #588. Reconciled with main `93cf7862b4690ff097663744689798fcbd197f3d` after PR #586 released the dedicated Practice tab. This is an unmerged Preview continuation, not a Production release.
+Branch: `codex/temporary-practice-workspace`, [PR #588](https://github.com/bencatchot/ServSync-App/pull/588). Reconciled with main `93cf7862b4690ff097663744689798fcbd197f3d` after PR #586 released the dedicated Practice tab. The owner approved Production merge on November 2 following Preview review. Exact final commit, checks and Production deployment evidence are recorded on the PR; approval alone is not deployment verification.
 
 ## What this slice delivers
 
@@ -39,10 +39,14 @@ PR #591 request navigation/linked-Invoice fixes and PR #593 Safari/landing behav
 
 ## Publication verification record
 
+November 2 release audit: fresh full/Practice types, lint (76 existing warnings), build, architecture/App budget, 116 main-flow Chromium/WebKit cases and 28 isolated Demo cases passed. The 50 domain/disposable PostgreSQL tests pass after fixing the expiry helper's calendar-day backdating across DST; fixed-hour offsets retain the exact 720-hour lifetime. Application and SQL bytes are unchanged by this repair. Independent source review found no release blocker and verified the fixture correction. Bounded authenticated Demo Preview acceptance previously read six SAMPLE/DEMO prices and two templates, accepted v1, refreshed to v2, and retained the older Practice record's v1 values; Practice records remained browser-tab-local. No real Draft was saved or sent. Authenticated Production acceptance, cross-device and physical-iPhone behavior remain unverified.
+
+Historical first publication:
+
 The first published app commit `742fad2f90192139d9d823f5865a472417c2773f` produced READY Preview `dpl_5wTWyozcorbQRXt7WLqtWm7Cs4Af` at [the exact deployment](https://servsync-demo-krstgkjjh-bencatchots-projects.vercel.app/#/contractor?practice=estimate). Anonymous HEAD returned HTTP 302 to Vercel `/sso-api`; protection was preserved and not bypassed. PR #588 is draft and mergeable against main `93cf7862`. Its first quality run stopped at the tutorial declaration before application checks because the PR body omitted the separate `Affected tutorials` and `Tutorial follow-up` fields. The body now includes both and passes the repository validator. This documentation-only follow-up triggers quality checks with the corrected declaration; final exact head/CI/Preview status is recorded on PR #588. It makes no app-code change or tutorial-completion claim.
 
 ## Remaining work and tutorial impact
 
-Next owner step: review the protected Preview on the existing account, without renewing the historical Demo pilot. Production merge requires separate approval. Remaining broader Practice work includes durable/cross-device business snapshots and real Draft import provenance/receipts/reconciliation, approved retention/cleanup, additional practice document/scenario types and hosted acceptance. Those are not implemented by this browser-tab slice.
+Owner Preview review and Production merge approval are complete. Next release step: verify the exact final head, terminal Production deployment and permitted smoke checks; record evidence on PR #588. Remaining broader Practice work includes durable/cross-device business snapshots and real Draft import provenance/receipts/reconciliation, approved retention/cleanup, additional practice document/scenario types and broader hosted acceptance. Those are not implemented by this browser-tab slice.
 
 Tutorial impact: **UPDATE REQUIRED**. TUT-002's existing guided-first-estimate replacement should explain Dashboard → Practice, example versus business setup, explicit refresh/frozen versions, fictional PDF and the separately confirmed unsaved Work handoff. No tutorial/narration/media work or Help Studio data access was performed. The user kept that work separate; this Preview does not claim the guidance gap complete. Previously recorded Help evidence is historical, not a fresh catalog/playback check.

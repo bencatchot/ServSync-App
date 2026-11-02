@@ -65,10 +65,11 @@ async function isolatedOwner() {
 }
 async function expire(id: string) {
   // Test setup only: app role cannot change cycle clocks or disable triggers.
+  // Match the fixed 720-hour lifetime across daylight-saving transitions.
   await query(
     fixture.db,
     OWNER,
-    `alter table practice.workspaces disable trigger guard_workspace; update practice.workspaces set created_at=clock_timestamp()-interval '31 days',expires_at=clock_timestamp()-interval '1 day' where id=${sql(id)}; alter table practice.workspaces enable trigger guard_workspace; select '{}'::json;`,
+    `alter table practice.workspaces disable trigger guard_workspace; update practice.workspaces set created_at=statement_timestamp()-interval '744 hours',expires_at=statement_timestamp()-interval '24 hours' where id=${sql(id)}; alter table practice.workspaces enable trigger guard_workspace; select '{}'::json;`,
     "postgres",
   );
 }

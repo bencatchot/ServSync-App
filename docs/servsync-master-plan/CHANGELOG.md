@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-02 — Practice release audit and fixed-hour expiry fixture
+
+- Branch: `codex/temporary-practice-workspace`, PR #588. Owner approved final checks and Production merge for the reviewed business-aware Practice slice. Exact final CI, merge and deployment evidence belongs on the PR; this entry alone does not prove deployment.
+- Files: `tests/practice/foundation.test.ts`, Practice feature review, marketing inventory, master plan, backlog and this changelog. Replace calendar-day test backdating with one statement timestamp and fixed 744/24-hour offsets, preserving the exact 720-hour simulated lifetime across daylight-saving changes. No application or shared SQL change.
+- Validation: fresh 50 domain/disposable PostgreSQL tests, 116 Chromium/WebKit business/onboarding/navigation/request-invoice/Draft cases, 28 isolated Demo browser cases, full/Practice types, build, lint (0 errors, 76 baseline warnings), architecture and App budget passed. Six expiry tests initially failed at the daylight-saving boundary; all pass after the fixture repair. Supported runtime escalation allowed disposable PostgreSQL shared memory after the sandbox blocked its initial rerun. Independent source review found no blocker and verified the fixture correction.
+- Hosted evidence: earlier bounded authenticated Demo Preview acceptance read six clearly labeled fictional prices and two templates, accepted/refreshed snapshots and retained frozen versions in browser-tab Practice. No real Draft save/send was exercised. This does not establish authenticated Production or cross-device acceptance.
+- Backlog Impact: owner Preview review/merge approval completed; next is exact release verification and separately scoped video/guidance work. Durable importer, retention, cross-device behavior and TUT-002 remain open. No pilot renewal, schema/access/settings change or customer mutation.
+
 ## 2026-11-01 — Business-aware Practice in the dedicated tab (Preview)
 
 - Branch: `codex/temporary-practice-workspace`, continuing draft PR #588. Merge released main `93cf7862` without rewriting existing history; preserve PR #591/#593 and the PR #586 Practice tab.

@@ -6,9 +6,9 @@ Last reconciled against `origin/main` at `97f529db9783fb12c04a9b43b65b9682932bd4
 
 ## Purpose
 
-### Practice workspace — business-aware Preview continuation
+### Practice workspace — business-aware release slice
 
-PR #586's dedicated Practice tab is released. PR #588 is being reviewed against that main with an owner-only, browser-tab business-pricing/template snapshot flow, explicit refresh, frozen draft versions, marked PDFs and confirmed new-unsaved-Draft handoff. The existing Save Draft workflow remains explicit; a monotonic same-tab journal blocks uncertain first-save replay. This is not a persistent live importer. Next: owner review of the exact protected Preview and bounded hosted acceptance; separate merge approval. Remaining product outcomes: cross-device snapshots/resume, durable import provenance/receipts/reconciliation, reviewed cleanup/retention, broader practice types and physical-device acceptance. No customer copies, team access, pilot renewal or migration is included. [Current slice and limits](../features/PRACTICE_BUSINESS_SNAPSHOT_REVIEW.md). TUT-002 remains separate and unfinished.
+PR #586's dedicated Practice tab is released. PR #588 is being reviewed against that main with an owner-only, browser-tab business-pricing/template snapshot flow, explicit refresh, frozen draft versions, marked PDFs and confirmed new-unsaved-Draft handoff. The existing Save Draft workflow remains explicit; a monotonic same-tab journal blocks uncertain first-save replay. This is not a persistent live importer. Owner Preview review and Production merge approval are complete; bounded Demo pricing/template read and browser-tab snapshot/refresh acceptance passed. Next: exact release verification on PR #588 and separately scoped video/guidance updates. Remaining product outcomes: cross-device snapshots/resume, durable import provenance/receipts/reconciliation, reviewed cleanup/retention, broader practice types and physical-device acceptance. No customer copies, team access, pilot renewal or migration is included. [Current slice and limits](../features/PRACTICE_BUSINESS_SNAPSHOT_REVIEW.md). TUT-002 remains separate and unfinished.
 
 ### Earlier synthetic Demo foundation and deferred rollout
 
