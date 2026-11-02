@@ -1,6 +1,6 @@
 # Business-aware Practice — browser-tab release slice
 
-Branch: `codex/temporary-practice-workspace`, [PR #588](https://github.com/bencatchot/ServSync-App/pull/588). Reconciled with main `93cf7862b4690ff097663744689798fcbd197f3d` after PR #586 released the dedicated Practice tab. The owner approved Production merge on November 2 following Preview review. Exact final commit, checks and Production deployment evidence are recorded on the PR; approval alone is not deployment verification.
+Branch: `codex/temporary-practice-workspace`, [PR #588](https://github.com/bencatchot/ServSync-App/pull/588). Reconciled with main `93cf7862b4690ff097663744689798fcbd197f3d` after PR #586 released the dedicated Practice tab. The owner approved Production merge on November 2 following Preview review. Exact final commit, checks and Production deployment evidence will be recorded on the PR after verification; approval alone is not deployment verification.
 
 ## What this slice delivers
 
