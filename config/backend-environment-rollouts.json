@@ -1,8 +1,44 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-09-25",
+  "updatedOn": "2026-10-16",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "practice-demo-access-deadline-response",
+      "artifact": "server/practice/demo-draft/20261016193850_practice_demo_access_deadline_response.sql",
+      "environments": {
+        "demo": {
+          "status": "Pending",
+          "reason": "Response-only source draft adds the existing pilot access deadline to state/start. Verified only in disposable local PostgreSQL. Approved application stopped at read-only preflight: the managed operator is not superuser and cannot inherit or SET ROLE to the function owner. No SQL attempted. Existing function-owner capability is required; no privilege grant or credential change is authorized. See docs/features/PRACTICE_DEMO_IMPROVEMENTS_REVIEW.md."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Demo-only Practice response; no Production installation proposed."
+        },
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Existing Demo reuse remains the approved direction; no Sandbox installation proposed."
+        }
+      }
+    },
+    {
+      "id": "practice-demo-review-draft",
+      "artifact": "server/practice/demo-draft/20261016171813_practice_demo_review_draft.sql (SHA-256 4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4)",
+      "environments": {
+        "demo": {
+          "status": "Applied",
+          "reason": "Ben approved exact SQL at 4618568d99fa731b571cabaa602bfb5f97431478 / SHA-256 4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4. Applied once as migration 20261016180520 on 2026-10-16. Pilots/cycles/Drafts all empty; Practice remains inactive/unmounted. Existing Demo catalog fingerprints, all 162 public-table row counts, managed Auth ACLs/owners/memberships and advisor findings unchanged. Private schema remains unexposed. No pilot activation, production change or deployment. See docs/features/PRACTICE_DEMO_INSTALLATION_2026-10-16.md."
+        },
+        "production": {
+          "status": "N/A",
+          "reason": "Synthetic Demo-only pilot draft; production installation is outside approved scope."
+        },
+        "sandbox": {
+          "status": "N/A",
+          "reason": "Owner requires reuse of existing Demo resources; no Sandbox installation is proposed."
+        }
+      }
+    },
     {
       "id": "homeowner-saved-contractors-v1",
       "artifact": "servsync-homeowner-saved-contractors.sql (SHA-256 aa2203badabc68ab3013fc312192fc0a7af6fb3711473028465ca33f9a9749d7)",

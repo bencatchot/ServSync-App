@@ -1,3 +1,4 @@
+import type { PracticeHandoffRef } from '../practice/businessPractice';
 import type { Inspection } from '../../types';
 import { createWorkComposerLineDraft } from '../work-composer/workComposerDrafts';
 import type { SharedDraftComposerDraft } from './draftComposerTypes';
@@ -20,7 +21,7 @@ import type {
 } from './durableDraftLaunchTypes';
 
 export type DurableDraftOpenTarget =
-  | { kind: 'new'; initialDraft: SharedDraftComposerDraft }
+  | { kind: 'new'; initialDraft: SharedDraftComposerDraft; practiceHandoff?: PracticeHandoffRef }
   | { kind: 'durable'; draftId: string }
   | { kind: 'legacy'; inspectionId: string };
 

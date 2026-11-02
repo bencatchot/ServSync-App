@@ -31,6 +31,14 @@ Current documentation hierarchy:
 
 # Version Control and How to Use This Document
 
+## Business-aware Practice — November 1 Preview continuation
+
+Practice is the central home for practice experiences, following the released PR #586 tab. PR #588 now reconciles with that main and adds an owner-only browser-tab slice: explicit pricing/template snapshot read/review, frozen versions per estimate, refresh for new estimates, reload/resume and watermarked PDFs. Deliberate destination confirmation opens a new **unsaved** real Estimate Draft, leaving Practice intact; real customer selection and Save Draft remain explicit in Work. A same-tab journal supports original-copy recovery before Save and blocks replay after a save starts. This is not durable/cross-device import. No schema/access/retention change or pilot renewal accompanies this slice. Following Preview review and bounded Demo snapshot/refresh acceptance, the owner approved Production merge on November 2; final release evidence will be recorded on PR #588 after verification. Broader persistent snapshots/import receipts/reconciliation and cleanup remain deferred. Future invoice/scenario practice belongs here architecturally but is not authorized or implemented in this slice. See [scope, evidence and limits](../features/PRACTICE_BUSINESS_SNAPSHOT_REVIEW.md). TUT-002 guidance remains a separate unfinished follow-up.
+
+## Temporary Practice workspace — October 16 local foundation
+
+The owner approved beginning an ongoing, owner-only Practice workspace with business/pricing/template snapshots, fictional customers and explicit create-only transfer review. He requested roughly monthly cleanup; a fixed 720-hour cycle with seven-day/one-day in-app warnings is the proposed initial default. The [local foundation specification](../features/TEMPORARY_PRACTICE_FOUNDATION.md) records persistence, bounded quotas, expiry-enforced reads, bounded transfer recovery independent of content cleanup, and finite minimal receipt retention. This is local/test implementation, not a released account capability. Ben requires no additional Supabase or Vercel projects. [Reuse of existing Demo resources](../features/PRACTICE_EXISTING_ENVIRONMENT_REUSE.md) is the next design target, with explicit shared-runtime/reset isolation gates. Same-account handoff, restricted hosted access, real snapshot export/live import, operational cleanup and cross-device rollout remain approval/validation gates. Team access and copying actual customer records are outside the first slice. Onboarding PR #586 stays separate.
+
 | Field | Value |
 | --- | --- |
 | Document name | ServSync Master Plan v1.0 Updated Draft |

@@ -1,3 +1,4 @@
+import { loadBusinessPracticeSetup } from './features/practice/businessPractice';
 import { rememberFirstEstimatePreview } from './features/onboarding/progress';
 import { useContractorPracticeAccess } from './features/navigation/useContractorPracticeAccess';
 import { ContractorPracticeWorkspace } from './features/onboarding/ContractorPracticeWorkspace';
@@ -28722,7 +28723,7 @@ function ContractorDashboard({
 
   const startDraftJobComposer = (
     overrides: Partial<DraftJobComposerDraft> = {},
-    options: { intendedOutput?: DraftIntendedOutput | null } = {},
+    options: { intendedOutput?: DraftIntendedOutput | null; practiceHandoff?: { storageKey: string; recordId: string } } = {},
   ) => {
     if (!DRAFT_JOB_UI_ENABLED) {
       setInspectionView('new');
@@ -28759,7 +28760,7 @@ function ContractorDashboard({
         jobSession: intendedOutput === 'job' ? { visited: true } : undefined,
         invoiceSession: intendedOutput === 'invoice' ? { visited: true } : undefined,
       });
-      setDurableDraftOpenTarget({ kind: 'new', initialDraft });
+      setDurableDraftOpenTarget({ kind: 'new', initialDraft, practiceHandoff: options.practiceHandoff });
       setInspectionView('draft_job');
       setContractorWorkView('new_jobs');
       setContractorTab('work');
@@ -31843,6 +31844,15 @@ function ContractorDashboard({
       {!loading && !SERVSYNC_DEMO_PRESENTATION_MODE && (durableDraftCapabilities.canLaunchEstimate || (!contractor?.id && !teamAccess)) && (
         <ContractorPracticeWorkspace activeTab={contractorTab} onOpenPractice={() => setContractorTab('practice')} key={`${profile.id}:${contractor?.id}`} identity={`${profile.id}:${contractor?.id}`}
           businessName={contractor?.business_name || ''} hasEstimates={estimates.length > 0}
+          businessPractice={contractor?.owner_user_id === profile.id && priceBookAccess.canView ? {
+            identity: `${profile.id}:${contractor.id}`, businessName: contractor.business_name,
+            loadSetup: () => { if (!supabase) throw new Error('Business setup is unavailable.'); return loadBusinessPracticeSetup(supabase, contractor.id, profile.id); },
+            canStage: sharedDraftComposerEnabled && !durableDraftCohortSafeHold && durableDraftCapabilities.canPersistDraft && !createEstimateCapability.disabled && inspectionView !== 'draft_job' && !estimateComposerOpen && !invoiceComposerOpen,
+            stageDraft: (draft, practiceHandoff) => {
+              if (!sharedDraftComposerEnabled || durableDraftCohortSafeHold || !durableDraftCapabilities.canPersistDraft || createEstimateCapability.disabled || inspectionView === 'draft_job' || estimateComposerOpen || invoiceComposerOpen) throw new Error('Finish or close existing work in Work, then review Practice again.');
+              setWorkCustomerFilterSubjectId(null); startDraftJobComposer(draft, { intendedOutput: 'estimate', practiceHandoff });
+            },
+          } : undefined}
           canStartReal={sharedDraftComposerEnabled && !durableDraftCohortSafeHold && !createEstimateCapability.disabled}
           onStartReal={startCleanDraftFirstEstimateComposer}
           onResumeReal={() => { setContractorTab('work'); setContractorWorkViewAndScroll('drafts'); setInspectionView('list'); }}

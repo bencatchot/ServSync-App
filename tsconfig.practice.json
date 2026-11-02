@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": [
+    "src/vite-env.d.ts",
+    "src/features/practice",
+    "server/practice",
+    "scripts/practice",
+    "tests/practice"
+  ]
+}

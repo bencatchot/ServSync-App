@@ -22,6 +22,7 @@ type WritingAssistInputProps = {
 };
 
 type WorkComposerLineItemRowProps = {
+  hidePrivateDetails?: boolean;
   line: WorkComposerLineDraft;
   index: number;
   itemLabel: 'estimate' | 'invoice' | 'draft job' | 'draft estimate' | 'draft';
@@ -64,6 +65,7 @@ function workComposerLineTotalLabel(line: WorkComposerLineDraft) {
 }
 
 export function WorkComposerLineItemRow({
+  hidePrivateDetails = false,
   line,
   index,
   itemLabel,
@@ -83,6 +85,7 @@ export function WorkComposerLineItemRow({
   const sourceNote = line.editor_source_note?.trim();
   const hasSecondaryRow = showModelSpec || showSupplyStatus;
   const showLaborHours = laborMode === 'line_specific' && workComposerLineCanTrackLaborHours(line);
+  const hasAdvancedDetails = !hidePrivateDetails || !draftLayout || showLaborHours || showModelSpec || showSupplyStatus || Boolean(sourceNote);
   const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
   const inputPrefix = itemLabel === 'invoice' ? 'Invoice' : itemLabel === 'estimate' ? 'Estimate' : itemLabel === 'draft job' ? 'Draft job' : itemLabel === 'draft estimate' ? 'Draft estimate' : 'Draft';
   const moreDetailsLabel = itemLabel;
@@ -137,6 +140,7 @@ export function WorkComposerLineItemRow({
         aria-label={`${inputPrefix} line item ${index + 1} unit price`}
         className={INPUT_CLASS}
         value={line.unit_price}
+        inputMode={hidePrivateDetails ? 'decimal' : undefined}
         onChange={event => onChange({ unit_price: event.target.value })}
         placeholder="$0.00"
       />
@@ -229,7 +233,7 @@ export function WorkComposerLineItemRow({
       </select>
     </WorkComposerField>
   );
-  const roomField = isDraftScope ? (
+  const roomField = isDraftScope && !hidePrivateDetails ? (
     <WorkComposerField label="Room">
       <input
         aria-label={`${inputPrefix} line item ${index + 1} room`}
@@ -240,7 +244,7 @@ export function WorkComposerLineItemRow({
       />
     </WorkComposerField>
   ) : null;
-  const locationField = isDraftScope ? (
+  const locationField = isDraftScope && !hidePrivateDetails ? (
     <WorkComposerField label="Location">
       <input
         aria-label={`${inputPrefix} line item ${index + 1} location`}
@@ -251,7 +255,7 @@ export function WorkComposerLineItemRow({
       />
     </WorkComposerField>
   ) : null;
-  const internalNotesField = isDraftScope ? (
+  const internalNotesField = isDraftScope && !hidePrivateDetails ? (
     <div className="lg:col-span-2">
       <WorkComposerField label="Internal notes">
         <input
@@ -292,7 +296,7 @@ export function WorkComposerLineItemRow({
           {actionButtons}
         </div>
         )}
-        <div className="mt-3 border-t border-slate-100 pt-3">
+        {hasAdvancedDetails && <div className="mt-3 border-t border-slate-100 pt-3">
           <button
             type="button"
             onClick={() => setAdvancedDetailsOpen(!advancedDetailsOpen)}
@@ -322,7 +326,7 @@ export function WorkComposerLineItemRow({
               ) : null}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     );
   }

@@ -33,4 +33,7 @@ jobs:
       - run: npm run runtime:parity:test
       - run: npm run test:demo-recorder
       - run: npm run typecheck
+      - run: npm run typecheck:practice
+      - name: Verify isolated Practice database foundation
+        run: PG16_BIN="$(pg_config --bindir)" npm run test:practice
       - run: npm run build

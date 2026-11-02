@@ -1,5 +1,24 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-02 — Practice release audit and fixed-hour expiry fixture
+
+- Branch: `codex/temporary-practice-workspace`, PR #588. Owner approved final checks and Production merge for the reviewed business-aware Practice slice. Exact final CI, merge and deployment evidence belongs on the PR; this entry alone does not prove deployment.
+- Files: `tests/practice/foundation.test.ts`, Practice feature review, marketing inventory, master plan, backlog and this changelog. Replace calendar-day test backdating with one statement timestamp and fixed 744/24-hour offsets, preserving the exact 720-hour simulated lifetime across daylight-saving changes. No application or shared SQL change.
+- Validation: fresh 50 domain/disposable PostgreSQL tests, 116 Chromium/WebKit business/onboarding/navigation/request-invoice/Draft cases, 28 isolated Demo browser cases, full/Practice types, build, lint (0 errors, 76 baseline warnings), architecture and App budget passed. Six expiry tests initially failed at the daylight-saving boundary; all pass after the fixture repair. Supported runtime escalation allowed disposable PostgreSQL shared memory after the sandbox blocked its initial rerun. Independent source review found no blocker and verified the fixture correction.
+- Hosted evidence: earlier bounded authenticated Demo Preview acceptance read six clearly labeled fictional prices and two templates, accepted/refreshed snapshots and retained frozen versions in browser-tab Practice. No real Draft save/send was exercised. This does not establish authenticated Production or cross-device acceptance.
+- Backlog Impact: owner Preview review/merge approval completed; next is exact release verification and separately scoped video/guidance work. Durable importer, retention, cross-device behavior and TUT-002 remain open. No pilot renewal, schema/access/settings change or customer mutation.
+
+## 2026-11-01 — Business-aware Practice in the dedicated tab (Preview)
+
+- Branch: `codex/temporary-practice-workspace`, continuing draft PR #588. Merge released main `93cf7862` without rewriting existing history; preserve PR #591/#593 and the PR #586 Practice tab.
+- Add owner-only explicit business pricing/template snapshot review, numbered frozen versions, refresh for new estimates, same-tab save/resume and watermarked PDFs. Confirmed current-business handoff opens a new unsaved real Estimate Draft with fictional/private/source fields removed. Same-tab original-copy recovery and a monotonic pre-Save fence prevent accidental local replay after uncertain saves. No automatic customer writes, sends or payments.
+- Files: App integration/budget; Practice business domain/component and template sanitizer; shared Draft target/Save integration; Practice wrapper/PDF preview; merge resolutions in shared composer/main/PDF; synthetic domain/browser fixtures and test script; feature review, master plan, backlog, marketing inventory and this changelog. Inherited installed/unapplied SQL bytes, Demo access gates and unrelated source remain unchanged.
+- Reason: continue the owner's approved broader Practice experience without introducing unapproved backend provenance/schema/access changes. Durable/cross-device import remains a separate next slice, not an implied capability.
+- Checks: 6 new domain and 8 new Chromium/WebKit browser cases; inherited 44 disposable PostgreSQL/contract and 28 Demo browser cases; types/Practice types/build, lint (76 baseline warnings), 27 architecture, 16 backend-parity, 6 runtime-parity, 60 recorder and App budget. All 108 focused regressions pass; an existing Draft mock registration race was repaired for deterministic Chromium/WebKit coverage. Exact published head/CI/Preview are recorded on PR #588. Independent source review: no remaining blockers after repairs. All runtime fixtures are synthetic/local; no hosted persistence claim.
+- Risks/follow-ups: same-tab storage only; unsaved Work edits are not restored from Practice; uncertain Save outcomes require checking Work and cannot replay; durable cross-device importer/cleanup/hosted acceptance remain open. See [business Practice review](../features/PRACTICE_BUSINESS_SNAPSHOT_REVIEW.md).
+- Publication: app commit `742fad2` produced READY protected Demo Preview; anonymous HEAD confirms the Vercel SSO gate. Corrected two missing PR tutorial-declaration fields after declaration-only CI failure; this documentation record triggers a fresh run. Exact final status is on PR #588. No app-code change in the verification follow-up.
+- Backlog Impact: update Practice's delivered Preview scope, remaining durable workflow and next owner review. Tutorial impact: UPDATE REQUIRED, existing TUT-002 follow-up; tutorial/narration/media remain separate per owner scope. No Production merge, shared SQL, security/access/environment change, pilot renewal or real customer testing.
+
 ## 2026-11-01 — Put the reviewed sample estimate builder in Practice
 
 - Branch: `codex/guided-contractor-first-estimate`, continuing draft PR #586 from reconciled `8b5de3b`. Owner requested a dedicated Practice tab and a Dashboard “Try practice estimate builder” button.
@@ -73,6 +92,71 @@
 - Validation: TypeScript/build/27 architecture tests; focused desktop/mobile browser and PDF checks; 29 existing Draft browser regressions; disposable PostgreSQL Estimate authority suite. Hosted and release acceptance evidence is distinguished in the feature report/PR.
 - Risks/follow-ups: same-browser guide progress and same-tab practice edits only; real work still requires Save Draft. Exact Demo Preview desktop/mobile checks passed. Fresh-account hosted persistence/duplicate-retry acceptance and the TUT-002 guidance replacement remain release gates; post-validation Demo Help search and hash-verified local published-package playback are recorded in the feature report and update brief. No merge, production deployment, shared SQL/data mutation, notifications, purchases, auth/permission/env changes or new dependencies.
 - Backlog Impact: FB-040 records the review-branch guided first-estimate slice and remaining acceptance/tutorial gates. Marketing wording remains conditional on release; no time-to-completion claim.
+## 2026-10-16 — Demo sign-in clarification approved for Preview publication
+
+- Replaced the enabled, signed-out Practice entry’s ambiguous regular-app link with Sign in to Demo, opening the existing sign-in in a separate tab and explaining how to return. Auth/role/default-off behavior is unchanged.
+- All 28 desktop/emulated-mobile browser cases, full/Practice types, lint baseline and build pass. Added same-origin/no-opener/cross-tab resume coverage and 320px touch/PDF reachability checks. Independent diff/visual review found no blocker. Hosted Escape/focus verified on the existing published Preview without writes; no physical-iPhone claim.
+- [Local review and deadline maintenance proposal](../features/PRACTICE_DEMO_ROUGH_EDGES_REVIEW.md) explains the intentional ownership barrier, absence of an existing authorized owner-capable connection, and a conditional single-transaction temporary-INHERIT candidate requiring separate approval/rehearsal. No SQL, grants, owners or records changed; owner approved UI/tests/docs publication and Demo Preview verification. Tutorial impact: NONE after final read-only catalog check.
+
+## 2026-10-16 — Practice improvements verified locally, UI-only publication approved
+
+- Added sample/blank starts, compact Practice-only guidance and one-row Save/Preview actions, working return-to-drafts navigation, inline currency/description recovery, and PDF-close keyboard focus restoration. Shared real-editor defaults remain unchanged.
+- Independent review found and verified repairs for unreadable primary buttons and overlong-description errors hiding the editor. All 24 desktop Chromium/mobile WebKit tests and 44 disposable PostgreSQL/contract checks pass. No hosted acceptance is claimed for this working tree.
+- Owner approved UI-only publication after read-only database preflight confirmed the existing operator cannot inherit or assume function-owner authority. No SQL was attempted and no grants/ownership/credentials changed.
+- Prepared a separate unapplied state/start response draft for the existing pilot deadline; legacy responses clearly disclose that access may end before the cycle. Installed SQL remains byte-identical. No pilot reset, renewal, cleanup or shared application occurred.
+- [Local evidence, UI recommendations and remaining gates](../features/PRACTICE_DEMO_IMPROVEMENTS_REVIEW.md). Backlog and rollout ledger distinguish the prior approved pilot from this UI improvement pass. Tutorial impact: NONE after final local application validation and read-only Demo Help catalog search found no matching current/published walkthrough.
+
+## 2026-10-16 — Default-off synthetic Demo Practice UI prepared
+
+- Added an isolated `/#/practice-demo` entry, exact Demo/build gating, existing-session handling and synthetic state/start/save editor using the reviewed installed RPC. No normal App/business queries load in this entry; no hosted pilot or setting was enabled.
+- Added saved-Draft resume, lost-response/revision handling, unsaved navigation warnings, account-change isolation, expiry notices and watermarked PDF preview. Independent review identified initial-access overlap and delayed-response expiry gaps; serialized checks and conservative monotonic deadlines fix both.
+- All 18 desktop Chromium/mobile WebKit browser checks passed independently; 42 real PostgreSQL checks, full/Practice types, lint baseline and build passed. Tutorial impact: NONE after read-only Demo catalog searches returned no matching published/current guidance. Local browser tests exercise the actual reviewed SQL in disposable PostgreSQL with synthetic Auth/HTTP. They cover desktop/mobile, $250.50 totals, interruption/retry/conflict, late account responses, expiry/revocation and public document entry. The latter exposed WebKit's late paired hash event; matching navigation URLs now preserves the consumed access token.
+- [UI review and smallest next approval](../features/PRACTICE_DEMO_UI_REVIEW.md) names the existing Demo reviewer account and a branch-only, 24-hour synthetic pilot proposal. Installation report/Applied ledger are published with this UI draft. Installed SQL is unchanged; no activation, access/config changes, real-data copy, renewal, cleanup, merge or manual deployment.
+
+## 2026-10-16 — Approved Practice Demo SQL installed, feature still inactive
+
+- Applied only approved SQL hash `4394c5ecb28167aee93f7a5cfcc08e3fb135a0e7dd8c45bd0ed02c89e3d833f4` from `4618568` to existing Demo, migration `20261016180520`. No pilot bindings, cycles or Drafts.
+- Read-back verified restricted executor, FORCE RLS, exact ACLs and unexposed private schema. Existing catalog fingerprints, all 162 public-table row counts, managed Auth permissions/definitions and security-advisor finding content are unchanged.
+- [Execution record](../features/PRACTICE_DEMO_INSTALLATION_2026-10-16.md) distinguishes catalog verification from still-pending user-session/UI/provider acceptance and cross-environment parity. Rollout ledger now marks only Demo Applied. No merge, code push, deployment, new credential, real-data write or cleanup. Tutorial impact: NOT APPLICABLE.
+
+## 2026-10-16 — Practice draft revised for managed installer permissions
+
+- The prior approved Demo installation stopped at read-only preflight; no SQL was attempted. The local fixture had incorrectly supplied Auth grant options. It now models the observed managed owners/ACLs and non-superuser installer, including existing BYPASSRLS.
+- Revised uninstalled SQL reads PostgREST-validated transaction-local claims through a private invoker helper. No managed Auth grants, elevated identity helper, alternate credential or managed owner switch is needed. Restricted executor, FORCE RLS, current pilot binding and tenant/expiry checks remain.
+- Three added real PostgreSQL regressions cover managed authority preservation, strict claims/spoof rejection and pooled-session identity clearing; all 41 combined tests pass. Independent review reran all 16 Demo checks and found no blocking issue in local scope. Read-only Demo API probes confirmed private-schema exclusion and unsigned-JWT rejection. The approval packet and Pending rollout hash were replaced; the previous approval does not authorize these bytes.
+- No hosted installation retry, permission/settings change, pilot activation, new project, production mutation or deployment. Tutorial impact: NOT APPLICABLE; source remains unmounted.
+
+## 2026-10-16 — Practice draft published; local process-result race corrected
+
+- Owner authorized publishing the reviewed Demo draft to PR #588 with only ordinary non-Practice Preview builds. No automatic migration route exists; the reviewed SQL hash is unchanged and hosted installation/access remains unapproved.
+- Initial CI passed all 13 Demo cases but failed an existing concurrent-recovery assertion. Independent investigation demonstrated an exit-before-stdout-drain race in the local PostgreSQL subprocess transport. It now waits for close, prints SQL NULL explicitly and rejects missing output. A deterministic delayed-writer regression and better concurrent-result diagnostics bring local coverage to 38 passing tests. Exact attribution of the earlier CI failure remains inferred.
+- Approval packet clarifies existing Auth-helper grants, empty-allowlist denial and separately gated post-commit rollback. Tutorial impact: NOT APPLICABLE; no normal UI or hosted Practice behavior changes.
+
+## 2026-10-16 — Existing Demo Practice integration prepared, not activated
+
+- Prepared a separately guarded migration draft outside automatic migration discovery and an unmounted/default-off Demo transport. Private storage, an empty pilot allowlist, fixed synthetic snapshots, 720-hour expiry, bounded revisioned saves and explicit grants are covered by 13 new actual PostgreSQL tests; the combined Practice suite passes 37/37.
+- Independent review found and verified fixes for non-superuser ownership setup and incomplete/Unicode Draft resume. Local Auth/HTTP are simulated; hosted acceptance remains unperformed. The disposable installer is unchanged.
+- The [approval packet](../features/PRACTICE_DEMO_DRAFT_APPROVAL.md) proposes only exact-target Demo installation with the allowlist empty. No push, migration application, credentials, hosted grants/settings, cleanup, merge or deployment occurred. Backlog, marketing limits and rollout ledger updated. No product-direction change.
+- Tutorial impact: NOT APPLICABLE to unmounted source-only code; hosted UI guidance remains a later validation gate.
+
+## 2026-10-16 — Practice expiry and transfer recovery corrected
+
+- PR #588 remains local/test-only. Expiry is now enforced by database read policies; status-only reads and recovery use separate narrow capabilities.
+- Expired content no longer waits for an uncertain transfer. Detached payload-free operation identities, timestamp-bound admission, destination cancellation fencing and permanent Draft provenance preserve duplicate prevention through cleanup and receipt pruning. Fresh starts remove only the owner's expired local cycles.
+- Independent review identified a worker concurrency issue; atomic leases, bounded claims/retries and stale-result handling address it. Regression coverage includes revocation, outages, concurrent workers, late destination writes and cleanup/fresh-start races.
+- Ben requires no additional Supabase/Vercel projects. The [existing Demo reuse assessment](../features/PRACTICE_EXISTING_ENVIRONMENT_REUSE.md) records read-only deployed reset/RLS/function/capacity evidence, shared-runtime risks and the required new reviewed migration. The disposable schema guard remains intact.
+- Physical deletion and backup retention are distinguished from expiry access denial. No hosted worker, purge, resource, credential, shared migration, production change or sidebar change occurred.
+- Tutorial impact: NOT APPLICABLE to the local synthetic harness; hosted guidance remains a later gate.
+
+## 2026-10-16 — Temporary Practice foundation prepared for review
+
+- Branch: `codex/temporary-practice-workspace`, based on main `5ea8fec`; issue #587, separate from onboarding PR #586.
+- Adds an isolated disposable PostgreSQL model, owner/tenant RLS tests, fixed 720-hour cycles, snapshot/Draft/file quotas, expiry warnings, explicit create-only transfer review into a synthetic destination, minimal receipts and dry-run cleanup. Reuses the existing composer/calculation/PDF code; ordinary defaults remain unchanged.
+- The local review harness uses synthetic fixtures only. No real account handoff, hosted Practice route, live importer, shared migration, credential, production data copy or scheduled purge is added. The subsequent retention correction below removes pending-transfer cleanup blockage. See [implementation and validation scope](../features/TEMPORARY_PRACTICE_FOUNDATION.md).
+- Validation: actual disposable PostgreSQL and isolated Chromium/WebKit browser tests; type/build/lint and repository checks recorded in the draft PR. A fixed-duration expiry test caught and corrected a daylight-saving-hour discrepancy. New foundation tests are included in PR quality checks.
+- Documentation impact: master plan/backlog/marketing inventory distinguish the local foundation and proposed retention defaults from unreleased hosted capabilities.
+- Tutorial impact: NOT APPLICABLE to this local-only harness and unchanged normal behavior. New hosted Practice guidance is a later gate; PR #586's TUT-002 replacement remains separate.
+- No merge, production deployment, paid provisioning, deployed security change or production cleanup.
 
 ## 2026-10-02 — Recurring contractor browser smoke selectors repaired
 
