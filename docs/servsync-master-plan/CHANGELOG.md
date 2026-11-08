@@ -6,8 +6,9 @@
 - Files: Discover profile/evidence/reference/helper/hook modules, App integration and shared button styling, focused unit/routed browser tests, existing Discover fixture headline, App size ratchet, feature evidence, master plan, backlog and marketing inventory.
 - Preserve original text, existing per-property/contact choices, active/pending relationship boundaries, no-auto-send and private-media rules. Public lookup validates owner/visibility at restoration and submission. Reference remains homeowner-authored text, never verified work or server provenance.
 - Extract public profile from App and repair duplicate sibling keys that left cancelled modal markup mounted. Independent review repairs keep references visible/removable on all request send surfaces and focus the continuation after selection.
-- Validation: 10 domain tests, types/build, 27 architecture tests and lint (0 errors/76 existing warnings) pass; final browser/Preview/check/tutorial evidence is recorded on the PR after validation. No hosted mutation or SQL/config/security change.
-- Backlog Impact: FB-009 source increment and remaining Preview/tutorial/release gate recorded. No production availability claim. See [feature evidence](../features/DISCOVER_PROJECT_INQUIRY_CONTINUITY.md).
+- Validation: 10 domain tests, types/build, 27 architecture tests, lint (0 errors/76 existing warnings), 30 Chromium cases, 13 WebKit inquiry cases and 15 protected Demo Preview cases pass. Independent re-review found no remaining blocker. Exact final head/check evidence is recorded on the PR. No hosted mutation or SQL/config/security change.
+- Tutorial impact: NONE after the post-validation published catalog search and full playback of hash-matched TUT-005/TUT-001 revision-1 media. Existing consent, acceptance, review/send and intake guidance remains accurate.
+- Backlog Impact: FB-009 source/Preview increment verified; draft PR review and separately approved release remain. No production availability claim. See [feature evidence](../features/DISCOVER_PROJECT_INQUIRY_CONTINUITY.md).
 
 ## 2026-11-02 — Practice release audit and fixed-hour expiry fixture
 
