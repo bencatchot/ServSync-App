@@ -6,8 +6,10 @@ import { safePublicUrl } from "./discoverSearch";
 
 export function PublicProfileEvidence({
   profile,
+  onAskAboutPost,
 }: {
   profile: ContractorPublicProfile;
+  onAskAboutPost?: (postId: string) => void;
 }) {
   const [posts, setPosts] = useState<DiscoverFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +113,7 @@ export function PublicProfileEvidence({
                   </a>
                 ))}
             </div>
+            {onAskAboutPost && <button type="button" className={discoverButton} onClick={() => onAskAboutPost(post.post_id)}>Ask about similar work</button>}
           </article>
         ))}
       </section>

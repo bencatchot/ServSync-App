@@ -373,6 +373,8 @@ The contractor experience should be practical, not bloated. The contractor shoul
 
 # 10. Discover Marketplace Strategy
 
+November 8 source revision: project-specific inquiry continuity is prepared for review. **Ask about similar work** retains a selected public post through sign-in/property setup and includes a visible, removable homeowner-supplied reference in an explicitly sent existing connection/service request. It creates no verified-completion claim, second messaging system, automatic send, or added sharing permission. No schema change; Production release remains separately gated. See [scope and evidence](../features/DISCOVER_PROJECT_INQUIRY_CONTINUITY.md).
+
 Discover helps homeowners find a suitable contractor, evaluate their public work, save a private shortlist, and start a controlled service relationship. Its first-use contractor value is a shareable public presence that helps an existing referral take the next step; marketplace scale is not a prerequisite. On September 25, 2026 the owner approved this task-oriented direction and implementation, replacing the previous feed-first emphasis. Local work and tips remain secondary supporting content.
 
 | Discover principle | Direction |

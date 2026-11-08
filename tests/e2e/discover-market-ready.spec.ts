@@ -46,7 +46,7 @@ async function mount(
   await page.goto("/");
   await page
     .getByRole("heading", {
-      name: "Find local contractors. Keep the work organized.",
+      name: "Home service, in sync.",
     })
     .waitFor();
   await page.evaluate(
