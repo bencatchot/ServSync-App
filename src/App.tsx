@@ -13048,7 +13048,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   }, [serviceRequestDraft.public_project, selectedRequestConnection?.contractor_id]);
   const renderServiceRequestProject = () => serviceRequestDraft.public_project
-    ? <ProjectReference project={serviceRequestDraft.public_project} disabled={savingServiceRequest} onRemove={() => setServiceRequestDraft(current => ({ ...current, public_project: undefined }))} /> : null;
+    ? <ProjectReference focusOnSelection project={serviceRequestDraft.public_project} disabled={savingServiceRequest} onRemove={() => setServiceRequestDraft(current => ({ ...current, public_project: undefined }))} /> : null;
   const requestIssueText = serviceProblemText || serviceRequestDraft.description;
   const requestClassification = classifyHomeownerRequest(requestIssueText, SERVICE_REQUEST_CATEGORIES);
   const requestCategorySuggestions = requestClassification.rankedServiceTypes;

@@ -41,3 +41,9 @@ Both matching published revision-1 videos were previewed locally through their e
 - TUT-001, **How to handle a homeowner service request**, 15.641 seconds, asset `a6c774b2-8758-47e5-ba80-f94a507c112e`, SHA-256 `5fddd844389082f79e0ba9d003a4e6ea0e1b79738b4bc7194c68f390a21924d8`.
 
 The existing request entry, explicit property/contact consent, acceptance requirement, review/send steps and contractor intake guidance remain accurate. The optional project entry does not invalidate the demonstrated paths. No replacement, recording, narration or Help publication is required for this increment. This review does not resolve unrelated existing tutorial work.
+
+## November 13 service-form visibility repair
+
+Live Safari review confirmed that **Ask about similar work** selects and focuses the public reference above the post. For Sarah's active connection, **Request service** is the next explicit action. That action opened the correct existing form but left the viewport at the contractor hub above it. Enable the existing reference-focus behavior on the service composer so the selected project and its form come into view. No submission, consent, authentication, or backend behavior changes.
+
+The new desktop/mobile regression assertions failed before the repair because the reference was unfocused. They now require both focus and viewport visibility before interacting with form fields, alongside the existing no-automatic-submission assertion. The 13 Chromium inquiry cases, domain tests, types, lint and build pass. The PR records WebKit and protected Preview verification for this revision. The live inspection opened only an empty, unsent form and preserved the retained post and all hosted records.

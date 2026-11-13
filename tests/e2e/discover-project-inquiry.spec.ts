@@ -96,6 +96,8 @@ for (const width of [1440, 390]) {
     await signIn(page);
     await page.getByRole('button', { name: 'Request service', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Request service from Bay Plumbing' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Public post reference' })).toBeFocused();
+    await expect(page.getByRole('region', { name: 'Public post reference' })).toBeInViewport();
     await expect(page.getByRole('region', { name: 'Public post reference' }).getByRole('link')).toHaveAttribute('href', new RegExp(postId));
     expect(writes).toEqual([]);
     await page.getByLabel('Short title', { exact: true }).fill('Similar faucet work');
