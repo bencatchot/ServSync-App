@@ -5,6 +5,7 @@ import {
   matchesContractorLocation,
   matchesContractorTrade,
 } from "./discoverSearch";
+import { suggestTaskServices, type TaskServiceSuggestion } from "./taskSearch";
 import { useSavedContractors } from "./useSavedContractors";
 
 export const discoverButton =
@@ -25,13 +26,15 @@ export function ContractorDiscovery({
 }) {
   const saved = useSavedContractors(homeownerId);
   const [category, setCategory] = useState("");
+  const [task, setTask] = useState("");
+  const [taskSuggestions, setTaskSuggestions] = useState<TaskServiceSuggestion[] | null>(null);
   const [location, setLocation] = useState("");
   const [onlySaved, setOnlySaved] = useState(false);
   const eligible = contractors.filter(
     (item) => item.public_profile_enabled && item.account_status === "active",
   );
   const categories = [
-    ...new Set(eligible.flatMap((item) => item.service_categories)),
+    ...new Set([...eligible.flatMap((item) => item.service_categories), ...(taskSuggestions ?? []).map(item => item.service)]),
   ].sort();
   const matches = eligible
     .filter(
@@ -58,6 +61,50 @@ export function ContractorDiscovery({
           private shortlist. Posting regularly is not required to appear here.
         </p>
       </div>
+      <form
+        className="space-y-3 rounded-xl bg-slate-50 p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const suggestions = suggestTaskServices(task);
+          setTaskSuggestions(suggestions);
+          setCategory(suggestions.length === 1 ? suggestions[0].service : "");
+        }}
+      >
+        <label className="block text-sm font-semibold">
+          What do you need done?
+          <input
+            className={`${discoverInput} mt-1`}
+            value={task}
+            maxLength={300}
+            onChange={(event) => {
+              setTask(event.target.value);
+              setTaskSuggestions(null);
+              setCategory("");
+            }}
+            placeholder="Replace a faucet, repair a deck, AC not cooling…"
+            aria-describedby="discover-task-help"
+          />
+        </label>
+        <p id="discover-task-help" className="text-sm text-slate-600">
+          Find a suggested service, then change it below if needed. Editing the task resets the service choice; your area and saved-list filter stay as they are.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" disabled={!task.trim()} className={`${discoverButton} !border-blue-600 !bg-blue-600 !text-white`}>Suggest service</button>
+          {task && <button type="button" className={discoverButton} onClick={() => { setTask(""); setTaskSuggestions(null); setCategory(""); }}>Clear task</button>}
+        </div>
+        {taskSuggestions !== null && <div className="space-y-2" aria-live="polite" aria-atomic="true">
+          <p className="text-sm font-semibold">
+            {taskSuggestions.length === 0 ? "No service suggestion yet. Try a specific item or choose a service below."
+              : taskSuggestions.length === 1 ? `Suggested service: ${taskSuggestions[0].service}. You can change it below.`
+                : "This task could fit more than one service. Choose one or use the Service menu below."}
+          </p>
+          {taskSuggestions.map(suggestion => <div key={suggestion.service} className="flex flex-wrap items-center gap-2 text-sm">
+            {taskSuggestions.length > 1 && <button type="button" className={discoverButton} aria-pressed={category === suggestion.service} onClick={() => setCategory(suggestion.service)}>Use {suggestion.service}</button>}
+            <span>{suggestion.service}: matched {suggestion.phrases.map(phrase => `“${phrase}”`).join(', ')}.</span>
+          </div>)}
+          {!category && <p className="text-sm text-slate-600">Showing all services until you choose one.</p>}
+        </div>}
+      </form>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-semibold">
           Service
@@ -84,7 +131,7 @@ export function ContractorDiscovery({
       </div>
       <p className="text-xs text-slate-600">
         Matches use the contractor’s listed city or ZIP codes. Confirm your
-        exact service address and job scope with the contractor. Results are
+        exact service address and job scope with the contractor. A service match does not confirm that a contractor performs your exact task. Results are
         alphabetical.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -152,6 +199,8 @@ export function ContractorDiscovery({
                 className={`${discoverButton} mt-2`}
                 onClick={() => {
                   setCategory("");
+                  setTask("");
+                  setTaskSuggestions(null);
                   setLocation("");
                   setOnlySaved(false);
                 }}

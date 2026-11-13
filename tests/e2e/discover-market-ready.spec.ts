@@ -263,6 +263,10 @@ async function mount(
           React.createElement(ContractorDiscovery, {
             homeownerId: "h1",
             contractors: [
+              ...(mode === "tasks" ? [
+                { ...contractor, id: "c3", slug: "deck-team", business_name: "Cedar Decks", service_categories: ["Decks"], city: "Mobile", zip_code: "36601", service_zip_codes: [] },
+                { ...contractor, id: "c4", slug: "cool-air", business_name: "Cool Air", service_categories: ["HVAC"] },
+              ] : []),
               contractor,
               {
                 ...contractor,
@@ -549,4 +553,77 @@ test('saved post filters do not imply geographic filtering', async ({ page }) =>
   await page.getByRole('button', { name: 'Saved Posts' }).click();
   await expect(page.getByLabel('Search by ZIP or city')).toBeDisabled();
   await expect(page.getByText('Saved posts are shown across all areas.', { exact: false })).toBeVisible();
+});
+
+for (const width of [1440, 390]) {
+  test(`task search preserves filters, allows correction and shows ambiguity at ${width}px`, async ({page}) => {
+    await page.setViewportSize({width, height: 1000});
+    await mount(page, 'directory', 'tasks');
+    const task = page.getByRole('textbox', {name: 'What do you need done?', exact: true});
+    const service = page.getByRole('combobox', {name: 'Service', exact: true});
+    const suggest = page.getByRole('button', {name: 'Suggest service', exact: true});
+    const area = page.getByLabel('ZIP or city');
+    await area.fill('36526');
+    await task.fill('replace a faucet');
+    await task.press('Enter');
+    await expect(service).toHaveValue('Plumbing');
+    await expect(page.getByText('Suggested service: Plumbing.', {exact:false})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Bay Plumbing',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Cool Air',exact:true})).toHaveCount(0);
+    await suggest.click();
+    await expect(service).toHaveValue('Plumbing');
+    await service.selectOption('HVAC');
+    await expect(page.getByRole('heading',{name:'Cool Air',exact:true})).toBeVisible();
+    await expect(task).toHaveValue('replace a faucet');
+    await task.fill('repair a deck');
+    await expect(service).toHaveValue('');
+    await suggest.click();
+    await expect(service).toHaveValue('Decks');
+    await expect(area).toHaveValue('36526');
+    await expect(page.getByText('No contractors match these choices.',{exact:true})).toBeVisible();
+    await area.fill('Mobile');
+    await expect(page.getByRole('heading',{name:'Cedar Decks',exact:true})).toBeVisible();
+    await task.fill('a leak');
+    await suggest.click();
+    await expect(service).toHaveValue('');
+    await expect(page.getByText('This task could fit more than one service.',{exact:false})).toBeVisible();
+    await page.getByRole('button',{name:'Use Roofing',exact:true}).click();
+    await expect(service).toHaveValue('Roofing');
+    await expect(area).toHaveValue('Mobile');
+    await expect(page.getByRole('heading',{name:'Delta Roofing',exact:true})).toBeVisible();
+    await task.fill('spaceship repair');
+    await suggest.click();
+    await expect(service).toHaveValue('');
+    await expect(page.getByText('No service suggestion yet.',{exact:false})).toBeVisible();
+    await task.fill('AC not cooling');
+    await suggest.click();
+    await expect(service).toHaveValue('HVAC');
+    await expect(page.getByText('No contractors match these choices.',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Clear task',exact:true}).click();
+    await expect(task).toHaveValue('');
+    await expect(area).toHaveValue('Mobile');
+    await expect(suggest).toBeDisabled();
+    await expect(page.getByText('A service match does not confirm',{exact:false})).toBeVisible();
+    expect((await page.evaluate(()=> (window as FixtureWindow).discoverCalls)).filter(call=>call.name || call.action)).toEqual([]);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await task.fill('a leak'); await suggest.click();
+    await page.screenshot({path:`/tmp/servsync-task-search-${width}.png`,fullPage:true});
+  });
+}
+
+test('task edits preserve the private saved-list filter and profile link', async ({page}) => {
+  await mount(page,'directory','tasks');
+  await page.getByRole('button',{name:'Save contractor Bay Plumbing',exact:true}).click();
+  await page.getByRole('button',{name:'Saved contractors',exact:true}).click();
+  const task=page.getByRole('textbox',{name:'What do you need done?',exact:true});
+  await task.fill('replace a faucet'); await task.press('Enter');
+  await expect(page.getByRole('link',{name:'View profile for Bay Plumbing'})).toHaveAttribute('href',/#\/profile\?slug=bay-plumbing$/);
+  await task.fill('AC not cooling'); await task.press('Enter');
+  await expect(page.getByRole('button',{name:'Saved contractors',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByText('No contractors match these choices in your saved list.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Clear task',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Bay Plumbing',exact:true})).toBeVisible();
+  const calls=await page.evaluate(()=> (window as FixtureWindow).discoverCalls);
+  expect(calls.filter(call=>call.name)).toEqual([]);
+  expect(calls.filter(call=>call.action)).toHaveLength(1);
 });
