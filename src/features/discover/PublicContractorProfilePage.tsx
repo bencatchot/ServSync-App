@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { ComponentType } from 'react';
 import { Link2, MapPin } from 'lucide-react';
 import { supabase, configuredSupabaseUrl } from '../../supabaseClient';
@@ -35,8 +35,32 @@ export function PublicContractorProfilePage({ slug, currentProfile, onAuthed, Au
   const [requestDone, setRequestDone] = useState(false);
   const [requestError, setRequestError] = useState('');
   const submitInFlight = useRef(false);
+  const nextStep = useRef<HTMLDivElement>(null);
+  const [selectedAction, setSelectedAction] = useState<{ postId: string; contractorId: string } | null>(null);
   const inquiry = useProjectInquiry(slug, data?.contractor_id);
   const reference = inquiry.postId ? <ProjectReference focusOnSelection project={inquiry.project} loading={inquiry.loading} error={inquiry.error} onRemove={inquiry.remove} onRetry={inquiry.retry} disabled={requesting} /> : null;
+
+  // Only a deliberate post-button click advances the flow. Restored links still
+  // allow inspection, and every send/accept action remains explicit.
+  useEffect(() => {
+    if (!selectedAction || loading) return;
+    if (inquiry.error || selectedAction.contractorId !== data?.contractor_id || selectedAction.postId !== inquiry.postId) {
+      setSelectedAction(null);
+      return;
+    }
+    if (!inquiry.ready) return;
+    setSelectedAction(null);
+    if (currentProfile?.role === 'homeowner' && connectionStatus === 'active') {
+      updateRoute('homeowner', new URLSearchParams({ request_contractor: data.contractor_id, request_post: selectedAction.postId, request_profile: slug }).toString());
+    } else if (currentProfile?.role === 'homeowner' && homeownerHomes.length > 0 && (!connectionStatus || ['declined', 'revoked', 'dismissed'].includes(connectionStatus))) {
+      setConnectionModalOpen(true);
+    } else {
+      // Pending relationships, property setup and sign-in have a visible next
+      // step instead of silently selecting an already-selected reference.
+      nextStep.current?.focus();
+      nextStep.current?.scrollIntoView({ block: 'center' });
+    }
+  }, [selectedAction, loading, inquiry.ready, inquiry.error, inquiry.postId, data?.contractor_id, currentProfile?.role, connectionStatus, homeownerHomes.length, slug]);
 
   const publicContractorTarget = data ? {
     id: data.contractor_id,
@@ -143,9 +167,9 @@ export function PublicContractorProfilePage({ slug, currentProfile, onAuthed, Au
         </div>
 
         {!connectionModalOpen && reference}
-        {inquiry.postId && connectionStatus === 'pending' && <p className="mt-3 text-sm">Your connection request is already pending. This post has not been added to that request. After the contractor accepts, you can return to this post and request service.</p>}
         {/* CTA */}
-        <div className="mt-5 border-t border-slate-200 pt-5">
+        <div ref={nextStep} tabIndex={-1} role="region" aria-label="Project inquiry next step" className="mt-5 border-t border-slate-200 pt-5">
+          {inquiry.postId && connectionStatus === 'pending' && <p className="mb-3 text-sm" role="status">Your connection request is already pending. This post has not been added to that request. After the contractor accepts, you can return to this post and request service.</p>}
           {!currentProfile && <div className="space-y-3">
             <p className="font-semibold">Connect with {data.business_name}</p><p className="text-sm text-slate-600">Sign in or create a homeowner account, then choose what to share. Nothing is sent automatically.</p>
             <div className="flex flex-wrap gap-2">{(['signin', 'signup'] as const).map(mode => <button key={mode} className={buttonClass(mode === 'signin' ? 'primary' : 'secondary')} onClick={() => { window.history.replaceState(null, '', appHashRoute('profile', { slug, intent: 'connect', mode, post: inquiry.postId })); setAuthMode(mode); }}>{mode === 'signin' ? 'Sign in to connect' : 'Create homeowner account'}</button>)}</div>
@@ -206,7 +230,7 @@ export function PublicContractorProfilePage({ slug, currentProfile, onAuthed, Au
         />
       )}
 
-      <PublicProfileEvidence key={`evidence-${data.contractor_id}`} profile={data} onAskAboutPost={currentProfile && currentProfile.role !== 'homeowner' ? undefined : postId => { inquiry.select(postId); setRequestError(''); }} />
+      <PublicProfileEvidence key={`evidence-${data.contractor_id}`} profile={data} onAskAboutPost={currentProfile && currentProfile.role !== 'homeowner' ? undefined : postId => { inquiry.select(postId); setRequestError(''); if (!currentProfile) setAuthMode(mode => mode ?? 'signin'); setSelectedAction({ postId, contractorId: data.contractor_id }); }} />
     </div>
   );
 }

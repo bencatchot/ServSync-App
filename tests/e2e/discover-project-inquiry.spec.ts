@@ -217,3 +217,69 @@ test('service revalidation blocks stale post, removal preserves draft, cancel cl
   await expect(page.getByRole('region', { name: 'Public post reference' })).toHaveCount(0);
   expect(writes).toEqual([]);
 });
+
+for (const width of [1440, 390]) {
+  for (const status of ['active', 'pending', 'new'] as const) {
+    test(`signed-in Ask opens the next step directly for ${status} at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const { writes } = await setup(page, status === 'new' ? null : status);
+      await page.goto(`/#/profile?slug=bay-plumbing&post=${postId}&intent=connect`);
+      await signIn(page);
+      // The exact review-link scenario: this post is already selected before clicking.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await page.getByRole('button', { name: 'Ask about similar work', exact: true }).click();
+        const reference = page.getByRole('region', { name: 'Public post reference' });
+        if (status === 'active') {
+          await expect(page.getByRole('heading', { name: 'Request service from Bay Plumbing' })).toBeVisible();
+          await expect(reference).toBeFocused();
+          await expect(reference).toBeInViewport();
+          await expect(reference.getByRole('link')).toHaveAttribute('href', new RegExp(postId));
+          expect(writes).toEqual([]);
+          await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+          await page.goto(`/#/profile?slug=bay-plumbing&post=${postId}&intent=connect`);
+        } else if (status === 'new') {
+          await expect(page.getByRole('dialog')).toBeVisible();
+          await expect(reference).toBeInViewport();
+          await expect(page.getByLabel('Share my contact info with this contractor')).not.toBeChecked();
+          await page.getByRole('textbox', { name: 'Optional message', exact: true }).fill('Unsent inquiry draft');
+          expect(writes).toEqual([]);
+          await page.getByRole('button', { name: 'Close connection request', exact: true }).click();
+          await expect(page).not.toHaveURL(/post=/);
+        } else {
+          const nextStep = page.getByRole('region', { name: 'Project inquiry next step' });
+          await expect(nextStep).toBeFocused();
+          await expect(nextStep).toBeInViewport();
+          await expect(nextStep).toContainText('This post has not been added');
+          await expect(page.getByRole('dialog')).toHaveCount(0);
+          await expect(page.getByRole('button', { name: 'Request service', exact: true })).toHaveCount(0);
+        }
+        expect(writes).toEqual([]);
+      }
+    });
+  }
+}
+
+test('Ask focuses property setup without inventing sharing or sending', async ({ page }) => {
+  const { state, writes } = await setup(page);
+  state.hasHome = false;
+  await page.goto(`/#/profile?slug=bay-plumbing&post=${postId}&intent=connect`);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Ask about similar work', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Project inquiry next step' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Set up my property' })).toBeInViewport();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(writes).toEqual([]);
+});
+
+test('Ask rechecks a selected post before advancing an active connection', async ({ page }) => {
+  const { state, writes } = await setup(page, 'active');
+  await page.goto(`/#/profile?slug=bay-plumbing&post=${postId}&intent=connect`);
+  await signIn(page);
+  await expect(page.getByRole('button', { name: 'Request service', exact: true })).toBeEnabled();
+  state.available = false;
+  await page.getByRole('button', { name: 'Ask about similar work', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Public post reference' })).toContainText('no longer available');
+  await expect(page).toHaveURL(/#\/profile/);
+  await expect(page.getByRole('button', { name: 'Request service', exact: true })).toBeDisabled();
+  expect(writes).toEqual([]);
+});
