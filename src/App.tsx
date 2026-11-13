@@ -1,3 +1,6 @@
+import { ProjectReference } from './features/discover/ProjectReference';
+import { appendPublicProject, loadPublicProject, type PublicProjectReference } from './features/discover/projectInquiry';
+import { buttonClass } from './ui/buttonClass';
 import { loadBusinessPracticeSetup } from './features/practice/businessPractice';
 import { rememberFirstEstimatePreview } from './features/onboarding/progress';
 import { useContractorPracticeAccess } from './features/navigation/useContractorPracticeAccess';
@@ -5,14 +8,13 @@ import { ContractorPracticeWorkspace } from './features/onboarding/ContractorPra
 import { contractorRequestQueueRecords, sortContractorRequestRecords } from './features/requests/contractorQueue';
 import { PublicPostConsent } from './features/discover/PublicPostConsent';
 import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
-import { usePublicContractorProfile } from './features/discover/usePublicContractorProfile';
-import { ContractorDiscovery, SaveContractor } from './features/discover/ContractorDiscovery';
-import { PublicProfileEvidence } from './features/discover/PublicProfileEvidence';
+import { ContractorDiscovery } from './features/discover/ContractorDiscovery';
+import { PublicContractorProfilePage } from './features/discover/PublicContractorProfilePage';
 import { ContractorPresence } from './features/discover/ContractorPresence';
 import type { AdminContractorDraft } from './features/contractor-prospects/adminContractorTypes';
 import { AdminContractorProspects } from './features/contractor-prospects/AdminContractorProspects';
 import { ContractorClaimPage } from './features/contractor-prospects/ContractorClaimPage';
-import { DiscoverContractorProspects, PublicContractorProspect } from './features/contractor-prospects/PublicContractorProspects';
+import { DiscoverContractorProspects } from './features/contractor-prospects/PublicContractorProspects';
 import { MobileNavigationDialog } from './features/navigation/MobileNavigationDialog';
 import { ConnectedCustomerScheduling } from './features/calendar/ConnectedCustomerScheduling';
 import { isOpenInvoice } from './features/invoices/recordStatus';
@@ -731,6 +733,7 @@ type RepairEstimateLineDraft = {
   notes: string;
 };
 type HomeownerServiceRequestDraft = {
+  public_project?: PublicProjectReference;
   connection_id: string;
   home_id: string;
   category: string;
@@ -6850,15 +6853,6 @@ function inputClass() {
   return 'w-full rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-base text-[#02132D] placeholder:text-slate-400 outline-none transition focus:border-[#0078FF] focus:ring-2 focus:ring-[#0078FF]/15 md:text-sm';
 }
 
-function buttonClass(kind: 'primary' | 'secondary' | 'danger' = 'primary') {
-  if (kind === 'secondary') {
-    return 'inline-flex items-center justify-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-4 py-2 text-sm font-semibold text-[#223D67] shadow-sm transition hover:border-[#1B85FB] hover:bg-[#F7F9FC] hover:text-[#0078FF]';
-  }
-  if (kind === 'danger') {
-    return 'inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700';
-  }
-  return 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005FD6]';
-}
 
 function mobileActionRowClass(className = '') {
   return ['flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center', className].filter(Boolean).join(' ');
@@ -12083,7 +12077,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         category: serviceRequestDraft.category,
         urgency: serviceRequestDraft.urgency,
         title: serviceRequestDraft.title,
-        description: cleanHumanWrittenText(serviceRequestDraft.description),
+        description: await appendPublicProject(supabase, cleanHumanWrittenText(serviceRequestDraft.description), serviceRequestDraft.public_project, connections.find(connection => connection.connection_id === serviceRequestDraft.connection_id)?.contractor_id ?? ''),
         home_id: serviceRequestDraft.home_id || selectedHome?.id || null,
         media,
       };
@@ -13048,6 +13042,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const selectedRequestConnection = serviceRequestDraft.connection_id
     ? activeConnections.find(connection => connection.connection_id === serviceRequestDraft.connection_id) ?? null
     : null;
+  useEffect(() => {
+    if (serviceRequestDraft.public_project && serviceRequestDraft.public_project.contractorId !== selectedRequestConnection?.contractor_id) {
+      setServiceRequestDraft(current => ({ ...current, public_project: undefined }));
+    }
+  }, [serviceRequestDraft.public_project, selectedRequestConnection?.contractor_id]);
+  const renderServiceRequestProject = () => serviceRequestDraft.public_project
+    ? <ProjectReference focusOnSelection project={serviceRequestDraft.public_project} disabled={savingServiceRequest} onRemove={() => setServiceRequestDraft(current => ({ ...current, public_project: undefined }))} /> : null;
   const requestIssueText = serviceProblemText || serviceRequestDraft.description;
   const requestClassification = classifyHomeownerRequest(requestIssueText, SERVICE_REQUEST_CATEGORIES);
   const requestCategorySuggestions = requestClassification.rankedServiceTypes;
@@ -13137,7 +13138,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </Field>
     );
   };
-  const startServiceRequestForConnection = (connection: HomeownerConnection, category?: string) => {
+  const startServiceRequestForConnection = (connection: HomeownerConnection, category?: string, publicProject?: PublicProjectReference) => {
     const categories = serviceCategoriesForConnection(connection);
     setRequestComposerOpen(false);
     setRequestComposerStep('issue');
@@ -13147,6 +13148,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setNewRequestFiles([]);
     setServiceProblemText('');
     setServiceRequestDraft({
+      public_project: publicProject,
       connection_id: connection.connection_id,
       home_id: selectedHome?.id || selectedHomeId || '',
       category: category || categories[0] || 'General Maintenance',
@@ -13160,14 +13162,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => { startProfileRequest.current = startServiceRequestForConnection; });
   useEffect(() => {
     if (loading || workspaceLoadPhase !== 'ready' || error || profileRequestConsumed.current) return;
-    const contractorId = new URLSearchParams(window.location.hash.split('?')[1]).get('request_contractor');
+    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    const contractorId = params.get('request_contractor');
     if (!contractorId) return;
-    profileRequestConsumed.current = true;
-    const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
-    if (connection) { startProfileRequest.current(connection); setHomeownerTab('contractors'); }
-    else setError('This contractor connection is not active. Review your connections before requesting service.');
-    // Consuming the intent must not emit hashchange: the entry router remounts the app.
-    window.history.replaceState(null, '', appHashRoute('homeowner'));
+    let current = true;
+    const route = window.location.hash;
+    void (async () => {
+      try {
+        const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
+        if (!connection) throw new Error('This contractor connection is not active. Review your connections before requesting service.');
+        const postId = params.get('request_post');
+        const project = postId && supabase ? await loadPublicProject(supabase, contractorId, params.get('request_profile') || '', postId) : undefined;
+        if (!current || window.location.hash !== route) return;
+        startProfileRequest.current(connection, undefined, project);
+        setHomeownerTab('contractors');
+      } catch (err) {
+        if (current) setError(readableError(err, 'The public post could not be checked. Return to the contractor profile and try again.'));
+      } finally {
+        if (current && window.location.hash === route) {
+          profileRequestConsumed.current = true;
+          // No hashchange: it would remount the workspace and discard the draft.
+          window.history.replaceState(null, '', appHashRoute('homeowner'));
+        }
+      }
+    })();
+    return () => { current = false; };
   }, [loading, workspaceLoadPhase, error, connections]);
   const selectedPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedEstimateCount = estimates.filter(estimate => !estimate.home_id).length;
@@ -16473,7 +16492,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     >
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
-      {new URLSearchParams(window.location.hash.split('?')[1]).get('return_profile') && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm"><p>After setting up your property, return to the contractor to choose what to share.</p><a className={buttonClass('secondary')} href={appHashRoute('profile', { slug: new URLSearchParams(window.location.hash.split('?')[1]).get('return_profile'), intent: 'connect' })}>Return to contractor profile</a></div>}
+      {new URLSearchParams(window.location.hash.split('?')[1]).get('return_profile') && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm"><p>After setting up your property, return to the contractor to choose what to share.</p><a className={buttonClass('secondary')} href={appHashRoute('profile', { slug: new URLSearchParams(window.location.hash.split('?')[1]).get('return_profile'), intent: 'connect', post: new URLSearchParams(window.location.hash.split('?')[1]).get('return_post') })}>Return to contractor profile</a></div>}
       <WorkspaceLoadBoundary
         phase={workspaceLoadPhase}
         label="homeowner workspace"
@@ -16952,6 +16971,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 )}
                 {serviceRequestDraft.connection_id ? (
                   <>
+                    {renderServiceRequestProject()}
                     <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
                       <Field label="Urgency">
                         <select
@@ -17677,6 +17697,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </div>
                 </div>
 
+                {renderServiceRequestProject()}
                 {renderServiceRequestPropertyField()}
 
                 <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
@@ -18883,6 +18904,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         </select>
                       </Field>
                     </div>
+                    {renderServiceRequestProject()}
                     <Field label="Message to contractor">
                       <textarea
                         rows={5}
@@ -47144,6 +47166,7 @@ export function ContextualConnectionRequestModal({
   contractor,
   homes,
   initialHomeId,
+  projectReference,
   submitting,
   error,
   onSubmit,
@@ -47152,6 +47175,7 @@ export function ContextualConnectionRequestModal({
   contractor: ContextualConnectionContractorTarget;
   homes: HomeProfile[];
   initialHomeId?: string;
+  projectReference?: ReactNode;
   submitting: boolean;
   error?: string;
   onSubmit: (draft: ContextualConnectionSubmitDraft) => Promise<void>;
@@ -47288,6 +47312,7 @@ export function ContextualConnectionRequestModal({
             </span>
           </label>
 
+          {projectReference}
           <Field label="Optional message">
             <textarea
               className={inputClass()}
@@ -47696,179 +47721,8 @@ function NotificationBell({
   );
 }
 
-export function ContractorPublicProfilePage({ slug, currentProfile, onAuthed }: {
-  slug: string; currentProfile: Profile | null; onAuthed: () => void;
-}) {
-  const { data, loading, notFound, error: profileError, connectionStatus, setConnectionStatus, homeownerHomes, retry } = usePublicContractorProfile(slug, currentProfile);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup' | null>(() => { const params = new URLSearchParams(window.location.hash.split('?')[1]); return params.get('intent') === 'connect' ? params.get('mode') === 'signup' ? 'signup' : 'signin' : null; });
-  const [connectionModalOpen, setConnectionModalOpen] = useState(false);
-  const [requesting, setRequesting] = useState(false);
-  const [requestDone, setRequestDone] = useState(false);
-  const [requestError, setRequestError] = useState('');
-
-  const publicContractorTarget = data ? {
-    id: data.contractor_id,
-    business_name: data.business_name,
-    city: data.city,
-    state: data.state,
-    logo_url: contractorLogoUrl(data.logo_url),
-    service_categories: data.categories,
-  } satisfies ContextualConnectionContractorTarget : null;
-
-  const submitConnectionRequest = async (draft: ContextualConnectionSubmitDraft) => {
-    if (!supabase || !data || !currentProfile) return;
-    setRequesting(true);
-    setRequestError('');
-    try {
-      const { error } = await supabase.rpc('servsync_submit_contextual_connection_request', {
-        p_contractor_id: data.contractor_id,
-        p_request_message: draft.message,
-        p_share_contact: draft.share_contact,
-        p_property_permissions: draft.properties.map(property => ({
-          home_id: property.home_id,
-          share_home_overview: property.share_home_overview,
-          share_address: property.share_address,
-          share_preferred_vendors: property.share_preferred_vendors,
-          share_photos: false,
-        })),
-      });
-      if (error) throw error;
-      setConnectionModalOpen(false);
-      setConnectionStatus('pending');
-      setRequestDone(true);
-    } catch (err) {
-      setRequestError(readableError(err, 'Unable to request contractor connection.'));
-    } finally {
-      setRequesting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-500 shadow-sm">
-        Loading profile…
-      </div>
-    );
-  }
-
-  if (profileError) return <div role="alert">{profileError} <button className={buttonClass('secondary')} onClick={retry}>Retry profile</button></div>;
-  if (notFound || !data) return <PublicContractorProspect slug={slug} />;
-
-  const location = [data.city, data.state].filter(Boolean).join(', ');
-  const returnToHomeownerDiscover = () => {
-    window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'discover');
-    updateRoute('homeowner');
-  };
-
-  return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      {currentProfile?.role === 'homeowner' && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-sm text-slate-500">Viewing a public contractor profile from ServSync.</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={returnToHomeownerDiscover} className={buttonClass('secondary')}>
-              Back to Discover
-            </button>
-            <button type="button" onClick={() => updateRoute('homeowner')} className={buttonClass('secondary')}>
-              Go to my portal
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Header card */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-1 gap-4">
-            {data.logo_url && (
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white shadow-sm">
-                <img src={contractorLogoUrl(data.logo_url)} alt={`${data.business_name} logo`} className="h-full w-full object-contain p-2" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Contractor profile</p>
-              <h1 className="mt-2 text-3xl font-bold text-slate-950">{data.business_name}</h1>
-              {location && (
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
-                  <MapPin size={14} />
-                  {location}
-                </p>
-              )}
-              {data.categories.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {data.categories.map(c => (
-                    <span key={c} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{c}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-        </div>
-
-        {/* CTA */}
-        <div className="mt-5 border-t border-slate-200 pt-5">
-          {!currentProfile && <div className="space-y-3">
-            <p className="font-semibold">Connect with {data.business_name}</p><p className="text-sm text-slate-600">Sign in or create a homeowner account, then choose what to share. Nothing is sent automatically.</p>
-            <div className="flex flex-wrap gap-2">{(['signin', 'signup'] as const).map(mode => <button key={mode} className={buttonClass(mode === 'signin' ? 'primary' : 'secondary')} onClick={() => { window.history.replaceState(null, '', appHashRoute('profile', { slug, intent: 'connect', mode })); setAuthMode(mode); }}>{mode === 'signin' ? 'Sign in to connect' : 'Create homeowner account'}</button>)}</div>
-            {authMode && <AuthPage key={authMode} role="homeowner" inviteCode="" referralCode="" initialMode={authMode} onAuthed={onAuthed} />}
-          </div>}
-          {currentProfile?.role === 'homeowner' && <SaveContractor key={currentProfile.id} homeownerId={currentProfile.id} contractorId={data.contractor_id} />}
-          {currentProfile?.role === 'homeowner' && (!connectionStatus || ['declined', 'revoked', 'dismissed'].includes(connectionStatus)) && !requestDone && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-semibold text-blue-950">Connect before requesting service</p>
-              <p className="mt-1 text-sm text-blue-800">
-                Send a connection request first. Choose the properties and service-relevant details this contractor may see if they accept.
-              </p>
-              {requestError && <div className="mt-3"><Notice tone="error" text={requestError} /></div>}
-              {homeownerHomes.length === 0 && <div className="mt-3 text-sm"><p>Add a property before sending a connection request. Then return here to choose what to share.</p><button className={buttonClass('secondary')} onClick={() => { window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'home'); updateRoute('homeowner', `return_profile=${encodeURIComponent(slug)}`); }}>Set up my property</button></div>}
-              <button type="button" onClick={() => setConnectionModalOpen(true)} disabled={requesting} className={`${buttonClass('primary')} mt-3`}>
-                <Link2 size={16} />
-                {requesting ? 'Sending request…' : connectionStatus ? `Request again with ${data.business_name}` : `Request connection with ${data.business_name}`}
-              </button>
-            </div>
-          )}
-          {currentProfile?.role === 'homeowner' && ((connectionStatus && !['declined', 'revoked', 'dismissed'].includes(connectionStatus)) || requestDone) && (
-            <div className="flex flex-wrap items-center gap-3">
-              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                connectionStatus === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-              }`}>
-                {connectionStatus === 'active' ? 'Connected' : 'Connection request sent'}
-              </span>
-              {connectionStatus === 'active' && <button className={buttonClass('primary')} onClick={() => updateRoute('homeowner', `request_contractor=${encodeURIComponent(data.contractor_id)}`)}>Request service</button>}
-              <button type="button" onClick={returnToHomeownerDiscover} className={buttonClass('secondary')}>
-                Back to Discover
-              </button>
-              <button type="button" onClick={() => updateRoute('homeowner')} className={buttonClass('secondary')}>
-                Go to my portal
-              </button>
-            </div>
-          )}
-          {currentProfile?.role === 'contractor' && (
-            <p className="text-xs text-slate-500">You're viewing this as a contractor. Homeowners can request a connection from this page.</p>
-          )}
-        </div>
-      </section>
-
-      {publicContractorTarget && connectionModalOpen && (
-        <ContextualConnectionRequestModal
-          key={publicContractorTarget.id}
-          contractor={publicContractorTarget}
-          homes={homeownerHomes}
-          submitting={requesting}
-          error={requestError}
-          onSubmit={submitConnectionRequest}
-          onClose={() => {
-            if (requesting) return;
-            setConnectionModalOpen(false);
-            setRequestError('');
-          }}
-        />
-      )}
-
-      <PublicProfileEvidence key={data.contractor_id} profile={data} />
-    </div>
-  );
+export function ContractorPublicProfilePage(props: { slug: string; currentProfile: Profile | null; onAuthed: () => void }) {
+  return <PublicContractorProfilePage {...props} AuthPage={AuthPage} ConnectionModal={ContextualConnectionRequestModal} />;
 }
 
 export function DiscoverFeed({
@@ -48522,6 +48376,7 @@ export function DiscoverFeed({
                     </button>
                   )}
 
+                  {perspective === 'homeowner' && contractorSlug && <button type="button" className={buttonClass('secondary')} onClick={() => { window.location.hash = appHashRoute('profile', { slug: contractorSlug, post: item.post_id, intent: 'connect' }); }}>Ask about similar work</button>}
                   {perspective === 'homeowner' && contractorSlug && (
                     <button
                       type="button"
@@ -48717,6 +48572,7 @@ export function DiscoverFeed({
                     {savingPostId === selectedPost.post_id ? 'Saving...' : selectedPost.is_saved ? 'Saved' : 'Save Post'}
                   </button>
                 )}
+                {perspective === 'homeowner' && selectedPostSlug && <button type="button" className={buttonClass('secondary')} onClick={() => { window.location.hash = appHashRoute('profile', { slug: selectedPostSlug, post: selectedPost.post_id, intent: 'connect' }); }}>Ask about similar work</button>}
                 {perspective === 'homeowner' && selectedPostSlug && (
                   <button
                     type="button"

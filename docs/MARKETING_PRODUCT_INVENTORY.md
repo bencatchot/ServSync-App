@@ -1,5 +1,7 @@
 # ServSync Marketing Product Inventory
 
+November 8 review-only source increment: a homeowner can select **Ask about similar work** on an existing public post and carry its exact reference through sign-in/property setup into an explicitly sent existing connection/service request. This is not yet a Production claim, verification of job completion, automatic outreach, or new messaging capability. Existing privacy consent and active-connection service authorization remain. See [implementation and limits](features/DISCOVER_PROJECT_INQUIRY_CONTINUITY.md).
+
 ## Business-aware Practice — November 2 release scope
 
 The owner approved PR #588's Production merge after Preview review. Check the [PR release evidence](https://github.com/bencatchot/ServSync-App/pull/588) for the final deployed commit before presenting this scope as live. After verified release, supported wording is: “You can also practice with a copy of the prices and templates you've already set up.” Workflow: Practice → My pricing and templates → review and accept the setup copy → create a practice estimate → use a template or browse the copied Price Book. Explicit refresh supplies new estimates; existing practice estimates keep their frozen version. Bounded authenticated Demo Preview verification used clearly labeled fictional HVAC samples. It did not save/send a real customer Draft. The following paragraph records the original Preview boundary; durable/cross-device import remains deferred.
