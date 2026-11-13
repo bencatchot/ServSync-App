@@ -36,9 +36,9 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     expect(serviceAgreementSource).toContain('title="Draft service plan"');
     expect(serviceAgreementSource).toContain('Not visible to the homeowner yet. Save the draft, then send when ready.');
     expect(serviceAgreementSource).toContain('Choose one explicitly shared property for each offer.');
-    expect(serviceAgreementSource).toContain('Homeowners can review and respond after an offer is sent, and accepted plans stay read-only.');
-    expect(serviceAgreementSource).toContain('Scheduling and billing are coordinated separately.');
-    expect(serviceAgreementSource).toContain('This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.');
+    expect(serviceAgreementSource).toContain('Accepted price, terms and visit allowance stay read-only.');
+    expect(serviceAgreementSource).toContain('Set up visits explicitly, then link existing Jobs for scheduling and completion.');
+    expect(serviceAgreementSource).toContain('Billing, renewals and delivery remain manual.');
     expect(serviceAgreementSource).not.toContain('Homeowner review and response is planned for a later slice.');
   });
 
@@ -129,7 +129,8 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     expect(uiSource).toContain('Explicitly shared property');
     expect(uiSource).toContain('selectedServiceAgreementOfferHomes.map');
     expect(uiSource).not.toContain("from('homes')");
-    expect(uiSource).not.toContain('homeowner_user_id');
+    expect(uiSource).not.toContain('name="homeowner_user_id"');
+    expect(uiSource).toContain("startCustomerProfileDraft('connected', plan.homeowner_user_id, plan.home_id)");
   });
 
   test('preserves role and read-only boundaries for create/edit/send controls', () => {
@@ -155,7 +156,7 @@ test.describe('FB-032 contractor Service Plans UI source guardrails', () => {
     expect(serviceAgreementSource).toContain('canManageServiceAgreements');
   });
 
-  test('does not add visits, homeowner response UI, or automation integrations', () => {
+  test('keeps contractor plan entry separate from homeowner responses and automated delivery', () => {
     const source = appSource();
     const serviceAgreementSource = sourceBetween(
       source,

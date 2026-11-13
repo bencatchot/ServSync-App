@@ -34,6 +34,10 @@ jobs:
       - run: npm run test:demo-recorder
       - run: npm run typecheck
       - run: npm run typecheck:practice
+      - name: Verify Service Plan visit logic
+        run: node --import tsx --test tests/serviceAgreements/*.test.ts
+      - name: Verify isolated Service Plan visit persistence
+        run: PATH="$(pg_config --bindir):$PATH" bash scripts/validation/validate-service-plan-visits.sh
       - name: Verify isolated Practice database foundation
         run: PG16_BIN="$(pg_config --bindir)" npm run test:practice
       - run: npm run build

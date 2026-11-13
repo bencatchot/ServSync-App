@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-10-16",
+  "updatedOn": "2026-11-13",
   "authoritativeEnvironment": "production",
   "foundations": [
+    {
+      "id": "service-plan-visit-tracking",
+      "artifact": "supabase/migrations/20261113223048_service_plan_visits.sql",
+      "environments": {
+        "sandbox": {
+          "status": "Pending",
+          "reason": "Source-only additive visit tracking migration; disposable local PostgreSQL validation passed. Hosted installation and fictional acceptance testing require separate approval. No environment changes performed."
+        },
+        "demo": {
+          "status": "Pending",
+          "reason": "Source-only additive visit tracking migration; disposable local PostgreSQL validation passed. Hosted installation and fictional acceptance testing require separate approval. No environment changes performed."
+        },
+        "production": {
+          "status": "Pending",
+          "reason": "Source-only additive visit tracking migration; disposable local PostgreSQL validation passed. Hosted installation and fictional acceptance testing require separate approval. No environment changes performed."
+        }
+      }
+    },
     {
       "id": "practice-demo-access-deadline-response",
       "artifact": "server/practice/demo-draft/20261016193850_practice_demo_access_deadline_response.sql",

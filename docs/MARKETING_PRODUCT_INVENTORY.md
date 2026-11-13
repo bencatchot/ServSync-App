@@ -459,3 +459,7 @@ Beta-safe landing page structure:
 8. Invite/request access CTA.
 
 Do not present the landing page as a public self-serve marketplace launch until that strategy is explicitly approved.
+
+
+### Service Plan visits — Preview work, not a live claim
+Accepted-plan visit tracking is being prepared for owner review: explicit setup, due targets, existing Job linkage and completion, optional shared homeowner progress. It does not provide automatic recurring scheduling, billing, renewal, messages or exact-job suitability promises. The additive hosted migration and real-backend acceptance remain pending; do not market this as available in Production.
