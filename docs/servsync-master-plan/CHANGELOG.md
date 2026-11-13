@@ -11375,3 +11375,10 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Corrections retain before/after history; role, account entitlement, property-sharing, version and duplicate-action checks protect mutation paths.
 - Accepted plan snapshots stay unchanged. No hosted SQL, Production release, billing, renewal, notification or retained Demo data changes.
 - Validation and hosted/tutorial gates: `docs/features/SERVICE_PLAN_VISITS.md`.
+
+## 2026-11-13 — Service Plan visits: Demo installation and initial acceptance
+- Applied only the owner-approved reviewed visit migration to ServSync Demo. Sandbox and Production remain unchanged.
+- Created eight clearly fictional test records using existing Demo identities and application RPCs: accepted offer/plan, two visits, Job, scope item, private Calendar event and visit-change history. Duplicate setup/update retries passed; initial Job activation and private scheduling persisted.
+- Preserved all 100 pre-existing fingerprints across 21 observed tables, including retained showcase and earlier pending cleanup fixtures. No new messages, notifications or email-attempt records; no cleanup performed.
+- The subsequent lifecycle test confirmation expired without execution. Hosted lifecycle/sharing/role coverage, authenticated browser acceptance, report workflow and tutorial playback remain incomplete. Scoped browser checks reached sign-in only.
+- Exact retained IDs, evidence and resumption boundaries: `docs/features/SERVICE_PLAN_VISITS_DEMO_ACCEPTANCE.md`.

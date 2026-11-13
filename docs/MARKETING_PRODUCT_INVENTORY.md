@@ -462,4 +462,4 @@ Do not present the landing page as a public self-serve marketplace launch until 
 
 
 ### Service Plan visits — Preview work, not a live claim
-Accepted-plan visit tracking is being prepared for owner review: explicit setup, due targets, existing Job linkage and completion, optional shared homeowner progress. It does not provide automatic recurring scheduling, billing, renewal, messages or exact-job suitability promises. The additive hosted migration and real-backend acceptance remain pending; do not market this as available in Production.
+Accepted-plan visit tracking is being prepared for owner review: explicit setup, due targets, existing Job linkage and completion, optional shared homeowner progress. It does not provide automatic recurring scheduling, billing, renewal, messages or exact-job suitability promises. The reviewed migration is installed in Demo and initial fictional setup/idempotency/private scheduling passed. Hosted lifecycle acceptance, authenticated browser review and tutorial playback remain incomplete; do not market this as available in Production.

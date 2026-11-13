@@ -12,8 +12,8 @@
           "reason": "Source-only additive visit tracking migration; disposable local PostgreSQL validation passed. Hosted installation and fictional acceptance testing require separate approval. No environment changes performed."
         },
         "demo": {
-          "status": "Pending",
-          "reason": "Source-only additive visit tracking migration; disposable local PostgreSQL validation passed. Hosted installation and fictional acceptance testing require separate approval. No environment changes performed."
+          "status": "Applied",
+          "reason": "Owner-approved reviewed migration applied to ServSync Demo bdytwgejqnlblhrnqxkp on 2026-11-13; table and RPC presence verified. SHA-256 3bcba1c91d9427d70a9e19a18932f44ab619771b5030525c03c29aba6818a7de. Initial fictional RPC setup/idempotency and private Calendar scheduling passed; eight new records retained, 100 pre-existing fingerprints unchanged. Hosted lifecycle confirmation expired without execution; browser acceptance and tutorial playback await authenticated sessions. Applied means schema installed, not acceptance complete. See docs/features/SERVICE_PLAN_VISITS_DEMO_ACCEPTANCE.md."
         },
         "production": {
           "status": "Pending",
