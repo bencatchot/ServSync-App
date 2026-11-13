@@ -11367,3 +11367,18 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Validation: focused core-authoring contracts 12/12 and combined reliability contracts 20/20; SQL catalog/security in all three environments; real Sandbox and Demo runtime matrices; connected/local parity; canonical resettable Sandbox full loop 2/2; action feedback 6/6; TypeScript; Production build; exact 80-warning lint budget; 50,837-line App-size and architecture guardrails; backend parity 16/16 plus live Production/Demo parity; migration checksums; rollout ledger; sensitive-value and Markdown-link scans; and `git diff --check`. Live Sandbox parity retains the same 21 unrelated pre-existing findings. Two adjacent pre-existing lifecycle suites still carry stale pre-FB-039B navigation/cohort assumptions and are not weakened or counted as FB-039E1 acceptance.
 - Compatibility and follow-up: Prior Request/direct-table write paths remain temporarily available only for database-ahead-of-app rollout compatibility. Retire them in a separately protected cleanup after the new application head is deployed and observed. FB-039E remains open for FB-039E2 report/Home History/document finalization and remaining shared-home acceptance; Phase 0.5 stays behind full Phase 0.4 acceptance.
 - Backlog impact: FB-039 remains Implementation In Progress. Request and direct Estimate/Invoice authoring move from frontend-only prevention to durable backend idempotency; FB-039E2 is the next launch-roadmap slice. FB-037 Marketing remains the bounded parallel lane.
+
+
+## 2026-11-13 — Service Plan visit tracking (source / Preview preparation)
+- Approved manual visits first version; PR595 task search remains set aside.
+- Added explicit setup and individual tracking for unspecified allowances, target dates, existing property-matched Job links, derived completion, explicit progress sharing and Work attention. Existing Draft/Job/Calendar/report workflows remain authoritative.
+- Corrections retain before/after history; role, account entitlement, property-sharing, version and duplicate-action checks protect mutation paths.
+- Accepted plan snapshots stay unchanged. No hosted SQL, Production release, billing, renewal, notification or retained Demo data changes.
+- Validation and hosted/tutorial gates: `docs/features/SERVICE_PLAN_VISITS.md`.
+
+## 2026-11-13 — Service Plan visits: Demo installation and initial acceptance
+- Applied only the owner-approved reviewed visit migration to ServSync Demo. Sandbox and Production remain unchanged.
+- Created eight clearly fictional test records using existing Demo identities and application RPCs: accepted offer/plan, two visits, Job, scope item, private Calendar event and visit-change history. Duplicate setup/update retries passed; initial Job activation and private scheduling persisted.
+- Preserved all 100 pre-existing fingerprints across 21 observed tables, including retained showcase and earlier pending cleanup fixtures. No new messages, notifications or email-attempt records; no cleanup performed.
+- The subsequent lifecycle test confirmation expired without execution. Hosted lifecycle/sharing/role coverage, authenticated browser acceptance, report workflow and tutorial playback remain incomplete. Scoped browser checks reached sign-in only.
+- Exact retained IDs, evidence and resumption boundaries: `docs/features/SERVICE_PLAN_VISITS_DEMO_ACCEPTANCE.md`.
