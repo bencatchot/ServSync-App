@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-13 — Task-based Discover search (Preview review)
+
+- Branch `codex/discover-task-search`, isolated from current main `111c309` after PR #594 released. Add a task input and small transparent local phrase-to-service map to the existing contractor directory. Single suggestions select a correctable Service filter; ambiguity asks for a choice and unmatched input keeps manual selection available.
+- Preserve city/full-ZIP matching, alphabetical ordering, private saved contractors and inquiry behavior. Task edits clear stale service choices while retaining area and saved-list scope. Matching a trade does not guarantee exact-task capability. No paid AI, schema, auth, consent, permission, configuration or hosted-record changes.
+- Focused phrase tests and desktop/mobile browser tests cover examples, ambiguity, no match, repetition/editing, correction, empty supply, location and saved filters; existing inquiry tests are rerun. Exact final validation, tutorial evidence, CI and protected Preview are recorded in the draft PR.
+- Documentation: scoped feature report, FB-009 next step, master-plan boundary and marketing limitations updated. Source/Preview only; Production release requires separate approval.
+
 ## 2026-11-08 — Public project inquiry continuity (source/Preview review)
 
 - Branch: `codex/discover-project-inquiry-continuity`, based on current main `4d74239`. Add a public-post action that preserves exact contractor/post context through existing auth/property continuation and explicit connection/service submission.

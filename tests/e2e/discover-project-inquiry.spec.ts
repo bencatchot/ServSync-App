@@ -11,7 +11,7 @@ async function setup(page: Page, initialStatus: string | null = null) {
   const connection = { connection_id: '30000000-0000-4000-8000-000000000001', contractor_id: contractorId, business_name: 'Bay Plumbing', contact_name: 'Pat', email: 'contractor@example.test', phone: '', logo_url: '', city: 'Fairhope', state: 'AL', status: 'active', source: 'homeowner', permissions, shared_properties: [{ ...permissions, home_id: homeId }], created_at: '2026-09-01T12:00:00Z', updated_at: '2026-09-01T12:00:00Z' };
   const writes: { name: string; body: { p_request_message?: string; p_share_contact?: boolean; p_property_permissions?: unknown[]; p_payload?: { description: string; media: unknown[] } } }[] = [];
   const state = { status: initialStatus, hasHome: true, available: true, lookupError: false, title: 'Garden faucet installation', profileAvailable: true };
-  const post = { post_id: postId, contractor_id: contractorId, title: state.title, description: 'A public update only.', photos: [], created_at: '2026-09-01T12:00:00Z' };
+  const post = { post_id: postId, contractor_id: contractorId, business_name: 'Bay Plumbing', contractor_city: 'Fairhope', contractor_state: 'AL', categories: ['Plumbing'], post_category: 'Plumbing', service_areas: [], external_review_links: [], is_saved: false, title: state.title, description: 'A public update only.', photos: [], created_at: '2026-09-01T12:00:00Z' };
   await page.route('**/*', async route => { const url = new URL(route.request().url()); if (url.origin === new URL(process.env.TEST_APP_URL!).origin) await route.continue(); else await route.abort(); });
   page.on('pageerror', error => { throw error; });
   // Intercept every backend request before navigation: safe on a hosted Preview too.
@@ -283,3 +283,22 @@ test('Ask rechecks a selected post before advancing an active connection', async
   await expect(page.getByRole('button', { name: 'Request service', exact: true })).toBeDisabled();
   expect(writes).toEqual([]);
 });
+
+for (const width of [1440, 390]) {
+  test(`task search reaches the existing project inquiry at ${width}px`, async ({page}) => {
+    await page.setViewportSize({width, height:1000});
+    const {writes}=await setup(page,'active');
+    await page.goto('/#/profile?slug=bay-plumbing&intent=connect');
+    await signIn(page);
+    await page.getByRole('button',{name:'Back to Discover',exact:true}).first().click();
+    await page.getByRole('textbox',{name:'What do you need done?',exact:true}).fill('replace a faucet');
+    await page.getByRole('button',{name:'Suggest service',exact:true}).click();
+    await expect(page.getByRole('combobox',{name:'Service',exact:true})).toHaveValue('Plumbing');
+    await page.getByRole('link',{name:'View profile for Bay Plumbing',exact:true}).click();
+    await page.getByRole('button',{name:'Ask about similar work',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Request service from Bay Plumbing'})).toBeVisible();
+    await expect(page.getByRole('region',{name:'Public post reference'}).getByRole('link')).toHaveAttribute('href',new RegExp(postId));
+    await expect(page.getByRole('textbox',{name:'What do you need help with?',exact:true})).toHaveValue('');
+    expect(writes).toEqual([]);
+  });
+}

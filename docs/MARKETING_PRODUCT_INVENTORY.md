@@ -1,5 +1,7 @@
 # ServSync Marketing Product Inventory
 
+November 13 task-search review increment: homeowners can describe common work and receive a transparent broad-service suggestion, with manual correction and choices for ambiguous wording. Existing location filters, private saves and public-project inquiries are preserved. This is a limited phrase map, not AI advice, exact-task qualification, contractor verification, availability or a released Production capability. See [scope](features/DISCOVER_TASK_SEARCH.md).
+
 November 8 review-only source increment: a homeowner can select **Ask about similar work** on an existing public post and carry its exact reference through sign-in/property setup into an explicitly sent existing connection/service request. This is not yet a Production claim, verification of job completion, automatic outreach, or new messaging capability. Existing privacy consent and active-connection service authorization remain. See [implementation and limits](features/DISCOVER_PROJECT_INQUIRY_CONTINUITY.md).
 
 ## Business-aware Practice — November 2 release scope
