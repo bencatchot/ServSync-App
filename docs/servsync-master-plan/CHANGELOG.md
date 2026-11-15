@@ -1,5 +1,13 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-15 — Recurring smoke runner and report repair (source review)
+
+- Pin the three FB-016 recurring smoke jobs to Ubuntu 24.04 after run `43715948043` stopped during Playwright installation on Ubuntu 26.04; run `43594225568` passed on 24.04 at the same main commit `111c3097`.
+- Sanitized browser reports distinguish `SETUP FAILURE`, `CHECKS NOT RUN`, executed-check `APPLICATION FAILURE`, and `JOB INCOMPLETE`. Setup/check group statuses are included; all required steps and the job must succeed before the report can claim success. Missing, skipped, cancelled, and unknown outcomes fail closed. Existing API evidence retains its detailed categories.
+- Add dependency-free report generation and 20 regression cases to the existing role-smoke contract suite; run the suite in PR quality checks. Preserve the smoke schedule, manual trigger, check commands, environment targets, and artifact paths.
+- Validation: all 27 smoke-contract tests, 27 architecture tests, 16 backend-parity tests, 6 runtime-parity tests, 60 recorder tests, and 50 disposable local Practice tests pass; lint passes with 76 existing warnings, App budget, application/Practice types, build, workflow YAML/reference validation, and diff checks pass. Local PostgreSQL required supported shared-memory access. Build retains its existing large-chunk warning.
+- Tutorial impact: NOT APPLICABLE; CI-only change. Authenticated smoke remains unverified until a safe successful run. No smoke dispatch, Production action, credentials/access change, or changes to held PR #595/#596.
+
 ## 2026-11-08 — Public project inquiry continuity (source/Preview review)
 
 - Branch: `codex/discover-project-inquiry-continuity`, based on current main `4d74239`. Add a public-post action that preserves exact contractor/post context through existing auth/property continuation and explicit connection/service submission.
