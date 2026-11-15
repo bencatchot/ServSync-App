@@ -15,7 +15,7 @@ permissions:
 jobs:
   sandbox-role-fixture-health:
     name: Sandbox role, fixture, UI, and backup health
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       SERVSYNC_ROLE_SMOKE_TARGET: sandbox
@@ -52,15 +52,21 @@ jobs:
       SERVSYNC_RECURRING_ROLE_UI: 'true'
     steps:
       - uses: actions/checkout@v4
+        id: checkout
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+        id: dependencies
       - run: npx playwright install --with-deps chromium
+        id: browser_install
       - name: Build exact head for Sandbox
+        id: build
         run: npm run build
       - name: Start local exact-head app
+        id: app_ready
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/servsync-role-smoke-vite.log 2>&1 &
           for attempt in {1..30}; do
@@ -70,18 +76,18 @@ jobs:
           echo 'APPLICATION FAILURE: exact-head app did not become ready.' >&2
           exit 1
       - name: Run fail-closed API identity, fixture, authorization, and backup checks
+        id: api_checks
         run: npm run ops:role-smoke:api
       - name: Run read-only role browser smoke
+        id: browser_checks
         run: npm run qa:e2e:role-smoke
       - name: Record browser result
         if: always()
-        run: |
-          mkdir -p artifacts
-          status='${{ job.status }}'
-          category=null
-          if [ "$status" != success ]; then category='"APPLICATION FAILURE"'; fi
-          printf '{"run_id":"github-%s-%s","environment":"sandbox","check":"browser","status":"%s","category":%s,"trigger":"%s"}\n' \
-            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$status" "$category" "$GITHUB_EVENT_NAME" > artifacts/sandbox-browser-smoke.json
+        env:
+          SMOKE_JOB_STATUS: ${{ job.status }}
+          SMOKE_SETUP_OUTCOMES: ${{ steps.checkout.outcome }},${{ steps.node.outcome }},${{ steps.dependencies.outcome }},${{ steps.browser_install.outcome }}
+          SMOKE_CHECK_OUTCOMES: ${{ steps.build.outcome }},${{ steps.app_ready.outcome }},${{ steps.api_checks.outcome }},${{ steps.browser_checks.outcome }}
+        run: node scripts/operational-smoke/record-browser-result.mjs sandbox browser artifacts/sandbox-browser-smoke.json
       - name: Upload sanitized operational evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -94,7 +100,7 @@ jobs:
 
   demo-readonly-health:
     name: Demo approved read-only identities
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       SERVSYNC_VALIDATION_TARGET: demo
@@ -108,23 +114,26 @@ jobs:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.DEMO_VERCEL_AUTOMATION_BYPASS_SECRET }}
     steps:
       - uses: actions/checkout@v4
+        id: checkout
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+        id: dependencies
       - run: npx playwright install --with-deps chromium
+        id: browser_install
       - name: Run Demo read-only navigation
+        id: browser_checks
         run: npm run qa:e2e:role-smoke:demo
       - name: Record sanitized Demo result
         if: always()
-        run: |
-          mkdir -p artifacts
-          status='${{ job.status }}'
-          category=null
-          if [ "$status" != success ]; then category='"APPLICATION FAILURE"'; fi
-          printf '{"run_id":"github-%s-%s","environment":"demo","check":"bounded_readonly_browser","status":"%s","category":%s,"trigger":"%s"}\n' \
-            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$status" "$category" "$GITHUB_EVENT_NAME" > artifacts/demo-readonly-smoke.json
+        env:
+          SMOKE_JOB_STATUS: ${{ job.status }}
+          SMOKE_SETUP_OUTCOMES: ${{ steps.checkout.outcome }},${{ steps.node.outcome }},${{ steps.dependencies.outcome }},${{ steps.browser_install.outcome }}
+          SMOKE_CHECK_OUTCOMES: ${{ steps.browser_checks.outcome }}
+        run: node scripts/operational-smoke/record-browser-result.mjs demo bounded_readonly_browser artifacts/demo-readonly-smoke.json
       - name: Upload sanitized Demo evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -136,7 +145,7 @@ jobs:
 
   production-readonly-health:
     name: Production approved read-only identities
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       TEST_APP_URL: https://servsync.app
@@ -146,25 +155,29 @@ jobs:
       PROD_SMOKE_HOMEOWNER_PASSWORD: ${{ secrets.PROD_SMOKE_HOMEOWNER_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+        id: checkout
       - uses: actions/setup-node@v4
+        id: node
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+        id: dependencies
       - run: npx playwright install --with-deps chromium
+        id: browser_install
       - name: Run Production public smoke
+        id: public_checks
         run: npm run qa:e2e:production-public-smoke
       - name: Run approved Production authenticated read-only smoke
+        id: browser_checks
         run: npm run qa:e2e:production-auth-readonly-smoke
       - name: Record sanitized Production result
         if: always()
-        run: |
-          mkdir -p artifacts
-          status='${{ job.status }}'
-          category=null
-          if [ "$status" != success ]; then category='"APPLICATION FAILURE"'; fi
-          printf '{"run_id":"github-%s-%s","environment":"production","check":"approved_readonly_browser","status":"%s","category":%s,"trigger":"%s"}\n' \
-            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$status" "$category" "$GITHUB_EVENT_NAME" > artifacts/production-readonly-smoke.json
+        env:
+          SMOKE_JOB_STATUS: ${{ job.status }}
+          SMOKE_SETUP_OUTCOMES: ${{ steps.checkout.outcome }},${{ steps.node.outcome }},${{ steps.dependencies.outcome }},${{ steps.browser_install.outcome }}
+          SMOKE_CHECK_OUTCOMES: ${{ steps.public_checks.outcome }},${{ steps.browser_checks.outcome }}
+        run: node scripts/operational-smoke/record-browser-result.mjs production approved_readonly_browser artifacts/production-readonly-smoke.json
       - name: Upload sanitized Production evidence
         if: always()
         uses: actions/upload-artifact@v4

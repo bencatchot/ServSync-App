@@ -31,6 +31,7 @@ jobs:
       - run: npm run test:architecture
       - run: npm run backend:parity:test
       - run: npm run runtime:parity:test
+      - run: npm run test:role-smoke-contract
       - run: npm run test:demo-recorder
       - run: npm run typecheck
       - run: npm run typecheck:practice
