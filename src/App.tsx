@@ -309,6 +309,8 @@ import {
 import { DraftJobComposer } from './features/jobs/DraftJobComposer';
 import { ContractorScheduleSnapshot, ContractorTodayWork, type ContractorScheduleSnapshotItem } from './features/dashboard/ContractorScheduleSnapshot';
 import { DraftJobList } from './features/jobs/DraftJobList';
+import { PlanGuardrails } from './features/serviceAgreements/PlanGuardrails';
+import { HomeownerPlanVisits, ServicePlanVisits, ServicePlanVisitAttention } from './features/serviceAgreements/PlanVisits';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
 import { TradeSectionJobPanel } from './features/trade-sections/TradeSectionJobPanel';
@@ -13450,17 +13452,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     record.ends_on ? `Ends: ${homeownerServiceAgreementDateLabel(record.ends_on)}` : null,
   ].filter(Boolean) as string[];
 
-  const renderServiceAgreementGuardrailCopy = () => (
-    <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm leading-6 text-blue-900">
-      <p className="font-semibold">Service plan guardrails</p>
-      <ul className="mt-1 list-disc space-y-1 pl-4">
-        <li>Accepting this plan does not set up autopay.</li>
-        <li>Accepting this plan does not create an invoice, schedule a visit, or create a job.</li>
-        <li>This is not a legal e-signature flow.</li>
-        <li>Your contractor will still coordinate scheduling and billing separately.</li>
-      </ul>
-    </div>
-  );
 
   const renderHomeownerServiceAgreementOfferCard = (offer: ServiceAgreementOffer) => {
     const contractorName = homeownerRecordContractorName(offer.contractor_id);
@@ -13518,7 +13509,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 testId="homeowner-service-agreement-sent-notice"
               />
             )}
-            {renderServiceAgreementGuardrailCopy()}
+            <PlanGuardrails />
             {details.length > 0 && (
               <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 {details.map(detail => <span key={detail} className="text-slate-600">{detail}</span>)}
@@ -13622,12 +13613,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               variant="compact"
               testId="homeowner-service-agreement-active-notice"
             />
-            {renderServiceAgreementGuardrailCopy()}
+            <PlanGuardrails />
             {details.length > 0 && (
               <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 {details.map(detail => <span key={detail} className="text-slate-600">{detail}</span>)}
               </div>
             )}
+            {supabase && <HomeownerPlanVisits key={`${profile.id}:${agreement.id}`} client={supabase} actorId={profile.id} plan={agreement} />}
             {agreement.description && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{agreement.description}</p>}
             {agreement.terms_summary && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -39619,15 +39611,16 @@ function ContractorDashboard({
                 />
               )}
 
+              {supabase && contractor && canManageServiceAgreements && contractorTab === 'work' && ['overview', 'needs_attention', 'open_jobs'].includes(contractorWorkView) && <ServicePlanVisitAttention key={`${profile.id}:${contractor.id}`} client={supabase} actorId={profile.id} contractorId={contractor.id} planLabel={plan => `${serviceAgreementConnectionLabel(plan.connection_id)} · ${serviceAgreementHomeLabel(plan.connection_id, plan.home_id)}`} onOpenPlans={openContractorServicePlans} />}
               {contractorTab === 'work' && contractorWorkView === 'service_agreements' && (
                 <Card title="Service Plans" icon={<ClipboardList size={18} />}>
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Contractor-side foundation</p>
-                        <h3 className="mt-1 text-lg font-bold text-slate-950">Create maintenance plan templates and draft offers.</h3>
+                        <h3 className="mt-1 text-lg font-bold text-slate-950">Manage Service Plans and accepted visits.</h3>
                         <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                          Choose one explicitly shared property for each offer. Homeowners can review and respond after an offer is sent, and accepted plans stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
+                          Choose one explicitly shared property for each offer. Accepted price, terms and visit allowance stay read-only. Set up visits explicitly, then link existing Jobs for scheduling and completion. Billing, renewals and delivery remain manual.
                         </p>
                       </div>
                       <button type="button" onClick={() => setContractorWorkViewAndScroll('overview')} className={buttonClass('secondary')}>
@@ -39646,6 +39639,8 @@ function ContractorDashboard({
                     {serviceAgreementDisabledReason && (
                       <Notice tone="info" text={serviceAgreementDisabledReason} />
                     )}
+
+                    {supabase && contractor && canManageServiceAgreements && <ServicePlanVisits key={`${profile.id}:${contractor.id}`} client={supabase} actorId={profile.id} contractorId={contractor.id} planLabel={plan => `${serviceAgreementConnectionLabel(plan.connection_id)} · ${serviceAgreementHomeLabel(plan.connection_id, plan.home_id)}`} disabledReason={serviceAgreementActionsDisabledReason} jobs={operationalInspections} onOpenJob={job => openInspection(job)} onStartDraft={plan => startCustomerProfileDraft('connected', plan.homeowner_user_id, plan.home_id)} />}
 
                     {!serviceAgreementDisabledReason && (
                       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

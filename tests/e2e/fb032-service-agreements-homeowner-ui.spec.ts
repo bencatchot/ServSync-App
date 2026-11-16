@@ -100,10 +100,10 @@ test.describe('FB-032 homeowner Service Plans UI source guardrails', () => {
       'const renderHomeownerInvoiceCard = (invoice: Invoice',
     );
 
-    expect(homeownerSource).toContain('Accepting this plan does not set up autopay.');
-    expect(homeownerSource).toContain('Accepting this plan does not create an invoice, schedule a visit, or create a job.');
-    expect(homeownerSource).toContain('This is not a legal e-signature flow.');
-    expect(homeownerSource).toContain('Your contractor will still coordinate scheduling and billing separately.');
+    expect(sourceFile('src/features/serviceAgreements/PlanGuardrails.tsx')).toContain('Accepting this plan does not set up autopay.');
+    expect(sourceFile('src/features/serviceAgreements/PlanGuardrails.tsx')).toContain('Accepting this plan does not create an invoice, schedule a visit, or create a job.');
+    expect(sourceFile('src/features/serviceAgreements/PlanGuardrails.tsx')).toContain('This is not a legal e-signature flow.');
+    expect(sourceFile('src/features/serviceAgreements/PlanGuardrails.tsx')).toContain('Your contractor will still coordinate scheduling and billing separately.');
     expect(agreementCardSource).toContain('data-testid="homeowner-service-agreement-card"');
     expect(agreementCardSource).toContain('This plan was accepted and is now read-only.');
     expect(agreementCardSource).not.toContain('respondToServiceAgreementOffer');
