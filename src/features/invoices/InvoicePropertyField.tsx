@@ -1,4 +1,5 @@
 import type { ContractorConnectedHomeowner, ContractorLocalContact } from '../../types';
+import { connectedInvoiceHomeDisplay } from './invoicePdfAddress';
 
 export function InvoicePropertyField({ homeId, localHomeId, connection, local, linked, disabled, onChange }: {
   homeId?: string; localHomeId?: string;
@@ -17,7 +18,11 @@ export function InvoicePropertyField({ homeId, localHomeId, connection, local, l
         disabled={disabled || linked} value={selected} onChange={event => onChange(connection ? event.target.value : '', connection ? '' : event.target.value)}>
         <option value="">No property selected</option>
         {selected && !known && <option value={selected}>Linked property unavailable</option>}
-        {homes.filter(home => home.id).map((home, index) => <option key={home.id} value={home.id}>{home.nickname || home.address_line1 || `Property ${index + 1}`}</option>)}
+        {homes.filter(home => home.id).map((home, index) => {
+          const display = connection ? connectedInvoiceHomeDisplay(home, connection) : null;
+          const label = display ? display.serviceLabel || display.serviceAddress.split('\n')[0] : home.nickname || home.address_line1;
+          return <option key={home.id} value={home.id}>{label || `Property ${index + 1}`}</option>;
+        })}
       </select>
     </label>
     <p className="mt-1 text-xs text-slate-500">{linked ? 'Uses the linked work property. ' : 'Choose the property this invoice covers. '}The PDF includes only available, authorized address details. A property name is not a street address.</p>

@@ -1,4 +1,4 @@
-import type { ContractorConnectedHomeowner, ContractorLocalContact, HomeProfile, Invoice } from '../../types';
+import type { ContractorConnectedHomeowner, ContractorConnectedHomeownerHome, ContractorLocalContact, HomeProfile, Invoice } from '../../types';
 
 type Address = Pick<HomeProfile, 'nickname' | 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'>;
 export type InvoiceServiceAddress = { serviceLabel: string; serviceAddress: string };
@@ -12,6 +12,14 @@ function format(home: Address, addressAllowed = true, labelAllowed = true): Invo
   };
 }
 
+// Shared by PDF output and the editor: never reveal stale fields when sharing is off.
+export function connectedInvoiceHomeDisplay(home: ContractorConnectedHomeownerHome, connection: ContractorConnectedHomeowner): InvoiceServiceAddress {
+  if (connection.status !== 'active') return empty();
+  return format(home,
+    (home.share_address ?? connection.permissions.share_address) === true,
+    (home.share_home_overview ?? connection.permissions.share_home_overview) === true);
+}
+
 // Only exact IDs in this customer's already-authorized context. Never fall back
 // to invoice snapshot text, a default property, or another customer's home.
 export function contractorInvoiceServiceAddress(invoice: Pick<Invoice, 'contractor_id' | 'homeowner_user_id' | 'local_contact_id' | 'home_id' | 'local_home_id'>, connection?: ContractorConnectedHomeowner | null, local?: ContractorLocalContact | null): InvoiceServiceAddress {
@@ -22,7 +30,7 @@ export function contractorInvoiceServiceAddress(invoice: Pick<Invoice, 'contract
     if (!home) return empty();
     // Legacy responses omit per-home flags but are already server-redacted.
     // An explicit per-home false always wins over the aggregate connection flag.
-    return format(home, home.share_address ?? connection.permissions.share_address, home.share_home_overview ?? connection.permissions.share_home_overview);
+    return connectedInvoiceHomeDisplay(home, connection);
   }
   if (!invoice.local_home_id || !invoice.local_contact_id || local?.id !== invoice.local_contact_id || local.contractor_id !== invoice.contractor_id) return empty();
   const home = local.homes?.find(item => item.id === invoice.local_home_id && item.local_contact_id === local.id && item.contractor_id === invoice.contractor_id);

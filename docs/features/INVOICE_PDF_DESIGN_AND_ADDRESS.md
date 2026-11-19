@@ -23,3 +23,7 @@ Exact remote head, CI, protected Preview and final tutorial evidence belong in t
 ## Review
 
 Review the fictional PDFs first. In an authorized Preview session, inspect an existing invoice's Preview PDF and Download PDF without sending or changing it. For a new unsaved invoice, inspect the Service property choice and dismiss without saving. Missing or withheld street information must remain absent. Do not assume a property nickname is its mailing address or that a service address is the billing address.
+
+## Defensive selector privacy follow-up
+
+The property selector now uses the same sharing-filtered display helper as invoice PDFs. Explicit per-property false overrides aggregate consent; withheld nicknames/addresses fall back to a neutral Property number. Local-customer labels remain unchanged. Three synthetic architecture regressions cover stale fields, independent permissions, legacy aggregate fallback, revoked/missing consent, PDF parity and selector wiring. Run with `node --test tests/architecture/invoice-property-privacy.test.mjs` on supported Node 22.13+ or 24. No permission values or access rules are changed. Hosted acceptance and tutorial playback remain open; earlier PDF visual checks apply to the renderer, which is unchanged by this follow-up.
