@@ -84,7 +84,7 @@ test.describe('Estimate Editing Basics polish', () => {
     const estimateComposerSource = sourceBetween(
       source,
       '{estimateComposerOpen && selectedJobsCustomerName && (',
-      '{invoiceComposerOpen && selectedJobsCustomerName && (',
+      '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (',
     );
     const groupedRendererSource = sourceBetween(
       source,
@@ -93,8 +93,8 @@ test.describe('Estimate Editing Basics polish', () => {
     );
     const invoiceComposerSource = sourceBetween(
       source,
-      '{invoiceComposerOpen && selectedJobsCustomerName && (',
-      "{contractorJobsView === 'templates' && (",
+      '{authorizedInvoiceComposerOpen && selectedJobsCustomerName && (',
+      "{((contractorTab === 'work' && (contractorWorkView === 'open_estimates'",
     );
 
     expect(estimateComposerSource).toContain('{renderEstimateDraftLineGroups()}');
@@ -110,7 +110,7 @@ test.describe('Estimate Editing Basics polish', () => {
     const source = appSource();
     const focusSource = sourceBetween(source, 'const shouldAutoFocusEstimateLine =', 'useEffect(() => {');
     const focusEffectSource = sourceBetween(source, 'useEffect(() => {\n    if (!estimateLineFocusId) return;', 'useEffect(() => {\n    if (!estimateComposerScrollStorageKey || error) return;');
-    const addSource = sourceBetween(source, 'const addSavedChargeToEstimateDraft =', 'const renderStructuredLineDraftEditor =');
+    const addSource = sourceBetween(source, 'const addPriceBookItemToEstimateDraft =', 'const renderStructuredLineDraftEditor =');
     const removeSource = sourceBetween(source, 'const removeEstimateLineFromDraft =', 'const renderStructuredLineDraftEditor =');
 
     expect(focusSource).toContain("window.matchMedia('(min-width: 768px) and (pointer: fine)').matches");

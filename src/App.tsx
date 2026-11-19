@@ -1,3 +1,4 @@
+import { InvoiceLineItems } from './features/invoices/InvoiceLineItems';
 import { ProjectReference } from './features/discover/ProjectReference';
 import { appendPublicProject, loadPublicProject, type PublicProjectReference } from './features/discover/projectInquiry';
 import { buttonClass } from './ui/buttonClass';
@@ -38226,15 +38227,13 @@ function ContractorDashboard({
                           </div>
                         ) : null}
 
-                        <div className="mt-4 space-y-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-bold text-slate-950">Invoice line items</p>
-                            <button type="button" onClick={() => setInvoiceDraft(d => ({ ...d, line_items: [...(d.line_items ?? []), createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
-                              <Plus size={14} />
-                              Add line
-                            </button>
-                          </div>
-                          {(invoiceDraft.line_items ?? []).map((line, index) => (
+                        <InvoiceLineItems lines={invoiceDraft.line_items ?? []} disabled={savingInvoice}
+                          onAddLine={() => {
+                            const line = createEstimateLineDraft();
+                            setInvoiceDraft(d => ({ ...d, line_items: [...(d.line_items ?? []), line] }));
+                            return line.id;
+                          }}
+                          renderLine={(line, index) => (
                             renderStructuredLineDraftEditor({
                               line,
                               index,
@@ -38249,8 +38248,8 @@ function ContractorDashboard({
                                 line_items: (d.line_items ?? []).length <= 1 ? [createEstimateLineDraft()] : (d.line_items ?? []).filter(item => item.id !== line.id),
                               })),
                             })
-                          ))}
-                        </div>
+                          )}
+                        />
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <Field label="Notes">

@@ -1,5 +1,14 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-19 — Consistent invoice Add Line controls (Preview review)
+
+- Branch: `codex/invoice-add-line-consistency`, based on current main `defce485e94e8f1489f9d136f7bdcc7a880f8049`. UI-only invoice fix; held PR595/PR596 excluded.
+- Moved the standalone invoice Add Line action below its rows and aligned shared Draft Invoice wording/focus. Each activation appends one row and focuses its description; focus is editor-scoped with no timer. Preserve source/partial/reopen routing, financial/status/linked-item restrictions, noninvoice labels, Price Book bulk-add and explicit save/send. No autosave.
+- Files: App integration, invoice line section, shared Draft composer, added-line focus hook, local fixture/browser tests, current-name repairs to estimate/shared routing regressions, one-line App-size ratchet and `docs/features/INVOICE_ADD_LINE_CONSISTENCY.md`.
+- Validation: local desktop/mobile real-component fixtures cover keyboard/repeated adds, focus, empty/disabled states, linked metadata, dismissal/reopen and intent changes; related source contracts cover all reachable editor routes, Price Book and role restrictions. Types, lint (76 existing warnings), build and repository aggregate checks passed. Exact browser totals and CI/Preview evidence are recorded in the PR; hosted authenticated role flows remain unrun.
+- Documentation impact: Backlog reviewed; no update needed. No material master-plan or marketing promise change. Required post-Preview tutorial comparison remains explicit in the PR.
+- No hosted writes, credentials/configuration changes, cleanup, merge or Production release. Existing project edits preserved in the original checkout.
+
 ## 2026-11-15 — Recurring smoke runner and report repair (source review)
 
 - Pin the three FB-016 recurring smoke jobs to Ubuntu 24.04 after run `43715948043` stopped during Playwright installation on Ubuntu 26.04; run `43594225568` passed on 24.04 at the same main commit `111c3097`.

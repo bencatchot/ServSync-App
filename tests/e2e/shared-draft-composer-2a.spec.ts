@@ -190,7 +190,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(estimateStart).toContain("startDraftJobComposer({}, { intendedOutput: 'estimate' });");
     expect(estimateStart).toContain("startCleanDraftJobComposer({ intendedOutput: 'estimate' });");
     expect(estimateStart).toContain('if (durableDraftCohortSafeHold) {');
-    expect(appSource).toContain('kind === \'estimates\' && sharedDraftComposerEnabled');
+    expect(invoiceStart).toContain('if (sharedDraftComposerEnabled && durableDraftInvoiceLaunchAvailable)');
     expect(openFinancialActions).toContain('disabled={durableDraftCohortSafeHold}');
     expect(openFinancialActions).toContain('onClick={durableDraftCohortSafeHold ? () => {');
     expect(openFinancialActions).toContain(': sharedDraftComposerEnabled ? startDraftFirstEstimateComposer');
