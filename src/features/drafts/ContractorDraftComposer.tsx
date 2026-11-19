@@ -5,6 +5,7 @@ import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } f
 import { DraftPriceBookPicker } from '../price-book/DraftPriceBookPicker';
 import type { PriceBookLoadState } from '../price-book/priceBookView';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
+import { useAddedLineFocus } from '../work-composer/useAddedLineFocus';
 import { WorkComposerTotalsPanel } from '../work-composer/WorkComposerTotals';
 import type { WorkComposerLineDraft } from '../work-composer/types';
 import { createWorkComposerLineDraft, workComposerDraftFinancialBreakdown } from '../work-composer/workComposerDrafts';
@@ -127,6 +128,7 @@ export function ContractorDraftComposer({
   // This row stays outside Draft state until edited, so it cannot dirty or block saving.
   const [starterLine] = useState(() => createWorkComposerLineDraft());
   const displayedLines = draft.line_items.length ? draft.line_items : [starterLine];
+  const { lineContainerRef, focusAddedLine } = useAddedLineFocus();
   const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(() => new Set());
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<EstimateTemplate | null>(null);
@@ -160,7 +162,7 @@ export function ContractorDraftComposer({
     : isInvoiceIntent
       ? 'Add the work to include in the draft Invoice. Nothing is sent.'
       : 'Add labor, materials, or fees. You can keep planning before choosing a next step.';
-  const addLineLabel = isEstimateIntent ? 'Add estimate line' : isInvoiceIntent ? 'Add invoice line' : 'Add work line';
+  const addLineLabel = isEstimateIntent ? 'Add estimate line' : isInvoiceIntent ? 'Add Line' : 'Add work line';
   const totalsTitle = isEstimateIntent ? 'Draft Estimate total' : isInvoiceIntent ? 'Draft Invoice total' : draft.intended_output === 'job' ? 'Draft Job total' : 'Draft total';
   const savedTemplateCount = savedWorkTemplates.length;
   const templateSelectionDisabled = interactionDisabled || isChecklistDraft;
@@ -208,9 +210,11 @@ export function ContractorDraftComposer({
   };
 
   const addLine = () => {
+    const line = createWorkComposerLineDraft();
+    if (isInvoiceIntent) focusAddedLine(line.id);
     onChange({
       ...draft,
-      line_items: [...draft.line_items, createWorkComposerLineDraft()],
+      line_items: [...(isInvoiceIntent ? displayedLines : draft.line_items), line],
     });
   };
 
@@ -623,7 +627,7 @@ export function ContractorDraftComposer({
             <p className="mt-1 text-xs leading-5 text-slate-500">{workItemsDescription}</p>
           </div>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-3" ref={lineContainerRef}>
           {displayedLines.map((line, index) => (
             <WorkComposerLineItemRow
               hidePrivateDetails={estimatePracticeOnly}
@@ -647,15 +651,16 @@ export function ContractorDraftComposer({
             />
           ))}
         </div>
-        {draft.line_items.length > 0 ? (
+        {isInvoiceIntent || draft.line_items.length > 0 ? (
           <div className="mt-3 flex justify-end">
             <button
               type="button"
               onClick={addLine}
+              disabled={isInvoiceIntent && (saving || interactionDisabled)}
               className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:w-auto"
               data-testid="durable-draft-add-line"
             >
-              <Plus size={15} />
+              <Plus size={15} aria-hidden="true" />
               {addLineLabel}
             </button>
           </div>
