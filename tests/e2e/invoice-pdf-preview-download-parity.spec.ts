@@ -77,7 +77,7 @@ const pdfContext: InvoicePdfContext = {
   contractorPhone: '(555) 010-2400',
   contractorAddress: 'Tulsa, OK 74103',
   customerName: 'Jordan Customer',
-  customerAddress: '412 Oak Street',
+  serviceAddress: '412 Oak Street',
   serviceLabel: 'Oak Street home',
 };
 
@@ -175,7 +175,7 @@ test.describe('Invoice Preview and Download semantic parity', () => {
       'ServSync Test HVAC',
       'Cooling service invoice',
       'INV-PARITY-1001',
-      'sent',
+      'SENT',
       'Aug 1, 2026',
       'Aug 15, 2026',
       'Jordan Customer',
@@ -200,7 +200,7 @@ test.describe('Invoice Preview and Download semantic parity', () => {
       updated_at: '2026-08-11T12:00:00.000Z',
     }), [
       'PAID',
-      'Status paid',
+      'PAID',
       'Invoice Total $240.00',
       'Amount Paid $240.00',
       'Balance Due $0.00',
@@ -215,7 +215,7 @@ test.describe('Invoice Preview and Download semantic parity', () => {
       amount_paid_cents: 6500,
       updated_at: '2026-08-08T12:00:00.000Z',
     }), [
-      'Status partially paid',
+      'PARTIALLY PAID',
       'Invoice Total $240.00',
       'Amount Paid $65.00',
       'Balance Due $175.00',

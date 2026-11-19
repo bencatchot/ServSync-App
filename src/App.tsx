@@ -1,3 +1,6 @@
+import { InvoicePropertyField } from './features/invoices/InvoicePropertyField';
+import type { InvoicePdfContext } from './utils/pdfDocuments';
+import { contractorInvoiceServiceAddress, homeownerInvoiceServiceAddress } from './features/invoices/invoicePdfAddress';
 import { InvoiceLineItems } from './features/invoices/InvoiceLineItems';
 import { ProjectReference } from './features/discover/ProjectReference';
 import { appendPublicProject, loadPublicProject, type PublicProjectReference } from './features/discover/projectInquiry';
@@ -4513,16 +4516,6 @@ function inspectionMediaStoragePath(value: string) {
 
 type EstimatePdfContext = { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null };
 
-type InvoicePdfContext = {
-  contractorName: string;
-  contractorLogoUrl?: string | null;
-  contractorEmail?: string;
-  contractorPhone?: string;
-  contractorAddress?: string;
-  customerName: string;
-  customerAddress?: string;
-  serviceLabel?: string;
-};
 
 async function loadPdfDocuments() {
   return import('./utils/pdfDocuments');
@@ -6328,6 +6321,8 @@ function normalizeConnectedHomeRecord(home: unknown): ContractorConnectedHomeown
   const id = sharedFieldDisplayValue(row.id);
   return {
     id: id || undefined,
+    share_address: typeof row.share_address === 'boolean' ? row.share_address : undefined,
+    share_home_overview: typeof row.share_home_overview === 'boolean' ? row.share_home_overview : undefined,
     nickname: sharedFieldDisplayValue(row.nickname),
     address_line1: sharedFieldDisplayValue(row.address_line1),
     address_line2: sharedFieldDisplayValue(row.address_line2),
@@ -13706,8 +13701,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               contractorPhone: formatPhoneNumber(invoiceConnection?.phone || invoiceDirectoryContractor?.phone || ''),
               contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
               customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
-              customerAddress: home?.address_line1 || '',
-              serviceLabel: home?.nickname || home?.address_line1 || '',
+              ...homeownerInvoiceServiceAddress(invoice, homes, profile.id),
             }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
             className={mobileButtonClass('secondary')}
           >
@@ -23183,8 +23177,8 @@ function ContractorDashboard({
       service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id ?? '',
       job_id: options.jobId ?? options.sourceEstimate?.inspection_id ?? '',
       estimate_id: options.estimateId ?? options.sourceEstimate?.id ?? '',
-      home_id: options.homeId ?? options.sourceEstimate?.home_id ?? defaultConnectedHomeId,
-      local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id ?? defaultLocalHomeId,
+      home_id: options.homeId ?? options.sourceEstimate?.home_id ?? '',
+      local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id ?? '',
       scope: options.sourceEstimate?.scope || 'Completed work performed for the customer.',
       labor_mode: normalizeEstimateLaborMode(options.sourceEstimate?.labor_mode),
       labor_rate: laborRateInputFromCents(options.sourceEstimate?.labor_rate_cents ?? contractor?.default_labor_rate_cents),
@@ -28532,8 +28526,8 @@ function ContractorDashboard({
     const linkedJob = draft.job_id ? inspections.find(job => job.id === draft.job_id) : null;
     const linkedEstimate = draft.estimate_id ? estimates.find(estimate => estimate.id === draft.estimate_id) : null;
     return {
-      home_id: draft.home_id || linkedRequest?.home_id || linkedJob?.home_id || linkedEstimate?.home_id || defaultConnectedHomeId || '',
-      local_home_id: draft.local_home_id || linkedJob?.local_home_id || linkedEstimate?.local_home_id || defaultLocalHomeId || '',
+      home_id: draft.home_id || linkedRequest?.home_id || linkedJob?.home_id || linkedEstimate?.home_id || '',
+      local_home_id: draft.local_home_id || linkedJob?.local_home_id || linkedEstimate?.local_home_id || '',
     };
   };
   const openJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsOpenJob);
@@ -38141,15 +38135,16 @@ function ContractorDashboard({
                             <p className="mt-1 text-sm font-semibold text-slate-800">
                               Creating invoice for: <span>{selectedJobsCustomerName}</span>
                             </p>
-                            {selectedJobsCustomerAddress && (
-                              <p className="mt-0.5 text-xs text-slate-600">{selectedJobsCustomerAddress}</p>
-                            )}
                             {renderInvoiceDraftStateNotice()}
                           </div>
                           <button type="button" onClick={closeActiveInvoiceEditor} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
                             Cancel
                           </button>
                         </div>
+
+                        <InvoicePropertyField homeId={invoiceSourceProperty(invoiceDraft).home_id} localHomeId={invoiceSourceProperty(invoiceDraft).local_home_id} connection={selectedJobsConnection} local={selectedJobsLocalContact}
+                          linked={Boolean(invoiceDraft.job_id || invoiceDraft.estimate_id || invoiceDraft.service_request_id)} disabled={savingInvoice}
+                          onChange={(home_id, local_home_id) => setInvoiceDraft(d => ({ ...d, home_id, local_home_id }))} />
 
                         {invoiceTemplateStartNotice && (
                           <p className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="invoice-template-pricing-notice">
@@ -38844,8 +38839,8 @@ function ContractorDashboard({
                                 const connection = invoice.homeowner_user_id ? connections.find(c => c.homeowner_user_id === invoice.homeowner_user_id) : null;
                                 const local = invoice.local_contact_id ? localCustomerContext.find(c => c.id === invoice.local_contact_id) : null;
                                 const customerName = connection?.display_name || local?.display_name || 'Customer';
-                                const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
-                                const customerServiceLabel = connection?.home?.nickname || local?.homes?.[0]?.nickname || customerAddress;
+                                const service = contractorInvoiceServiceAddress(invoice, connection, local);
+                                const customerAddress = service.serviceAddress.replace(/\n/g, ', ');
                                 const lineCount = invoice.line_items?.length ?? 0;
                                 const propertyLabel = recordPropertyLabelForContractor(invoice);
                                 const invoiceNextStep = invoiceLifecycleNextStep({
@@ -38908,8 +38903,7 @@ function ContractorDashboard({
                                           contractorPhone: formatPhoneNumber(contractor?.phone || contractorDraft.phone || ''),
                                           contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
                                           customerName,
-                                          customerAddress,
-                                          serviceLabel: customerServiceLabel,
+                                          ...service,
                                         }).catch(err => setError(readableError(err, 'Unable to preview invoice PDF.')))}
                                         className={mobileButtonClass(invoiceNextStep.id === 'review_record' ? 'primary' : 'secondary')}
                                         data-lifecycle-primary-action={invoiceNextStep.id === 'review_record' ? 'true' : undefined}
@@ -38926,8 +38920,7 @@ function ContractorDashboard({
                                           contractorPhone: formatPhoneNumber(contractor?.phone || contractorDraft.phone || ''),
                                           contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
                                           customerName,
-                                          customerAddress,
-                                          serviceLabel: customerServiceLabel,
+                                          ...service,
                                         }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
                                         className={mobileButtonClass('secondary')}
                                       >

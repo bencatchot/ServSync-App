@@ -157,7 +157,7 @@ test.describe('contractor estimate and invoice PDF actions', () => {
       contractorPhone: '(555) 010-2000',
       contractorAddress: 'Tulsa, OK',
       customerName: 'Local Customer',
-      customerAddress: '200 Local Ave',
+      serviceAddress: '200 Local Ave',
       serviceLabel: 'Local customer home',
     });
 
@@ -177,7 +177,7 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     const result = await createInvoicePdf(paidInvoice, {
       contractorName: 'ServSync Test Contractor',
       customerName: 'Local Customer',
-      customerAddress: '200 Local Ave',
+      serviceAddress: '200 Local Ave',
       contractorLogoUrl: null,
     });
 
@@ -189,8 +189,9 @@ test.describe('contractor estimate and invoice PDF actions', () => {
     expect(pdfBytes).toContain('(Balance Due)');
     expect(pdfBytes).toContain('($165.00)');
     expect(pdfBytes).toContain('($0.00)');
-    expect(pdfBytes).toContain('(Aug 11, 2026)');
-    expect(pdfBytes).toContain('(Paid in full on Aug 11, 2026. No balance remains.)');
+    expect(pdfBytes).toContain('(Paid Aug 11, 2026)');
+    expect(pdfBytes).toContain('Paid in full');
+    expect(pdfBytes).toContain('No balance remains.');
   });
 
   test('download helper delays object URL revocation until after browser handoff', () => {
