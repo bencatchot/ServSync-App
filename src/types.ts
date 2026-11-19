@@ -1147,6 +1147,8 @@ export interface HomeownerConnection {
 
 export interface ContractorConnectedHomeownerHome {
   id?: string;
+  share_address?: boolean;
+  share_home_overview?: boolean;
   nickname: string;
   address_line1: string;
   address_line2: string;

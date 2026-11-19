@@ -1,5 +1,12 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-19 — Invoice PDF design and exact service address (Preview review)
+
+- Fresh branch `codex/invoice-pdf-address-design`, based on main `9bcc223`. Rework invoice PDFs with contractor-first Letter layout, full line details, continuation headers/page numbers, distinct paid/void states and factual payment wording. Preserve persisted finances and backlog meaning.
+- Resolve addresses from the invoice's exact authorized customer/property only. Keep nickname separate; retain and honor per-property sharing flags; remove first/default property fallback. Homeowner download uses the exact owned property. Add an optional explicit standalone editor property choice while preserving linked-work restrictions and existing shared Draft selection.
+- Validation: actual approved fictional reference viewed; all pages of seven generated fictional samples inspected. Six PDF/address tests, 22 Chromium checks, six WebKit checks, native PDF lifecycle and repository aggregate checks pass. No real customer document used; no claim about an individual record's cause. See `docs/features/INVOICE_PDF_DESIGN_AND_ADDRESS.md` and PR for exact-head CI/Preview/tutorial limits.
+- Documentation impact: no new master-plan workflow, billing feature or marketing promise. Backlog reviewed without changing feature status. No hosted writes, schema/security/settings/credentials changes, cleanup or Production release.
+
 ## 2026-11-19 — Consistent invoice Add Line controls (Preview review)
 
 - Branch: `codex/invoice-add-line-consistency`, based on current main `defce485e94e8f1489f9d136f7bdcc7a880f8049`. UI-only invoice fix; held PR595/PR596 excluded.

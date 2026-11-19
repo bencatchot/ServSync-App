@@ -755,7 +755,9 @@ export type InvoicePdfContext = {
   contractorPhone?: string;
   contractorAddress?: string;
   customerName: string;
-  customerAddress?: string;
+  // A distinct billing address must be independently known; never copy service here.
+  billingAddress?: string;
+  serviceAddress?: string;
   serviceLabel?: string;
 };
 
@@ -979,275 +981,193 @@ function invoiceBalanceDueCents(invoice: Pick<Invoice, 'status' | 'total_cents' 
 }
 
 export async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentW = pageW - margin * 2;
-  let y = 18;
+  const margin = 16;
+  const right = pageW - margin;
+  const contentW = right - margin;
+  const bottom = pageH - 21;
+  const ink = [24, 48, 60] as const;
+  const muted = [77, 96, 108] as const;
+  const teal = [24, 105, 99] as const;
+  let y = margin;
+  let inTable = false;
   const contractorLogo = await loadPdfImageAsset(context.contractorLogoUrl);
   const balanceDue = invoiceBalanceDueCents(invoice);
-
+  const totals = persistedFinancialBreakdown(invoice);
   const formatPdfDate = (value?: string | null) => {
     if (!value) return 'Not specified';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Date-only due dates are calendar dates, not UTC instants.
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
-  const addPageIfNeeded = (height = 12) => {
-    if (y + height <= pageH - margin) return;
-    pdf.addPage();
-    y = margin;
-  };
-  const addWrappedText = (text: string, x: number, maxW: number, fontSize = 10, lineGap = 5) => {
-    if (!text.trim()) return;
-    pdf.setFontSize(fontSize);
-    const lines = pdf.splitTextToSize(text, maxW);
-    lines.forEach((line: string) => {
-      addPageIfNeeded(lineGap);
-      pdf.text(line, x, y);
-      y += lineGap;
-    });
-  };
-  const sectionTitle = (title: string) => {
-    addPageIfNeeded(10);
-    y += 2;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(12);
-    pdf.setTextColor(15, 23, 42);
-    pdf.text(title, margin, y);
-    y += 7;
-    pdf.setFont('helvetica', 'normal');
-  };
-  const moneyRow = (label: string, amount: number, bold = false) => {
-    addPageIfNeeded(7);
+  const style = (size = 10, bold = false, color: readonly [number, number, number] = ink) => {
     pdf.setFont('helvetica', bold ? 'bold' : 'normal');
-    pdf.setFontSize(bold ? 12 : 10);
-    pdf.setTextColor(15, 23, 42);
-    pdf.text(label, pageW - margin - 58, y);
-    pdf.text(formatMoney(amount), pageW - margin, y, { align: 'right' });
-    y += bold ? 7 : 6;
+    pdf.setFontSize(size);
+    pdf.setTextColor(...color);
   };
-
-  pdf.setFillColor(2, 19, 45);
-  pdf.rect(0, 0, pageW, 45, 'F');
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(22);
-  pdf.text('Invoice', margin, 18);
-  if (invoice.status === 'paid') {
-    pdf.setFillColor(5, 150, 105);
-    pdf.roundedRect(margin + 34, 8, 28, 12, 2, 2, 'F');
-    pdf.setFontSize(11);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('PAID', margin + 48, 16, { align: 'center' });
+  const split = (text: string, width: number, size = 10, bold = false): string[] => {
+    style(size, bold);
+    return pdf.splitTextToSize(text, width);
+  };
+  const rule = (at: number) => { pdf.setDrawColor(208, 220, 222); pdf.line(margin, at, right, at); };
+  const columns = [margin + 3, margin + contentW * .59, margin + contentW * .69, margin + contentW * .84, right - 3];
+  const tableHeader = () => {
+    pdf.setFillColor(241, 245, 245);
+    pdf.roundedRect(margin, y - 4, contentW, 9, 1, 1, 'F');
+    style(8, true, muted);
+    ['DESCRIPTION', 'QTY', 'UNIT', 'RATE', 'AMOUNT'].forEach((label, i) => pdf.text(label, columns[i], y + 1, { align: i ? 'right' : 'left' }));
+    y += 12;
+  };
+  const nextPage = () => {
+    pdf.addPage();
+    y = 18;
+    style(11, true);
+    const name = split(context.contractorName || 'Contractor', contentW * .58, 11, true);
+    pdf.text(name, margin, y);
+    style(9, true, teal);
+    const continuation = split(`${invoice.invoice_number || 'Invoice'} / Continued`, contentW * .38, 9, true);
+    pdf.text(continuation, right, y, { align: 'right' });
+    y += Math.max(name.length * 5, continuation.length * 4) + 4;
+    rule(y); y += 8;
+    if (inTable) tableHeader();
+  };
+  const ensure = (height = 6) => { if (y + height > bottom) nextPage(); };
+  const wrapped = (text: string, width = contentW, size = 10, bold = false, color: readonly [number, number, number] = muted) => {
+    if (!text.trim()) return;
+    for (const line of split(text, width, size, bold)) {
+      ensure(5); style(size, bold, color); pdf.text(line, margin, y); y += 5;
+    }
+  };
+  const section = (title: string) => {
+    ensure(16); y += 3; style(9, true, muted); pdf.text(title, margin, y); y += 7;
+  };
+  // Contractor identity leads the page; contact lines are never truncated.
+  let nameX = margin;
+  if (contractorLogo) { drawPdfLogo(pdf, contractorLogo, margin, 14, 16, 16); nameX += 20; }
+  const nameLines = split(context.contractorName || 'Contractor', contentW - 72 - (nameX - margin), 16, true);
+  style(16, true); pdf.text(nameLines, nameX, 20);
+  let identityY = 20 + nameLines.length * 6;
+  for (const contact of [[context.contractorPhone, context.contractorEmail].filter(Boolean).join(' | '), context.contractorAddress].filter(Boolean) as string[]) {
+    const contactLines = split(contact, contentW - 72 - (nameX - margin), 9);
+    style(9, false, muted); pdf.text(contactLines, nameX, identityY); identityY += contactLines.length * 4 + 1;
   }
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(10);
-  pdf.text(context.contractorName || 'Contractor', margin, 27);
-  const contractorContact = [context.contractorPhone, context.contractorEmail, context.contractorAddress].filter(Boolean).join(' · ');
-  if (contractorContact) {
-    pdf.setFontSize(8);
-    pdf.setTextColor(219, 234, 254);
-    pdf.text(pdf.splitTextToSize(contractorContact, 105)[0] || '', margin, 34);
-  }
-  if (contractorLogo) {
-    const logoW = 38;
-    const logoH = 20;
-    const logoX = pageW - margin - logoW;
-    pdf.setFillColor(255, 255, 255);
-    pdf.roundedRect(logoX, 7, logoW, logoH, 2, 2, 'F');
-    drawPdfLogo(pdf, contractorLogo, logoX, 7, logoW, logoH);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(5.5);
-    pdf.setTextColor(219, 234, 254);
-    pdf.text('Powered by ServSync', logoX + logoW / 2, 32, { align: 'center' });
-  }
-
-  y = 55;
-  pdf.setTextColor(15, 23, 42);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(16);
-  addWrappedText(invoice.title || 'Invoice', margin, contentW - 60, 16, 7);
-  const amountLabel = invoice.status === 'paid' ? 'Balance Due' : invoice.status === 'void' ? 'Void' : 'Amount Due';
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(9);
-  pdf.setTextColor(71, 85, 105);
-  pdf.text(amountLabel, pageW - margin, 55, { align: 'right' });
-  pdf.setFontSize(18);
-  pdf.setTextColor(15, 23, 42);
-  pdf.text(formatMoney(balanceDue), pageW - margin, 63, { align: 'right' });
-  y = Math.max(y, 73);
-
-  pdf.setDrawColor(226, 232, 240);
-  pdf.line(margin, y, pageW - margin, y);
-  y += 8;
-
-  const metaRows = [
-    ['Invoice #', invoice.invoice_number || 'Not assigned'],
-    ['Status', invoiceStatusLabel(invoice.status)],
-    ['Issued', formatPdfDate(invoice.issued_at)],
-    ['Due', formatPdfDate(invoice.due_at)],
-  ];
-  pdf.setFontSize(9);
-  metaRows.forEach(([label, value], index) => {
-    const colW = contentW / 4;
-    const x = margin + index * colW;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(100, 116, 139);
-    pdf.text(label, x, y);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(15, 23, 42);
-    pdf.text(pdf.splitTextToSize(value, colW - 4)[0] || value, x, y + 5);
-  });
-  y += 17;
-
-  sectionTitle('Bill To');
-  pdf.setTextColor(51, 65, 85);
-  addWrappedText(context.customerName || 'Customer', margin, contentW, 10, 5);
-  if (context.customerAddress || context.serviceLabel) {
-    addWrappedText(context.serviceLabel || context.customerAddress || '', margin, contentW, 10, 5);
-  }
-
-  if (invoice.scope) {
-    sectionTitle('Description');
-    pdf.setTextColor(51, 65, 85);
-    addWrappedText(invoice.scope, margin, contentW, 10, 5);
-  }
-
-  sectionTitle('Line Items');
-  const lines = [...(invoice.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
-  const totals = persistedFinancialBreakdown(invoice);
-  const invoiceUnpricedCount = unpricedLineCount(lines);
-  addPageIfNeeded(10);
-  pdf.setFillColor(241, 245, 249);
-  pdf.roundedRect(margin, y - 4, contentW, 9, 1.5, 1.5, 'F');
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(8);
-  pdf.setTextColor(51, 65, 85);
-  pdf.text('Description', margin + 3, y);
-  pdf.text('Qty', pageW - margin - 72, y, { align: 'right' });
-  pdf.text('Unit', pageW - margin - 54, y, { align: 'right' });
-  pdf.text('Unit price', pageW - margin - 25, y, { align: 'right' });
-  pdf.text('Total', pageW - margin - 3, y, { align: 'right' });
-  y += 10;
-
-  if (lines.length === 0) {
-    addWrappedText('No line items were listed for this invoice.', margin, contentW, 10, 5);
-  } else {
-    lines.forEach(line => {
-      const descriptionLines = pdf.splitTextToSize(
-        [lineDisplayTitle(line), ...customerLineDisplayDetailRows(line, invoice)].join('\n'),
-        contentW - 88,
-      );
-      const rowH = Math.max(12, descriptionLines.length * 4 + 7);
-      addPageIfNeeded(rowH);
-      pdf.setDrawColor(226, 232, 240);
-      pdf.line(margin, y - 3, pageW - margin, y - 3);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(15, 23, 42);
-      pdf.text(descriptionLines, margin + 3, y);
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(String(line.quantity), pageW - margin - 72, y, { align: 'right' });
-      pdf.text(line.unit || 'each', pageW - margin - 54, y, { align: 'right' });
-      pdf.text(persistedLinePriceLabel(line), pageW - margin - 25, y, { align: 'right' });
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(15, 23, 42);
-      pdf.text(persistedLineTotalLabel(line), pageW - margin - 3, y, { align: 'right' });
-      y += rowH;
+  style(28, true); pdf.text('Invoice', right, 22, { align: 'right' });
+  const numberLines = split(invoice.invoice_number || 'Number not assigned', 65, 11, true);
+  style(11, true, teal); pdf.text(numberLines, right, 31, { align: 'right' });
+  const statusY = 34 + numberLines.length * 5;
+  style(9, true, invoice.status === 'void' ? [153, 45, 45] : teal);
+  pdf.text(invoiceStatusLabel(invoice.status).toUpperCase(), right, statusY, { align: 'right' });
+  y = Math.max(identityY, statusY + 3, 35) + 5;
+  rule(y); y += 9;
+  const addressTop = y;
+  const addressWidth = (contentW - 70) / 2;
+  const block = (label: string, values: string[], x: number, width: number) => {
+    style(8, true, muted); pdf.text(label, x, addressTop);
+    let blockY = addressTop + 7;
+    values.filter(Boolean).forEach((value, index) => {
+      const text = split(value, width, 10, index === 0);
+      style(10, index === 0); pdf.text(text, x, blockY); blockY += text.length * 4.5 + 1;
     });
-  }
-
-  if (invoiceUnpricedCount > 0) {
-    addPageIfNeeded(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(146, 64, 14);
-    addWrappedText('Invoice total does not include items marked "Price to be confirmed."', margin, contentW, 9, 4);
-  }
-
-  const backlogItems = [...(invoice.backlog_items || [])].sort((a, b) => a.sort_order - b.sort_order);
-  if (backlogItems.length > 0) {
-    sectionTitle('Open backlog — not included in total');
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    pdf.setTextColor(146, 64, 14);
-    addWrappedText('These items were captured for context only. They are not completed billable invoice lines and do not affect subtotal, tax, or total.', margin, contentW, 9, 4);
-    y += 1;
-    backlogItems.forEach(item => {
-      const itemText = [
-        `${item.title || 'Backlog item'} — ${invoiceBacklogStatusLabel(item)}`,
-        item.description || '',
-        item.not_included_reason || '',
-      ].filter(Boolean).join('\n');
-      const descriptionLines = pdf.splitTextToSize(itemText, contentW - 6);
-      const rowH = Math.max(11, descriptionLines.length * 4 + 6);
-      addPageIfNeeded(rowH);
-      pdf.setDrawColor(253, 230, 138);
-      pdf.line(margin, y - 3, pageW - margin, y - 3);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(51, 65, 85);
-      pdf.text(descriptionLines, margin + 3, y);
-      y += rowH;
-    });
-  }
-
-  addPageIfNeeded(42);
-  pdf.setDrawColor(226, 232, 240);
-  pdf.line(pageW - margin - 62, y, pageW - margin, y);
+    return blockY;
+  };
+  const billingBottom = block('BILL TO', [context.customerName || 'Customer', context.billingAddress || ''], margin, addressWidth - 4);
+  const serviceBottom = context.serviceAddress || context.serviceLabel
+    ? block(context.serviceAddress ? 'SERVICE ADDRESS' : 'SERVICE PROPERTY', [context.serviceLabel || '', context.serviceAddress || ''], margin + addressWidth + 2, addressWidth - 4)
+    : addressTop;
+  const dueX = right - 61;
+  pdf.setFillColor(238, 247, 246); pdf.roundedRect(dueX, addressTop - 4, 61, 30, 2, 2, 'F');
+  style(8, true, muted); pdf.text(invoice.status === 'void' ? 'VOID - NO PAYMENT DUE' : 'BALANCE DUE', dueX + 5, addressTop + 2);
+  style(20, true, teal); pdf.text(formatMoney(balanceDue), dueX + 5, addressTop + 13);
+  style(8, true); pdf.text(`Due ${formatPdfDate(invoice.due_at)}`, dueX + 5, addressTop + 21);
+  y = Math.max(billingBottom, serviceBottom, addressTop + 30) + 2;
+  wrapped(`Issued ${formatPdfDate(invoice.issued_at)}`, contentW, 9);
+  y += 5;
+  wrapped(invoice.title || 'Invoice', contentW, 17, true, ink);
+  if (invoice.scope) { y += 2; wrapped(invoice.scope, contentW, 10); }
   y += 7;
-  moneyRow('Material total', totals.materialTotalCents);
-  moneyRow('Labor total', totals.laborTotalCents, false);
-  if (totals.laborHours > 0) {
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    pdf.setTextColor(100, 116, 139);
-    pdf.text(`${formatLaborHours(totals.laborHours)} labor hrs`, pageW - margin - 58, y - 2);
+  ensure(22); inTable = true; tableHeader();
+  const lines = [...(invoice.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  for (const line of lines) {
+    const descriptionWidth = contentW * .51 - 6;
+    const titleLines = split(lineDisplayTitle(line), descriptionWidth, 10, true);
+    const details = customerLineDisplayDetailRows(line, invoice).flatMap(detail => split(detail, descriptionWidth, 9));
+    const cells = [
+      [...titleLines, ...details], split(String(line.quantity), contentW * .07, 9),
+      split(line.unit || 'each', contentW * .09, 9),
+      split(persistedLinePriceLabel(line), contentW * .14 - 2, 9),
+      split(persistedLineTotalLabel(line), contentW * .15 - 2, 9, true),
+    ];
+    const length = Math.max(...cells.map(cell => cell.length));
+    const rowHeight = length * 4.5 + 10;
+    // Keep ordinary rows together; split unusually long details across pages.
+    ensure(Math.min(rowHeight, 55));
+    let offset = 0;
+    while (offset < length) {
+      ensure(11);
+      const count = Math.min(length - offset, Math.max(1, Math.floor((bottom - y - 9) / 4.5)));
+      for (let n = 0; n < count; n += 1) {
+        cells.forEach((cell, col) => {
+          const value = cell[offset + n];
+          if (value === undefined) return;
+          const isTitle = col === 0 && offset + n < titleLines.length;
+          style(isTitle ? 10 : 9, isTitle || col === 4, col === 0 || col === 4 ? ink : muted);
+          pdf.text(value, columns[col], y + n * 4.5, { align: col ? 'right' : 'left' });
+        });
+      }
+      y += count * 4.5 + 5; rule(y - 2); y += 4; offset += count;
+      if (offset < length) nextPage();
+    }
   }
-  moneyRow('Subtotal', totals.subtotalCents);
-  moneyRow('Fees', totals.feeTotalCents);
-  moneyRow('Tax', totals.taxCents);
-  moneyRow('Discount', -invoice.discount_cents);
-  moneyRow('Invoice Total', invoice.total_cents, true);
-  moneyRow('Amount Paid', invoice.amount_paid_cents);
-  moneyRow('Balance Due', balanceDue, true);
-  if (invoice.status === 'paid' && invoice.paid_at) {
-    addPageIfNeeded(7);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    pdf.setTextColor(15, 23, 42);
-    pdf.text('Paid', pageW - margin - 58, y);
-    pdf.text(formatPdfDate(invoice.paid_at), pageW - margin, y, { align: 'right' });
-    y += 6;
+  inTable = false;
+  if (!lines.length) wrapped('No line items were listed for this invoice.');
+  if (unpricedLineCount(lines)) { y += 2; wrapped('Invoice total does not include items marked "Price to be confirmed."', contentW, 9); }
+  const backlog = [...(invoice.backlog_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  if (backlog.length) {
+    section('Open backlog - not included in total');
+    wrapped('These items are context only, not completed billable lines. They do not affect subtotal, tax, or total.', contentW, 9);
+    for (const item of backlog) {
+      y += 2; wrapped(`${item.title || 'Backlog item'} - ${invoiceBacklogStatusLabel(item)}`, contentW, 10, true);
+      wrapped([item.description, item.not_included_reason].filter(Boolean).join('\n'), contentW, 9);
+    }
   }
-
-  sectionTitle(invoice.status === 'paid' ? 'Payment Status' : 'Payment Instructions');
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(51, 65, 85);
-  addWrappedText(
-    invoice.status === 'paid'
-      ? `Paid in full${invoice.paid_at ? ` on ${formatPdfDate(invoice.paid_at)}` : ''}. No balance remains.`
-      : 'Payment processing through ServSync is coming soon. Please follow the contractor payment instructions provided outside this invoice.',
-    margin,
-    contentW,
-    10,
-    5,
-  );
-
-  if (invoice.notes) {
-    sectionTitle('Notes');
-    pdf.setTextColor(51, 65, 85);
-    addWrappedText(invoice.notes, margin, contentW, 10, 5);
+  const moneyRows: Array<[string, number, boolean?]> = [];
+  if (totals.materialTotalCents) moneyRows.push(['Material total', totals.materialTotalCents]);
+  if (totals.laborTotalCents) moneyRows.push(['Labor total', totals.laborTotalCents]);
+  if (totals.otherTotalCents) moneyRows.push(['Other total', totals.otherTotalCents]);
+  moneyRows.push(['Subtotal', totals.subtotalCents]);
+  if (totals.feeTotalCents) moneyRows.push(['Fees', totals.feeTotalCents]);
+  if (totals.taxCents) moneyRows.push(['Tax', totals.taxCents]);
+  if (invoice.discount_cents) moneyRows.push(['Discount', -invoice.discount_cents]);
+  moneyRows.push(['Invoice Total', invoice.total_cents, true], ['Amount Paid', invoice.amount_paid_cents], ['Balance Due', balanceDue, true]);
+  const paymentText = invoice.status === 'void' ? 'This invoice is void. No payment is due.'
+    : invoice.status === 'paid' ? `Paid in full${invoice.paid_at ? ` on ${formatPdfDate(invoice.paid_at)}` : ''}. No balance remains.`
+      : `Contact ${context.contractorName || 'the contractor'} for payment instructions.`;
+  const paymentLines = split(paymentText, contentW - 100, 10);
+  ensure(Math.max(moneyRows.length * 7 + 8 + (totals.laborHours > 0 ? 5 : 0) + (invoice.status === 'paid' && invoice.paid_at ? 5 : 0), paymentLines.length * 5 + 15));
+  y += 8; const totalsTop = y;
+  style(8, true, muted); pdf.text(invoice.status === 'paid' || invoice.status === 'void' ? 'PAYMENT STATUS' : 'PAYMENT INSTRUCTIONS', margin, y);
+  y += 7;
+  for (const line of paymentLines) { ensure(); style(10, false, muted); pdf.text(line, margin, y); y += 5; }
+  const paymentBottom = y;
+  y = totalsTop;
+  for (const [label, amount, bold] of moneyRows) {
+    if (label === 'Balance Due') { pdf.setFillColor(238, 247, 246); pdf.roundedRect(right - 91, y - 5, 91, 10, 1, 1, 'F'); }
+    style(10, Boolean(bold), label === 'Balance Due' ? teal : ink);
+    pdf.text(label, right - 87, y); pdf.text(formatMoney(amount), right - 3, y, { align: 'right' }); y += 7;
   }
-
-  if (invoice.terms) {
-    sectionTitle('Terms');
-    pdf.setTextColor(51, 65, 85);
-    addWrappedText(invoice.terms, margin, contentW, 10, 5);
+  if (totals.laborHours > 0) { style(8, false, muted); pdf.text(`${formatLaborHours(totals.laborHours)} labor hrs`, right - 87, y); y += 5; }
+  if (invoice.status === 'paid' && invoice.paid_at) { style(9, false, muted); pdf.text(`Paid ${formatPdfDate(invoice.paid_at)}`, right - 87, y); y += 5; }
+  y = Math.max(y, paymentBottom) + 4;
+  if (invoice.notes) { section('NOTES'); wrapped(invoice.notes); }
+  if (invoice.terms) { section('TERMS'); wrapped(invoice.terms); }
+  const pageCount = pdf.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page += 1) {
+    pdf.setPage(page); rule(pageH - 15); style(8, false, muted);
+    pdf.text('Powered by ServSync', margin, pageH - 9);
+    pdf.text(`${page} of ${pageCount}`, right, pageH - 9, { align: 'right' });
   }
-
   const fileName = `${safeFileName(`${context.contractorName}-invoice-${invoice.invoice_number || invoice.title || invoice.id}`)}.pdf`;
   return { blob: pdf.output('blob'), fileName };
 }
