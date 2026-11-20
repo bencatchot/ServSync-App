@@ -1,4 +1,4 @@
-import { handleNativePdf } from "./nativePdfAction";
+import { getNativePdfAction } from "./nativePdfAction";
 import { showPdfPreview } from './pdfPreview';
 import { jsPDF } from 'jspdf';
 
@@ -265,7 +265,8 @@ export function schedulePdfObjectUrlRevoke(url: string, delayMs = PDF_OBJECT_URL
 }
 
 export function downloadPdfBlob(blob: Blob, fileName: string) {
-  if (handleNativePdf(blob, fileName)) return;
+  const nativeAction = getNativePdfAction('download');
+  if (nativeAction) return nativeAction(blob, fileName);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -278,7 +279,7 @@ export function downloadPdfBlob(blob: Blob, fileName: string) {
 }
 
 export function previewPdfBlob(blob: Blob, fileName?: string) {
-  showPdfPreview(blob, fileName);
+  return showPdfPreview(blob, fileName);
 }
 
 function dataUrlFromBlob(blob: Blob): Promise<string> {
@@ -972,7 +973,7 @@ export async function previewEstimatePdf(
   context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
 ) {
   const { blob, fileName } = await createEstimatePdf(estimate, context);
-  previewPdfBlob(blob, fileName);
+  return previewPdfBlob(blob, fileName);
 }
 
 function invoiceBalanceDueCents(invoice: Pick<Invoice, 'status' | 'total_cents' | 'amount_paid_cents'>) {
@@ -1179,5 +1180,5 @@ export async function downloadInvoicePdf(invoice: Invoice, context: InvoicePdfCo
 
 export async function previewInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
   const { blob, fileName } = await createInvoicePdf(invoice, context);
-  previewPdfBlob(blob, fileName);
+  return previewPdfBlob(blob, fileName);
 }

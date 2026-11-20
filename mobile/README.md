@@ -38,7 +38,7 @@ For Android, use JDK 21 and an installed Google Android SDK with accepted licens
 ## Implemented foundation
 
 - Shared existing role-aware app, with contractor entry on first launch and a Demo label.
-- Native PDF action registration: the existing Preview/Download actions offer an explicit system share-sheet action. It never automatically chooses a destination or sends a document. Retry/cancel keeps the source document intact; closing the dialog removes its temporary cache file.
+- On iOS, Preview PDF opens the generated document in an in-app PDFKit reader. Scroll to read additional pages and tap Done to return. The reader holds the PDF in memory and releases it on dismissal. Download PDF opens the existing save/share dialog. Android continues to use that dialog for both actions. Closing the save/share dialog removes its temporary cache file.
 - Native network-status notice; no claim of offline editing or synchronized drafts.
 - Android back action closes an open dialog first, otherwise navigates back or minimizes at the root.
 - Generated links use the Demo website origin rather than `capacitor://localhost`. Password recovery and invitations still return to the website; automatic native callback handling is not implemented.

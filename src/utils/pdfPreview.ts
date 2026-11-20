@@ -1,10 +1,11 @@
-import { handleNativePdf } from "./nativePdfAction";
+import { getNativePdfAction } from "./nativePdfAction";
 
 let closeActivePreview: (() => void) | undefined;
 
 /** Same-page native dialog avoids popup blockers and owns its temporary URL. */
 export function showPdfPreview(blob: Blob, fileName = 'ServSync-document.pdf') {
-  if (handleNativePdf(blob, fileName)) return;
+  const nativeAction = getNativePdfAction('preview');
+  if (nativeAction) return nativeAction(blob, fileName);
   closeActivePreview?.();
   const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const url = URL.createObjectURL(blob);

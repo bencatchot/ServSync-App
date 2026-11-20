@@ -3,14 +3,18 @@ import { installNativeViewport } from './viewport';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
-import { registerNativePdfAction } from '../utils/nativePdfAction';
+import { registerNativePdfActions } from '../utils/nativePdfAction';
+import { previewIosPdf } from './iosPdfPreview';
 import { showNativePdf } from './pdf';
 
 async function start() {
   if (Capacitor.isNativePlatform()) {
     document.documentElement.classList.add('servsync-native');
     installNativeViewport();
-    registerNativePdfAction(showNativePdf);
+    registerNativePdfActions({
+      preview: Capacitor.getPlatform() === 'ios' ? previewIosPdf : showNativePdf,
+      download: showNativePdf,
+    });
     const label = document.createElement('div');
     label.textContent = import.meta.env.VITE_IOS_INTERNAL_BETA === 'true'
       ? 'ServSync Beta · Demo accounts only'

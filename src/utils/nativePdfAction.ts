@@ -1,13 +1,17 @@
-type NativePdfAction = (blob: Blob, fileName: string) => void;
-let nativePdfAction: NativePdfAction | undefined;
+type PdfAction = (blob: Blob, fileName: string) => void | Promise<void>;
+
+type NativePdfActions = {
+  preview: PdfAction;
+  download: PdfAction;
+};
+
+let nativePdfActions: NativePdfActions | undefined;
 
 /** Registered only by the separately bundled native entry point. */
-export function registerNativePdfAction(action: NativePdfAction) {
-  nativePdfAction = action;
+export function registerNativePdfActions(actions: NativePdfActions) {
+  nativePdfActions = actions;
 }
 
-export function handleNativePdf(blob: Blob, fileName: string) {
-  if (!nativePdfAction) return false;
-  nativePdfAction(blob, fileName);
-  return true;
+export function getNativePdfAction(action: keyof NativePdfActions) {
+  return nativePdfActions?.[action];
 }
