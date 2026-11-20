@@ -1,5 +1,9 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-20 — iPhone invoice Add Line
+
+The standalone invoice editor and shared Invoice Draft now finish an editing tap on Add Line before iOS can dismiss the keyboard and lose the click. The new row receives Description focus. Saving still requires an explicit action.
+
 ## 2026-11-19 — Invoice PDF design and exact service address (Preview review)
 
 - Fresh branch `codex/invoice-pdf-address-design`, based on main `9bcc223`. Rework invoice PDFs with contractor-first Letter layout, full line details, continuation headers/page numbers, distinct paid/void states and factual payment wording. Preserve persisted finances and backlog meaning.

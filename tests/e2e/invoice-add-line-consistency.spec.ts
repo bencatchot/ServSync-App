@@ -89,3 +89,57 @@ test('all existing invoice entry points retain their gates and converge on the c
   expect(app).toContain('job_work_item_id: line.job_work_item_id || null');
   expect(app).toContain('onAddLines={addPriceBookLinesToInvoiceDraft}');
 });
+
+test.describe('touch activation while editing an invoice price', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  for (const shared of [false, true]) {
+    test(shared ? 'shared invoice' : 'standalone invoice', async ({ page }) => {
+      await mountEditor(page, { shared });
+      const price = page.getByLabel('Invoice line item 1 unit price');
+      await price.fill('12.34');
+      // The native shell marks focused text fields while the keyboard is active.
+      // Capture focus before React appends the row and moves it to Description.
+      await price.evaluate(input => {
+        document.documentElement.classList.add('native-editing');
+        // Reproduce WKWebView losing its compatibility click when the keyboard
+        // dismisses. A completed tap must still reach the regular add action.
+        document.addEventListener('click', event => {
+          if (event.isTrusted) event.stopImmediatePropagation();
+          else input.dataset.focusAtClick = String(document.activeElement === input);
+        }, { once: true, capture: true });
+      });
+      await page.getByRole('button', { name: 'Add Line', exact: true }).tap();
+      await expect(price).toHaveAttribute('data-focus-at-click', 'true');
+      await expect(price).toHaveValue('12.34');
+      await expect(page.getByLabel(/^Invoice line item \d+ description$/)).toHaveCount(2);
+      await expect(page.getByLabel('Invoice line item 2 description')).toBeFocused();
+      await expect(page.getByTestId('saves')).toHaveText('0');
+    });
+  }
+});
+
+test('a dragged or cancelled editing gesture does not append an invoice line', async ({ page }) => {
+  await mountEditor(page, { shared: true });
+  const price = page.getByLabel('Invoice line item 1 unit price');
+  await price.fill('12.34');
+  const add = page.getByRole('button', { name: 'Add Line', exact: true });
+  await add.scrollIntoViewIfNeeded();
+  await add.evaluate(button => {
+    document.documentElement.classList.add('native-editing');
+    const box = button.getBoundingClientRect();
+    const point = { clientX: box.left + 5, clientY: box.top + 5 };
+    const moved = { ...point, clientX: point.clientX + 20 };
+    // Dispatch the component's gesture sequence without a compatibility click.
+    const send = (type: string, touches: typeof point[], changedTouches: typeof point[]) => {
+      button.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { touches, changedTouches }));
+    };
+    send('touchstart', [point], [point]);
+    send('touchmove', [moved], [moved]);
+    send('touchend', [], [moved]);
+    send('touchstart', [point], [point]);
+    send('touchcancel', [], [point]);
+  });
+  await expect(page.getByLabel(/^Invoice line item \d+ description$/)).toHaveCount(1);
+  await expect(price).toHaveValue('12.34');
+  await expect(page.getByTestId('saves')).toHaveText('0');
+});
