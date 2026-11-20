@@ -5,7 +5,7 @@ import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } f
 import { DraftPriceBookPicker } from '../price-book/DraftPriceBookPicker';
 import type { PriceBookLoadState } from '../price-book/priceBookView';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
-import { useAddedLineFocus } from '../work-composer/useAddedLineFocus';
+import { useAddedLineFocus, useInvoiceAddLineTouch } from '../work-composer/useAddedLineFocus';
 import { WorkComposerTotalsPanel } from '../work-composer/WorkComposerTotals';
 import type { WorkComposerLineDraft } from '../work-composer/types';
 import { createWorkComposerLineDraft, workComposerDraftFinancialBreakdown } from '../work-composer/workComposerDrafts';
@@ -129,6 +129,7 @@ export function ContractorDraftComposer({
   const [starterLine] = useState(() => createWorkComposerLineDraft());
   const displayedLines = draft.line_items.length ? draft.line_items : [starterLine];
   const { lineContainerRef, focusAddedLine } = useAddedLineFocus();
+  const addLineTouch = useInvoiceAddLineTouch();
   const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(() => new Set());
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<EstimateTemplate | null>(null);
@@ -655,6 +656,7 @@ export function ContractorDraftComposer({
           <div className="mt-3 flex justify-end">
             <button
               type="button"
+              {...(isInvoiceIntent ? addLineTouch : {})}
               onClick={addLine}
               disabled={isInvoiceIntent && (saving || interactionDisabled)}
               className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 sm:w-auto"
