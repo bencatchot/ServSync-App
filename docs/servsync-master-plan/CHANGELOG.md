@@ -1,5 +1,9 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-20 — Draft customer selection on iPhone
+
+The shared Draft customer picker keeps the search field focused through a result tap so iOS can deliver the click. The customer and its single eligible property populate on the first tap. The change also applies when editing an eligible saved planning Draft.
+
 ## 2026-11-20 — iPhone invoice Add Line
 
 The standalone invoice editor and shared Invoice Draft now finish an editing tap on Add Line before iOS can dismiss the keyboard and lose the click. The new row receives Description focus. Saving still requires an explicit action.
