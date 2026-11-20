@@ -1,0 +1,37 @@
+:root { font: 16px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; color: #02132d; background: #f7f9fc; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { background: #02132d; color: white; }
+.bar, main { max-width: 56rem; margin: auto; padding-inline: clamp(1rem, 5vw, 3rem); }
+.bar { height: 4.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.bar > span:last-child { color: #c1d5e9; font-size: .875rem; }
+.brand, button, .workspace-detail { display: inline-flex; align-items: center; gap: .5rem; }
+.brand { font-size: 1.35rem; font-weight: 750; }
+.brand img { width: 2rem; height: 2rem; object-fit: contain; }
+main { padding-block: 1.75rem 4rem; }
+.scenario { display: grid; grid-template-columns: auto minmax(0, 21rem); gap: .4rem 1rem; align-items: center; border-bottom: 1px solid #d9dfe6; padding-bottom: 1.5rem; }
+.scenario p, small, .single-role, .workspace-detail { color: #495f74; font-size: .875rem; }
+.scenario p { grid-column: 1 / -1; margin: .25rem 0 0; }
+label { display: block; font-weight: 650; }
+select, textarea { width: 100%; padding: .7rem; border: 1px solid #acbac8; border-radius: .6rem; background: white; color: #112940; font: inherit; }
+textarea { resize: vertical; }
+.portal-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-block: 2.1rem 1.5rem; }
+.section-label { color: #45667d; font-size: .85rem; font-weight: 650; margin: 0 0 .25rem; }
+h1, h2 { margin: 0; letter-spacing: -.035em; line-height: 1.14; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.65rem); }
+h2 { font-size: clamp(1.55rem, 3vw, 2rem); }
+button { min-height: 44px; border: none; border-radius: .75rem; padding: .7rem 1rem; background: #075ec6; color: white; font: inherit; font-weight: 650; cursor: pointer; }
+button:hover { background: #034ca3; }
+:focus-visible { outline: 3px solid #267ce5; outline-offset: 3px; }
+.workspace { border: 1px solid #d7dfe8; border-radius: 1.2rem; background: white; padding: clamp(1.25rem, 3vw, 2rem); }
+.workspace-icon { display: inline-flex; padding: .65rem; border-radius: .8rem; background: #e9f2fd; color: #175994; margin-bottom: 1rem; }
+.workspace-detail { margin-top: .6rem; }
+hr { height: 1px; border: 0; background: #dce4eb; margin: 1.5rem 0; }
+.workspace label { margin-bottom: .4rem; }
+.note { margin-top: 1rem; }
+small { display: block; margin-top: .3rem; }
+@media (max-width: 36rem) {
+  .scenario { grid-template-columns: 1fr; }
+  .portal-heading { align-items: flex-start; flex-direction: column; }
+  .single-role { margin: 0; }
+}

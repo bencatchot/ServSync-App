@@ -1,5 +1,9 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-20 — Fictional portal switching preview
+
+Added a protected Demo-only review of one fictional account with two portals and two single-role examples. See [prototype scope and account-linking design](../features/FICTIONAL_PORTAL_SWITCH_PREVIEW.md).
+
 ## 2026-11-20 — iPhone invoice Add Line
 
 The standalone invoice editor and shared Invoice Draft now finish an editing tap on Add Line before iOS can dismiss the keyboard and lose the click. The new row receives Description focus. Saving still requires an explicit action.
