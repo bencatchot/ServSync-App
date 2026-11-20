@@ -103,6 +103,7 @@
     "marketing:prepare-codex-directions": "node scripts/marketing/prepare-codex-marketing-directions.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "mobile:build": "vite build --config vite.mobile.config.ts --mode mobile",
+    "mobile:ios-beta:prepare": "node scripts/mobile/prepare-ios-beta.mjs",
     "mobile:sync": "npm run mobile:build && cap sync",
     "mobile:ios": "cap open ios",
     "mobile:android": "cap open android",

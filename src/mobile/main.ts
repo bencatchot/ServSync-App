@@ -12,7 +12,9 @@ async function start() {
     installNativeViewport();
     registerNativePdfAction(showNativePdf);
     const label = document.createElement('div');
-    label.textContent = 'ServSync Demo · Test accounts only';
+    label.textContent = import.meta.env.VITE_IOS_INTERNAL_BETA === 'true'
+      ? 'ServSync Beta · Demo accounts only'
+      : 'ServSync Demo · Test accounts only';
     label.className = 'native-demo-label';
     document.body.prepend(label);
     const connection = document.createElement('div');

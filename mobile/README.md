@@ -60,3 +60,23 @@ This is a feasibility prototype, not a store-ready app. Both native projects com
 Native universal/app links, password recovery callbacks, notification providers, offline synchronization, biometric login, production signing, store submission and physical-device acceptance remain follow-ups. Login persistence uses the existing Supabase client behavior; iOS and Android fresh-launch and account-switch checks passed; physical-device lifecycle checks remain. The iPhone simulator has no physical camera; simulator tests cannot establish actual camera behavior.
 
 Test only with existing approved fictional Demo accounts. Do not submit signups, recovery emails, customer messages, payments or live provider actions as part of a smoke check. Keep AthleticsArc's simulator and processes separate.
+
+## ServSync internal iOS beta
+
+The internal beta uses the permanent bundle ID `app.servsync.mobile` on team `GMMS9989NV` (App Store Connect record `6837063138`). Its home-screen name is **ServSync Beta** and its in-app banner identifies Demo accounts. The original iOS and Android prototype keeps `app.servsync.demo`.
+
+On macOS, run `npm run mobile:ios-beta:prepare` with the approved public Demo URL and publishable key in `.env.mobile.local`. This creates a fresh project beneath ignored `mobile-build/` and prints its path. It uses the installed dependencies, packages web assets locally and checks the exact public key fingerprint, backend, web origin and beta banner. A key rotation requires reviewing the new public fingerprint. Build only from the printed project. Keep at least 10 GB free during Xcode builds.
+
+For a local unsigned device archive, set `BETA_PROJECT` to the printed project path, then run:
+
+```sh
+xcodebuild -project "$BETA_PROJECT" -scheme App -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath mobile-build/ServSyncBeta.xcarchive \
+  -derivedDataPath mobile-build/beta-derived -disableAutomaticPackageResolution \
+  -skipPackageUpdates CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+node scripts/mobile/verify-ios-beta.mjs mobile-build/ServSyncBeta.xcarchive/Products/Applications/App.app
+```
+
+Check the archive's application Info.plist for the permanent ID, beta display name, intended version/build and iPhoneOS platform. This unsigned archive exercises device compilation. Distribution needs a separately approved signed Release archive, a valid team distribution identity and a matching App Store Connect distribution profile. Use Xcode's **TestFlight Internal Only** distribution option for the Demo-backed build. The [local export template](ios-beta/InternalOnlyExport.plist) sets `testFlightInternalTestingOnly=true`, manual signing and a local export destination. Supply the separately approved matching profile when preparing a signed export. Verify that internal-only designation before any tester invitation.
+
+**Gate before the first Production update on this ID.** Test an in-place upgrade on a dedicated device with a fictional signed-in Demo session, property selections, an unsaved draft and cached PDF. Use an isolated test backend for the destination. Demonstrate a fresh sign-in and workspace, with no inherited Demo session, cached record, PDF, selected ID, pending upload or queued write reaching the new environment. Exercise cold launch and return from background. Ship an environment-scoped storage migration if any Demo state survives. Verify Production configuration separately before authorizing a Production build.
