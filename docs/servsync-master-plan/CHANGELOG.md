@@ -1,5 +1,9 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-20 — In-app iPhone PDF preview
+
+iOS Preview PDF displays the generated document in PDFKit and returns to the invoice or estimate with Done. Download PDF retains its explicit system share action. The unsigned Demo beta candidate uses build number 2.
+
 ## 2026-11-20 — Internal iOS beta preparation
 
 Added a separate Demo-backed build for the registered ServSync iOS identity, with packaged environment checks, manual signing configuration and an internal-only export template. Signing, TestFlight distribution and the later production upgrade test remain pending. See [the mobile build instructions](../../mobile/README.md#servsync-internal-ios-beta).

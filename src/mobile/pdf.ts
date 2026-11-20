@@ -1,7 +1,7 @@
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-function base64(blob: Blob): Promise<string> {
+export function pdfBlobBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(',')[1]);
@@ -32,7 +32,7 @@ export function showNativePdf(blob: Blob, fileName: string) {
     status.textContent = 'Preparing PDF…';
     void (async () => {
       try {
-        const { uri } = await Filesystem.writeFile({ path: tempPath, data: await base64(blob), directory: Directory.Cache, recursive: true });
+        const { uri } = await Filesystem.writeFile({ path: tempPath, data: await pdfBlobBase64(blob), directory: Directory.Cache, recursive: true });
         await Share.share({ title: fileName, files: [uri], dialogTitle: 'Open or share PDF' });
         status.textContent = 'The share sheet closed. You can open it again or return to ServSync.';
       } catch {
