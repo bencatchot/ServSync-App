@@ -28,6 +28,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run check:app-size
+      - run: npm run mobile:test
       - run: npm run test:architecture
       - run: npm run backend:parity:test
       - run: npm run runtime:parity:test

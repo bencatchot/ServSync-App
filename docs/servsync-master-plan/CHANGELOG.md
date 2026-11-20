@@ -1,5 +1,9 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-20 — Internal iOS beta preparation
+
+Added a separate Demo-backed build for the registered ServSync iOS identity, with packaged environment checks, manual signing configuration and an internal-only export template. Signing, TestFlight distribution and the later production upgrade test remain pending. See [the mobile build instructions](../../mobile/README.md#servsync-internal-ios-beta).
+
 ## 2026-11-20 — iPhone invoice Add Line
 
 The standalone invoice editor and shared Invoice Draft now finish an editing tap on Add Line before iOS can dismiss the keyboard and lose the click. The new row receives Description focus. Saving still requires an explicit action.

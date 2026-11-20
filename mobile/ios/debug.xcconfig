@@ -1,1 +1,2 @@
+#include "identity.xcconfig"
 CAPACITOR_DEBUG = true
