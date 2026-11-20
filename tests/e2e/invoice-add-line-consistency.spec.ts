@@ -117,3 +117,29 @@ test.describe('touch activation while editing an invoice price', () => {
     });
   }
 });
+
+test('a dragged or cancelled editing gesture does not append an invoice line', async ({ page }) => {
+  await mountEditor(page, { shared: true });
+  const price = page.getByLabel('Invoice line item 1 unit price');
+  await price.fill('12.34');
+  const add = page.getByRole('button', { name: 'Add Line', exact: true });
+  await add.scrollIntoViewIfNeeded();
+  await add.evaluate(button => {
+    document.documentElement.classList.add('native-editing');
+    const box = button.getBoundingClientRect();
+    const point = { clientX: box.left + 5, clientY: box.top + 5 };
+    const moved = { ...point, clientX: point.clientX + 20 };
+    // Dispatch the component's gesture sequence without a compatibility click.
+    const send = (type: string, touches: typeof point[], changedTouches: typeof point[]) => {
+      button.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { touches, changedTouches }));
+    };
+    send('touchstart', [point], [point]);
+    send('touchmove', [moved], [moved]);
+    send('touchend', [], [moved]);
+    send('touchstart', [point], [point]);
+    send('touchcancel', [], [point]);
+  });
+  await expect(page.getByLabel(/^Invoice line item \d+ description$/)).toHaveCount(1);
+  await expect(price).toHaveValue('12.34');
+  await expect(page.getByTestId('saves')).toHaveText('0');
+});
