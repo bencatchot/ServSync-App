@@ -1,4 +1,5 @@
 import { InvoicePropertyField } from './features/invoices/InvoicePropertyField';
+import { HomeownerInvoicePdfActions } from './features/invoices/HomeownerInvoicePdfActions';
 import type { InvoicePdfContext } from './utils/pdfDocuments';
 import { contractorInvoiceServiceAddress, homeownerInvoiceServiceAddress } from './features/invoices/invoicePdfAddress';
 import { InvoiceLineItems } from './features/invoices/InvoiceLineItems';
@@ -13641,6 +13642,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const invoiceConnection = connections.find(connection => connection.contractor_id === invoice.contractor_id) ?? null;
     const invoiceDirectoryContractor = directoryContractors.find(contractor => contractor.id === invoice.contractor_id) ?? null;
     const contractorName = homeownerRecordContractorName(invoice.contractor_id);
+    const pdfContext: InvoicePdfContext = {
+      contractorName,
+      contractorLogoUrl: contractorLogoUrl(invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url),
+      contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
+      contractorPhone: formatPhoneNumber(invoiceConnection?.phone || invoiceDirectoryContractor?.phone || ''),
+      contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
+      customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
+      ...homeownerInvoiceServiceAddress(invoice, homes, profile.id),
+    };
     const isOpen = viewingInvoiceId === invoice.id;
     const cardTone = options.showPaymentGuidance ? 'invoice' : 'closed';
     const propertyLabel = propertyRecordLabel(invoice, { homes });
@@ -13692,22 +13702,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Receipt size={16} />
             {updatingInvoiceId === invoice.id ? 'Opening...' : isOpen ? 'Hide Details' : 'View Invoice'}
           </button>
-          <button
-            type="button"
-            onClick={() => void downloadInvoicePdf(invoice, {
-              contractorName,
-              contractorLogoUrl: contractorLogoUrl(invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url),
-              contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
-              contractorPhone: formatPhoneNumber(invoiceConnection?.phone || invoiceDirectoryContractor?.phone || ''),
-              contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
-              customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
-              ...homeownerInvoiceServiceAddress(invoice, homes, profile.id),
-            }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
-            className={mobileButtonClass('secondary')}
-          >
-            <Download size={16} />
-            Download PDF
-          </button>
+          <HomeownerInvoicePdfActions invoice={invoice} context={pdfContext} buttonClass={mobileButtonClass('secondary')}
+            onPreview={previewInvoicePdf} onDownload={downloadInvoicePdf}
+            onError={(error, fallback) => setError(readableError(error, fallback))} />
           {supabase && (
             <InvoiceOnlinePaymentButton channel="authenticated" invoiceId={invoice.id} client={supabase} />
           )}
