@@ -45,9 +45,9 @@ const buildOptions = (overrides: Partial<Parameters<typeof buildDraftCustomerOpt
   ...overrides,
 });
 
-async function installUnifiedComposerHarness(page: Page) {
+async function installUnifiedComposerHarness(page: Page, mode: 'new' | 'edit' = 'new') {
   await page.goto('/');
-  await page.evaluate(async () => {
+  await page.evaluate(async mode => {
     const dynamicImport = new Function('path', 'return import(path)') as (path: string) => Promise<Record<string, unknown>>;
     const reactModule = await dynamicImport('/node_modules/.vite/deps/react.js');
     const reactDomModule = await dynamicImport('/node_modules/.vite/deps/react-dom_client.js');
@@ -58,7 +58,12 @@ async function installUnifiedComposerHarness(page: Page) {
     const ContractorDraftComposer = composerModule.ContractorDraftComposer as (...args: unknown[]) => unknown;
     const createBlankDraft = mappingModule.createBlankSharedDraftComposerDraft as (value: Record<string, unknown>) => Record<string, unknown>;
     const state = {
-      draft: createBlankDraft({ intended_output: null, title: 'Unified customer Draft' }),
+      draft: createBlankDraft({
+        intended_output: 'invoice',
+        title: 'Unified customer Draft',
+        ...(mode === 'edit' ? { subject_type: 'local', local_contact_id: 'fixture-000', local_home_id: 'fixture-home-0' } : {}),
+      }),
+      changes: 0,
     };
     const customerOptions = [
       {
@@ -87,17 +92,22 @@ async function installUnifiedComposerHarness(page: Page) {
     const root = createRoot(document.getElementById('unified-customer-root') as HTMLElement);
     const render = () => root.render(React.createElement(ContractorDraftComposer, {
       draft: state.draft,
-      customerOptions,
+      customerOptions: mode === 'edit' ? customerOptions.filter(option => option.subjectType === 'local') : customerOptions,
+      currentDraftId: mode === 'edit' ? 'fixture-draft' : null,
       checklistOptions: [],
       canSave: true,
       saving: false,
-      onChange: (draft: Record<string, unknown>) => { state.draft = draft; render(); },
+      onChange: (draft: Record<string, unknown>) => {
+        state.draft = draft;
+        document.getElementById('unified-customer-root')!.dataset.changes = String(++state.changes);
+        render();
+      },
       onSave: () => undefined,
       onBack: () => undefined,
       onRemovePersistedLine: () => undefined,
     }));
     render();
-  });
+  }, mode);
 }
 
 test.describe('unified Draft customer options', () => {
@@ -316,7 +326,8 @@ test.describe('unified Draft UI wiring', () => {
     expect(profile).not.toContain('<p className="mt-2 text-sm font-bold">Create job</p>');
     expect(profile).not.toContain('<p className="mt-2 text-sm font-bold">Create estimate</p>');
     expect(profile).not.toContain('<p className="mt-2 text-sm font-bold">Create invoice</p>');
-    expect(app).toContain('data-testid="contractor-create-job-from-accepted-estimate"');
+    expect(app).toContain('onCreateJob={() => void createJobFromAcceptedEstimate(estimate)}');
+    expect(read('src/features/work/EstimateLifecycleActions.tsx')).toContain('data-testid="contractor-create-job-from-accepted-estimate"');
     expect(app).toContain('Create invoice from estimate');
   });
 
@@ -336,6 +347,57 @@ test.describe('unified Draft UI wiring', () => {
     await page.getByRole('button', { name: 'Clear customer selection' }).click();
     await expect(customer).toHaveValue('');
     await expect(property).toHaveValue('');
+  });
+
+  for (const mode of ['new', 'edit'] as const) {
+    test(`iOS compatibility mousedown preserves the focused result until click in ${mode} Invoice Draft mode`, async ({ page }) => {
+      await installUnifiedComposerHarness(page, mode);
+      const customer = page.getByTestId('durable-draft-customer');
+      const root = page.locator('#unified-customer-root');
+      await customer.click();
+      await customer.fill('Fixture Customer 319');
+      const result = page.getByRole('option', { name: /Fixture Customer 319/ });
+
+      // Native WebKit can emit a separate compatibility mousedown despite the
+      // canceled pointerdown. Its default blurs the search and removes the list.
+      const prevented = await result.evaluate(element => !element.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }),
+      ));
+      expect(prevented).toBe(true);
+      await expect(customer).toBeFocused();
+      await expect(result).toBeVisible();
+      await expect(root).not.toHaveAttribute('data-changes', /.+/);
+      await result.dispatchEvent('click');
+      await expect(root).toHaveAttribute('data-changes', '1');
+      await expect(customer).toHaveValue('Fixture Customer 319 — Not connected · 419 Oak Avenue');
+      await expect(page.getByTestId('durable-draft-property')).toHaveValue('fixture-home-319');
+      await expect(page.getByRole('listbox')).toHaveCount(0);
+    });
+  }
+
+  test('touch scrolling a long customer list leaves the draft unchanged', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'Uses Chromium touch input to exercise an actual scrolling gesture.');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installUnifiedComposerHarness(page);
+    const customer = page.getByTestId('durable-draft-customer');
+    await customer.click();
+    const list = page.getByRole('listbox');
+    await list.scrollIntoViewIfNeeded();
+    const bounds = await list.boundingBox();
+    if (!bounds) throw new Error('Expected a visible customer result list');
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height - 20;
+    const input = await page.context().newCDPSession(page);
+    await input.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (const distance of [20, 50, 80, 120]) {
+      await input.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - distance }] });
+    }
+    await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    await expect(page.locator('#unified-customer-root')).not.toHaveAttribute('data-changes', /.+/);
+    await customer.press('Escape');
+    await expect(list).toHaveCount(0);
+    await expect(customer).toHaveValue('');
   });
 
   for (const viewport of [

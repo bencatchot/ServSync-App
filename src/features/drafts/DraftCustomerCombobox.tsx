@@ -158,7 +158,11 @@ export function DraftCustomerCombobox({
                 }`}
                 onMouseEnter={() => setActiveIndex(index)}
                 onPointerDown={event => {
-                  // Keep Safari from blurring the input and unmounting this option before click.
+                  if (event.button === 0) event.preventDefault();
+                }}
+                onMouseDown={event => {
+                  // iOS can still synthesize mousedown after touchend. Keep the option
+                  // mounted through click without intercepting touch or scroll gestures.
                   if (event.button === 0) event.preventDefault();
                 }}
                 onClick={() => choose(option)}
