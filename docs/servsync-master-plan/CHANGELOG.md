@@ -11405,3 +11405,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Added optional per-job tech assignment and an isolated private SQL ledger/receipt contract with manager-only reads. A solo owner can enter expenses without assignment. Assigned active field techs may submit but not list costs or read photos/profit. Customer records and delivery interfaces are unchanged.
 - Local-only UI wiring preserves the accepted review layout. The hosted branch Preview remains synthetic. Photo cap is 3 MiB JPG/PNG (no HEIC), with manual entry available regardless of upload.
 - Verified with disposable PostgreSQL, domain/adapter tests and browser review. Further requirements include target schema/PostgREST verification, physical camera, receipt retention, and explicit shared backend and UI rollout approval. No shared changes made.
+
+### 2026-11-22 · Private job expenses · optional receipt recovery
+- Owners and assigned field techs can remove an optional receipt, including one rejected for size or type, without losing the entered expense fields. Validation stops before the write adapter, both file inputs reset, and the same file can be chosen again.
+- Six Chromium/WebKit browser checks passed, including both roles rejecting a generated JPEG one byte over the limit, then recording one photo-free expense. No schema, policy, storage, deployment configuration, or native camera behavior changed.

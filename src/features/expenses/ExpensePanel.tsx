@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Camera, Check, ChevronDown, LockKeyhole, Plus, ReceiptText, X } from 'lucide-react';
-import { categories, centsFromText, type Category, type ExpenseGateway, type Scope } from './ledger';
+import { categories, centsFromText, validateSubmission, type Category, type ExpenseGateway, type Scope } from './ledger';
 
 const usd = (c: number) => new Intl.NumberFormat('en-US',{style:'currency', currency:'USD'}).format(c / 100);
 function today() { const d = new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
@@ -23,6 +23,7 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
   const submitKey = useRef(crypto.randomUUID());
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
+  const choosePhotoButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const ident = useId();
@@ -35,6 +36,16 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
   const view = gateway.read(scope);
   if (view.kind === 'unavailable') return <section className="ex-card"><h2>Expenses unavailable</h2><p>You don’t have access to expenses for this work.</p></section>;
   const isManager = view.kind === 'manage';
+  function clearPhoto() {
+    setFile(undefined);
+    if (fileInput.current) fileInput.current.value = '';
+    if (cameraInput.current) cameraInput.current.value = '';
+  }
+  function removePhoto() {
+    clearPhoto();
+    setError('');
+    choosePhotoButton.current?.focus();
+  }
   async function save(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -42,11 +53,11 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
     try {
       const cents = centsFromText(amount);
       if (cents === null) throw Error('Enter a positive amount, such as 24.95.');
-      await gateway.submit(scope, {amountCents:cents, vendor, day, category, receipt:file, requestId:submitKey.current});
-      setMessage(file ? 'Expense recorded with its receipt.' : 'Expense recorded.'); setAmount(''); setVendor(''); setFile(undefined); setOpened(false);
+      const input = {amountCents:cents, vendor, day, category, receipt:file, requestId:submitKey.current};
+      validateSubmission(input);
+      await gateway.submit(scope, input);
+      setMessage(file ? 'Expense recorded with its receipt.' : 'Expense recorded.'); setAmount(''); setVendor(''); clearPhoto(); setOpened(false);
       submitKey.current = crypto.randomUUID(); refresh(revision+1);
-      if (fileInput.current) fileInput.current.value = '';
-      if (cameraInput.current) cameraInput.current.value = '';
     } catch(e) { setError(e instanceof Error ? e.message : 'Could not record expense.'); } finally { setBusy(false); }
   }
   async function run(action: () => Promise<void>) {
@@ -71,11 +82,11 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
       <label>Category<select value={category} onChange={e=>setCategory(e.target.value as Category)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Vendor <small>(optional)</small><input maxLength={140} value={vendor} placeholder="e.g. Supply house" onChange={e=>setVendor(e.target.value)}/></label></div>
       <div className="ex-receipt"><Camera size={19}/><strong>Receipt photo <small>(optional JPG or PNG, up to 3 MB)</small></strong>
-      <div className="ex-actions"><button type="button" onClick={()=>cameraInput.current?.click()}>Take photo</button><button type="button" onClick={()=>fileInput.current?.click()}>Choose photo</button></div>
+      <div className="ex-actions"><button type="button" disabled={busy} onClick={()=>cameraInput.current?.click()}>Take photo</button><button ref={choosePhotoButton} type="button" disabled={busy} onClick={()=>fileInput.current?.click()}>Choose photo</button></div>
       <input hidden ref={cameraInput} aria-label="Take receipt photo" type="file" accept="image/jpeg,image/png" capture="environment" onChange={e=>{if (e.target.files?.[0]) setFile(e.target.files[0]);}}/>
       <input hidden ref={fileInput} id={ident} aria-label="Choose receipt photo" type="file" accept="image/jpeg,image/png" onChange={e=>{if (e.target.files?.[0]) setFile(e.target.files[0]);}}/>
-      {file && <small>Attached: {file.name}</small>}</div>
-      <div className="ex-actions"><button className="ex-primary" type="submit" disabled={busy}>Record expense</button>{isManager && <button type="button" disabled={busy} onClick={()=>{setOpened(false); setFile(undefined); setError(''); setAmount(''); setVendor('');}}>Cancel</button>}</div></form>}
+      {file && <div className="ex-photo-attached"><small>Attached: {file.name}</small><button type="button" disabled={busy} onClick={removePhoto}>Remove photo</button></div>}</div>
+      <div className="ex-actions"><button className="ex-primary" type="submit" disabled={busy}>Record expense</button>{isManager && <button type="button" disabled={busy} onClick={()=>{setOpened(false); clearPhoto(); setError(''); setAmount(''); setVendor('');}}>Cancel</button>}</div></form>}
     {error && <div role="alert" className="ex-error">{error}</div>}
     {view.kind === 'manage' && <div className="ex-entries"><h3>Recorded expenses <span>{view.entries.length}</span></h3>
       {view.entries.length === 0 && <p>No expenses recorded for this work yet.</p>}
