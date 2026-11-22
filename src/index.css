@@ -60,7 +60,7 @@ textarea {
   font: inherit;
 }
 
-/* Keep the homeowner section picker in place while its current records scroll.
+/* Keep the homeowner section tabs in place while its current records scroll.
    Native already sizes the shell to the safe viewport, including the keyboard. */
 @media (max-width: 767px) {
   html:not(.servsync-native) .workspace-shell:has(.homeowner-records-layout) {

@@ -39,7 +39,7 @@ async function openFictionalRecords(page: Page) {
   await page.getByLabel('Email', { exact: true }).fill(profile.email);
   await page.getByLabel('Password', { exact: true }).fill('fictional-only');
   await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Open Invoices' })).toBeVisible();
+  await expect(page.getByRole(page.viewportSize()!.width < 768 ? 'tabpanel' : 'region', { name: /^Open Invoices/ })).toBeVisible();
 }
 
 for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [1280, 900]]) {
@@ -56,35 +56,87 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [
       });
     }
     const mobile = width < 768;
-    const section = page.getByRole('combobox', { name: 'Section', exact: true });
-    const results = page.getByRole('region', { name: 'Open Invoices' });
-    const pick = async (title: string, value: string) => {
-      if (mobile) await section.selectOption(value);
+    const section = page.getByRole('tablist', { name: 'Record sections' });
+    const tab = (name: string) => section.getByRole('tab', { name: new RegExp('^' + name) });
+    const results = page.getByRole(mobile ? 'tabpanel' : 'region', { name: /^Open Invoices/ });
+    const pick = async (title: string) => {
+      if (mobile) await tab(title).click();
       else await page.getByRole('button', { name: new RegExp('^' + title) }).click();
     };
-    const initialPickerTop = mobile ? (await section.boundingBox())!.y : 0;
+    const initialTabsTop = mobile ? (await section.boundingBox())!.y : 0;
     if (mobile) {
       await expect(results.getByText('Fixture repair 0', { exact: true })).toBeInViewport();
       const navigation = page.getByRole('navigation', { name: /Homeowner Portal mobile/ });
       const bounds = (await results.boundingBox())!;
       expect(bounds.y + bounds.height).toBeLessThanOrEqual((await navigation.boundingBox())!.y + 1);
-      if (width === 390) expect(initialPickerTop).toBeGreaterThan(47);
+      if (width === 390) expect(initialTabsTop).toBeGreaterThan(47);
+      await expect(tab('Open Invoices')).toHaveAttribute('aria-selected', 'true');
+      await expect(section.locator('[tabindex="0"]')).toHaveCount(1);
+      await expect(tab('Open Invoices')).toBeInViewport({ ratio: 0.99 });
+      const right = page.getByRole('button', { name: 'Scroll sections right' });
+      const left = page.getByRole('button', { name: 'Scroll sections left' });
+      const outerPosition = () => page.evaluate(() => [
+        window.scrollY, document.querySelector('.workspace-content')!.scrollTop,
+      ]);
+      const originalPosition = await outerPosition();
       await results.evaluate(el => { el.scrollTop = el.scrollHeight; });
       expect(await results.evaluate(el => el.scrollTop)).toBeGreaterThan(200);
       await expect(section).toBeInViewport();
-      expect((await section.boundingBox())!.y).toBeCloseTo(initialPickerTop, 0);
+      expect((await section.boundingBox())!.y).toBeCloseTo(initialTabsTop, 0);
+      for (let step = 0; step < 8; step++) {
+        const atEnd = await section.evaluate(el => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+        if (atEnd) break;
+        await right.click();
+      }
+      await expect(right).toBeDisabled();
+      await expect(tab('Paid / Closed')).toBeInViewport({ ratio: 0.99 });
+      // Browsing offscreen labels does not change the open panel.
+      await expect(results).toBeVisible();
+      await pick('Paid / Closed');
+      const empty = page.getByRole('tabpanel', { name: /^Paid \/ Closed/ });
+      await expect(empty.getByText('No paid or closed records yet', { exact: true })).toBeInViewport();
+      expect((await empty.boundingBox())!.y).toBeCloseTo(bounds.y, 0);
+      expect(bounds.y - initialTabsTop - (await section.boundingBox())!.height).toBeLessThanOrEqual(12);
+      expect((await section.boundingBox())!.y).toBeCloseTo(initialTabsTop, 0);
+      expect(await outerPosition()).toEqual(originalPosition);
+      await expect(tab('Paid / Closed')).toBeInViewport({ ratio: 0.99 });
+      for (let step = 0; step < 8; step++) {
+        const visible = await tab('Open Invoices').evaluate(el => {
+          const rail = el.parentElement!.getBoundingClientRect();
+          const box = el.getBoundingClientRect();
+          return box.right > rail.left && box.left < rail.right;
+        });
+        if (visible) break;
+        await left.click();
+      }
+      await pick('Open Invoices');
+      await expect(tab('Open Invoices')).toBeInViewport({ ratio: 0.99 });
+      await expect(results.getByText('Fixture repair 0', { exact: true })).toBeInViewport();
+      expect(await results.evaluate(el => el.scrollTop)).toBe(0);
+      expect((await results.boundingBox())!.y).toBeCloseTo(bounds.y, 0);
+      expect((await section.boundingBox())!.y).toBeCloseTo(initialTabsTop, 0);
+      expect(await outerPosition()).toEqual(originalPosition);
+      await tab('Open Invoices').focus();
+      for (const [key, title] of [['End', 'Paid / Closed'], ['ArrowRight', 'Needs Review'], ['ArrowLeft', 'Paid / Closed'], ['ArrowLeft', 'Active Plans'], ['ArrowLeft', 'Accepted Estimates'], ['Home', 'Needs Review'], ['ArrowRight', 'Plan Offers'], ['ArrowRight', 'Open Invoices']]) {
+        await page.keyboard.press(key);
+        await expect(tab(title)).toBeFocused();
+        await expect(tab(title)).toHaveAttribute('aria-selected', 'true');
+        await expect(tab(title)).toBeInViewport({ ratio: 0.99 });
+        await expect(page.getByRole('tabpanel', { name: new RegExp('^' + title) })).toBeVisible();
+        expect((await section.boundingBox())!.y).toBeCloseTo(initialTabsTop, 0);
+      }
     }
-    await pick('Plan Offers', 'agreement_offers');
+    await pick('Plan Offers');
     await expect(page.getByText('No plan offers yet', { exact: true })).toBeVisible();
     if (mobile) await expect(page.getByText('No plan offers yet', { exact: true })).toBeInViewport();
-    await pick('Open Invoices', 'open_invoices');
+    await pick('Open Invoices');
     if (mobile) {
-      expect((await section.boundingBox())!.y).toBeCloseTo(initialPickerTop, 0);
+      expect((await section.boundingBox())!.y).toBeCloseTo(initialTabsTop, 0);
       expect(await results.evaluate(el => el.scrollTop)).toBe(0);
     }
     const first = results.getByRole('button', { name: 'View Invoice' }).first();
     await first.click();
-    await pick('Open Invoices', 'open_invoices');
+    await pick('Open Invoices');
     await expect(results.getByRole('button', { name: 'Hide Details' })).toHaveCount(1);
     for (let attempt = 0; attempt < 2; attempt++) {
       await results.getByRole('button', { name: 'Preview PDF' }).first().click();
