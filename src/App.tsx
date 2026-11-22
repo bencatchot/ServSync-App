@@ -315,11 +315,8 @@ import { ContractorScheduleSnapshot, ContractorTodayWork, type ContractorSchedul
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
-import { TradeSectionJobPanel } from './features/trade-sections/TradeSectionJobPanel';
-import {
-  DURABLE_TRADE_SECTIONS_UI_ENABLED,
-  shouldMountTradeSectionJobPanel,
-} from './features/trade-sections/tradeSectionAvailability';
+import { ContractorJobSupplement } from './features/jobs/ContractorJobSupplement';
+import { createPrivateExpenseRenderer } from './features/expenses/mountPrivateExpenses';
 import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
 import { ContractorNeedsAttention, ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
 import { ContractorFinancialsDashboard, ContractorFinancialsNeedsAttention } from './features/financials/ContractorFinancialsDashboard';
@@ -30513,6 +30510,7 @@ function ContractorDashboard({
   const canUseInvoiceDraftPriceBook = priceBookAccess.canView && effectiveDurableDraftCapabilities.canLaunchInvoice;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
+  const renderPrivateExpenses = createPrivateExpenseRenderer(supabase, contractor?.id, profile.id, currentContractorTeamRole, configuredSupabaseUrl);
   const canManageMarketing = CONTRACTOR_MARKETING_UI_ENABLED && (
     currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
@@ -37008,6 +37006,7 @@ function ContractorDashboard({
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                                           </div>
                                           {!isInvoiceWorkspaceTab && <LifecycleNextStep step={estimateNextStep} state={`${estimate.status}-estimate`} />}
+                                          {!isInvoiceWorkspaceTab && renderPrivateExpenses('estimate',estimate.id,estimate.contractor_id)}
                                           {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows)}
                                           {!SERVSYNC_DEMO_PRESENTATION_MODE
                                             && supabase
@@ -39068,6 +39067,7 @@ function ContractorDashboard({
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                               </div>
                               {!isInvoice && <LifecycleNextStep step={estimateNextStep} state={`${estimate.status}-estimate`} />}
+                              {!isInvoice && renderPrivateExpenses('estimate',estimate.id,estimate.contractor_id)}
                               {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows, { mobile: true })}
                               {!SERVSYNC_DEMO_PRESENTATION_MODE
                                 && supabase
@@ -41229,29 +41229,7 @@ function ContractorDashboard({
               : null;
             const linkedCalendarOccurrenceForJob = linkedCalendarEventJobLinkForJob?.occurrence_starts_at ?? linkedStandaloneCalendarEventForJob?.starts_at ?? null;
             const scheduledAtForJob = linkedVisitEventForJob?.scheduled_at ?? linkedCalendarOccurrenceForJob ?? null;
-            const activeTradeSectionJobStatus = inspectionJobStatus(activeInspection);
-            const renderTradeSectionJobPanel = () => (
-              supabase
-              && contractor?.id
-              && shouldMountTradeSectionJobPanel({
-                enabled: DURABLE_TRADE_SECTIONS_UI_ENABLED,
-                role: currentContractorTeamRole,
-                jobStatus: activeTradeSectionJobStatus,
-                recordStatus: activeInspection.status,
-              })
-                ? (
-                    <TradeSectionJobPanel
-                      client={supabase}
-                      contractorId={contractor.id}
-                      jobId={activeInspection.id}
-                      jobStatus={activeTradeSectionJobStatus}
-                      recordStatus={activeInspection.status}
-                      role={currentContractorTeamRole}
-                      enabled={DURABLE_TRADE_SECTIONS_UI_ENABLED}
-                    />
-                  )
-                : null
-            );
+            const renderJobSupplement = () => <ContractorJobSupplement job={activeInspection} client={supabase} contractorId={contractor?.id} role={currentContractorTeamRole} renderExpenses={renderPrivateExpenses} />;
             const renderJobCardHeader = () => (
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 sm:px-5">
@@ -41525,8 +41503,7 @@ function ContractorDashboard({
                   </button>
 
                   {renderJobCardHeader()}
-
-                  {renderTradeSectionJobPanel()}
+                  {renderJobSupplement()}
 
                   <div className="space-y-4">
                     {renderContractorJobWorkflowThread(activeInspection)}
@@ -41815,8 +41792,7 @@ function ContractorDashboard({
                 </button>
 
                 {renderJobCardHeader()}
-
-                {renderTradeSectionJobPanel()}
+                  {renderJobSupplement()}
 
                 {renderContractorJobWorkflowThread(activeInspection)}
 
