@@ -15,6 +15,7 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
   const [opened,setOpened] = useState(false);
   const [revision,refresh] = useState(0);
   const [message,setMessage] = useState('');
+  const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [preview,setPreview] = useState<File | null>(null);
   const [url,setUrl] = useState('');
@@ -34,17 +35,24 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
   const view = gateway.read(scope);
   if (view.kind === 'unavailable') return <section className="ex-card"><h2>Expenses unavailable</h2><p>You don’t have access to expenses for this work.</p></section>;
   const isManager = view.kind === 'manage';
-  function save(event: FormEvent) {
-    event.preventDefault(); setError('');
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setError(''); setBusy(true);
     try {
       const cents = centsFromText(amount);
       if (cents === null) throw Error('Enter a positive amount, such as 24.95.');
-      gateway.submit(scope, {amountCents:cents, vendor, day, category, receipt:file, requestId:submitKey.current});
+      await gateway.submit(scope, {amountCents:cents, vendor, day, category, receipt:file, requestId:submitKey.current});
       setMessage(file ? 'Expense recorded with its receipt.' : 'Expense recorded.'); setAmount(''); setVendor(''); setFile(undefined); setOpened(false);
       submitKey.current = crypto.randomUUID(); refresh(revision+1);
       if (fileInput.current) fileInput.current.value = '';
       if (cameraInput.current) cameraInput.current.value = '';
-    } catch(e) { setError(e instanceof Error ? e.message : 'Could not record expense.'); }
+    } catch(e) { setError(e instanceof Error ? e.message : 'Could not record expense.'); } finally { setBusy(false); }
+  }
+  async function run(action: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true); setError('');
+    try { await action(); } catch { setError('This expense action could not be completed. Try again.'); } finally { setBusy(false); }
   }
   return <section className="ex-card">
     <div className="ex-top"><div><span className="ex-private"><LockKeyhole size={13}/> Contractor only</span><h2>{isManager ? 'Job expenses' : 'Record an expense'}</h2>
@@ -62,18 +70,18 @@ export function ExpensePanel({ gateway, scope }: {gateway:ExpenseGateway; scope:
       <label>Purchase date<input type="date" required value={day} onChange={e=>setDay(e.target.value)}/></label>
       <label>Category<select value={category} onChange={e=>setCategory(e.target.value as Category)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Vendor <small>(optional)</small><input maxLength={140} value={vendor} placeholder="e.g. Supply house" onChange={e=>setVendor(e.target.value)}/></label></div>
-      <div className="ex-receipt"><Camera size={19}/><strong>Receipt photo <small>(optional JPG or PNG, up to 8 MB)</small></strong>
+      <div className="ex-receipt"><Camera size={19}/><strong>Receipt photo <small>(optional JPG or PNG, up to 3 MB)</small></strong>
       <div className="ex-actions"><button type="button" onClick={()=>cameraInput.current?.click()}>Take photo</button><button type="button" onClick={()=>fileInput.current?.click()}>Choose photo</button></div>
       <input hidden ref={cameraInput} aria-label="Take receipt photo" type="file" accept="image/jpeg,image/png" capture="environment" onChange={e=>{if (e.target.files?.[0]) setFile(e.target.files[0]);}}/>
       <input hidden ref={fileInput} id={ident} aria-label="Choose receipt photo" type="file" accept="image/jpeg,image/png" onChange={e=>{if (e.target.files?.[0]) setFile(e.target.files[0]);}}/>
       {file && <small>Attached: {file.name}</small>}</div>
-      {error && <div role="alert" className="ex-error">{error}</div>}
-      <div className="ex-actions"><button className="ex-primary" type="submit">Record expense</button>{isManager && <button type="button" onClick={()=>{setOpened(false); setFile(undefined); setError(''); setAmount(''); setVendor('');}}>Cancel</button>}</div></form>}
+      <div className="ex-actions"><button className="ex-primary" type="submit" disabled={busy}>Record expense</button>{isManager && <button type="button" disabled={busy} onClick={()=>{setOpened(false); setFile(undefined); setError(''); setAmount(''); setVendor('');}}>Cancel</button>}</div></form>}
+    {error && <div role="alert" className="ex-error">{error}</div>}
     {view.kind === 'manage' && <div className="ex-entries"><h3>Recorded expenses <span>{view.entries.length}</span></h3>
       {view.entries.length === 0 && <p>No expenses recorded for this work yet.</p>}
       {view.entries.map(e=><article key={e.id}><div className="ex-row"><ReceiptText size={20}/><div><b>{e.vendor || e.category}</b><small>{e.day} · {e.category}</small></div><strong>{usd(e.amountCents)}</strong></div>
-      <div className="ex-links">{e.hasReceipt && <button onClick={()=>setPreview(gateway.receipt(scope,e.id))}>View receipt</button>}
-      {voidId===e.id ? <><span>Remove from job costs?</span><button onClick={()=>{gateway.void(scope,e.id);setVoidId(null);setMessage('Expense removed from job costs.');refresh(revision+1);}}>Yes, remove</button><button onClick={()=>setVoidId(null)}>Keep</button></> : <button onClick={()=>setVoidId(e.id)}>Correct an entry <ChevronDown size={12}/></button>}</div></article>)}</div>}
+      <div className="ex-links">{e.hasReceipt && <button disabled={busy} onClick={()=>void run(async()=>setPreview(await gateway.receipt(scope,e.id)))}>View receipt</button>}
+      {voidId===e.id ? <><span>Remove from job costs?</span><button disabled={busy} onClick={()=>void run(async()=>{await gateway.void(scope,e.id);setVoidId(null);setMessage('Expense removed from job costs.');refresh(revision+1);})}>Yes, remove</button><button onClick={()=>setVoidId(null)}>Keep</button></> : <button onClick={()=>setVoidId(e.id)}>Correct an entry <ChevronDown size={12}/></button>}</div></article>)}{view.loadMore && <button disabled={busy} onClick={()=>void run(view.loadMore!)}>Load older expenses</button>}</div>}
     {preview && <dialog ref={dialog} onClose={()=>setPreview(null)}><div className="ex-top"><h3>Private receipt</h3><button ref={closeButton} aria-label="Close receipt" onClick={()=>dialog.current?.close()}><X size={16}/></button></div>{url && <img src={url} alt="Attached purchase receipt"/>}</dialog>}
   </section>;
 }

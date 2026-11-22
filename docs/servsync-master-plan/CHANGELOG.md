@@ -11400,3 +11400,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Branch: codex/private-job-expenses-v1. Added isolated job-expenses-preview.html, src/features/expenses, browser and domain tests, conditional extra Preview build entry, and the linked product/access plan.
 - Managers review direct costs and projected gross job profit; assigned technicians rehearse entry only. Estimate and linked-job views share one ledger. No customer route or customer-document field changed. No shared backend, finance data, auth or access configuration touched.
 - Follow-up: confirm server-authoritative job scope and approve private ledger/receipt design before durable implementation.
+
+### 2026-11-22 · Private job expenses · durable local review
+- Added optional per-job tech assignment and an isolated private SQL ledger/receipt contract with manager-only reads. A solo owner can enter expenses without assignment. Assigned active field techs may submit but not list costs or read photos/profit. Customer records and delivery interfaces are unchanged.
+- Local-only UI wiring preserves the accepted review layout. The hosted branch Preview remains synthetic. Photo cap is 3 MiB JPG/PNG (no HEIC), with manual entry available regardless of upload.
+- Verified with disposable PostgreSQL, domain/adapter tests and browser review. Further requirements include target schema/PostgREST verification, physical camera, receipt retention, and explicit shared backend and UI rollout approval. No shared changes made.
