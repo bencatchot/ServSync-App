@@ -59,3 +59,128 @@ select,
 textarea {
   font: inherit;
 }
+
+/* Keep the homeowner section tabs in place while its current records scroll.
+   Native already sizes the shell to the safe viewport, including the keyboard. */
+@media (max-width: 767px) {
+  html:not(.servsync-native) .workspace-shell:has(.homeowner-records-layout) {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .workspace-column:has(.homeowner-records-layout) {
+    min-height: 0;
+  }
+
+  .workspace-content:has(.homeowner-records-layout) {
+    overflow-y: auto;
+  }
+
+  .workspace-content:has(.homeowner-records-layout) > div {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  section:has(> .homeowner-records-layout),
+  .homeowner-records-layout {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+
+  .homeowner-wheel-strip {
+    scroll-snap-type: x mandatory;
+  }
+
+  /* End spaces let the first and last sections come all the way to the front. */
+  .homeowner-wheel-strip::before,
+  .homeowner-wheel-strip::after {
+    content: "";
+    flex: 0 0 35%;
+  }
+
+  .homeowner-wheel-slot {
+    flex: 0 0 30%;
+    position: relative;
+    min-width: 0;
+    min-height: 4rem;
+    scroll-snap-align: center;
+    pointer-events: none;
+  }
+
+  /* Transform the actual button, including its label and hit area, as one face. */
+  .homeowner-wheel-tab {
+    appearance: none;
+    position: absolute;
+    inset: 3px -10%;
+    width: 120%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.15rem 0.45rem;
+    pointer-events: auto;
+    border-radius: 12px;
+    border: 1px solid #91a9bf;
+    background: linear-gradient(#f0f5fa, #d8e3ee);
+    color: #263d55;
+    box-shadow: 0 2px 3px #19324a38;
+    font-size: 0.8rem;
+    font-weight: 650;
+    line-height: 1.1;
+    text-align: center;
+    transform: perspective(245px)
+      translateX(calc(-1.5% * var(--wheel-turn, 0)))
+      translateZ(calc(-38px * var(--wheel-depth, 0)))
+      rotateY(calc(34deg * var(--wheel-turn, 0)))
+      scaleY(calc(1 - 0.12 * var(--wheel-depth, 0)));
+  }
+
+  .homeowner-wheel-slot[data-front] .homeowner-wheel-tab {
+    border-color: #67859e;
+    background: linear-gradient(#fff, #edf3f9);
+    box-shadow: 0 2px 4px #142c4655, 0 0 8px #142c4638;
+  }
+
+  .homeowner-wheel-slot .homeowner-wheel-tab[aria-selected="true"] {
+    border-color: #173e64;
+    background: linear-gradient(#285b8f, #163c65);
+    color: white;
+  }
+
+  .homeowner-wheel-tab > span {
+    max-width: calc(100% - 4px);
+    transform: translateX(calc(4px * var(--wheel-turn, 0)));
+  }
+
+  .homeowner-wheel-count {
+    margin-top: 2px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
+  .homeowner-wheel-tab:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .homeowner-wheel-tab { transform: scale(0.9); }
+    .homeowner-wheel-tab > span { transform: none; }
+    .homeowner-wheel-slot[data-front] .homeowner-wheel-tab { transform: none; }
+  }
+
+  @media (forced-colors: active) {
+    .homeowner-wheel-tab[aria-selected="true"] { border: 3px solid Highlight; }
+  }
+
+  .homeowner-record-filters,
+  .homeowner-record-results {
+    flex: 1 0 0;
+    min-height: 9rem;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+}
