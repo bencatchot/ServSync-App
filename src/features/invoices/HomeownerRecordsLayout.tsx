@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { formatMoney } from '../../utils/format';
 
@@ -54,30 +54,45 @@ const isPhoneLayout = () => window.matchMedia(phoneQuery).matches;
 function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 'selected' | 'onSelect'>) {
   const strip = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: true, end: false });
-  function updateEdges() {
+  const [focusTarget, setFocusTarget] = useState<HomeownerRecordSection | null>(null);
+  const updateWheel = useCallback(() => {
     const list = strip.current;
-    if (!list) return;
+    if (!list || !list.clientWidth) return;
+    const slots = Array.from(list.children) as HTMLElement[];
+    const position = list.scrollLeft / slots[0].getBoundingClientRect().width;
+    const front = Math.max(0, Math.min(slots.length - 1, Math.round(position)));
     const start = list.scrollLeft <= 1;
     const end = list.scrollLeft + list.clientWidth >= list.scrollWidth - 1;
+    slots.forEach((slot, index) => {
+      const offset = Math.max(-1.5, Math.min(1.5, index - position));
+      slot.style.setProperty('--wheel-turn', offset.toFixed(3));
+      slot.style.setProperty('--wheel-depth', Math.abs(offset).toFixed(3));
+      const layer = index === front ? slots.length + 1 : slots.length - Math.round(Math.abs(index - position));
+      slot.style.zIndex = String(layer);
+      slot.toggleAttribute('data-front', index === front);
+    });
     setEdges(previous => previous.start === start && previous.end === end ? previous : { start, end });
-  }
+  }, []);
+
+  const centerTab = useCallback((button: HTMLButtonElement) => {
+    const list = strip.current!;
+    // Measure the stable slot, not the rotating button. Only this strip moves.
+    const slot = button.parentElement!;
+    list.scrollLeft = slot.offsetLeft - (list.clientWidth - slot.offsetWidth) / 2;
+    updateWheel();
+  }, [updateWheel]);
 
   useLayoutEffect(() => {
     const list = strip.current!;
-    const active = list.querySelector<HTMLElement>('[aria-selected="true"]')!;
-    function centerSelected() {
-      // Move only the strip. scrollIntoView can also move the page and its ancestors.
-      const tab = active.getBoundingClientRect();
-      const rail = list.getBoundingClientRect();
-      list.scrollLeft += tab.left - rail.left - (rail.width - tab.width) / 2;
-      updateEdges();
+    const selectedButton = list.querySelector<HTMLButtonElement>('[aria-selected="true"]')!;
+    function alignSelection() {
+      centerTab(selectedButton);
     }
-    centerSelected();
-    const observer = new ResizeObserver(centerSelected);
+    alignSelection();
+    const observer = new ResizeObserver(alignSelection);
     observer.observe(list);
-    observer.observe(active);
     return () => observer.disconnect();
-  }, [selected]);
+  }, [centerTab, selected]);
 
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next: number;
@@ -91,15 +106,16 @@ function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 
     event.preventDefault();
     const button = strip.current!.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next];
     button.focus({ preventScroll: true });
-    onSelect(sections[next].id);
+    setFocusTarget(sections[next].id);
+    centerTab(button);
   }
 
-  const activeIndex = sections.findIndex(section => section.id === selected);
   const arrowStyle = 'flex min-h-11 w-7 shrink-0 items-center justify-center rounded-lg text-slate-700 disabled:text-slate-300 focus-visible:outline-blue-700';
   function scrollTabs(direction: number) {
     const list = strip.current!;
-    list.scrollLeft += direction * list.clientWidth * 0.8;
-    updateEdges();
+    const slotWidth = list.firstElementChild!.getBoundingClientRect().width;
+    list.scrollLeft = (Math.round(list.scrollLeft / slotWidth) + direction) * slotWidth;
+    updateWheel();
   }
   return (
     <div className="-mx-2 flex min-w-0 items-stretch rounded-xl border border-slate-200 bg-slate-50">
@@ -118,28 +134,35 @@ function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 
         ref={strip}
         role="tablist"
         aria-label="Record sections"
-        onScroll={updateEdges}
-        className="relative isolate flex min-w-0 flex-1 items-stretch overflow-x-auto overscroll-x-contain"
+        onScroll={updateWheel}
+        onBlur={event => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setFocusTarget(null);
+        }}
+        className="homeowner-wheel-strip relative isolate flex min-w-0 flex-1 items-stretch overflow-x-auto overscroll-x-contain"
       >
         {sections.map((section, index) => {
           const active = section.id === selected;
           return (
-            <button
-              key={section.id}
-              type="button"
-              role="tab"
-              id={`record-tab-${section.id}`}
-              aria-selected={active}
-              aria-controls={`record-panel-${section.id}`}
-              tabIndex={active ? 0 : -1}
-              onKeyDown={event => navigate(event, index)}
-              onClick={() => onSelect(section.id)}
-              data-side={active ? undefined : index < activeIndex ? 'left' : 'right'}
-              className="homeowner-wheel-tab"
-            >
-              <span>{section.title}</span>
-              <span className="homeowner-wheel-count">{section.count}</span>
-            </button>
+            <div key={section.id} role="presentation" className="homeowner-wheel-slot">
+              <button
+                type="button"
+                role="tab"
+                id={`record-tab-${section.id}`}
+                aria-selected={active}
+                aria-controls={`record-panel-${section.id}`}
+                tabIndex={(focusTarget ?? selected) === section.id ? 0 : -1}
+                onKeyDown={event => navigate(event, index)}
+                onClick={event => {
+                  setFocusTarget(section.id);
+                  centerTab(event.currentTarget);
+                  onSelect(section.id);
+                }}
+                className="homeowner-wheel-tab"
+              >
+                <span>{section.title}</span>
+                <span className="homeowner-wheel-count">{section.count}</span>
+              </button>
+            </div>
           );
         })}
       </div>

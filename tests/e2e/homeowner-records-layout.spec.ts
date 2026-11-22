@@ -43,9 +43,9 @@ async function openFictionalRecords(page: Page) {
 }
 
 for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [1280, 900]]) {
-  test(`homeowner sections, filters and PDF return at ${width}px`, async ({ page }) => {
+  test(`homeowner sections, filters and PDF return at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height });
-    if (width === 320) await page.emulateMedia({ reducedMotion: 'reduce' });
+    if (width === 375) await page.emulateMedia({ reducedMotion: 'reduce' });
     await openFictionalRecords(page);
     // Exercise the native shell's inner scroller and synthetic notch/home indicator.
     if (width === 390) {
@@ -80,6 +80,37 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [
         window.scrollY, document.querySelector('.workspace-content')!.scrollTop,
       ]);
       const originalPosition = await outerPosition();
+      const front = section.locator('[data-front] [role="tab"]');
+      await expect(front).toHaveAccessibleName(/^Open Invoices/);
+      if (width === 320 || width === 390) {
+        await testInfo.attach('wheel-at-rest', { body: await page.screenshot(), contentType: 'image/png' });
+      }
+      await right.click();
+      await expect(front).toHaveAccessibleName(/^Accepted Estimates/);
+      await expect(tab('Open Invoices')).toHaveAttribute('aria-selected', 'true');
+      await expect(results).toBeVisible();
+      // Inspect the rendered projection, not just the identity of the front slot.
+      const shape = await section.evaluate(el => {
+        const front = el.querySelector<HTMLElement>('[data-front] [role="tab"]')!;
+        const back = el.querySelector<HTMLElement>('[aria-selected="true"]')!;
+        const matrix = (button: HTMLElement) => new DOMMatrix(getComputedStyle(button).transform === 'none' ? undefined : getComputedStyle(button).transform);
+        return {
+          frontWidth: front.getBoundingClientRect().width, backWidth: back.getBoundingClientRect().width,
+          frontLayer: Number(getComputedStyle(front.parentElement!).zIndex), backLayer: Number(getComputedStyle(back.parentElement!).zIndex),
+          frontTilt: Math.abs(matrix(front).m13), backTilt: Math.abs(matrix(back).m13),
+        };
+      });
+      expect(shape.frontLayer).toBeGreaterThan(shape.backLayer);
+      expect(shape.frontWidth).toBeGreaterThan(shape.backWidth);
+      expect(shape.frontTilt).toBeLessThan(0.02);
+      if (width === 375) expect(shape.backTilt).toBe(0);
+      else expect(shape.backTilt).toBeGreaterThan(0.25);
+      expect(await outerPosition()).toEqual(originalPosition);
+      if (width === 320 || width === 390) {
+        await testInfo.attach('wheel-browsed', { body: await page.screenshot(), contentType: 'image/png' });
+      }
+      await left.click();
+      await expect(front).toHaveAccessibleName(/^Open Invoices/);
       // Tap just beyond the raised face on each side, where its neighbor appears tucked under it.
       for (const [direction, neighbor] of [[-1, 'Plan Offers'], [1, 'Accepted Estimates']] as const) {
         const active = (await tab('Open Invoices').boundingBox())!;
@@ -116,7 +147,7 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [
       await expect(tab('Paid / Closed')).toBeInViewport({ ratio: 0.99 });
       for (let step = 0; step < 8; step++) {
         const visible = await tab('Open Invoices').evaluate(el => {
-          const rail = el.parentElement!.getBoundingClientRect();
+          const rail = el.closest('[role="tablist"]')!.getBoundingClientRect();
           const box = el.getBoundingClientRect();
           return box.right > rail.left && box.left < rail.right;
         });
@@ -134,11 +165,18 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [
       for (const [key, title] of [['End', 'Paid / Closed'], ['ArrowRight', 'Needs Review'], ['ArrowLeft', 'Paid / Closed'], ['ArrowLeft', 'Active Plans'], ['ArrowLeft', 'Accepted Estimates'], ['Home', 'Needs Review'], ['ArrowRight', 'Plan Offers'], ['ArrowRight', 'Open Invoices']]) {
         await page.keyboard.press(key);
         await expect(tab(title)).toBeFocused();
-        await expect(tab(title)).toHaveAttribute('aria-selected', 'true');
+        await expect(tab('Open Invoices')).toHaveAttribute('aria-selected', 'true');
+        await expect(results).toBeVisible();
+        await expect(front).toHaveAccessibleName(new RegExp('^' + title));
         await expect(tab(title)).toBeInViewport({ ratio: 0.99 });
-        await expect(page.getByRole('tabpanel', { name: new RegExp('^' + title) })).toBeVisible();
         expect((await section.boundingBox())!.y).toBeCloseTo(initialTabsTop, 0);
       }
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('Enter');
+      await expect(tab('Plan Offers')).toHaveAttribute('aria-selected', 'true');
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Space');
+      await expect(tab('Open Invoices')).toHaveAttribute('aria-selected', 'true');
     }
     await pick('Plan Offers');
     await expect(page.getByText('No plan offers yet', { exact: true })).toBeVisible();
