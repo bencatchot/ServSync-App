@@ -59,3 +59,42 @@ select,
 textarea {
   font: inherit;
 }
+
+/* Keep the homeowner section picker in place while its current records scroll.
+   Native already sizes the shell to the safe viewport, including the keyboard. */
+@media (max-width: 767px) {
+  html:not(.servsync-native) .workspace-shell:has(.homeowner-records-layout) {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .workspace-column:has(.homeowner-records-layout) {
+    min-height: 0;
+  }
+
+  .workspace-content:has(.homeowner-records-layout) {
+    overflow-y: auto;
+  }
+
+  .workspace-content:has(.homeowner-records-layout) > div {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  section:has(> .homeowner-records-layout),
+  .homeowner-records-layout {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+
+  .homeowner-record-filters,
+  .homeowner-record-results {
+    flex: 1 0 0;
+    min-height: 9rem;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+}

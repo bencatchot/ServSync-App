@@ -1,4 +1,5 @@
 import { InvoicePropertyField } from './features/invoices/InvoicePropertyField';
+import { HomeownerRecordsLayout, type HomeownerRecordSection } from './features/invoices/HomeownerRecordsLayout';
 import { HomeownerInvoicePdfActions } from './features/invoices/HomeownerInvoicePdfActions';
 import type { InvoicePdfContext } from './utils/pdfDocuments';
 import { contractorInvoiceServiceAddress, homeownerInvoiceServiceAddress } from './features/invoices/invoicePdfAddress';
@@ -998,7 +999,6 @@ type StarterEstimateTemplate = {
   line_items: EstimateTemplateLineItem[];
 };
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'beta' | 'trust' | 'privacy' | 'support';
-type HomeownerRecordSection = 'needs_review' | 'agreement_offers' | 'open_invoices' | 'accepted' | 'agreements' | 'closed';
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
 type RequestContractorAttributeFilter = 'licensed' | 'insured' | 'bonded' | 'website' | 'profileDetails' | 'discoverPosts';
@@ -13403,23 +13403,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     : homeownerRecordPropertyScope === 'unassigned' && !homeownerHasAnyPropertyScopedRecords
       ? 'Unassigned records will appear here when older estimates or invoices are not tied to a property.'
       : selectedHomeownerRecordTile.emptyText;
-  const homeownerRecordTileChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', active: boolean) => {
-    const tones = {
-      attention: active
-        ? 'border-amber-300 bg-amber-50 text-amber-950 ring-2 ring-amber-100'
-        : 'border-amber-200 bg-white text-slate-800 hover:border-amber-300 hover:bg-amber-50/60',
-      invoice: active
-        ? 'border-blue-300 bg-blue-50 text-blue-950 ring-2 ring-blue-100'
-        : 'border-blue-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/60',
-      accepted: active
-        ? 'border-emerald-300 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-100'
-        : 'border-emerald-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/60',
-      closed: active
-        ? 'border-slate-400 bg-slate-100 text-slate-950 ring-2 ring-slate-200'
-        : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50',
-    };
-    return `rounded-xl border p-3 text-left shadow-sm transition ${tones[tone]}`;
-  };
   const homeownerRecordCardChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', expanded: boolean) => {
     const tones = {
       attention: expanded
@@ -14084,8 +14067,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               : 'No paid or closed records yet';
 
     return (
-      <section className="space-y-5 border-t border-slate-200 pt-8 first:border-t-0 first:pt-0">
-        <div className={`relative overflow-hidden rounded-xl border px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 ${sectionTone}`}>
+      <section className="flex flex-col gap-5 border-t border-slate-200 pt-8 first:border-t-0 first:pt-0">
+        <div className={`relative hidden overflow-hidden rounded-xl border px-4 py-3 md:block before:absolute before:inset-y-0 before:left-0 before:w-1 ${sectionTone}`}>
           <p className="text-base font-bold leading-6 sm:text-lg">{title}</p>
           <p className="mt-1 text-sm leading-5 text-slate-600">{helper}</p>
         </div>
@@ -14133,135 +14116,120 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const renderHomeownerEstimatesInvoicesPage = () => (
     <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
-      <div className="space-y-5">
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-900">Review estimates, invoices, and service plan offers from connected contractors</p>
-          <p className="mt-1 text-sm text-blue-800">
-            Drafts stay private to the contractor. Sent estimates and plan offers need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
-          </p>
-          <p className="mt-2 text-xs font-semibold leading-5 text-blue-900">
-            Payment collection happens outside ServSync during the controlled beta. ServSync can show and file eligible Invoice records, but it does not take your payment here.
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px] lg:items-end">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">Showing records for: {homeownerRecordScopeLabel}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                {homeownerHasMultipleProperties && unassignedRecordCount > 0
-                  ? 'Use All properties to see every record, or Unassigned to find older records that are not tied to a property yet.'
-                  : homeownerHasMultipleProperties
-                    ? 'Use All properties to see records across every property.'
-                    : 'Use the menu to switch between selected, all, or unassigned records.'}
-              </p>
-            </div>
-            <Field label="Show">
-              <select
-                className={inputClass()}
-                value={homeownerRecordPropertyScope}
-                onChange={event => {
-                  setHomeownerRecordPropertyScope(event.target.value as HomeownerRecordPropertyScope);
-                  setViewingEstimateId(null);
-                  setViewingInvoiceId(null);
-                }}
-              >
-                <option value="selected">Selected property</option>
-                <option value="all">All properties</option>
-                <option value="unassigned">Unassigned</option>
-              </select>
-            </Field>
+      <HomeownerRecordsLayout
+        sections={homeownerRecordSectionTiles}
+        selected={selectedHomeownerRecordSection}
+        onSelect={section => {
+          if (section === selectedHomeownerRecordSection) return;
+          setHomeownerRecordSection(section);
+          setViewingEstimateId(null);
+          setViewingInvoiceId(null);
+          setViewingServiceAgreementOfferId(null);
+          setViewingServiceAgreementId(null);
+        }}
+        scopeLabel={homeownerRecordScopeLabel}
+        filtered={homeownerRecordControlsDirty}
+        guidance={(
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-semibold text-blue-900">Review estimates, invoices, and service plan offers from connected contractors</p>
+            <p className="mt-1 text-sm text-blue-800">
+              Drafts stay private to the contractor. Sent estimates and plan offers need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
+            </p>
+            <p className="mt-2 text-xs font-semibold leading-5 text-blue-900">
+              Payment collection happens outside ServSync during the controlled beta. ServSync can show and file eligible Invoice records, but it does not take your payment here.
+            </p>
           </div>
-          {shouldShowHomeownerUnassignedPropertyNotice(homeownerRecordPropertyScope, unassignedRecordCount) && (
-            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-              <span>Some older records are not assigned to a property. You can find them in the related tab under Unassigned.</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setHomeownerRecordPropertyScope('unassigned');
-                  setViewingEstimateId(null);
-                  setViewingInvoiceId(null);
-                }}
-                className="text-left font-bold text-amber-900 underline-offset-2 hover:underline sm:text-right"
-              >
-                View Unassigned
-              </button>
+        )}
+        propertyControls={(
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="grid gap-3 lg:grid-cols-[1fr_220px] lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
+                <p className="mt-1 text-sm font-semibold text-slate-950">Showing records for: {homeownerRecordScopeLabel}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {homeownerHasMultipleProperties && unassignedRecordCount > 0
+                    ? 'Use All properties to see every record, or Unassigned to find older records that are not tied to a property yet.'
+                    : homeownerHasMultipleProperties
+                      ? 'Use All properties to see records across every property.'
+                      : 'Use the menu to switch between selected, all, or unassigned records.'}
+                </p>
+              </div>
+              <Field label="Show">
+                <select
+                  className={inputClass()}
+                  value={homeownerRecordPropertyScope}
+                  onChange={event => {
+                    setHomeownerRecordPropertyScope(event.target.value as HomeownerRecordPropertyScope);
+                    setViewingEstimateId(null);
+                    setViewingInvoiceId(null);
+                  }}
+                >
+                  <option value="selected">Selected property</option>
+                  <option value="all">All properties</option>
+                  <option value="unassigned">Unassigned</option>
+                </select>
+              </Field>
             </div>
-          )}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-          {homeownerRecordSectionTiles.map(tile => {
-            const active = tile.id === selectedHomeownerRecordSection;
-            return (
-              <button
-                key={tile.id}
-                type="button"
-                onClick={() => {
-                  setHomeownerRecordSection(tile.id);
-                  setViewingEstimateId(null);
-                  setViewingInvoiceId(null);
-                  setViewingServiceAgreementOfferId(null);
-                  setViewingServiceAgreementId(null);
-                }}
-                className={homeownerRecordTileChrome(tile.tone, active)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-bold">{tile.title}</p>
-                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">{tile.helper}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-slate-800 shadow-sm">
-                    {tile.count}
-                  </span>
-                </div>
-                <p className="mt-2 break-words text-base font-bold sm:text-lg">{formatMoney(tile.totalCents)}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr_220px_150px]">
-            <Field label="Search">
-              <input
-                className={inputClass()}
-                value={homeownerRecordSearch}
-                onChange={event => setHomeownerRecordSearch(event.target.value)}
-                placeholder="Search title, contractor, or scope"
+            {shouldShowHomeownerUnassignedPropertyNotice(homeownerRecordPropertyScope, unassignedRecordCount) && (
+              <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                <span>Some older records are not assigned to a property. You can find them in the related tab under Unassigned.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHomeownerRecordPropertyScope('unassigned');
+                    setViewingEstimateId(null);
+                    setViewingInvoiceId(null);
+                  }}
+                  className="text-left font-bold text-amber-900 underline-offset-2 hover:underline sm:text-right"
+                >
+                  View Unassigned
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        filters={(
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="grid gap-3 lg:grid-cols-[1fr_220px_150px]">
+              <Field label="Search">
+                <input
+                  className={inputClass()}
+                  value={homeownerRecordSearch}
+                  onChange={event => setHomeownerRecordSearch(event.target.value)}
+                  placeholder="Search title, contractor, or scope"
+                />
+              </Field>
+              <Field label="Contractor">
+                <select className={inputClass()} value={homeownerRecordContractorFilter} onChange={event => setHomeownerRecordContractorFilter(event.target.value)}>
+                  <option value="all">All contractors</option>
+                  {homeownerRecordContractors.map(([contractorId, contractorName]) => (
+                    <option key={contractorId} value={contractorId}>{contractorName}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Sort">
+                <select className={inputClass()} value={homeownerRecordSort} onChange={event => setHomeownerRecordSort(event.target.value as typeof homeownerRecordSort)}>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </Field>
+            </div>
+            {homeownerRecordControlsDirty && (
+              <FilterSummary
+                className="mt-3"
+                compact
+                resultCount={selectedHomeownerRecordCount}
+                totalCount={selectedHomeownerRecordTile.count}
+                activeLabels={homeownerRecordFilterLabels}
+                searchTerm={homeownerRecordSearch}
+                onClear={clearHomeownerRecordControls}
+                clearLabel={homeownerRecordSearch ? 'Clear search and filters' : 'Clear filters'}
+                testId="homeowner-record-filter-summary"
               />
-            </Field>
-            <Field label="Contractor">
-              <select className={inputClass()} value={homeownerRecordContractorFilter} onChange={event => setHomeownerRecordContractorFilter(event.target.value)}>
-                <option value="all">All contractors</option>
-                {homeownerRecordContractors.map(([contractorId, contractorName]) => (
-                  <option key={contractorId} value={contractorId}>{contractorName}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Sort">
-              <select className={inputClass()} value={homeownerRecordSort} onChange={event => setHomeownerRecordSort(event.target.value as typeof homeownerRecordSort)}>
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-              </select>
-            </Field>
+            )}
           </div>
-          {homeownerRecordControlsDirty && (
-            <FilterSummary
-              className="mt-3"
-              compact
-              resultCount={selectedHomeownerRecordCount}
-              totalCount={selectedHomeownerRecordTile.count}
-              activeLabels={homeownerRecordFilterLabels}
-              searchTerm={homeownerRecordSearch}
-              onClear={clearHomeownerRecordControls}
-              clearLabel={homeownerRecordSearch ? 'Clear search and filters' : 'Clear filters'}
-              testId="homeowner-record-filter-summary"
-            />
-          )}
-        </div>
-
+        )}
+      >
         {homeownerHasAnyPropertyScopedRecords && homeownerRecordFiltersActive && selectedHomeownerRecordCount === 0 ? (
           <EmptyState
             compact
@@ -14292,7 +14260,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             selectedHomeownerRecordTile.tone
           )
         )}
-      </div>
+      </HomeownerRecordsLayout>
     </Card>
   );
   const homeownerClosedRequestStatuses = ['closed', 'declined', 'cancelled', 'archived'];
@@ -16728,15 +16696,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
           {homes.length > 1 ? (
             <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className={homeownerTab === 'estimates' ? 'flex items-center justify-between gap-2' : 'flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'}>
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Property</p>
-                  <p className="mt-0.5 truncate text-sm font-bold text-slate-950">
+                  <p className={`mt-0.5 truncate text-sm font-bold text-slate-950 ${homeownerTab === 'estimates' ? 'hidden md:block' : ''}`}>
                     {selectedHome ? homeProfileDisplayLabel(selectedHome) : 'Selected property'}
                   </p>
                 </div>
                 <select
-                  className="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  aria-label="Property"
+                  className={`${homeownerTab === 'estimates' ? 'min-w-0 flex-1 md:min-w-[220px] md:flex-none' : 'min-w-[220px]'} rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100`}
                   value={selectedHome?.id || ''}
                   onChange={event => void selectHome(event.target.value)}
                 >
@@ -16748,7 +16717,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </select>
               </div>
               {dashboardUnassignedRecordCount > 0 && (
-                <p className="mt-2 text-xs leading-5 text-slate-500">
+                <p className={`mt-2 text-xs leading-5 text-slate-500 ${homeownerTab === 'estimates' ? 'hidden md:block' : ''}`}>
                   Some older records are not assigned to a property. Use each tab's All properties or Unassigned view to find them.
                 </p>
               )}

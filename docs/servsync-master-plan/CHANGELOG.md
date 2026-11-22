@@ -1,5 +1,9 @@
 # ServSync Master Plan Changelog
 
+## 2026-11-22 — Homeowner financial records on phones
+
+The Estimates / Invoices page now keeps its section picker above scrollable results. Property scope, search, contractor and sort share a Filters panel. See [the homeowner invoice notes](../features/HOMEOWNER_INVOICE_PREVIEW.md).
+
 ## 2026-11-21 — Homeowner invoice preview and service request property display
 
 Added separate homeowner Preview PDF and Download PDF actions. Contractor request displays now honor the selected property’s sharing choices. Changes are under non-production review; no hosted SQL changes or iPhone release. See [the feature notes](../features/HOMEOWNER_INVOICE_PREVIEW.md).

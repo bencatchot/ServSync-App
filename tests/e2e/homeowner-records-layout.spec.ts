@@ -1,0 +1,108 @@
+import { readFileSync } from 'node:fs';
+import { expect, test, type Page } from '@playwright/test';
+
+async function openFictionalRecords(page: Page) {
+  const userId = '10000000-0000-4000-8000-000000000001';
+  const homeId = '20000000-0000-4000-8000-000000000001';
+  const companyId = '30000000-0000-4000-8000-000000000001';
+  const profile = { id: userId, role: 'homeowner', email: 'records@example.test', full_name: 'Fixture Owner' };
+  const now = '2026-09-01T12:00:00Z';
+  const home = { id: homeId, homeowner_user_id: userId, nickname: 'Fixture Cottage', notes: '', address_line1: '1 Fictional Way', city: 'Test City', state: 'AL', zip_code: '36532', created_at: now };
+  const invoices = Array.from({ length: 16 }, (_, i) => ({
+    id: `fixture-invoice-${i}`, invoice_number: `QA-${i}`, title: `Fixture repair ${i}`, status: 'viewed',
+    contractor_id: companyId, homeowner_user_id: userId, home_id: homeId,
+    scope: '', notes: '', terms: '', total_cents: 15000, subtotal_cents: 15000, amount_paid_cents: 0,
+    issued_at: now, updated_at: now, created_at: now, line_items: [], backlog_items: [],
+  }));
+  const claims = Buffer.from(JSON.stringify({ sub: userId, aud: 'authenticated', exp: Date.now() / 1000 + 3600 })).toString('base64url');
+  const session = {
+    user: { id: userId, email: profile.email, aud: 'authenticated', role: 'authenticated', user_metadata: { role: 'homeowner' }, app_metadata: { provider: 'email' } },
+    access_token: `eyJhbGciOiJIUzI1NiJ9.${claims}.fixture`, refresh_token: 'fixture-refresh', token_type: 'bearer', expires_in: 3600,
+  };
+  const replies: Record<string, unknown> = {
+    token: session, profiles: [profile], homeowner_profiles: [{ user_id: userId, display_name: profile.full_name }],
+    homes: [home, { ...home, id: '20000000-0000-4000-8000-000000000002', nickname: 'Fixture Cabin' }], invoices,
+    servsync_get_homeowner_connections: [{ contractor_id: companyId, connection_id: 'fixture-connection', business_name: 'Fixture Plumbing', status: 'active', shared_properties: [] }],
+  };
+  const appOrigin = new URL(process.env.TEST_APP_URL!).origin;
+  await page.routeWebSocket(/.*/, socket => socket.close());
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.hostname === 'records-fixture.invalid' || url.hostname.endsWith('.supabase.co')) {
+      return route.fulfill({ json: replies[url.pathname.split('/').pop()!] ?? [] });
+    }
+    if (url.origin === appOrigin && !url.pathname.startsWith('/api/') && route.request().method() === 'GET') return route.continue();
+    return route.abort();
+  });
+  await page.addInitScript(() => localStorage.setItem('servsync.homeowner.activeTab', 'estimates'));
+  await page.goto('/#/homeowner');
+  await page.getByLabel('Email', { exact: true }).fill(profile.email);
+  await page.getByLabel('Password', { exact: true }).fill('fictional-only');
+  await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Open Invoices' })).toBeVisible();
+}
+
+for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [1280, 900]]) {
+  test(`homeowner sections, filters and PDF return at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await openFictionalRecords(page);
+    // Exercise the native shell's inner scroller and synthetic notch/home indicator.
+    if (width === 390) {
+      await page.addStyleTag({ content: readFileSync('src/mobile/native.css', 'utf8') });
+      await page.evaluate(() => {
+        document.documentElement.classList.add('servsync-native');
+        document.documentElement.style.setProperty('--safe-area-inset-top', '47px');
+        document.documentElement.style.setProperty('--safe-area-inset-bottom', '34px');
+      });
+    }
+    const mobile = width < 768;
+    const section = page.getByRole('combobox', { name: 'Section', exact: true });
+    const results = page.getByRole('region', { name: 'Open Invoices' });
+    const pick = async (title: string, value: string) => {
+      if (mobile) await section.selectOption(value);
+      else await page.getByRole('button', { name: new RegExp('^' + title) }).click();
+    };
+    const initialPickerTop = mobile ? (await section.boundingBox())!.y : 0;
+    if (mobile) {
+      await expect(results.getByText('Fixture repair 0', { exact: true })).toBeInViewport();
+      const navigation = page.getByRole('navigation', { name: /Homeowner Portal mobile/ });
+      const bounds = (await results.boundingBox())!;
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual((await navigation.boundingBox())!.y + 1);
+      if (width === 390) expect(initialPickerTop).toBeGreaterThan(47);
+      await results.evaluate(el => { el.scrollTop = el.scrollHeight; });
+      expect(await results.evaluate(el => el.scrollTop)).toBeGreaterThan(200);
+      await expect(section).toBeInViewport();
+      expect((await section.boundingBox())!.y).toBeCloseTo(initialPickerTop, 0);
+    }
+    await pick('Plan Offers', 'agreement_offers');
+    await expect(page.getByText('No plan offers yet', { exact: true })).toBeVisible();
+    if (mobile) await expect(page.getByText('No plan offers yet', { exact: true })).toBeInViewport();
+    await pick('Open Invoices', 'open_invoices');
+    if (mobile) {
+      expect((await section.boundingBox())!.y).toBeCloseTo(initialPickerTop, 0);
+      expect(await results.evaluate(el => el.scrollTop)).toBe(0);
+    }
+    const first = results.getByRole('button', { name: 'View Invoice' }).first();
+    await first.click();
+    await pick('Open Invoices', 'open_invoices');
+    await expect(results.getByRole('button', { name: 'Hide Details' })).toHaveCount(1);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await results.getByRole('button', { name: 'Preview PDF' }).first().click();
+      const preview = page.getByRole('dialog', { name: 'PDF preview' });
+      await expect(preview).toBeVisible();
+      await expect(preview.getByTitle('ServSync PDF document')).toHaveAttribute('src', /^blob:/);
+      await preview.getByRole('button', { name: 'Close PDF preview' }).click();
+      await expect(preview).toHaveCount(0);
+    }
+    if (mobile) await page.getByRole('button', { name: 'Filters', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Show', exact: true }).selectOption('all');
+    await page.getByRole('combobox', { name: 'Contractor', exact: true }).selectOption({ label: 'Fixture Plumbing' });
+    await page.getByRole('combobox', { name: 'Sort', exact: true }).selectOption('oldest');
+    await page.getByLabel('Search', { exact: true }).fill('no matching fixture');
+    if (mobile) await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(results.getByText('No matching records', { exact: true })).toBeVisible();
+    await results.getByRole('button', { name: 'Clear search and filters' }).click();
+    await expect(results.getByText('Fixture repair 0', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
