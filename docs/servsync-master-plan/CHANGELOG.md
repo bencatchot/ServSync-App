@@ -2,7 +2,7 @@
 
 ## 2026-11-22 — Homeowner financial records on phones
 
-The Estimates / Invoices page now keeps a horizontally scrollable row of section tabs above the results on phones. Property scope, search, contractor and sort share a Filters panel. See [the homeowner invoice notes](../features/HOMEOWNER_INVOICE_PREVIEW.md).
+The Estimates / Invoices page now keeps a horizontally scrollable row of overlapping section tabs above the results on phones. Property scope, search, contractor and sort share a Filters panel. See [the homeowner invoice notes](../features/HOMEOWNER_INVOICE_PREVIEW.md).
 
 ## 2026-11-21 — Homeowner invoice preview and service request property display
 

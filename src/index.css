@@ -90,6 +90,74 @@ textarea {
     flex-direction: column;
   }
 
+  /* The faces overlap, while each button keeps its own unobstructed hit area. */
+  .homeowner-wheel-tab {
+    position: relative;
+    isolation: isolate;
+    flex: 0 0 calc(100% / 3);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 3.75rem;
+    padding: 0.3rem 0.15rem;
+    color: #29415a;
+    font-size: 0.75rem;
+    font-weight: 650;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .homeowner-wheel-tab::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 7px -5px;
+    pointer-events: none;
+    border: 1px solid #a7bacd;
+    border-radius: 10px;
+    background: linear-gradient(#fafcff, #dde8f2);
+  }
+
+  .homeowner-wheel-tab[data-side="left"]::before {
+    transform: perspective(120px) rotateY(-10deg);
+  }
+
+  .homeowner-wheel-tab[data-side="right"]::before {
+    transform: perspective(120px) rotateY(10deg);
+  }
+
+  .homeowner-wheel-tab[aria-selected="true"] {
+    z-index: 1;
+    color: white;
+  }
+
+  .homeowner-wheel-tab[aria-selected="true"]::before {
+    inset: 2px 0 3px;
+    border-color: #173e64;
+    background: linear-gradient(#285b8f, #163c65);
+    box-shadow: 0 2px 4px #172f5160, -3px 0 7px #16344d35, 3px 0 7px #16344d35;
+  }
+
+  .homeowner-wheel-count {
+    margin-top: 2px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
+  .homeowner-wheel-tab:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -5px;
+    border-radius: 10px;
+  }
+
+  @media (forced-colors: active) {
+    .homeowner-wheel-tab[aria-selected="true"]::before {
+      border: 3px solid Highlight;
+    }
+  }
+
   .homeowner-record-filters,
   .homeowner-record-results {
     flex: 1 0 0;

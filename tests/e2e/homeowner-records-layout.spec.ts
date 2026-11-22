@@ -45,6 +45,7 @@ async function openFictionalRecords(page: Page) {
 for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [1280, 900]]) {
   test(`homeowner sections, filters and PDF return at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height });
+    if (width === 320) await page.emulateMedia({ reducedMotion: 'reduce' });
     await openFictionalRecords(page);
     // Exercise the native shell's inner scroller and synthetic notch/home indicator.
     if (width === 390) {
@@ -79,6 +80,19 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [
         window.scrollY, document.querySelector('.workspace-content')!.scrollTop,
       ]);
       const originalPosition = await outerPosition();
+      // Tap just beyond the raised face on each side, where its neighbor appears tucked under it.
+      for (const [direction, neighbor] of [[-1, 'Plan Offers'], [1, 'Accepted Estimates']] as const) {
+        const active = (await tab('Open Invoices').boundingBox())!;
+        const x = direction === -1 ? active.x - 3 : active.x + active.width + 3;
+        const y = active.y + active.height / 2;
+        expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[role="tab"]')?.textContent, { x, y })).toContain(neighbor);
+        if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await page.touchscreen.tap(x, y);
+        else await page.mouse.click(x, y);
+        await expect(tab(neighbor)).toHaveAttribute('aria-selected', 'true');
+        await pick('Open Invoices');
+        await expect(tab('Open Invoices')).toHaveAttribute('aria-selected', 'true');
+        expect(await outerPosition()).toEqual(originalPosition);
+      }
       await results.evaluate(el => { el.scrollTop = el.scrollHeight; });
       expect(await results.evaluate(el => el.scrollTop)).toBeGreaterThan(200);
       await expect(section).toBeInViewport();
@@ -158,3 +172,27 @@ for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
+
+test('a horizontal touch swipe browses tabs without selecting a section', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Raw touch-drag input uses the Chromium DevTools protocol.');
+  await page.setViewportSize({ width: 320, height: 568 });
+  await openFictionalRecords(page);
+  const strip = page.getByRole('tablist', { name: 'Record sections' });
+  const box = (await strip.boundingBox())!;
+  const initial = await strip.evaluate(el => el.scrollLeft);
+  const input = await page.context().newCDPSession(page);
+  await input.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const y = box.y + box.height / 2;
+  const startX = box.x + box.width * 0.84;
+  await input.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] });
+  for (let i = 1; i <= 6; i++) {
+    await input.send('Input.dispatchTouchEvent', {
+      type: 'touchMove', touchPoints: [{ x: startX - box.width * 0.1 * i, y }],
+    });
+  }
+  await input.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => strip.evaluate(el => el.scrollLeft)).toBeGreaterThan(initial + 20);
+  await expect(page.getByRole('tab', { name: /^Open Invoices/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel', { name: /^Open Invoices/ })).toBeVisible();
+  expect((await strip.boundingBox())!.y).toBeCloseTo(box.y, 0);
+});

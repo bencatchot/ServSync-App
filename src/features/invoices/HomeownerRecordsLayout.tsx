@@ -65,17 +65,15 @@ function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 
   useLayoutEffect(() => {
     const list = strip.current!;
     const active = list.querySelector<HTMLElement>('[aria-selected="true"]')!;
-    function revealSelected() {
+    function centerSelected() {
       // Move only the strip. scrollIntoView can also move the page and its ancestors.
       const tab = active.getBoundingClientRect();
       const rail = list.getBoundingClientRect();
-      if (tab.left < rail.left || tab.right > rail.right) {
-        list.scrollLeft += tab.left - rail.left - (rail.width - tab.width) / 2;
-      }
+      list.scrollLeft += tab.left - rail.left - (rail.width - tab.width) / 2;
       updateEdges();
     }
-    revealSelected();
-    const observer = new ResizeObserver(revealSelected);
+    centerSelected();
+    const observer = new ResizeObserver(centerSelected);
     observer.observe(list);
     observer.observe(active);
     return () => observer.disconnect();
@@ -96,14 +94,15 @@ function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 
     onSelect(sections[next].id);
   }
 
-  const arrowStyle = 'flex min-h-11 w-8 shrink-0 items-center justify-center rounded-lg text-slate-700 disabled:text-slate-300 focus-visible:outline-blue-700';
+  const activeIndex = sections.findIndex(section => section.id === selected);
+  const arrowStyle = 'flex min-h-11 w-7 shrink-0 items-center justify-center rounded-lg text-slate-700 disabled:text-slate-300 focus-visible:outline-blue-700';
   function scrollTabs(direction: number) {
     const list = strip.current!;
     list.scrollLeft += direction * list.clientWidth * 0.8;
     updateEdges();
   }
   return (
-    <div className="flex min-w-0 items-stretch rounded-xl border border-slate-300 bg-slate-50">
+    <div className="-mx-2 flex min-w-0 items-stretch rounded-xl border border-slate-200 bg-slate-50">
       <button
         type="button"
         aria-label="Scroll sections left"
@@ -120,7 +119,7 @@ function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 
         role="tablist"
         aria-label="Record sections"
         onScroll={updateEdges}
-        className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto overscroll-x-contain"
+        className="relative isolate flex min-w-0 flex-1 items-stretch overflow-x-auto overscroll-x-contain"
       >
         {sections.map((section, index) => {
           const active = section.id === selected;
@@ -135,9 +134,11 @@ function SectionTabs({ sections, selected, onSelect }: Pick<Props, 'sections' | 
               tabIndex={active ? 0 : -1}
               onKeyDown={event => navigate(event, index)}
               onClick={() => onSelect(section.id)}
-              className={`flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 ${active ? 'bg-blue-900 text-white focus-visible:outline-white' : 'text-slate-800 focus-visible:outline-blue-700'}`}
+              data-side={active ? undefined : index < activeIndex ? 'left' : 'right'}
+              className="homeowner-wheel-tab"
             >
-              {section.title}<span className="text-xs font-bold">({section.count})</span>
+              <span>{section.title}</span>
+              <span className="homeowner-wheel-count">{section.count}</span>
             </button>
           );
         })}
