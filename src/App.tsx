@@ -1,3 +1,5 @@
+import { useAccountDeletionOperatorAvailable } from './features/privacy/useAccountDeletionOperatorAvailable';
+import { AccountDeletionOperator } from './features/privacy/AccountDeletionOperator';
 import { DeletionAvailabilityNotice } from './features/privacy/DeletionAvailabilityNotice';
 import { SERVSYNC_POLICY_PAGES as LEGAL_PAGES, SERVSYNC_POLICY_OPERATOR, SERVSYNC_SUPPORT_EMAIL, policyEffectiveDate } from './features/privacy/servsyncLaunchPolicy';
 import { PolicySignupAcknowledgment } from './features/privacy/PolicySignupAcknowledgment';
@@ -43783,7 +43785,8 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'unclaimed_profiles' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports' | 'marketing' | 'help_studio'>(() => (
+  const isClosureReviewer = useAccountDeletionOperatorAvailable(profile.id);
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'unclaimed_profiles' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'account_deletion' | 'reports' | 'marketing' | 'help_studio'>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'marketing' : 'overview'
   ));
   useEffect(() => {
@@ -44499,6 +44502,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
         { id: 'referrals',    label: 'Referrals',   icon: <Link2 size={17} /> },
         { id: 'reviews',      label: 'Reviews',     icon: <Star size={17} />, badge: pendingReviewModerationCount || undefined },
         { id: 'support',      label: 'Support',     icon: <MessageSquare size={17} />, badge: openSupportCount },
+        ...(isClosureReviewer ? [{ id: 'account_deletion', label: 'Account deletion requests', icon: <HelpCircle size={17} /> }] : []),
         { id: 'reports',      label: 'Reports',     icon: <Receipt size={17} /> },
         { id: 'marketing',    label: 'Marketing',   icon: <Megaphone size={17} />, group: 'Internal Workspace' },
         { id: 'help_studio',  label: 'Help Studio', icon: <HelpCircle size={17} />, group: 'Internal Workspace' },
@@ -45750,6 +45754,8 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
           savingInquiryId={savingSupportInquiryId}
         />
       )}
+
+      {adminTab === 'account_deletion' && isClosureReviewer && <AccountDeletionOperator key={profile.id} />}
 
       {adminTab === 'reports' && (
         <div className="space-y-5">
