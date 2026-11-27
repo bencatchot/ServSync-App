@@ -42592,11 +42592,9 @@ function ContractorDashboard({
                                       {...writingAssistProps}
                                       placeholder="Describe what you observed during the job…"
                                       value={aiNoteText} onChange={e => setAiNoteDraft({ scope: inspectionAiScope, notes: e.target.value })} />
-                                    <InspectionAiConsent
-                                      key={inspectionAiScope}
+                                    <InspectionAiConsent key={inspectionAiScope}
                                       request={{ notes: aiNoteText, rooms: activeRooms.map(r => ({ room: roomDisplayLabel(r), items: r.items })) }}
-                                      busy={aiProcessing}
-                                      enabled={Boolean(supabase)}
+                                      busy={aiProcessing} enabled={Boolean(supabase)}
                                       onApprove={async request => {
                                         if (!supabase) return;
                                         setAiProcessing(true);

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { InspectionAiConsent, type InspectionAiRequest } from '../../../../src/features/findings/InspectionAiConsent';
 import '../../../../src/index.css';
 
-function Fixture() {
+export default function Fixture() {
   const [draft, setDraft] = useState<{ scope: number; notes: string } | null>(null);
   const [room, setRoom] = useState('Utility room');
   const [inspection, setInspection] = useState(1);
