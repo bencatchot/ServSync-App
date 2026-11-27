@@ -23,7 +23,7 @@ export function JobThreadSafetyAction({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending.current || (reporting && !Object.hasOwn(DISCOVER_REPORT_REASONS, reason))) return;
+    if (pending.current || (reporting && !Object.prototype.hasOwnProperty.call(DISCOVER_REPORT_REASONS, reason))) return;
     pending.current = true;
     setBusy(true);
     setError('');
