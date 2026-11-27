@@ -1,6 +1,7 @@
 -- CANDIDATE: run only with the matching application on an isolated Preview database.
 -- Apply after servsync-review-public-display-pause.sql, Discover media patches,
--- connection/service-request foundations, and the public-signup role hardening.
+-- connection/service-request and workflow message foundations, appointment windows,
+-- unified visits, service-request media, and the public-signup role hardening.
 -- No backfill publishes an existing post.
 -- Existing rows stay intact and pending. Legacy URL photos require withdrawal and
 -- resubmission using fresh private keys; do not re-publish or sign those old URLs.
@@ -524,6 +525,169 @@ end;
 $$;
 revoke all on function public.servsync_workflow_job_messaging_paused(uuid) from public,anon,authenticated,service_role;
 grant execute on function public.servsync_workflow_job_messaging_paused(uuid) to authenticated;
+
+-- Separate request replies, attachment publication and appointment notes
+-- must respect the same block as the dedicated job message composer.
+create function discover_safety_private.request_pair_blocked(p_request_id uuid)
+returns boolean language plpgsql volatile security definer set search_path = ''
+as $$
+declare v_home uuid; v_owner uuid;
+begin
+  select r.homeowner_user_id,cp.owner_user_id into v_home,v_owner
+    from public.service_requests r join public.contractor_profiles cp on cp.id=r.contractor_id
+    where r.id=p_request_id;
+  if v_home is null or v_owner is null then return false; end if;
+  perform discover_safety_private.lock_pair(v_home,v_owner);
+  return discover_safety_private.is_blocked(v_home,v_owner);
+end;
+$$;
+
+create function discover_safety_private.guard_request_communication()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not discover_safety_private.request_pair_blocked(new.request_id) then return new; end if;
+  case tg_table_name
+    when 'service_request_messages' then
+      if tg_op = 'UPDATE' then
+        raise exception 'Request messaging is unavailable.' using errcode='PSS01';
+      end if;
+      -- Keep real transaction actions working. Never forward supplied text,
+      -- even if an older client still attaches a note to the status change.
+      new.body := case new.message_type
+        when 'homeowner_closed' then 'Homeowner closed this request.'
+        when 'contractor_closed' then 'Contractor closed this request.'
+        when 'contractor_declined' then 'Contractor declined this request.'
+        when 'appointment_update' then 'Appointment updated. Open the appointment for details.'
+        else null
+      end;
+      if new.body is null then
+        raise exception 'Request messaging is unavailable.' using errcode='PSS01';
+      end if;
+    when 'service_request_media' then
+      raise exception 'Reply attachments are unavailable.' using errcode='PSS01';
+    when 'service_request_appointments' then
+      if tg_op = 'UPDATE' and new.request_id = old.request_id then
+        new.notes := old.notes;
+      else
+        new.notes := '';
+      end if;
+    when 'service_request_appointment_windows' then
+      if tg_op = 'UPDATE' and new.request_id = old.request_id then
+        new.contractor_note := old.contractor_note;
+        new.homeowner_response_note := old.homeowner_response_note;
+      else
+        new.contractor_note := '';
+        new.homeowner_response_note := '';
+      end if;
+    when 'service_request_appointment_events' then
+      new.event_note := '';
+      -- Existing scheduling RPCs provide typed timestamps, IDs and counts in
+      -- metadata; clients have no direct write grant on this event table.
+    else
+      raise exception 'Unsupported request communication table.';
+  end case;
+  return new;
+end;
+$$;
+
+create function discover_safety_private.guard_request_summary()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+begin
+  if discover_safety_private.request_pair_blocked(old.id) then
+    new.closing_summary := old.closing_summary;
+    new.title := old.title;
+    new.description := old.description;
+  end if;
+  return new;
+end;
+$$;
+
+create function discover_safety_private.guard_shared_visit_note()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare v_home uuid; v_owner uuid;
+begin
+  if not new.share_with_homeowner then return new; end if;
+  select i.homeowner_user_id,cp.owner_user_id into v_home,v_owner
+    from public.inspections i join public.contractor_profiles cp on cp.id=i.contractor_id
+    where i.id=new.inspection_id;
+  if v_home is not null and v_owner is not null then
+    perform discover_safety_private.lock_pair(v_home,v_owner);
+    if discover_safety_private.is_blocked(v_home,v_owner) then
+      if tg_op = 'UPDATE' and old.share_with_homeowner and old.inspection_id = new.inspection_id then
+        new.notes := old.notes;
+      else
+        new.notes := '';
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger discover_request_message_guard before insert or update on public.service_request_messages
+  for each row execute function discover_safety_private.guard_request_communication();
+create trigger discover_request_media_guard before insert or update on public.service_request_media
+  for each row execute function discover_safety_private.guard_request_communication();
+create trigger discover_request_appointment_note_guard before insert or update on public.service_request_appointments
+  for each row execute function discover_safety_private.guard_request_communication();
+create trigger discover_request_window_note_guard before insert or update on public.service_request_appointment_windows
+  for each row execute function discover_safety_private.guard_request_communication();
+create trigger discover_request_appointment_event_guard before insert or update on public.service_request_appointment_events
+  for each row execute function discover_safety_private.guard_request_communication();
+create trigger discover_request_summary_guard before update of closing_summary,title,description on public.service_requests
+  for each row execute function discover_safety_private.guard_request_summary();
+create trigger discover_shared_visit_note_guard before insert or update on public.contractor_visit_events
+  for each row execute function discover_safety_private.guard_shared_visit_note();
+
+create function discover_safety_private.request_media_upload_allowed(p_name text)
+returns boolean language plpgsql volatile security definer set search_path = ''
+as $$
+declare v_request text := pg_catalog.split_part(p_name,'/',2);
+begin
+  if v_request !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
+    return false;
+  end if;
+  return not discover_safety_private.request_pair_blocked(v_request::uuid);
+end;
+$$;
+revoke all on function discover_safety_private.request_pair_blocked(uuid),
+  discover_safety_private.guard_request_communication(),discover_safety_private.guard_request_summary(),
+  discover_safety_private.guard_shared_visit_note(),discover_safety_private.request_media_upload_allowed(text)
+  from public,anon,authenticated,service_role;
+grant execute on function discover_safety_private.request_media_upload_allowed(text) to authenticated;
+-- Only the existing authorized RPCs may create automatic notices for a paused
+-- request. A direct table insert cannot impersonate a lifecycle notice.
+grant execute on function discover_safety_private.request_pair_blocked(uuid) to authenticated;
+create policy discover_request_message_blocked_insert on public.service_request_messages as restrictive
+  for insert to authenticated with check (not discover_safety_private.request_pair_blocked(request_id));
+
+create policy discover_request_media_blocked_insert on storage.objects as restrictive
+  for insert to authenticated with check (
+    bucket_id <> 'service-request-media' or discover_safety_private.request_media_upload_allowed(name)
+  );
+create policy discover_request_media_blocked_update on storage.objects as restrictive
+  for update to authenticated using (
+    bucket_id <> 'service-request-media' or discover_safety_private.request_media_upload_allowed(name)
+  ) with check (
+    bucket_id <> 'service-request-media' or discover_safety_private.request_media_upload_allowed(name)
+  );
+
+-- Bulk query for already-authorized request cards. The reply never reveals
+-- who enabled the pause and cannot enumerate another party's request IDs.
+create function public.servsync_paused_request_messaging(p_request_ids uuid[])
+returns uuid[] language sql stable security definer set search_path = ''
+as $$
+  select coalesce(array_agg(r.id),'{}'::uuid[])
+  from public.service_requests r join public.contractor_profiles cp on cp.id=r.contractor_id
+  where auth.uid() is not null and r.id = any(p_request_ids)
+    and (r.homeowner_user_id=auth.uid() or public.current_user_can_access_contractor(r.contractor_id))
+    and discover_safety_private.is_blocked(r.homeowner_user_id,cp.owner_user_id);
+$$;
+revoke all on function public.servsync_paused_request_messaging(uuid[]) from public,anon,authenticated,service_role;
+grant execute on function public.servsync_paused_request_messaging(uuid[]) to authenticated;
 
 revoke all on function public.servsync_create_contractor_post(text,text,text,text[],text,text),
   public.servsync_delete_contractor_post(uuid),public.servsync_my_discover_post_statuses(),

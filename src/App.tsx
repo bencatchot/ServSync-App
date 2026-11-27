@@ -444,6 +444,7 @@ import {
 } from './features/workflow/WorkflowActivityTimeline';
 import { WorkflowActivityTimelineWithDurableEvents } from './features/workflow/WorkflowActivityTimelineWithDurableEvents';
 import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread';
+import { RequestCommunicationPausedNotice, usePausedServiceRequests } from './features/workflow/RequestCommunicationPause';
 import {
   invoiceCanVoid,
   invoiceStatusLabel,
@@ -9114,6 +9115,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [homeownerPropertyProposalsByConnectionId, setHomeownerPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
+  const pausedRequests = usePausedServiceRequests(supabase, profile.id, serviceRequests);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [serviceAgreementOffers, setServiceAgreementOffers] = useState<ServiceAgreementOffer[]>([]);
@@ -12007,14 +12009,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       homeownerActionGuard.end(actionKey);
     }
   };
-
   const updateHomeownerServiceRequest = async (request: ServiceRequestSummary, action: 'reply' | 'close') => {
     if (!supabase) return;
     setNotice('');
     setError('');
     setUpdatingServiceRequestId(request.id);
     try {
-      const body = action === 'close'
+      const communicationIsPaused = pausedRequests.has(request.id);
+      const body = communicationIsPaused ? '' : action === 'close'
         ? homeownerReplyDrafts[request.id] || 'Homeowner closed this request.'
         : homeownerReplyDrafts[request.id] || '';
       if (action === 'reply' && !body.trim()) {
@@ -12029,7 +12031,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       });
       if (updateError) throw updateError;
 
-      const files = replyFiles[request.id] ?? [];
+      const files = communicationIsPaused ? [] : replyFiles[request.id] ?? [];
       if (files.length > 0 && updateData?.message_id) {
         await uploadMediaFiles(files, request.id, updateData.message_id as string);
       }
@@ -12044,7 +12046,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setUpdatingServiceRequestId(null);
     }
   };
-
   const respondToQuote = async (request: ServiceRequestSummary, action: 'accept' | 'decline') => {
     if (!supabase) return;
     setNotice('');
@@ -12308,7 +12309,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           return;
         }
         params.p_proposed_at = proposedDate.toISOString();
-        params.p_notes = cleanHumanWrittenText(notes ?? '');
+        params.p_notes = pausedRequests.has(request.id) ? '' : cleanHumanWrittenText(notes ?? '');
       }
       const { error: apptError } = await supabase.rpc('servsync_homeowner_respond_to_appointment', params);
       if (apptError) throw apptError;
@@ -12352,7 +12353,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           })
         : await supabase.rpc('servsync_decline_service_request_appointment_window', {
             p_window_id: window.id,
-            p_note: cleanHumanWrittenText(appointmentWindowDeclineNotes[window.id] ?? ''),
+            p_note: pausedRequests.has(window.request_id) ? '' : cleanHumanWrittenText(appointmentWindowDeclineNotes[window.id] ?? ''),
           });
       if (appointmentWindowError) throw appointmentWindowError;
       if (action === 'accept') {
@@ -12384,7 +12385,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setRespondingAppointmentWindowId(null);
     }
   };
-
   const rescheduleAsHomeowner = async (request: ServiceRequestSummary) => {
     if (!supabase) return;
     const draft = homeownerRescheduleDrafts[request.id];
@@ -12405,7 +12405,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error: apptError } = await supabase.rpc('servsync_homeowner_propose_appointment', {
         p_request_id: request.id,
         p_proposed_at: proposedDate.toISOString(),
-        p_notes: cleanHumanWrittenText(draft.notes ?? ''),
+        p_notes: pausedRequests.has(request.id) ? '' : cleanHumanWrittenText(draft.notes ?? ''),
       });
       if (apptError) throw apptError;
       setNotice('Reschedule request sent to contractor.');
@@ -18889,6 +18889,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               const canLeaveReview = request.status === 'closed' && Boolean(request.review_eligible);
               const isExpanded = expandedRequestIds.has(request.id);
               const isUpdating = updatingServiceRequestId === request.id;
+              const communicationPaused = pausedRequests.has(request.id);
               const lastMessage = request.messages[request.messages.length - 1];
               const propertyLabel = serviceRequestPropertyLabel(request);
               const displayBadge = homeownerRequestDisplayBadge(request);
@@ -18991,7 +18992,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                       </Field>
                                       <Field label="Reason (optional)">
                                         <input className={inputClass()} placeholder="Why you need to reschedule..."
-                                          value={homeownerRescheduleDrafts[request.id]?.notes ?? ''}
+                                          disabled={communicationPaused} value={homeownerRescheduleDrafts[request.id]?.notes ?? ''}
                                           onChange={e => setHomeownerRescheduleDrafts(c => ({ ...c, [request.id]: { ...(c[request.id] || { open: true, proposedAt: '' }), notes: e.target.value } }))}
                                         />
                                       </Field>
@@ -19029,7 +19030,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                         </Field>
                                         <Field label="Notes (optional)">
                                           <input className={inputClass()} placeholder="Why you need a different time, etc."
-                                            value={counterProposeDrafts[request.id]?.notes ?? ''}
+                                            disabled={communicationPaused} value={counterProposeDrafts[request.id]?.notes ?? ''}
                                             onChange={e => setCounterProposeDrafts(c => ({ ...c, [request.id]: { ...(c[request.id] || { open: true, proposedAt: '' }), notes: e.target.value } }))}
                                           />
                                         </Field>
@@ -19073,13 +19074,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             perspective="homeowner"
                             hasConfirmedAppointment={request.appointment?.status === 'confirmed'}
                             respondingWindowId={respondingAppointmentWindowId}
-                            declineNotes={appointmentWindowDeclineNotes}
+                            declineNotes={appointmentWindowDeclineNotes} notesPaused={communicationPaused}
                             onDeclineNoteChange={(windowId, note) => setAppointmentWindowDeclineNotes(current => ({ ...current, [windowId]: note }))}
                             onAcceptWindow={window => void respondToAppointmentWindow(window, 'accept')}
                             onDeclineWindow={window => void respondToAppointmentWindow(window, 'decline')}
                           />
                           <div className="space-y-3">
-                            <Field label="Reply">
+                            {communicationPaused ? <RequestCommunicationPausedNotice /> : <><Field label="Reply">
                               <textarea className={inputClass()} rows={3}
                                 {...writingAssistProps}
                                 value={homeownerReplyDrafts[request.id] || ''}
@@ -19114,8 +19115,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </ul>
                               )}
                             </div>
-                            <div className={mobileActionRowClass()}>
-                              <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'reply')} disabled={isUpdating} className={mobileButtonClass('primary')}>
+                            </>}<div className={mobileActionRowClass()}>
+                              <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'reply')} disabled={isUpdating || communicationPaused} className={mobileButtonClass('primary')}>
                                 {isUpdating ? 'Sending...' : 'Send reply'}
                               </button>
                               <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'close')} disabled={isUpdating} className={mobileButtonClass('secondary')}>
@@ -20677,6 +20678,7 @@ function ContractorDashboard({
   const [connections, setConnections] = useState<ContractorConnectedHomeowner[]>([]);
   const [connectionRequests, setConnectionRequests] = useState<ContractorConnectionRequest[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
+  const pausedRequests = usePausedServiceRequests(supabase, profile.id, serviceRequests);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
@@ -22495,7 +22497,6 @@ function ContractorDashboard({
       setUpdatingRequestId(null);
     }
   };
-
   const uploadContractorMediaFiles = async (files: File[], requestId: string, messageId: string | null) => {
     if (!supabase || files.length === 0) return;
     for (const file of files) {
@@ -22524,7 +22525,8 @@ function ContractorDashboard({
     setError('');
     setUpdatingServiceRequestId(request.id);
     try {
-      const typedBody = action === 'respond'
+      const communicationIsPaused = pausedRequests.has(request.id);
+      const typedBody = communicationIsPaused ? '' : action === 'respond'
         ? contractorResponseDrafts[request.id] || ''
         : action === 'decline'
           ? contractorResponseDrafts[request.id] || 'Contractor declined this request.'
@@ -22550,11 +22552,11 @@ function ContractorDashboard({
         p_new_status: nextStatus,
         p_quote_amount_cents: attachQuote ? dollarsToCents(quoteDraft.amount) : null,
         p_quote_scope: attachQuote ? cleanHumanWrittenText(quoteDraft.scope || '') : null,
-        p_closing_summary: nextStatus === 'closed' ? cleanHumanWrittenText(closingSummaryDrafts[request.id] ?? '') : null,
+        p_closing_summary: nextStatus === 'closed' && !communicationIsPaused ? cleanHumanWrittenText(closingSummaryDrafts[request.id] ?? '') : null,
       });
       if (updateError) throw updateError;
 
-      const cFiles = contractorResponseFiles[request.id] ?? [];
+      const cFiles = communicationIsPaused ? [] : contractorResponseFiles[request.id] ?? [];
       if (cFiles.length > 0 && updateData?.message_id) {
         await uploadContractorMediaFiles(cFiles, request.id, updateData.message_id as string);
       }
@@ -22573,7 +22575,6 @@ function ContractorDashboard({
       setUpdatingServiceRequestId(null);
     }
   };
-
   const upsertContractorHomeMapDraftRoom = async (
     draft: ContractorHomeMapDraft,
     room: ContractorHomeMapDraftRoom | null,
@@ -22813,7 +22814,7 @@ function ContractorDashboard({
     setError('');
     setProposingAppointmentWindowsRequestId(request.id);
     try {
-      const note = cleanHumanWrittenText(draft.note ?? '');
+      const note = pausedRequests.has(request.id) ? '' : cleanHumanWrittenText(draft.note ?? '');
       const { error: proposalError } = await supabase.rpc('servsync_propose_service_request_appointment_windows', {
         p_request_id: request.id,
         p_windows: draft.windows.map(window => ({
@@ -22855,7 +22856,6 @@ function ContractorDashboard({
       setProposingAppointmentId(null);
     }
   };
-
   const rescheduleAsContractor = async (request: ServiceRequestSummary) => {
     if (!supabase) return;
     const draft = contractorRescheduleDrafts[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
@@ -22870,7 +22870,7 @@ function ContractorDashboard({
     setError('');
     setContractorReschedulingId(request.id);
     try {
-      const reason = cleanHumanWrittenText(draft.note ?? '');
+      const reason = pausedRequests.has(request.id) ? '' : cleanHumanWrittenText(draft.note ?? '');
       const { error: apptError } = await supabase.rpc('servsync_reschedule_service_request_appointment', {
         p_request_id: request.id,
         p_windows: draft.windows.map(window => ({
@@ -22890,7 +22890,6 @@ function ContractorDashboard({
       setContractorReschedulingId(null);
     }
   };
-
   const cancelAppointmentAsContractor = async (request: ServiceRequestSummary) => {
     if (!supabase) return;
     const draft = contractorCancelAppointmentDrafts[request.id] ?? { open: true, reason: '' };
@@ -22900,7 +22899,7 @@ function ContractorDashboard({
     try {
       const { error: apptError } = await supabase.rpc('servsync_cancel_service_request_appointment', {
         p_request_id: request.id,
-        p_reason: cleanHumanWrittenText(draft.reason ?? ''),
+        p_reason: pausedRequests.has(request.id) ? '' : cleanHumanWrittenText(draft.reason ?? ''),
       });
       if (apptError) throw apptError;
       setNotice('Appointment canceled. The service request remains open unless you close or decline it separately.');
@@ -22940,7 +22939,7 @@ function ContractorDashboard({
           return;
         }
         params.p_proposed_at = proposedDate.toISOString();
-        params.p_notes = cleanHumanWrittenText(notes ?? '');
+        params.p_notes = pausedRequests.has(request.id) ? '' : cleanHumanWrittenText(notes ?? '');
       }
       const { error: apptError } = await supabase.rpc('servsync_contractor_respond_to_appointment', params);
       if (apptError) throw apptError;
@@ -32728,6 +32727,7 @@ function ContractorDashboard({
             const renderContractorRequestCard = (request: ServiceRequestSummary, isClosedCard: boolean) => {
               const isExpanded = contractorExpandedRequestIds.has(request.id);
               const isUpdating = updatingServiceRequestId === request.id;
+              const communicationPaused = pausedRequests.has(request.id);
               const lastMessage = request.messages[request.messages.length - 1];
               const needsFollowUp = contractorRequestNeedsFollowUp(request);
               const hasAppointment = Boolean(request.appointment);
@@ -33039,7 +33039,7 @@ function ContractorDashboard({
                               <Field label="Note for homeowner (optional)">
                                 <input
                                   className={inputClass()}
-                                  value={appointmentWindowDraft.note}
+                                  disabled={communicationPaused} value={appointmentWindowDraft.note}
                                   placeholder="Access notes, what to expect, or preferred contact details."
                                   data-testid="contractor-appointment-window-note"
                                   onChange={event => setContractorAppointmentWindowDrafts(current => {
@@ -33121,7 +33121,7 @@ function ContractorDashboard({
                                       <input
                                         className={inputClass()}
                                         placeholder="What to expect, access needed, etc."
-                                        value={contractorCounterProposeDrafts[request.id]?.notes ?? ''}
+                                        disabled={communicationPaused} value={contractorCounterProposeDrafts[request.id]?.notes ?? ''}
                                         onChange={event => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, proposedAt: '' }), notes: event.target.value } }))}
                                       />
                                     </Field>
@@ -33260,7 +33260,7 @@ function ContractorDashboard({
                                       <input
                                         className={inputClass()}
                                         placeholder="Why you need to reschedule..."
-                                        value={contractorRescheduleDraft.note}
+                                        disabled={communicationPaused} value={contractorRescheduleDraft.note}
                                         data-testid="contractor-reschedule-window-note"
                                         onChange={event => setContractorRescheduleDrafts(current => {
                                           const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
@@ -33362,7 +33362,7 @@ function ContractorDashboard({
                                       <Field label="Reason for homeowner (optional)">
                                         <input
                                           className={inputClass()}
-                                          value={contractorCancelAppointmentDraft.reason}
+                                          disabled={communicationPaused} value={contractorCancelAppointmentDraft.reason}
                                           placeholder="Share a short reason or next step."
                                           data-testid="contractor-cancel-appointment-reason"
                                           onChange={event => setContractorCancelAppointmentDrafts(current => ({
@@ -33400,7 +33400,7 @@ function ContractorDashboard({
                             </div>
                           )}
 
-                          <Field label="Response">
+                          {communicationPaused ? <RequestCommunicationPausedNotice /> : <><Field label="Response">
                             <textarea
                               className={inputClass()}
                               rows={3}
@@ -33478,9 +33478,9 @@ function ContractorDashboard({
                             </div>
                           )}
 
-                          {closingExpandedId === request.id && (
+                          </>}{closingExpandedId === request.id && (
                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                              <Field label="Closing summary (what was done)">
+                              {!communicationPaused && <Field label="Closing summary (what was done)">
                                 <textarea
                                   className={inputClass()}
                                   rows={3}
@@ -33489,7 +33489,7 @@ function ContractorDashboard({
                                   onChange={event => setClosingSummaryDrafts(current => ({ ...current, [request.id]: event.target.value }))}
                                   placeholder="Describe the work completed, parts used, next steps, etc."
                                 />
-                              </Field>
+                              </Field>}
                               <div className={mobileActionRowClass()}>
                                 <button
                                   type="button"
@@ -33515,7 +33515,7 @@ function ContractorDashboard({
                             <button
                               type="button"
                               onClick={() => void updateContractorServiceRequest(request, 'respond')}
-                              disabled={isUpdating}
+                              disabled={isUpdating || communicationPaused}
                               className={mobileButtonClass('primary')}
                             >
                               {isUpdating ? 'Sending...' : 'Send response'}
@@ -46551,7 +46551,7 @@ function ServiceRequestAppointmentWindowsCard({
   hasConfirmedAppointment,
   respondingWindowId,
   declineNotes,
-  onDeclineNoteChange,
+  onDeclineNoteChange, notesPaused,
   onAcceptWindow,
   onDeclineWindow,
 }: {
@@ -46560,7 +46560,7 @@ function ServiceRequestAppointmentWindowsCard({
   perspective: 'homeowner' | 'contractor';
   hasConfirmedAppointment?: boolean;
   respondingWindowId?: string | null;
-  declineNotes?: Record<string, string>;
+  declineNotes?: Record<string, string>; notesPaused?: boolean;
   onDeclineNoteChange?: (windowId: string, note: string) => void;
   onAcceptWindow?: (window: ServiceRequestAppointmentWindow) => void;
   onDeclineWindow?: (window: ServiceRequestAppointmentWindow) => void;
@@ -46610,7 +46610,7 @@ function ServiceRequestAppointmentWindowsCard({
                     onChange={event => onDeclineNoteChange?.(window.id, event.target.value)}
                     placeholder="If this time does not work, add a quick note."
                     data-testid="homeowner-decline-appointment-window-note"
-                    disabled={respondingWindowId === window.id}
+                    disabled={respondingWindowId === window.id || notesPaused}
                   />
                 </Field>
                 <div className={mobileActionRowClass()}>

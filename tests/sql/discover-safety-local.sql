@@ -52,6 +52,8 @@ create table public.contractor_profiles (
   business_summary text,external_review_links jsonb,license_number text,
   insurance_status text,bonded_status text
 );
+grant select on public.contractor_profiles to authenticated;
+
 create table public.contractor_service_areas (
   contractor_id uuid,label text,location_text text,zip_code text,city text,state text,
   radius_miles numeric,sort_order integer,created_at timestamptz,latitude numeric,
@@ -72,13 +74,35 @@ create table auth.users (id uuid primary key);
 create table public.inspections (id uuid primary key, homeowner_user_id uuid, contractor_id uuid);
 create table public.estimates (id uuid primary key, homeowner_user_id uuid, contractor_id uuid);
 create table public.invoices (id uuid primary key, homeowner_user_id uuid, contractor_id uuid);
-create table public.service_request_appointments (id uuid primary key);
+create table public.service_request_appointments (
+  id uuid primary key default gen_random_uuid(), request_id uuid not null unique, contractor_id uuid,
+  notes text not null default '', proposed_at timestamptz, status text, proposed_by text, updated_at timestamptz
+);
+create table public.contractor_visit_events (id uuid primary key, inspection_id uuid, share_with_homeowner boolean, notes text);
+create table public.service_request_messages (
+  id uuid primary key default gen_random_uuid(),request_id uuid not null,actor_user_id uuid,
+  actor_role text,message_type text,body text not null,created_at timestamptz default now()
+);
+create table public.service_request_quotes (
+  request_id uuid primary key,contractor_id uuid,amount_cents integer,scope text,status text
+);
+alter table public.service_requests add column title text default '', add column description text default '',
+  add column closing_summary text default '', add column updated_at timestamptz default now();
+grant select,insert on public.service_request_messages to authenticated;
+alter table public.service_request_messages enable row level security;
+create policy fixture_request_message_select on public.service_request_messages for select to authenticated using (true);
+create policy fixture_request_message_insert on public.service_request_messages for insert to authenticated with check (actor_user_id=auth.uid());
 create table public.contractor_team_members (contractor_id uuid,user_id uuid,status text,role text);
 create function public.current_user_can_access_contractor(uuid) returns boolean language sql stable security definer set search_path=''
 as $$select exists(select 1 from public.contractor_profiles cp where cp.id=$1 and cp.owner_user_id=auth.uid())
   or exists(select 1 from public.contractor_team_members tm where tm.contractor_id=$1 and tm.user_id=auth.uid() and tm.status='active')$$;
 create function public.touch_updated_at() returns trigger language plpgsql as $$ begin new.updated_at=now(); return new; end $$;
+set check_function_bodies = off;
+\ir ../../servsync-media-attachments.sql
+\ir ../../servsync-contractor-media.sql
+set check_function_bodies = on;
 \ir ../../servsync-fb025-workflow-communication-foundation.sql
+\ir ../../servsync-fb021-scheduling-foundation.sql
 
 \ir ../../servsync-discover.sql
 \ir ../../servsync-discover-analytics.sql
@@ -98,9 +122,18 @@ insert into public.contractor_posts(id,contractor_id,title,photos) values
 insert into public.homeowner_contractor_connections values
  ('40000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','active');
 insert into public.service_requests values
- ('50000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','closed');
+ ('50000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','closed'),
+ ('50000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','open'),
+ ('50000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001','open');
+insert into public.service_request_appointments(request_id,contractor_id,proposed_at,notes,status,proposed_by)
+values ('50000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','2040-01-01 12:00+00','Original meeting note','confirmed','contractor');
+insert into public.service_request_messages(request_id,actor_role,message_type,body)
+values ('50000000-0000-0000-0000-000000000002','homeowner','homeowner_reply','Prior request reply');
+insert into public.contractor_visit_events values
+ ('80000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001',false,'Existing internal note');
 insert into storage.buckets (id,name,public,file_size_limit) values ('other-test','other-test',false,100);
 insert into storage.objects values ('other-test','independent.txt');
+insert into storage.objects values ('service-request-media','10000000-0000-0000-0000-000000000002/50000000-0000-0000-0000-000000000002/prior.jpg');
 insert into auth.users select id from public.profiles;
 insert into public.inspections values
  ('60000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001'),
@@ -300,6 +333,75 @@ select public.expect((public.servsync_append_workflow_activity_event(
   'invoice','invoice_sent',p_inspection_id=>'60000000-0000-0000-0000-000000000001',
   p_invoice_id=>'70000000-0000-0000-0000-000000000001')).event_type='invoice_sent',
   'a structured invoice event can still be recorded with no message body');
+-- Real request and scheduling RPCs, including stale clients supplying text.
+set role authenticated;
+select set_config('request.jwt.claim.sub',:'home',false);
+select public.expect(public.servsync_paused_request_messaging(array[
+  '50000000-0000-0000-0000-000000000002'::uuid,'50000000-0000-0000-0000-000000000003'::uuid]) =
+  array['50000000-0000-0000-0000-000000000002'::uuid], 'only accessible, blocked requests are returned');
+do $$
+begin
+  begin
+    perform public.servsync_homeowner_update_service_request('50000000-0000-0000-0000-000000000002','Fictional reply','reply');
+    raise exception 'Homeowner request reply must be denied';
+  exception when sqlstate 'PSS01' then null; end;
+  begin
+    insert into public.service_request_media(request_id,uploader_user_id,storage_path)
+    values ('50000000-0000-0000-0000-000000000002',auth.uid(),'fictional.jpg');
+    raise exception 'Reply attachment record must be denied';
+  exception when sqlstate 'PSS01' then null; end;
+  begin
+    insert into public.service_request_messages(request_id,actor_user_id,actor_role,message_type,body)
+    values ('50000000-0000-0000-0000-000000000002',auth.uid(),'contractor','contractor_closed','Not an actual close');
+    raise exception 'Direct table writes cannot impersonate a lifecycle notice';
+  exception when insufficient_privilege then null; end;
+  begin
+    insert into public.service_request_messages(request_id,actor_user_id,actor_role,message_type,body)
+    values ('50000000-0000-0000-0000-000000000002',auth.uid(),'homeowner','message','Fictional direct reply');
+    raise exception 'Direct table writes cannot relay text';
+  exception when sqlstate 'PSS01' then null; end;
+  begin
+    insert into storage.objects values
+      ('service-request-media','10000000-0000-0000-0000-000000000002/50000000-0000-0000-0000-000000000002/new.jpg');
+    raise exception 'Reply storage upload must be denied';
+  exception when insufficient_privilege then null; end;
+end$$;
+select public.expect((select count(*)=1 from storage.objects where name like '%/prior.jpg'),'prior upload remains readable');
+select set_config('request.jwt.claim.sub',:'owner',false);
+do $$
+begin
+  begin
+    perform public.servsync_contractor_update_service_request('50000000-0000-0000-0000-000000000002','Fictional reply','contractor_responded');
+    raise exception 'Contractor request reply must be denied';
+  exception when sqlstate 'PSS01' then null; end;
+end$$;
+select public.expect((public.servsync_reschedule_service_request_appointment(
+  '50000000-0000-0000-0000-000000000002',
+  '[{"starts_at":"2099-01-05T12:00:00Z","ends_at":"2099-01-05T13:00:00Z","note":"Fictional replacement note"}]',
+  'Fictional reschedule reason'))->>'status'='reschedule_proposed', 'contractor can offer a replacement visit');
+select id as new_window from public.service_request_appointment_windows where request_id='50000000-0000-0000-0000-000000000002' and status='proposed' \gset
+select set_config('request.jwt.claim.sub',:'home',false);
+select public.expect((public.servsync_accept_service_request_appointment_window(:'new_window'))->>'status'='confirmed','homeowner can confirm replacement time');
+select set_config('request.jwt.claim.sub',:'owner',false);
+select public.expect((public.servsync_cancel_service_request_appointment(
+  '50000000-0000-0000-0000-000000000002','Fictional cancel reason'))->>'status'='cancelled','contractor can cancel confirmed visit');
+select public.expect((public.servsync_contractor_update_service_request(
+  '50000000-0000-0000-0000-000000000002','Fictional close message','closed',null,null,'Fictional closing note'))->>'status'='closed','contractor can close the request');
+reset role;
+select public.expect((select count(*)=2 from public.service_request_messages where request_id='50000000-0000-0000-0000-000000000002' and body in ('Prior request reply','Contractor closed this request.')),'prior reply and fixed closure notice survive');
+select public.expect((select count(*)=1 from public.service_requests where id='50000000-0000-0000-0000-000000000002' and status='closed' and closing_summary=''),'closing summary did not relay text');
+select public.expect((select count(*)=1 from public.service_request_appointments where request_id='50000000-0000-0000-0000-000000000002' and status='cancelled' and notes='Original meeting note'),'prior meeting note survives appointment updates');
+select public.expect(not exists(select 1 from public.service_request_appointment_windows where contractor_note <> '' or homeowner_response_note <> ''),'replacement notes not shared');
+select public.expect(not exists(select 1 from public.service_request_appointment_events where event_note <> ''),'event notes are not relayed');
+update public.contractor_visit_events set notes='Updated internal note';
+select public.expect((select notes='Updated internal note' from public.contractor_visit_events),'private visit notes remain editable');
+update public.contractor_visit_events set share_with_homeowner=true;
+select public.expect((select notes='' and share_with_homeowner from public.contractor_visit_events),'a previously private note is not shared');
+set role authenticated;
+select set_config('request.jwt.claim.sub',:'other',false);
+select public.expect((public.servsync_homeowner_update_service_request(
+  '50000000-0000-0000-0000-000000000003','Unrelated reply continues to work','reply'))->>'status'='homeowner_replied','unblocked reply unaffected');
+reset role;
 delete from public.profiles where id=:'home';
 select public.expect((select count(*)=1 from discover_safety_private.reports where id=:'report_id' and reporter_id is null),'profile removal de-links the reporter without deleting private case evidence');
 select 'Discover candidate SQL passed on synthetic local roles and storage.' as result;

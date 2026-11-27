@@ -125,7 +125,7 @@ export function DiscoverSafetyActions({
             </>
           ) : (
             <p className="text-sm">
-              This account’s posts won’t appear in your Discover feed. Blocking also prevents new connection or service requests between you. New messages in existing job threads stop for both sides. Past messages and job records stay in place. No report is sent.
+              This account’s posts won’t appear in your Discover feed. Blocking also prevents new connection or service requests between you. Both sides can still manage existing appointments and close requests, but new job messages, request replies, attachments, and shared appointment notes stop. Past messages and job records stay in place. No report is sent.
             </p>
           )}
           {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
