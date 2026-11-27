@@ -16,6 +16,9 @@ import { useContractorPracticeAccess } from './features/navigation/useContractor
 import { ContractorPracticeWorkspace } from './features/onboarding/ContractorPracticeWorkspace';
 import { contractorRequestQueueRecords, sortContractorRequestRecords } from './features/requests/contractorQueue';
 import { PublicPostConsent } from './features/discover/PublicPostConsent';
+import { ConnectedDiscoverSafetyAdmin, DiscoverPostSafety } from './features/discover/DiscoverSafetyConnections';
+import { attachOwnDiscoverModeration, resolveDiscoverPhotos, uploadDiscoverReviewPhotos } from './features/discover/discoverSafetyApi';
+import { useDiscoverBlocklist } from './features/discover/useDiscoverBlocklist';
 import { InspectionAiConsent } from './features/findings/InspectionAiConsent';
 import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
 import { ContractorDiscovery } from './features/discover/ContractorDiscovery';
@@ -9116,6 +9119,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [serviceAgreementOffers, setServiceAgreementOffers] = useState<ServiceAgreementOffer[]>([]);
   const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([]);
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
+  const discoverBlocklist = useDiscoverBlocklist(profile.id);
   const [directoryUnavailable, setDirectoryUnavailable] = useState(false);
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
@@ -10716,7 +10720,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           p_search_lng: null,
         });
         if (error) throw error;
-        if (!cancelled) setRequestDiscoverPosts((data || []) as DiscoverFeedItem[]);
+        const posts = await resolveDiscoverPhotos((data || []) as DiscoverFeedItem[]); if (!cancelled) setRequestDiscoverPosts(posts);
       } catch {
         if (!cancelled) setRequestDiscoverPosts([]);
       } finally {
@@ -12439,9 +12443,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const contractorProfileById = new Map(directoryContractors.map(c => [c.id, c]));
   const connectionByContractorId = new Map(connections.map(connection => [connection.contractor_id, connection]));
   const activeConnections = connections.filter(connection => connection.status === 'active');
+  const newContactDirectory = discoverBlocklist.blocked ? directoryContractors.filter(value => !discoverBlocklist.blocked?.has(value.id)) : [], newContactConnections = discoverBlocklist.blocked ? activeConnections.filter(value => !discoverBlocklist.blocked?.has(value.contractor_id)) : [];
   const homeownerFindTradeOptions = Array.from(new Map([
     ...SERVICE_REQUEST_CATEGORIES.filter(category => category !== 'Other'),
-    ...directoryContractors.flatMap(contractor => contractor.service_categories),
+    ...newContactDirectory.flatMap(contractor => contractor.service_categories),
   ].map(category => {
     const display = category.trim().replace(/\s+/g, ' ');
     return [display.toLowerCase(), display] as const;
@@ -12449,7 +12454,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     .sort((a, b) => a.localeCompare(b));
   const homeownerFindContractorMatchesLocation = (contractor: ContractorProfile) => matchesContractorLocation(contractor, homeownerFindContractorZip);
   const homeownerFindContractorMatchesTrade = (contractor: ContractorProfile) => matchesContractorTrade(contractor, homeownerFindContractorTrade);
-  const homeownerFindContractorResults = directoryContractors
+  const homeownerFindContractorResults = newContactDirectory
     .filter(contractor => homeownerFindContractorMatchesLocation(contractor) && homeownerFindContractorMatchesTrade(contractor))
     .sort((a, b) => a.business_name.localeCompare(b.business_name))
     .slice(0, 8);
@@ -12481,7 +12486,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setHomeownerRequestSearch('');
     scrollToHomeownerSection(homeownerRequestListSectionRef);
   };
-  const connectedContractorsForRequest = activeConnections.filter(connection => {
+  const connectedContractorsForRequest = newContactConnections.filter(connection => {
     if (!serviceRequestDraft.category) return true;
     const contractor = contractorProfileById.get(connection.contractor_id);
     if (!contractor) return false;
@@ -12952,7 +12957,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const connectionMatchesRequestCategory = (connection: HomeownerConnection, category = serviceRequestDraft.category) => {
     return contractorCategoriesMatchRequest(serviceCategoriesForConnection(connection), category);
   };
-  const connectedContractorsForWizard = activeConnections.filter(connection => (
+  const connectedContractorsForWizard = newContactConnections.filter(connection => (
     contractorMatchesRequestLocation(contractorProfileById.get(connection.contractor_id), connection)
     && contractorMatchesRequestAttributeFilters(contractorProfileById.get(connection.contractor_id), connection.contractor_id)
   )).sort((a, b) => {
@@ -12962,7 +12967,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return a.business_name.localeCompare(b.business_name);
   });
   const connectedContractorIds = new Set(activeConnections.map(connection => connection.contractor_id));
-  const discoverContractorCandidates = directoryContractors.filter(contractor => (
+  const discoverContractorCandidates = newContactDirectory.filter(contractor => (
     requestContractorFilter === 'all'
     && !connectedContractorIds.has(contractor.id)
     && contractorMatchesRequestLocation(contractor)
@@ -18674,6 +18679,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                         </div>
 
                                         <p className="mt-3 text-base font-semibold text-slate-950">{post.title}</p>
+                                        <DiscoverPostSafety post={post} afterBlock={blockedId => { setRequestDiscoverPosts(items => items.filter(item => item.contractor_id !== blockedId)); setRequestContractorInsight(null); setServiceRequestDraft(draft => ({ ...draft, connection_id: draft.connection_id === connection?.connection_id ? '' : draft.connection_id })); setNotice('Account blocked. New requests to this account are unavailable.'); }} />
                                         {post.description && (
                                           <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">{post.description}</p>
                                         )}
@@ -20371,7 +20377,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 Discover is limited during the private beta. Contractor coverage, rankings, response times, and lead volume are not promised.
               </p>
             </div>
-            <ContractorDiscovery contractors={directoryContractors} homeownerId={profile.id} unavailable={directoryUnavailable} onRetry={() => void loadHomeowner()} />
+            <ContractorDiscovery contractors={newContactDirectory} homeownerId={profile.id} unavailable={directoryUnavailable || !discoverBlocklist.blocked} onRetry={() => { discoverBlocklist.retry(); void loadHomeowner(); }} />
             <details className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold">Other local business listings</summary><p className="my-2 text-sm text-slate-600">Informational listings. Unclaimed businesses cannot receive requests through ServSync.</p><DiscoverContractorProspects /></details>
             <h2 className="text-lg font-bold">Local work and tips</h2>
             <DiscoverFeed
@@ -20379,7 +20385,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               userId={profile.id}
               contractorId={null}
               connections={connections}
-              contractorSlugs={Object.fromEntries(directoryContractors.map(contractor => [contractor.id, contractor.slug]))}
+              contractorSlugs={Object.fromEntries(newContactDirectory.map(contractor => [contractor.id, contractor.slug]))}
               onRequestConnection={contractor => openContextualConnectionRequest(contractor)}
               onRequestService={(contractorId, category) => {
                 const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
@@ -43786,7 +43792,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
   const isClosureReviewer = useAccountDeletionOperatorAvailable(profile.id);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'unclaimed_profiles' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'account_deletion' | 'reports' | 'marketing' | 'help_studio'>(() => (
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'unclaimed_profiles' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'discover_safety' | 'support' | 'account_deletion' | 'reports' | 'marketing' | 'help_studio'>(() => (
     marketingFacebookReturnStatus(window.location.search) ? 'marketing' : 'overview'
   ));
   useEffect(() => {
@@ -44501,6 +44507,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
         { id: 'invite_leads', label: 'Invite Leads', icon: <Mail size={17} />, badge: newInviteLeadCount || undefined },
         { id: 'referrals',    label: 'Referrals',   icon: <Link2 size={17} /> },
         { id: 'reviews',      label: 'Reviews',     icon: <Star size={17} />, badge: pendingReviewModerationCount || undefined },
+        { id: 'discover_safety', label: 'Discover safety', icon: <ShieldCheck size={17} /> },
         { id: 'support',      label: 'Support',     icon: <MessageSquare size={17} />, badge: openSupportCount },
         ...(isClosureReviewer ? [{ id: 'account_deletion', label: 'Account deletion requests', icon: <HelpCircle size={17} /> }] : []),
         { id: 'reports',      label: 'Reports',     icon: <Receipt size={17} /> },
@@ -45600,6 +45607,7 @@ function PlatformAdminDashboard({ profile, onSignOut }: { profile: Profile; onSi
       </div>
       )}
 
+      {adminTab === 'discover_safety' && <ConnectedDiscoverSafetyAdmin />}
       {adminTab === 'reviews' && (
         <Card title="Review moderation" icon={<Star size={18} />}>
           <div className="space-y-4">
@@ -47665,7 +47673,7 @@ export function DiscoverFeed({
     try {
       const { data, error } = await supabase.rpc('servsync_discover_saved_posts');
       if (error) throw error;
-      if (generation === savedGeneration.current) setSavedFeed((data || []) as DiscoverFeedItem[]);
+      const signedPosts = await resolveDiscoverPhotos((data || []) as DiscoverFeedItem[]); if (generation === savedGeneration.current) setSavedFeed(signedPosts);
     } catch {
       if (generation === savedGeneration.current) setSavedFeedError('Saved posts could not be loaded. Please retry.');
     } finally { if (generation === savedGeneration.current) setSavedFeedLoading(false); }
@@ -47715,7 +47723,7 @@ export function DiscoverFeed({
 	          p_search_lng: searchLng,
 	        });
       if (error) throw error;
-      if (generation === feedGeneration.current) setFeed((data || []) as DiscoverFeedItem[]);
+      const posts = await resolveDiscoverPhotos((data || []) as DiscoverFeedItem[]), reviewed = perspective === 'contractor' ? await attachOwnDiscoverModeration(posts) : posts; if (generation === feedGeneration.current) setFeed(reviewed);
     } catch {
       if (generation === feedGeneration.current) setFeedError('Contractor posts could not be loaded. Please retry.');
     } finally {
@@ -47747,40 +47755,27 @@ export function DiscoverFeed({
     }
   };
 
-  const uploadPostPhotos = async (files: File[]): Promise<string[]> => {
-    if (!supabase || files.length === 0) return [];
-    const urls: string[] = [];
-    for (const file of files) {
-      const contentType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
-      const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
-        throw new Error('Discover photos must be JPG, PNG, or WebP. HEIC/HEIF photos may upload but will not display reliably in web browsers.');
-      }
-      const storagePath = `${userId}/posts/${crypto.randomUUID()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('discover-media')
-        .upload(storagePath, file, { contentType });
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('discover-media').getPublicUrl(storagePath);
-      urls.push(urlData.publicUrl);
-    }
-    return urls;
+  const handleDiscoverBlock = (blockedId: string) => {
+    feedGeneration.current++; savedGeneration.current++;
+    setFeed(items => items.filter(item => item.contractor_id !== blockedId));
+    setSavedFeed(items => items.filter(item => item.contractor_id !== blockedId));
+    setSelectedPostId(null); setFeedLoading(false); setSavedFeedLoading(false);
+    setActionNotice('Account blocked. Their posts and new contact options are hidden from Discover.');
   };
-
   const submitPost = async () => {
-    if (!supabase) return;
+    if (!supabase || posting) return;
     if (!postDraft.title.trim()) { setPostError('Add a title before posting.'); return; }
     if (!postConsent) { setPostError('Confirm you have permission to publish this content.'); return; }
     setPosting(true);
     setPostError('');
     setPostNotice('');
     try {
-      const photoUrls = await uploadPostPhotos(postFiles);
+      const photoKeys = await uploadDiscoverReviewPhotos(userId, postFiles);
       const { error } = await supabase.rpc('servsync_create_contractor_post', {
         p_category: postDraft.category,
         p_title: postDraft.title.trim(),
         p_description: cleanHumanWrittenText(postDraft.description),
-        p_photos: photoUrls,
+        p_photos: photoKeys,
         p_city: postDraft.city.trim(),
         p_state: postDraft.state.trim(),
       });
@@ -47788,7 +47783,7 @@ export function DiscoverFeed({
       setPostDraft({ category: '', title: '', description: '', city: '', state: '' });
       setPostFiles([]);
       setPostConsent(false);
-      setPostNotice('Post published.');
+      setPostNotice('Submitted for review. Your post is not public while it is being reviewed.');
       await loadFeed();
     } catch (err) {
       setPostError(err instanceof Error ? err.message : 'Unable to create post.');
@@ -48053,7 +48048,7 @@ export function DiscoverFeed({
             Share recent work, maintenance tips, or helpful local advice. Homeowners choose whether to view your profile or request a connection.
           </p>
           <p className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
-            Posts are public and should share recent work, maintenance tips, or helpful local advice. Discover does not allow contractors to directly contact homeowners.
+            Posts are reviewed before they become public. Share recent work, maintenance tips, or helpful local advice. Discover does not allow contractors to directly contact homeowners.
             Homeowners choose when to view your profile, connect, or request service.
           </p>
           {postNotice && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{postNotice}</div>}
@@ -48096,7 +48091,7 @@ export function DiscoverFeed({
               className="hidden"
               onChange={e => {
                 const files = Array.from(e.target.files ?? []);
-                setPostFiles(prev => [...prev, ...files]);
+                setPostFiles(prev => [...prev, ...files].slice(0, 6));
                 e.target.value = '';
               }}
             />
@@ -48104,7 +48099,7 @@ export function DiscoverFeed({
               <Paperclip size={15} /> Add photos
             </button>
             <span className="max-w-xl text-xs leading-5 text-slate-500">
-              Discover photos are public. Use JPG, PNG, or WebP so they display correctly.
+              Photos stay private while under review. Choose up to six JPG, PNG, or WebP files, 8 MB each.
             </span>
             {postFiles.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -48123,7 +48118,7 @@ export function DiscoverFeed({
           <PublicPostConsent files={postFiles} accepted={postConsent} onChange={setPostConsent} />
           <div className="mt-4">
             <button type="button" onClick={() => void submitPost()} disabled={posting} className={buttonClass('primary')}>
-              {posting ? 'Publishing...' : 'Create Post'}
+              {posting ? 'Submitting…' : 'Submit for review'}
             </button>
           </div>
         </div>
@@ -48241,8 +48236,9 @@ export function DiscoverFeed({
 
                 {/* Rating + actions */}
                 <div className="flex shrink-0 flex-col items-end gap-2" onClick={event => event.stopPropagation()}>
+                  {perspective === 'homeowner' && <DiscoverPostSafety post={item} afterBlock={handleDiscoverBlock} />}
                   {isOwnPost && (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">[{item.moderation_status === 'approved' ? 'Approved' : item.moderation_status === 'rejected' ? 'Not approved' : item.moderation_status === 'removed' ? 'Removed' : 'In review'}] ·
                       {Number(item.view_count ?? 0).toLocaleString()} {Number(item.view_count ?? 0) === 1 ? 'view' : 'views'} · {Number(item.save_count ?? 0).toLocaleString()} {Number(item.save_count ?? 0) === 1 ? 'save' : 'saves'}
                     </span>
                   )}
@@ -48444,6 +48440,7 @@ export function DiscoverFeed({
               )}
 
               <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+                {perspective === 'homeowner' && <DiscoverPostSafety post={selectedPost} afterBlock={handleDiscoverBlock} />}
                 {perspective === 'homeowner' && (
                   <button
                     type="button"
