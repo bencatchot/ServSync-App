@@ -16,6 +16,7 @@ import { useContractorPracticeAccess } from './features/navigation/useContractor
 import { ContractorPracticeWorkspace } from './features/onboarding/ContractorPracticeWorkspace';
 import { contractorRequestQueueRecords, sortContractorRequestRecords } from './features/requests/contractorQueue';
 import { PublicPostConsent } from './features/discover/PublicPostConsent';
+import { InspectionAiConsent } from './features/findings/InspectionAiConsent';
 import { matchesContractorLocation, matchesContractorTrade } from './features/discover/discoverSearch';
 import { ContractorDiscovery } from './features/discover/ContractorDiscovery';
 import { PublicContractorProfilePage } from './features/discover/PublicContractorProfilePage';
@@ -21179,7 +21180,7 @@ function ContractorDashboard({
   const [singleNoteItem, setSingleNoteItem] = useState('');
   const [walkthroughText, setWalkthroughText] = useState('');
   const [walkthroughSuggestions, setWalkthroughSuggestions] = useState<WalkthroughSuggestion[]>([]);
-  const [aiNoteText, setAiNoteText] = useState('');
+  const [aiNoteDraft, setAiNoteDraft] = useState<{ scope: string; notes: string } | null>(null);
   const [aiProcessing, setAiProcessing] = useState(false);
   const [customItemInput, setCustomItemInput] = useState('');
   const [customRoomInput, setCustomRoomInput] = useState('');
@@ -42206,6 +42207,8 @@ function ContractorDashboard({
 
                 {/* ── INSPECT SUB-TAB ── */}
                 {inspectionSubTab === 'inspect' && (() => {
+                  const inspectionAiScope = JSON.stringify([profile.id, activeInspection.id]);
+                  const aiNoteText = aiNoteDraft?.scope === inspectionAiScope ? aiNoteDraft.notes : '';
                   const activeWorkRoom = findRoomByIdentity(activeRooms, selectedChecklistRoom) ?? activeRooms[0] ?? null;
                   const activeWorkRoomKey = activeWorkRoom ? roomIdentityKey(activeWorkRoom) : null;
                   if (!canManageJobOperations) {
@@ -42588,15 +42591,15 @@ function ContractorDashboard({
                                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 resize-none bg-white"
                                       {...writingAssistProps}
                                       placeholder="Describe what you observed during the job…"
-                                      value={aiNoteText} onChange={e => setAiNoteText(e.target.value)} />
-                                    <button type="button" disabled={!aiNoteText.trim() || aiProcessing}
-                                      onClick={async () => {
-                                        if (!supabase || !aiNoteText.trim()) return;
+                                      value={aiNoteText} onChange={e => setAiNoteDraft({ scope: inspectionAiScope, notes: e.target.value })} />
+                                    <InspectionAiConsent key={inspectionAiScope}
+                                      request={{ notes: aiNoteText, rooms: activeRooms.map(r => ({ room: roomDisplayLabel(r), items: r.items })) }}
+                                      busy={aiProcessing} enabled={Boolean(supabase)}
+                                      onApprove={async request => {
+                                        if (!supabase) return;
                                         setAiProcessing(true);
                                         try {
-                                          const { data, error: fnErr } = await supabase.functions.invoke('inspection-ai', {
-                                            body: { notes: aiNoteText, rooms: activeRooms.map(r => ({ room: roomDisplayLabel(r), items: r.items })) },
-                                          });
+                                          const { data, error: fnErr } = await supabase.functions.invoke('inspection-ai', { body: request });
                                           if (fnErr) throw fnErr;
                                           const roomNames = activeRooms.map(r => roomDisplayLabel(r));
                                           const selectedRoomLabel = findRoomByIdentity(activeRooms, selectedChecklistRoom)
@@ -42638,10 +42641,7 @@ function ContractorDashboard({
                                           setAiProcessing(false);
                                         }
                                       }}
-                                      className="w-full bg-blue-600 text-white rounded-lg px-3 py-2 text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
-                                      {aiProcessing ? 'Getting AI suggestions…' : 'Get AI suggestions'}
-                                    </button>
-                                    <p className="text-[11px] text-slate-400 leading-relaxed">Requires the job assistant service.</p>
+                                    />
                                   </>
                                 )}
                               </div>
