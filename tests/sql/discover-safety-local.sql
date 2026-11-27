@@ -402,6 +402,60 @@ select set_config('request.jwt.claim.sub',:'other',false);
 select public.expect((public.servsync_homeowner_update_service_request(
   '50000000-0000-0000-0000-000000000003','Unrelated reply continues to work','reply'))->>'status'='homeowner_replied','unblocked reply unaffected');
 reset role;
+
+-- Targeted two-role job safety checks, against the actual candidate RPCs.
+\ir ../../servsync-job-thread-safety-candidate.sql
+set role authenticated;
+select set_config('request.jwt.claim.sub',:'owner',false);
+select public.expect((public.servsync_job_safety_permissions('60000000-0000-0000-0000-000000000002')->>'can_block')::boolean,'contractor owner can block');
+select (public.servsync_send_workflow_message('job','Fictional contractor reply',null,'60000000-0000-0000-0000-000000000002')).id as contractor_note \gset
+select set_config('fixture.contractor_note',:'contractor_note',false);
+select id as homeowner_note from public.workflow_messages where inspection_id='60000000-0000-0000-0000-000000000002' and sender_role='homeowner' limit 1 \gset
+select public.servsync_report_job_message('60000000-0000-0000-0000-000000000002',:'homeowner_note','harassment') as pro_report \gset
+select public.expect(public.servsync_report_job_message('60000000-0000-0000-0000-000000000002',:'homeowner_note','other')=:'pro_report'::uuid,'second report returns the same receipt');
+do $$
+begin
+ begin
+   perform public.servsync_report_job_message('60000000-0000-0000-0000-000000000002',current_setting('fixture.contractor_note')::uuid,'spam');
+   raise exception 'Own message incorrectly reportable.';
+ exception when insufficient_privilege then null; end;
+ begin
+   perform public.servsync_list_job_message_reports();
+   raise exception 'Contractor saw moderation evidence.';
+ exception when insufficient_privilege then null; end;
+end $$;
+select set_config('request.jwt.claim.sub',:'other',false);
+select public.expect((public.servsync_job_safety_permissions('60000000-0000-0000-0000-000000000002')->>'can_block')::boolean,'homeowner can block');
+select public.servsync_report_job_message('60000000-0000-0000-0000-000000000002',:'contractor_note','privacy') as home_report \gset
+select set_config('request.jwt.claim.sub',:'home',false);
+select public.expect(not (public.servsync_job_safety_permissions('60000000-0000-0000-0000-000000000002')->>'can_report')::boolean,'unrelated homeowner cannot report');
+do $$
+begin
+ begin
+   perform public.servsync_report_job_message('60000000-0000-0000-0000-000000000002',current_setting('fixture.contractor_note')::uuid,'privacy');
+   raise exception 'Unrelated homeowner reported a private message.';
+ exception when insufficient_privilege then null; end;
+ begin
+   perform public.servsync_block_job_counterparty('60000000-0000-0000-0000-000000000002');
+   raise exception 'Unrelated homeowner blocked this job.';
+ exception when insufficient_privilege then null; end;
+end $$;
+select public.expect(public.servsync_block_job_counterparty('60000000-0000-0000-0000-000000000001'),'homeowner block is idempotent');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000005',false);
+select public.expect((public.servsync_job_safety_permissions('60000000-0000-0000-0000-000000000002')->>'can_report')::boolean,'office role can report');
+select public.expect(not (public.servsync_job_safety_permissions('60000000-0000-0000-0000-000000000002')->>'can_block')::boolean,'office role cannot block on behalf of the business');
+select set_config('request.jwt.claim.sub',:'owner',false);
+select public.expect(public.servsync_block_job_counterparty('60000000-0000-0000-0000-000000000002'),'contractor can block existing job counterparty');
+select set_config('request.jwt.claim.sub',:'other',false);
+select public.expect(public.servsync_workflow_job_messaging_paused('60000000-0000-0000-0000-000000000002'),'new sends paused for the homeowner after contractor block');
+select public.expect((select count(*)=2 from public.workflow_messages where inspection_id='60000000-0000-0000-0000-000000000002'),'both original messages preserved');
+select set_config('request.jwt.claim.sub',:'operator',false);
+select public.expect((select count(*)=2 from public.servsync_list_job_message_reports()),'operator sees reports from both roles');
+select public.expect(public.servsync_review_job_message_report(:'home_report'),'operator closes one report');
+select public.expect((select count(*)=1 from public.servsync_list_job_message_reports()),'closed report leaves queue');
+reset role;
+select public.expect((select evidence='' from discover_safety_private.job_message_reports where id=:'home_report'),'reviewed copy cleared');
+
 delete from public.profiles where id=:'home';
 select public.expect((select count(*)=1 from discover_safety_private.reports where id=:'report_id' and reporter_id is null),'profile removal de-links the reporter without deleting private case evidence');
 select 'Discover candidate SQL passed on synthetic local roles and storage.' as result;
