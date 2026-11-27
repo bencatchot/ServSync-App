@@ -1,0 +1,7 @@
+# Job message safety follow-up
+
+- Sign in as the assigned fictional homeowner or business owner and open the existing job’s message thread. Report an incoming message, choose a reason, and keep the reference. Reporting does not alert the other party or create a block.
+- Confirm a block separately from either side. The existing blocked-pair rules stop new job messages, service-request replies and new shared notes. Standard appointment changes and old history remain. Read-authorized office members can report incoming messages; they cannot establish a business-wide block.
+- Platform admins see job reports under Admin → Discover safety → Job message reports. Opening a report shows only its evidence and reason. Mark reviewed after investigating; the temporary evidence copy is cleared and job history remains untouched. Handle unresolved evidence in the existing restricted privacy workflow, not by blanket deletion or retention.
+- Use the existing fictional owner and homeowner review accounts when the updated native build is available. For Apple, provide private instructions for both roles and direct the reviewer to a fictional job conversation. Do not share admin access. Do not use an actual customer conversation to test either control.
+- Run the established disposable PostgreSQL fixture and the protected scenario for both roles. The candidate SQL is additive to the installed Discover migration. Do not apply to Production or submit a build without separate approval.

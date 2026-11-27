@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Send } from 'lucide-react';
 import { formatDateTime } from '../../utils/format';
+import { JobThreadSafetyAction } from './JobThreadSafetyActions';
 
 type WorkflowMessageRow = {
   id: string;
@@ -54,6 +55,8 @@ export function WorkflowMessageThread({
   const [sendError, setSendError] = useState('');
   const [pausedInspectionId, setPausedInspectionId] = useState<string>();
   const messagingPaused = pausedInspectionId === inspectionId;
+  const [safety, setSafety] = useState<{ jobId: string; viewerId: string; canReport: boolean; canBlock: boolean; isHomeowner: boolean }>();
+  const liveSafety = safety?.jobId === inspectionId && safety.viewerId === currentUserId ? safety : undefined;
 
   const markRead = useCallback(async () => {
     const { error } = await supabaseClient.rpc('servsync_mark_workflow_thread_read', {
@@ -101,6 +104,15 @@ export function WorkflowMessageThread({
     return () => { active = false; };
   }, [inspectionId, currentUserId, supabaseClient]);
 
+  useEffect(() => {
+    let active = true;
+    void supabaseClient.rpc('servsync_job_safety_permissions', { p_job_id: inspectionId }).then(({ data, error }) => {
+      if (active && !error) setSafety({ jobId: inspectionId, viewerId: currentUserId,
+        canReport: data?.can_report === true, canBlock: data?.can_block === true, isHomeowner: data?.is_homeowner === true });
+    });
+    return () => { active = false; };
+  }, [inspectionId, currentUserId, supabaseClient]);
+
   const sendMessage = async () => {
     const body = draft.trim();
     if (!body || sending || !canSend || messagingPaused) return;
@@ -138,7 +150,9 @@ export function WorkflowMessageThread({
           <h3 className="text-sm font-bold text-slate-950">{title}</h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
         </div>
-        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Job thread</span>
+        {liveSafety?.canBlock && !messagingPaused
+          ? <JobThreadSafetyAction client={supabaseClient} jobId={inspectionId} onBlocked={() => setPausedInspectionId(inspectionId)} />
+          : <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Job thread</span>}
       </div>
 
       <div className="mt-4 space-y-2">
@@ -166,6 +180,9 @@ export function WorkflowMessageThread({
                 <p className="text-xs font-medium text-slate-400">{formatDateTime(message.created_at)}</p>
               </div>
               <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{message.body}</p>
+              {liveSafety?.canReport && !isCurrentUser && message.sender_role === (liveSafety.isHomeowner ? 'contractor' : 'homeowner') && (
+                <div className="mt-2"><JobThreadSafetyAction client={supabaseClient} jobId={inspectionId} messageId={message.id} /></div>
+              )}
             </div>
           );
         })}

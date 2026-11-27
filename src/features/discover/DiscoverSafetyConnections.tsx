@@ -3,6 +3,7 @@ import { DiscoverSafetyActions } from './DiscoverSafetyActions';
 import { DiscoverSafetyAdminQueue, type DiscoverSafetyQueueItem, type DiscoverSafetyDecision } from './DiscoverSafetyAdminQueue';
 import { blockDiscoverContractor, reportDiscoverPost, resolveDiscoverPhotos } from './discoverSafetyApi';
 import type { DiscoverFeedItem } from '../../types';
+import { JobMessageReportQueue } from '../workflow/JobMessageReportQueue';
 
 export function DiscoverPostSafety({ post, afterBlock }: { post: Pick<DiscoverFeedItem, 'post_id' | 'contractor_id' | 'title'>; afterBlock: (contractorId: string) => void }) {
   return <DiscoverSafetyActions postId={post.post_id} contractorId={post.contractor_id} title={post.title} onReport={reportDiscoverPost} onBlock={async contractorId => {
@@ -32,5 +33,5 @@ async function decide(id: string, kind: 'post' | 'report', decision: DiscoverSaf
 }
 
 export function ConnectedDiscoverSafetyAdmin() {
-  return <DiscoverSafetyAdminQueue loadQueue={loadQueue} onDecide={decide} imageOrigin={configuredSupabaseUrl} />;
+  return <><DiscoverSafetyAdminQueue loadQueue={loadQueue} onDecide={decide} imageOrigin={configuredSupabaseUrl} /><JobMessageReportQueue /></>;
 }
