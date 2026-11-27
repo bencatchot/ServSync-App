@@ -52,6 +52,8 @@ export function WorkflowMessageThread({
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [sendError, setSendError] = useState('');
+  const [pausedInspectionId, setPausedInspectionId] = useState<string>();
+  const messagingPaused = pausedInspectionId === inspectionId;
 
   const markRead = useCallback(async () => {
     const { error } = await supabaseClient.rpc('servsync_mark_workflow_thread_read', {
@@ -88,9 +90,20 @@ export function WorkflowMessageThread({
     void loadMessages();
   }, [loadMessages]);
 
+  useEffect(() => {
+    let active = true;
+    // The database checks again on send, including if the thread was already open.
+    void supabaseClient.rpc('servsync_workflow_job_messaging_paused', {
+      p_inspection_id: inspectionId,
+    }).then(({ data, error }) => {
+      if (active && !error) setPausedInspectionId(data === true ? inspectionId : undefined);
+    });
+    return () => { active = false; };
+  }, [inspectionId, currentUserId, supabaseClient]);
+
   const sendMessage = async () => {
     const body = draft.trim();
-    if (!body || sending || !canSend) return;
+    if (!body || sending || !canSend || messagingPaused) return;
 
     setSending(true);
     setSendError('');
@@ -102,7 +115,8 @@ export function WorkflowMessageThread({
     });
 
     if (error) {
-      setSendError('Unable to send this job message. Please check the job context and try again.');
+      if (error.code === 'PSS01') setPausedInspectionId(inspectionId);
+      else setSendError('Unable to send this job message. Please check the job context and try again.');
       setSending(false);
       return;
     }
@@ -157,7 +171,12 @@ export function WorkflowMessageThread({
         })}
       </div>
 
-      {canSend ? (
+      {messagingPaused ? (
+        <div data-testid="workflow-message-paused" role="status" className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <p>New messages are unavailable for this job. You can still view past messages and job records.</p>
+          <a className="font-semibold text-blue-700 underline" href="mailto:support@servsync.app">Contact ServSync support</a>
+        </div>
+      ) : canSend ? (
         <div data-testid="workflow-message-composer" className="mt-4 space-y-2">
           <label className="block text-xs font-semibold text-slate-500" htmlFor={`workflow-message-${inspectionId}`}>
             Add job message

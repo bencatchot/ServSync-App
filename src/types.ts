@@ -1555,6 +1555,7 @@ export interface DiscoverFeedItem {
   created_at: string;
   view_count?: number;
   save_count?: number;
+  moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed';
   is_saved?: boolean;
   external_review_links?: ExternalReviewLink[];
   service_areas?: PublicContractorServiceArea[];

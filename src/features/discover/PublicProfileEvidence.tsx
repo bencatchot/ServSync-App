@@ -3,13 +3,16 @@ import type { ContractorPublicProfile, DiscoverFeedItem } from "../../types";
 import { supabase } from "../../supabaseClient";
 import { discoverButton } from "./ContractorDiscovery";
 import { safePublicUrl } from "./discoverSearch";
+import { resolveDiscoverPhotos } from "./discoverSafetyApi";
 
 export function PublicProfileEvidence({
   profile,
   onAskAboutPost,
+  renderSafetyActions,
 }: {
   profile: ContractorPublicProfile;
   onAskAboutPost?: (postId: string) => void;
+  renderSafetyActions?: (post: DiscoverFeedItem) => React.ReactNode;
 }) {
   const [posts, setPosts] = useState<DiscoverFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +39,8 @@ export function PublicProfileEvidence({
           .order("created_at", { ascending: false })
           .limit(6);
         if (result.error) throw result.error;
-        if (current) setPosts((result.data || []) as DiscoverFeedItem[]);
+        const visiblePosts = await resolveDiscoverPhotos((result.data || []) as DiscoverFeedItem[]);
+        if (current) setPosts(visiblePosts);
       } catch {
         if (current) setError(true);
       } finally {
@@ -113,6 +117,7 @@ export function PublicProfileEvidence({
                   </a>
                 ))}
             </div>
+            {renderSafetyActions?.(post)}
             {onAskAboutPost && <button type="button" className={discoverButton} onClick={() => onAskAboutPost(post.post_id)}>Ask about similar work</button>}
           </article>
         ))}

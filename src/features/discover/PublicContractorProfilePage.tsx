@@ -9,6 +9,7 @@ import type { Profile, ContextualConnectionContractorTarget, HomeProfile, Contex
 import { usePublicContractorProfile } from './usePublicContractorProfile';
 import { SaveContractor } from './ContractorDiscovery';
 import { PublicProfileEvidence } from './PublicProfileEvidence';
+import { DiscoverPostSafety } from './DiscoverSafetyConnections';
 import { PublicContractorProspect } from '../contractor-prospects/PublicContractorProspects';
 import { useProjectInquiry } from './useProjectInquiry';
 import { ProjectReference } from './ProjectReference';
@@ -230,7 +231,7 @@ export function PublicContractorProfilePage({ slug, currentProfile, onAuthed, Au
         />
       )}
 
-      <PublicProfileEvidence key={`evidence-${data.contractor_id}`} profile={data} onAskAboutPost={currentProfile && currentProfile.role !== 'homeowner' ? undefined : postId => { inquiry.select(postId); setRequestError(''); if (!currentProfile) setAuthMode(mode => mode ?? 'signin'); setSelectedAction({ postId, contractorId: data.contractor_id }); }} />
+      <PublicProfileEvidence key={`evidence-${data.contractor_id}`} profile={data} renderSafetyActions={currentProfile?.role === 'homeowner' ? post => <DiscoverPostSafety post={post} afterBlock={returnToHomeownerDiscover} /> : undefined} onAskAboutPost={currentProfile && currentProfile.role !== 'homeowner' ? undefined : postId => { inquiry.select(postId); setRequestError(''); if (!currentProfile) setAuthMode(mode => mode ?? 'signin'); setSelectedAction({ postId, contractorId: data.contractor_id }); }} />
     </div>
   );
 }
