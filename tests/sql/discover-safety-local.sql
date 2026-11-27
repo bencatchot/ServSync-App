@@ -68,6 +68,18 @@ create table public.service_requests (
 );
 grant select,insert,update on public.homeowner_contractor_connections,public.service_requests to authenticated;
 
+create table auth.users (id uuid primary key);
+create table public.inspections (id uuid primary key, homeowner_user_id uuid, contractor_id uuid);
+create table public.estimates (id uuid primary key, homeowner_user_id uuid, contractor_id uuid);
+create table public.invoices (id uuid primary key, homeowner_user_id uuid, contractor_id uuid);
+create table public.service_request_appointments (id uuid primary key);
+create table public.contractor_team_members (contractor_id uuid,user_id uuid,status text,role text);
+create function public.current_user_can_access_contractor(uuid) returns boolean language sql stable security definer set search_path=''
+as $$select exists(select 1 from public.contractor_profiles cp where cp.id=$1 and cp.owner_user_id=auth.uid())
+  or exists(select 1 from public.contractor_team_members tm where tm.contractor_id=$1 and tm.user_id=auth.uid() and tm.status='active')$$;
+create function public.touch_updated_at() returns trigger language plpgsql as $$ begin new.updated_at=now(); return new; end $$;
+\ir ../../servsync-fb025-workflow-communication-foundation.sql
+
 \ir ../../servsync-discover.sql
 \ir ../../servsync-discover-analytics.sql
 \ir ../../servsync-review-public-display-pause.sql
@@ -89,6 +101,14 @@ insert into public.service_requests values
  ('50000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','closed');
 insert into storage.buckets (id,name,public,file_size_limit) values ('other-test','other-test',false,100);
 insert into storage.objects values ('other-test','independent.txt');
+insert into auth.users select id from public.profiles;
+insert into public.inspections values
+ ('60000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001'),
+ ('60000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001');
+insert into public.contractor_team_members values
+ ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000005','active','office');
+insert into public.invoices values
+ ('70000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001');
 \ir ../../servsync-discover-safety-candidate.sql
 
 create function public.expect(ok boolean,msg text) returns void language plpgsql
@@ -128,6 +148,8 @@ select public.expect(not exists(select from deleted),'no deleting referenced med
 
 select set_config('request.jwt.claim.sub',:'home',false);
 select public.expect((select count(*)=0 from public.contractor_posts),'pending hidden from authenticated table');
+select public.expect(not public.servsync_workflow_job_messaging_paused('60000000-0000-0000-0000-000000000001'), 'unblocked job composer enabled');
+select public.expect((public.servsync_send_workflow_message('job','Prior job message',null,'60000000-0000-0000-0000-000000000001')).body = 'Prior job message','real send RPC works before blocking');
 select public.expect((select count(*)=0 from storage.objects where bucket_id='discover-media'),'generic storage policy does not expose pending');
 do $$
 begin
@@ -228,6 +250,56 @@ select set_config('request.jwt.claim.sub',:'operator',false);
 select public.expect((select count(*)=1 from storage.objects where bucket_id='discover-media'),'only operators can still review the private evidence following withdrawal');
 reset role;
 select public.expect((select count(*)=1 from discover_safety_private.reports where id=:'report_id'),'evidence outlives withdrawal');
+-- Exercise the real workflow send and read RPCs with both blocked parties.
+set role authenticated;
+select set_config('request.jwt.claim.sub',:'home',false);
+select public.expect(public.servsync_workflow_job_messaging_paused('60000000-0000-0000-0000-000000000001'),'homeowner sees paused job');
+select public.expect((select count(*)=1 from public.workflow_messages where body='Prior job message'),'homeowner retains prior job message');
+select public.expect((public.servsync_mark_workflow_thread_read('job',null,'60000000-0000-0000-0000-000000000001')).id is not null,'homeowner read marker still works');
+do $$
+begin
+  begin
+    perform public.servsync_send_workflow_message('job','New fictional message',null,'60000000-0000-0000-0000-000000000001');
+    raise exception 'Homeowner message must be denied';
+  exception when sqlstate 'PSS01' then null; end;
+  begin
+    perform public.servsync_workflow_job_messaging_paused('60000000-0000-0000-0000-000000000002');
+    raise exception 'Unrelated job state must not be disclosed';
+  exception when insufficient_privilege then null; end;
+end$$;
+select set_config('request.jwt.claim.sub',:'owner',false);
+select public.expect(public.servsync_workflow_job_messaging_paused('60000000-0000-0000-0000-000000000001'),'contractor sees paused job');
+select public.expect((select count(*)=1 from public.workflow_messages where body='Prior job message'),'contractor retains prior job message');
+do $$
+begin
+  begin
+    perform public.servsync_send_workflow_message('job','New fictional message',null,'60000000-0000-0000-0000-000000000001');
+    raise exception 'Contractor message must be denied';
+  exception when sqlstate 'PSS01' then null; end;
+  begin
+    perform public.servsync_send_workflow_message('service_request','New fictional message','50000000-0000-0000-0000-000000000001',null);
+    raise exception 'Workflow service request message must be denied';
+  exception when sqlstate 'PSS01' then null; end;
+end$$;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000005',false);
+do $$
+begin
+  begin
+    perform public.servsync_send_workflow_message('job','New fictional office message',null,'60000000-0000-0000-0000-000000000001');
+    raise exception 'Office sender must respect the contractor pause';
+  exception when sqlstate 'PSS01' then null; end;
+end$$;
+select set_config('request.jwt.claim.sub',:'other',false);
+select public.expect(not public.servsync_workflow_job_messaging_paused('60000000-0000-0000-0000-000000000002'),'unrelated job not paused');
+select public.expect((public.servsync_send_workflow_message('job','Other job remains open',null,'60000000-0000-0000-0000-000000000002')).id is not null,'unrelated participant can still send');
+reset role;
+select public.expect((select count(*)=1 from public.invoices),'invoice record unchanged');
+select public.expect((select count(*)=1 from public.workflow_activity_events where inspection_id='60000000-0000-0000-0000-000000000001'),'blocked attempts did not create notifications or activity');
+
+select public.expect((public.servsync_append_workflow_activity_event(
+  'invoice','invoice_sent',p_inspection_id=>'60000000-0000-0000-0000-000000000001',
+  p_invoice_id=>'70000000-0000-0000-0000-000000000001')).event_type='invoice_sent',
+  'a structured invoice event can still be recorded with no message body');
 delete from public.profiles where id=:'home';
 select public.expect((select count(*)=1 from discover_safety_private.reports where id=:'report_id' and reporter_id is null),'profile removal de-links the reporter without deleting private case evidence');
 select 'Discover candidate SQL passed on synthetic local roles and storage.' as result;

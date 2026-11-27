@@ -433,7 +433,7 @@ end;
 $$;
 
 -- Reject new requests at the underlying write boundaries, including direct
--- table writes. Do not touch accepted relationships, jobs, messages or finance.
+-- table writes. Existing relationships, job records and finance stay intact.
 create function discover_safety_private.check_new_discover_contact()
 returns trigger language plpgsql security definer set search_path = ''
 as $$
@@ -466,6 +466,64 @@ create trigger discover_connection_contact_guard
 create trigger discover_service_request_contact_guard
   before insert or update of homeowner_user_id,contractor_id on public.service_requests
   for each row execute function discover_safety_private.check_new_discover_contact();
+
+-- The workflow table contains human-authored messages only. Do not gate
+-- workflow_activity_events, read markers, or existing records.
+create function discover_safety_private.guard_workflow_message()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_home uuid;
+  v_owner uuid;
+begin
+  if new.context_type = 'job' then
+    select j.homeowner_user_id, cp.owner_user_id into v_home,v_owner
+      from public.inspections j join public.contractor_profiles cp on cp.id = j.contractor_id
+      where j.id = new.inspection_id;
+  elsif new.context_type = 'service_request' then
+    select sr.homeowner_user_id, cp.owner_user_id into v_home,v_owner
+      from public.service_requests sr join public.contractor_profiles cp on cp.id = sr.contractor_id
+      where sr.id = new.service_request_id;
+  end if;
+  if v_home is not null and v_owner is not null then
+    perform discover_safety_private.lock_pair(v_home,v_owner);
+    if discover_safety_private.is_blocked(v_home,v_owner) then
+      raise exception 'Job messaging is unavailable.' using errcode = 'PSS01';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function discover_safety_private.guard_workflow_message()
+  from public,anon,authenticated,service_role;
+create trigger discover_workflow_message_guard before insert on public.workflow_messages
+  for each row execute function discover_safety_private.guard_workflow_message();
+
+-- Only a party already authorized to view this job can see its messaging state.
+-- Do not reveal who blocked whom, or expose account-wide block status.
+create function public.servsync_workflow_job_messaging_paused(p_inspection_id uuid)
+returns boolean language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_home uuid;
+  v_contractor uuid;
+  v_owner uuid;
+begin
+  select j.homeowner_user_id,j.contractor_id,cp.owner_user_id into v_home,v_contractor,v_owner
+    from public.inspections j left join public.contractor_profiles cp on cp.id = j.contractor_id
+    where j.id = p_inspection_id;
+  if auth.uid() is null or v_contractor is null or not (
+    coalesce(v_home = auth.uid(),false)
+    or coalesce(public.current_user_can_access_contractor(v_contractor),false)
+    or coalesce(public.current_user_is_platform_admin(),false)
+  ) then
+    raise exception 'Job not available.' using errcode = '42501';
+  end if;
+  return discover_safety_private.is_blocked(v_home,v_owner);
+end;
+$$;
+revoke all on function public.servsync_workflow_job_messaging_paused(uuid) from public,anon,authenticated,service_role;
+grant execute on function public.servsync_workflow_job_messaging_paused(uuid) to authenticated;
 
 revoke all on function public.servsync_create_contractor_post(text,text,text,text[],text,text),
   public.servsync_delete_contractor_post(uuid),public.servsync_my_discover_post_statuses(),
