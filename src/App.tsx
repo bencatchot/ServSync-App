@@ -444,7 +444,8 @@ import {
 } from './features/workflow/WorkflowActivityTimeline';
 import { WorkflowActivityTimelineWithDurableEvents } from './features/workflow/WorkflowActivityTimelineWithDurableEvents';
 import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread';
-import { RequestCommunicationPausedNotice, usePausedServiceRequests } from './features/workflow/RequestCommunicationPause';
+import { RequestCommunicationPausedNotice } from './features/workflow/RequestCommunicationPause';
+import { usePausedServiceRequests } from './features/workflow/usePausedServiceRequests';
 import {
   invoiceCanVoid,
   invoiceStatusLabel,
@@ -22911,7 +22912,6 @@ function ContractorDashboard({
       setContractorCancellingAppointmentId(null);
     }
   };
-
   const respondToHomeownerAppointment = async (
     request: ServiceRequestSummary,
     action: 'confirm' | 'decline' | 'counter',
